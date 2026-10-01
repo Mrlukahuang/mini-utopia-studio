@@ -116,7 +116,6 @@ page = st.sidebar.radio(
 if page == "🏠 Home":
     st.markdown(
         """<div class="mu-hero">
-<div class="mu-cloud">☁️</div>
 <h1>Small Worlds. Big Imagination. ✨</h1>
 <p>Create a character once, keep it forever, and take it anywhere. Today Auckland. Tomorrow the Moon. Next week — who knows?</p>
 </div>""",
