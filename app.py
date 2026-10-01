@@ -92,7 +92,7 @@ st.markdown(
 if "char_draft" not in st.session_state:
     st.session_state.char_draft = None
 
-st.title("✨ Mini Utopia · AI Creative Studio")
+st.title("❤️✨ Charlotte & Chelsea ✨❤️ 的 Utopia (乌托邦) ✨☁️")
 
 mode = st.sidebar.radio(
     "Mode",
@@ -118,7 +118,6 @@ if page == "🏠 Home":
         """<div class="mu-hero">
 <div class="mu-cloud">☁️</div>
 <h1>Small Worlds. Big Imagination. ✨</h1>
-<div class="mu-signature">❤️✨ Charlotte & Chelsea ✨❤️ 的 Utopia (乌托邦) ✨☁️</div>
 <p>Create a character once, keep it forever, and take it anywhere. Today Auckland. Tomorrow the Moon. Next week — who knows?</p>
 </div>""",
         unsafe_allow_html=True,
