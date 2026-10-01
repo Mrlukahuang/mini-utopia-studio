@@ -46,22 +46,98 @@ st.markdown(
         color: #20243a !important;
     }
     .mu-hero {
-        padding: 28px 30px;
-        border-radius: 28px;
-        background: linear-gradient(135deg, rgba(255,244,208,.96), rgba(236,245,255,.96));
-        border: 1px solid rgba(108,92,231,.10);
-        margin-bottom: 22px;
+        position: relative;
+        overflow: hidden;
+        padding: 34px 36px 32px 36px;
+        border-radius: 36px;
+
+        background:
+            radial-gradient(
+                circle at 15% 20%,
+                rgba(255, 255, 255, 0.95),
+                transparent 30%
+            ),
+            radial-gradient(
+                circle at 85% 25%,
+                rgba(255, 220, 244, 0.75),
+                transparent 32%
+            ),
+            radial-gradient(
+                circle at 80% 85%,
+                rgba(214, 229, 255, 0.85),
+                transparent 34%
+            ),
+            linear-gradient(
+                135deg,
+                #fff4fb 0%,
+                #f9efff 35%,
+                #eef7ff 70%,
+                #fff8e8 100%
+            );
+
+        border: 2px solid rgba(255, 255, 255, 0.85);
+
+        box-shadow:
+            0 18px 45px rgba(167, 132, 210, 0.16),
+            inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
+        margin-bottom: 24px;
     }
+
     .mu-hero h1 {
-        color: #25233b;
-        margin: 0 0 8px 0;
-        font-size: 2.35rem;
+        position: relative;
+        z-index: 2;
+        color: #2f2948;
+        margin: 0 0 10px 0;
+        font-size: 2.55rem;
         line-height: 1.12;
+        font-weight: 800;
+        letter-spacing: -0.02em;
     }
+
+    .mu-signature {
+        position: relative;
+        z-index: 2;
+        display: inline-block;
+        margin: 4px 0 18px 0;
+        padding: 8px 16px;
+        border-radius: 999px;
+
+        background:
+            linear-gradient(
+                90deg,
+                rgba(255, 221, 238, 0.92),
+                rgba(235, 220, 255, 0.92),
+                rgba(220, 240, 255, 0.92)
+            );
+
+        border: 1px solid rgba(255, 255, 255, 0.95);
+        color: #a04d96;
+        font-size: 1.15rem;
+        font-weight: 700;
+
+        box-shadow:
+            0 8px 22px rgba(202, 142, 196, 0.15);
+    }
+
     .mu-hero p {
-        color: #55546b;
+        position: relative;
+        z-index: 2;
+        color: #5f5a75;
         font-size: 1.05rem;
+        line-height: 1.7;
         margin: 0;
+        max-width: 900px;
+    }
+
+    .mu-cloud {
+        position: absolute;
+        right: 28px;
+        top: 18px;
+        font-size: 4rem;
+        opacity: 0.22;
+        filter: blur(0.2px);
+        transform: rotate(-8deg);
     }
     .mu-note {
         padding: 16px 18px;
@@ -117,7 +193,14 @@ if page == "🏠 Home":
     st.markdown(
         """
         <div class="mu-hero">
+            <div class="mu-cloud">☁️</div>
+
             <h1>Small Worlds. Big Imagination. ✨</h1>
+
+            <div class="mu-signature">
+                ❤️✨ Charlotte & Chelsea ✨❤️ 的 Utopia (乌托邦) ✨☁️
+            </div>
+
             <p>Create a character once, keep it forever, and take it anywhere. Today Auckland. Tomorrow the Moon. Next week — who knows?</p>
         </div>
         """,
