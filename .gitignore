@@ -1,0 +1,21 @@
+# Secrets
+.env
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Local data
+data/*.db
+data/**/*.db
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
