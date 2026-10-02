@@ -4,6 +4,7 @@ import json
 from html import escape
 
 from studio.models.character import CharacterProfile
+from studio.models.runtime_character import CharacterRuntimeSpec
 from studio.models.world import WorldBlueprint, WorldProfile
 
 
@@ -22,6 +23,7 @@ def build_world_runtime_html(
     blueprint: WorldBlueprint,
     character_name: str = "Mini Traveler",
     character_profile: CharacterProfile | None = None,
+    character_runtime: CharacterRuntimeSpec | None = None,
 ) -> str:
     """Build a self-contained Three.js playground for a saved WorldBlueprint.
 
@@ -38,6 +40,11 @@ def build_world_runtime_html(
             character_profile.model_dump(mode="json")
             if character_profile is not None
             else None
+        ),
+        "characterRuntime": (
+            character_runtime.model_dump(mode="json")
+            if character_runtime is not None
+            else CharacterRuntimeSpec().model_dump(mode="json")
         ),
     }
     data_json = _safe_json(runtime_data)
@@ -88,6 +95,7 @@ def build_world_runtime_html(
     <p><b>Explore Mode</b> · WASD / Arrow Keys</p>
     <p>Blueprint v{escape(blueprint.schema_version)} · {blueprint.grid.width}×{blueprint.grid.depth} · {len(blueprint.chunks)} chunks</p>
     <span class="pill">🧸 {escape(character_name)}</span>
+    <span class="pill" id="animState">Idle</span>
     <span class="pill">🌀 Portal</span>
     <span class="pill">🎬 Director Camera</span>
   </div>
@@ -95,16 +103,18 @@ def build_world_runtime_html(
     <button id="reset">↺ Reset</button>
     <button id="tour" class="primary">🎬 Start Director Tour</button>
   </div>
-  <div class="tip">Click inside the world, then use WASD to explore · 方向键也可以</div>
+  <div class="tip">WASD / 方向键移动 · Hold Shift to Run / 按住 Shift 奔跑</div>
 </div>
 
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@{THREE_VERSION}/build/three.module.js';
+import {{ GLTFLoader }} from 'https://cdn.jsdelivr.net/npm/three@{THREE_VERSION}/examples/jsm/loaders/GLTFLoader.js';
 
 const DATA = {data_json};
 const profile = DATA.profile;
 const bp = DATA.blueprint;
 const character = DATA.character || {{}};
+const characterRuntime = DATA.characterRuntime || {{}};
 const host = document.getElementById('canvas');
 
 const renderer = new THREE.WebGLRenderer({{ antialias:true, alpha:false }});
@@ -268,13 +278,10 @@ if (bp.portal) {{
 
 function makeAvatar() {{
   const g = new THREE.Group();
-  const favorite = (character.favorite_color_hexes && character.favorite_color_hexes.length)
-    ? character.favorite_color_hexes
-    : palette;
-  const bodyColor = favorite[0] || '#FFF4D7';
-  const accentColor = favorite[1] || palette[1] || '#B9E7D0';
-  const hairColor = character.hair_or_fur_color_hex || favorite[2] || '#D7C2F3';
-  const eyeColor = (character.eyes && character.eyes.color_hex) || '#7A5238';
+  const bodyColor = characterRuntime.body_color_hex || '#FFF4D7';
+  const accentColor = characterRuntime.accent_color_hex || '#B9E7D0';
+  const hairColor = characterRuntime.hair_color_hex || '#5B4036';
+  const eyeColor = characterRuntime.eye_color_hex || '#7A5238';
 
   const body = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.35, .82), mat(bodyColor));
   body.position.y = 1.18; body.castShadow = true; g.add(body);
@@ -301,11 +308,64 @@ function makeAvatar() {{
   const rf = new THREE.Mesh(footGeo, footMat); rf.position.set(.36,.25,.08); rf.castShadow=true; g.add(rf);
 
   g.userData.characterName = DATA.characterName || 'Mini Traveler';
+  g.userData.parts = {{ body, head, la, ra, lf, rf }};
   return g;
 }}
 
-const player = makeAvatar();
+const player = new THREE.Group();
+const proceduralAvatar = makeAvatar();
+player.add(proceduralAvatar);
 scene.add(player);
+
+let gltfMixer = null;
+let gltfActions = {{}};
+let activeGltfAction = null;
+
+function findClip(clips, preferredName) {{
+  const target = (preferredName || '').toLowerCase();
+  return clips.find(clip => clip.name.toLowerCase() === target)
+    || clips.find(clip => clip.name.toLowerCase().includes(target));
+}}
+
+function playGltfState(state) {{
+  if (!gltfMixer) return;
+  const clipName = (characterRuntime.animation_clips || {{}})[state.toLowerCase()] || state;
+  const next = gltfActions[clipName] || gltfActions[state];
+  if (!next || next === activeGltfAction) return;
+  if (activeGltfAction) activeGltfAction.fadeOut(.18);
+  next.reset().fadeIn(.18).play();
+  activeGltfAction = next;
+}}
+
+if (characterRuntime.mode === 'glb' && characterRuntime.model_data_uri) {{
+  const loader = new GLTFLoader();
+  loader.load(characterRuntime.model_data_uri, gltf => {{
+    proceduralAvatar.visible = false;
+    const model = gltf.scene;
+    model.scale.setScalar(characterRuntime.scale || 1);
+    model.traverse(obj => {{
+      if (obj.isMesh) {{
+        obj.castShadow = true;
+        obj.receiveShadow = true;
+      }}
+    }});
+    player.add(model);
+    gltfMixer = new THREE.AnimationMixer(model);
+    const names = characterRuntime.animation_clips || {{}};
+    ['Idle','Walk','Run'].forEach(state => {{
+      const wanted = names[state.toLowerCase()] || state;
+      const clip = findClip(gltf.animations || [], wanted);
+      if (clip) {{
+        const action = gltfMixer.clipAction(clip);
+        gltfActions[wanted] = action;
+        gltfActions[state] = action;
+      }}
+    }});
+    playGltfState('Idle');
+  }}, undefined, () => {{
+    proceduralAvatar.visible = true;
+  }});
+}}
 
 const spawn = bp.spawn || {{x:6,y:0,z:25,facing_degrees:90}};
 function resetPlayer() {{
@@ -317,10 +377,16 @@ resetPlayer();
 const keys = new Set();
 let manualMode = true;
 let tourState = null;
+let animationState = 'Idle';
+let animationTime = 0;
 
 window.addEventListener('keydown', e => {{
-  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','KeyW','KeyA','KeyS','KeyD'].includes(e.code)) {{
-    e.preventDefault(); keys.add(e.code);
+  if ([
+    'ArrowUp','ArrowDown','ArrowLeft','ArrowRight',
+    'KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight'
+  ].includes(e.code)) {{
+    if (e.code.startsWith('Arrow')) e.preventDefault();
+    keys.add(e.code);
   }}
 }});
 window.addEventListener('keyup', e => keys.delete(e.code));
@@ -329,20 +395,53 @@ const velocity = new THREE.Vector3();
 const cameraTarget = new THREE.Vector3();
 const clock = new THREE.Clock();
 
+function setAnimationState(next) {{
+  if (animationState === next) return;
+  animationState = next;
+  const label = document.getElementById('animState');
+  if (label) label.textContent = next;
+  playGltfState(next);
+}}
+
+function updateProceduralAnimation(dt) {{
+  if (!proceduralAvatar.visible) return;
+  animationTime += dt;
+  const p = proceduralAvatar.userData.parts || {{}};
+  const moving = animationState !== 'Idle';
+  const run = animationState === 'Run';
+  const speed = run ? 11.0 : moving ? 7.0 : 2.2;
+  const amplitude = run ? .8 : moving ? .52 : .06;
+  const swing = Math.sin(animationTime * speed) * amplitude;
+
+  if (p.la) p.la.rotation.x = moving ? swing : Math.sin(animationTime*2.2)*.04;
+  if (p.ra) p.ra.rotation.x = moving ? -swing : -Math.sin(animationTime*2.2)*.04;
+  if (p.lf) p.lf.rotation.x = moving ? -swing*.48 : 0;
+  if (p.rf) p.rf.rotation.x = moving ? swing*.48 : 0;
+  if (p.body) p.body.position.y = 1.18 + Math.abs(Math.sin(animationTime*speed)) * (run ? .11 : moving ? .06 : .025);
+  if (p.head) p.head.rotation.z = moving ? Math.sin(animationTime*speed*.5)*.025 : Math.sin(animationTime*1.7)*.018;
+}}
+
 function updatePlayer(dt) {{
-  if (!manualMode) return;
+  if (!manualMode) {{
+    setAnimationState('Idle');
+    return;
+  }}
   let dx = 0, dz = 0;
   if (keys.has('KeyW') || keys.has('ArrowUp')) dz -= 1;
   if (keys.has('KeyS') || keys.has('ArrowDown')) dz += 1;
   if (keys.has('KeyA') || keys.has('ArrowLeft')) dx -= 1;
   if (keys.has('KeyD') || keys.has('ArrowRight')) dx += 1;
   const len = Math.hypot(dx, dz);
+  const running = keys.has('ShiftLeft') || keys.has('ShiftRight');
   if (len > 0) {{
     dx /= len; dz /= len;
-    const speed = 7.0;
+    const speed = running ? 10.5 : 6.2;
+    setAnimationState(running ? 'Run' : 'Walk');
     player.position.x += dx * speed * dt;
     player.position.z += dz * speed * dt;
     player.rotation.y = Math.atan2(dx, dz);
+  }} else {{
+    setAnimationState('Idle');
   }}
   const margin = 1.5;
   player.position.x = THREE.MathUtils.clamp(player.position.x, margin, bp.grid.width*cell-margin);
@@ -427,6 +526,8 @@ function animate() {{
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), .05);
   updatePlayer(dt);
+  updateProceduralAnimation(dt);
+  if (gltfMixer) gltfMixer.update(dt);
   updateFollowCamera(dt);
   updateTour(dt);
   renderer.render(scene, camera);
