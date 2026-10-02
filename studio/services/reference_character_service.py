@@ -35,6 +35,12 @@ class ReferenceCharacterService:
             asset = self.repository.get_asset(asset_id)
             if asset is None or asset.asset_type != AssetType.CHARACTER:
                 raise ValueError(f"Reference asset is not a Character: {asset_id}")
+            profile = asset.metadata.get("character_profile", {})
+            height_cm = profile.get("height_cm")
+            if not isinstance(height_cm, (int, float)) or height_cm <= 0:
+                raise ValueError(
+                    f"Reference Character needs a positive exact height: {asset_id}"
+                )
         self.storage.put_bytes(
             REFERENCE_CONFIG_PATH,
             config.model_dump_json(indent=2).encode("utf-8"),
@@ -67,8 +73,12 @@ class ReferenceCharacterService:
         if any(asset is None for asset in assets):
             return None
 
-        heights = [
-            float(asset.metadata["character_profile"]["height_cm"])
-            for asset in assets
-        ]
+        heights = []
+        for asset in assets:
+            profile = asset.metadata.get("character_profile", {})
+            height_cm = profile.get("height_cm")
+            if not isinstance(height_cm, (int, float)) or height_cm <= 0:
+                return None
+            heights.append(float(height_cm))
+
         return config, assets, heights
