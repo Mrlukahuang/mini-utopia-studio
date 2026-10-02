@@ -110,12 +110,13 @@ class WorldConceptService:
         world.metadata["world_concept_path"] = selected.path
 
         profile = WorldProfile.model_validate(world.metadata.get("world_profile", {}))
+        concept_direction = selected.path.rsplit("/", 1)[-1].split("_", 1)[0]
         blueprint = self.blueprint_service.build(
             location_asset_id=world.asset_id,
             style_asset_id=style_asset_id,
             profile=profile,
             concept_path=selected.path,
-            concept_direction=world.metadata.get("world_concept_last_direction", ""),
+            concept_direction=concept_direction,
         )
         world.metadata["world_blueprint"] = blueprint.model_dump(mode="json")
         self.repository.save_asset(world)
