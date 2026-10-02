@@ -602,6 +602,7 @@ elif page == "🎮 Explore World":
         ]
         selected_character = None
         character_profile = None
+        character_runtime = ctx.character_runtime.resolve(None)
         if playable_characters:
             selected_character = st.selectbox(
                 "Traveler / 选择进入世界的角色",
@@ -612,6 +613,7 @@ elif page == "🎮 Explore World":
             character_profile = CharacterProfile.model_validate(
                 selected_character.metadata.get("character_profile", {})
             )
+            character_runtime = ctx.character_runtime.resolve(selected_character)
         else:
             st.caption("还没有 Approved Character，Runtime 会使用 Mini Traveler placeholder。")
 
@@ -628,8 +630,15 @@ elif page == "🎮 Explore World":
         d.metric("Director Shots", summary["camera_points"])
 
         st.caption(
-            "Controls: WASD / Arrow Keys · 第三人称跟随相机 · "
-            "右上角可启动 Director Tour。角色外观已开始读取 Character Profile；最终 GLB/动画模型下一阶段再接。"
+            "Controls: WASD / Arrow Keys · Hold Shift to Run · 第三人称跟随相机 · "
+            "右上角可启动 Director Tour。"
+        )
+        st.caption(
+            f"Character Runtime · {character_runtime.mode.upper()} · "
+            f"Idle / Walk / Run clips: "
+            f"{character_runtime.animation_clips.idle} / "
+            f"{character_runtime.animation_clips.walk} / "
+            f"{character_runtime.animation_clips.run}"
         )
 
         components.html(
@@ -643,6 +652,7 @@ elif page == "🎮 Explore World":
                     else "Mini Traveler"
                 ),
                 character_profile=character_profile,
+                character_runtime=character_runtime,
             ),
             height=760,
             scrolling=False,
