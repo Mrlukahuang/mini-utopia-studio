@@ -30,3 +30,10 @@ def test_relative_height_label_handles_large_character():
 
     assert "Charlotte" in label
     assert "Much taller" in label
+
+
+def test_character_factory_returns_to_library_after_approval():
+    from pathlib import Path
+
+    source = Path("studio/ui/creator/character_factory.py").read_text()
+    assert 'pending_app_page = "🎭 My Characters"' in source
