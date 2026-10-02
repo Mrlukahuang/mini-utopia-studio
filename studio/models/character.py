@@ -63,6 +63,7 @@ class CharacterProfile(BaseModel):
     appearance: str = ""
     eyes: EyeProfile = Field(default_factory=EyeProfile)
     hair_or_fur: str = ""
+    hair_style: str = ""
     hair_or_fur_color: str = ""
     body_build: str = ""
     height: str = ""
