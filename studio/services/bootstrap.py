@@ -76,7 +76,7 @@ def build_context(settings: Settings) -> StudioContext:
             character_master_prompts,
             image_provider=image_provider,
         ),
-        character_runtime=CharacterRuntimeService(),
+        character_runtime=CharacterRuntimeService(repository, storage),
         world_concept_prompts=world_concept_prompts,
         world_blueprints=world_blueprints,
         world_concepts=WorldConceptService(
