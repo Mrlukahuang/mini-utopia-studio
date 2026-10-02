@@ -43,7 +43,7 @@ def render_primary_brand() -> None:
     with st.container():
         st.markdown('<div class="mu-primary-logo-shell">', unsafe_allow_html=True)
         st.image(
-            str(HORIZONTAL_LOGO_PATH),
+            HORIZONTAL_LOGO_PATH.read_bytes(),
             use_container_width=True,
         )
         st.markdown('</div>', unsafe_allow_html=True)

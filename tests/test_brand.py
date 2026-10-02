@@ -24,3 +24,8 @@ def test_brand_logo_files_are_decodable_images():
     for path in (SQUARE_LOGO_PATH, HORIZONTAL_LOGO_PATH):
         with Image.open(path) as image:
             image.verify()
+
+
+def test_horizontal_logo_has_png_signature():
+    data = HORIZONTAL_LOGO_PATH.read_bytes()
+    assert data.startswith(b"\x89PNG\r\n\x1a\n")
