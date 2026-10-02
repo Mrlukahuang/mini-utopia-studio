@@ -11,7 +11,7 @@ BRAND_TAGLINE = "Travel Around Every World"
 
 ASSET_DIR = Path(__file__).parent / "assets"
 SQUARE_LOGO_PATH = ASSET_DIR / "mini_utopia_logo_badge.webp"
-HORIZONTAL_LOGO_PATH = ASSET_DIR / "mini_utopia_logo_horizontal.webp"
+HORIZONTAL_LOGO_PATH = ASSET_DIR / "mini_utopia_logo_horizontal.png"
 
 
 def _data_uri(path: Path) -> str:
