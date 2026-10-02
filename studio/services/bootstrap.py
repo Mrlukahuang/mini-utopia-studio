@@ -10,6 +10,8 @@ from studio.services.universe_service import UniverseService
 from studio.services.job_service import JobService
 from studio.services.reference_character_service import ReferenceCharacterService
 from studio.services.character_master_prompt_service import CharacterMasterPromptService
+from studio.services.character_master_service import CharacterMasterService
+from studio.providers.openai_image import OpenAIImageProvider
 from studio.storage.local import LocalObjectStorage
 
 
@@ -26,6 +28,7 @@ class StudioContext:
     jobs: JobService
     references: ReferenceCharacterService
     character_master_prompts: CharacterMasterPromptService
+    character_masters: CharacterMasterService
 
 
 def build_context(settings: Settings) -> StudioContext:
@@ -34,6 +37,17 @@ def build_context(settings: Settings) -> StudioContext:
     registry = PluginRegistry()
     registry.register(MockCharacterParsePlugin())
     registry.register(MockTurnaroundPlugin())
+
+    character_master_prompts = CharacterMasterPromptService()
+    image_provider = (
+        OpenAIImageProvider(
+            settings.openai_api_key,
+            model=settings.openai_image_model,
+        )
+        if settings.openai_api_key
+        else None
+    )
+
     return StudioContext(
         settings=settings,
         repository=repository,
@@ -45,5 +59,11 @@ def build_context(settings: Settings) -> StudioContext:
         universes=UniverseService(repository),
         jobs=JobService(repository),
         references=ReferenceCharacterService(repository, storage),
-        character_master_prompts=CharacterMasterPromptService(),
+        character_master_prompts=character_master_prompts,
+        character_masters=CharacterMasterService(
+            repository,
+            storage,
+            character_master_prompts,
+            image_provider=image_provider,
+        ),
     )
