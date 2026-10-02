@@ -88,12 +88,14 @@ def test_wearable_asset_uses_wear_prefix():
 
 def test_visual_difference_fields_are_preserved():
     profile = CharacterProfile(
-        hair_or_fur="卷发",
+        hair_or_fur="头发",
+        hair_style="双辫 / Twin braids",
         hair_or_fur_color="紫色",
         body_build="圆润 / Round",
         height="很高 / Very tall",
     )
 
+    assert profile.hair_style == "双辫 / Twin braids"
     assert profile.hair_or_fur_color == "紫色"
     assert profile.body_build == "圆润 / Round"
     assert profile.height == "很高 / Very tall"
