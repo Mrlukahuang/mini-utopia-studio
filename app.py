@@ -4,7 +4,7 @@ import streamlit as st
 
 from studio.core.config import get_settings
 from studio.core.enums import AssetType, StoryMode
-from studio.models.character import CharacterProfile
+from studio.models.character import CharacterProfile, EyeProfile
 from studio.recipes.character_factory import CharacterFactoryRecipe
 from studio.services.bootstrap import build_context
 from studio.ui.auth import lock_studio, require_studio_pin
@@ -255,7 +255,7 @@ elif page == "🎭 My Characters":
             st.write(asset.description or "等待描述")
 
             profile = asset.metadata.get("character_profile", {})
-            personality = profile.get("personality", [])
+            personality = profile.get("personality_traits", [])
 
             if personality:
                 st.markdown(
@@ -270,23 +270,23 @@ elif page == "🎭 My Characters":
 
 
 elif page == "✨ Character Factory":
-    st.header("✨ Create Our Traveler")
+    st.header("✨ Create Our Traveler / 创造角色")
     st.write(
-        "先像讲故事一样描述。AI 会把想法拆成维度；"
-        "你仍然拥有最后决定权。"
+        "先像讲故事一样描述。AI 会帮你整理角色设定；"
+        "你可以修改每一个决定。"
     )
 
     description = st.text_area(
-        "你想创造谁？",
+        "你想创造谁？ / Who do you want to create?",
         placeholder=(
-            "例如：一只胖胖的大熊猫，戴黄色帽子，"
-            "穿蓝色背带裤。他有点胆小，但特别喜欢冒险。"
+            "例如：一只胖胖的大熊猫，戴黄色帽子，穿蓝色背带裤。"
+            "他有点胆小，但特别喜欢冒险。"
         ),
         height=130,
     )
 
     if st.button(
-        "✨ Help Me Understand",
+        "✨ Help Me Understand / 帮我整理",
         type="primary",
         disabled=not description.strip(),
     ):
@@ -299,92 +299,234 @@ elif page == "✨ Character Factory":
 
     if draft:
         st.divider()
-        st.subheader("🧩 我理解的角色")
+        st.subheader("⭐ Core / 核心设定")
+
+        def split_items(value: str) -> list[str]:
+            return [
+                item.strip()
+                for item in value.replace("，", ",").split(",")
+                if item.strip()
+            ]
 
         name = st.text_input(
-            "名字",
-            placeholder="可以现在取，也可以以后改",
+            "名字 / Name",
+            placeholder="给角色取一个名字",
         )
 
         c1, c2 = st.columns(2)
 
         with c1:
-            species = st.text_input(
-                "物种 / 类型",
-                value=draft.species,
+            character_type = st.text_input(
+                "TA是什么？ / Character Type",
+                value=draft.character_type,
+                placeholder="例如：人类、大熊猫、机器人、云朵生物",
             )
-            body = st.text_input(
-                "身体特征",
-                value=draft.body,
+            age = st.text_input(
+                "年龄 / Age",
+                value=draft.age,
+                placeholder="例如：8、teen、ageless",
             )
-            face = st.text_input(
-                "脸部特征",
-                value=draft.face,
+            appearance = st.text_input(
+                "外形 / Appearance",
+                value=draft.appearance,
             )
-            clothing = st.text_input(
-                "服装",
-                value=draft.clothing,
+            hair_or_fur = st.text_input(
+                "头发 / 毛发 / Hair or Fur",
+                value=draft.hair_or_fur,
+            )
+            favorite_colors = st.text_input(
+                "喜爱的颜色 / Favorite Colors",
+                value="，".join(draft.favorite_colors),
+                placeholder="例如：粉色，蓝色",
             )
 
         with c2:
             personality = st.text_input(
-                "性格（逗号分隔）",
-                value="，".join(draft.personality),
+                "性格 / Personality",
+                value="，".join(draft.personality_traits),
             )
-            strengths = st.text_input(
-                "擅长",
-                value="，".join(draft.strengths),
+            speaking_tone = st.text_input(
+                "说话语气 / Speaking Tone",
+                value=draft.speaking_tone,
+                placeholder="例如：温柔、有点害羞、说话慢慢的",
             )
-            weaknesses = st.text_input(
-                "弱点",
-                value="，".join(draft.weaknesses),
+            native_language = st.text_input(
+                "母语 / Native Language",
+                value=draft.native_language,
+                placeholder="例如：中文 / Chinese",
             )
-            immutable = st.text_input(
-                "以后不能随便改变的特征",
-                value="，".join(draft.immutable_features),
+            english_level = st.slider(
+                "英语水平 / English Level",
+                min_value=1,
+                max_value=10,
+                value=draft.english_level or 5,
+                help="1 = 几乎不会 / Almost none · 10 = 母语水平 / Native",
+            )
+            eye_color = st.text_input(
+                "眼睛颜色 / Eye Color",
+                value=draft.eyes.color,
             )
 
+        with st.expander("🎨 Detail / 更多细节", expanded=False):
+            d1, d2 = st.columns(2)
+
+            with d1:
+                story_role = st.text_input(
+                    "故事角色定位 / Story Role",
+                    value=draft.story_role,
+                    placeholder="例如：Traveler、Explorer、Inventor",
+                )
+                body_type = st.text_input(
+                    "身体类型 / Body Type",
+                    value=draft.body_type,
+                )
+                proportions = st.text_input(
+                    "身体比例 / Proportions",
+                    value=draft.proportions,
+                )
+                face = st.text_input(
+                    "脸部 / Face",
+                    value=draft.face,
+                )
+                eye_shape = st.text_input(
+                    "眼睛形状 / Eye Shape",
+                    value=draft.eyes.shape,
+                )
+                eye_size = st.text_input(
+                    "眼睛大小 / Eye Size",
+                    value=draft.eyes.size,
+                )
+                eye_special = st.text_input(
+                    "眼睛特别特征 / Eye Special Features",
+                    value="，".join(draft.eyes.special_features),
+                )
+                skin_fur_material = st.text_input(
+                    "皮肤 / 毛发 / 材质 / Skin, Fur or Material",
+                    value=draft.skin_fur_material,
+                )
+
+            with d2:
+                distinctive = st.text_input(
+                    "特别特征 / Distinctive Features",
+                    value="，".join(draft.distinctive_features),
+                )
+                strengths = st.text_input(
+                    "擅长 / Strengths",
+                    value="，".join(draft.strengths),
+                )
+                weaknesses = st.text_input(
+                    "弱点 / Weaknesses",
+                    value="，".join(draft.weaknesses),
+                )
+                fears = st.text_input(
+                    "害怕什么 / Fears",
+                    value="，".join(draft.fears),
+                )
+                habits = st.text_input(
+                    "小习惯 / Habits",
+                    value="，".join(draft.habits),
+                )
+                likes = st.text_input(
+                    "喜欢 / Likes",
+                    value="，".join(draft.likes),
+                )
+                dislikes = st.text_input(
+                    "不喜欢 / Dislikes",
+                    value="，".join(draft.dislikes),
+                )
+                abilities = st.text_input(
+                    "能力 / Abilities",
+                    value="，".join(draft.abilities),
+                )
+
+        prop_assets = ctx.repository.list_assets(AssetType.PROP)
+        selected_props = st.multiselect(
+            "🎒 初始道具 / Starting Props（最多 2 个 / max 2）",
+            prop_assets,
+            default=[
+                prop
+                for prop in prop_assets
+                if prop.asset_id in draft.starting_prop_ids
+            ],
+            format_func=lambda asset: asset.display_name,
+            max_selections=2,
+        )
+
+        st.caption(
+            "👕 上衣、裤子、鞋子、帽子和配饰已经在数据结构中作为 "
+            "WEAR Asset 引用；Wearable Library 会在后续 Factory 中接入。"
+        )
+
         if st.button(
-            "❤️ Save This Character",
+            "❤️ Save This Character / 保存角色",
             type="primary",
             disabled=not name.strip(),
         ):
-            def split_items(value: str) -> list[str]:
-                return [
-                    item.strip()
-                    for item in value.replace("，", ",").split(",")
-                    if item.strip()
-                ]
-
             final_profile = draft.model_copy(
                 update={
-                    "species": species,
-                    "body": body,
+                    "source_description": st.session_state.get(
+                        "char_source", ""
+                    ),
+                    "character_type": character_type,
+                    "age": age,
+                    "appearance": appearance,
+                    "hair_or_fur": hair_or_fur,
+                    "favorite_colors": split_items(favorite_colors),
+                    "personality_traits": split_items(personality),
+                    "speaking_tone": speaking_tone,
+                    "native_language": native_language,
+                    "english_level": english_level,
+                    "story_role": story_role,
+                    "body_type": body_type,
+                    "proportions": proportions,
                     "face": face,
-                    "clothing": clothing,
-                    "personality": split_items(personality),
+                    "eyes": EyeProfile(
+                        shape=eye_shape,
+                        color=eye_color,
+                        size=eye_size,
+                        special_features=split_items(eye_special),
+                    ),
+                    "skin_fur_material": skin_fur_material,
+                    "distinctive_features": split_items(distinctive),
                     "strengths": split_items(strengths),
                     "weaknesses": split_items(weaknesses),
-                    "immutable_features": split_items(immutable),
+                    "fears": split_items(fears),
+                    "habits": split_items(habits),
+                    "likes": split_items(likes),
+                    "dislikes": split_items(dislikes),
+                    "abilities": split_items(abilities),
+                    "starting_prop_ids": [
+                        prop.asset_id for prop in selected_props
+                    ],
                 }
             )
 
-            asset = character_factory.save_character(
-                name=name,
-                description=st.session_state.get("char_source", ""),
-                profile=final_profile,
-            )
+            missing = final_profile.missing_core_fields()
 
-            st.success(
-                f"保存成功：{asset.display_name} · {asset.asset_id}"
-            )
+            if missing:
+                st.warning(
+                    "还有核心设定没有完成 / Core fields still missing: "
+                    + ", ".join(missing)
+                )
+            else:
+                asset = character_factory.save_character(
+                    name=name,
+                    description=st.session_state.get(
+                        "char_source", ""
+                    ),
+                    profile=final_profile,
+                )
 
-            st.session_state.char_draft = None
+                st.success(
+                    f"保存成功：{asset.display_name} · {asset.asset_id}"
+                )
 
-            st.caption(
-                "下一阶段会把 Master Reference、Front / Side / Back、"
-                "表情、姿势都挂在这个 CHAR_ID 下。"
-            )
+                st.session_state.char_draft = None
+
+                st.caption(
+                    "下一阶段会把 Master Reference、Front / Side / Back、"
+                    "表情、姿势都挂在这个 CHAR_ID 下。"
+                )
 
 
 elif page == "🌎 Mini Utopia":
