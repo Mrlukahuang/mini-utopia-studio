@@ -7,6 +7,7 @@ from studio.core.enums import AssetType, StoryMode
 from studio.models.character import CharacterProfile, EyeProfile
 from studio.recipes.character_factory import CharacterFactoryRecipe
 from studio.services.bootstrap import build_context
+from studio.services.style_service import StyleService
 from studio.ui.auth import lock_studio, require_studio_pin
 
 
@@ -20,7 +21,11 @@ st.set_page_config(
 
 ctx = build_context(get_settings(ROOT))
 universe = ctx.universes.ensure_mini_utopia()
-universe = ctx.styles.attach_base_style(universe)
+# Construct the style service from the repository at the app boundary.
+# This stays safe during Streamlit hot-reload when an older StudioContext
+# object may briefly remain in memory while app.py has already refreshed.
+style_service = StyleService(ctx.repository)
+universe = style_service.attach_base_style(universe)
 character_factory = CharacterFactoryRecipe(ctx.registry, ctx.assets)
 
 
