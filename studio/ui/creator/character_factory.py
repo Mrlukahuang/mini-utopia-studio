@@ -207,6 +207,20 @@ def _guided_index(options: list[str], value: str) -> int:
     return 0
 
 
+def _wearables_for_slot(assets: list[Any], slot: str) -> list[Any]:
+    """Keep typed default wearables out of unrelated slots.
+
+    Legacy/user-created wearables without a subtype remain available everywhere
+    until the dedicated Wearable Factory adds stricter categories.
+    """
+    return [
+        asset
+        for asset in assets
+        if not asset.metadata.get("wearable_type")
+        or asset.metadata.get("wearable_type") == slot
+    ]
+
+
 def _asset_selector(label: str, assets: list[Any], current_id: str | None, key: str):
     default_index = 0
     options = [None, *assets]
@@ -644,23 +658,27 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
     )
     default_wearables = ctx.assets.ensure_default_character_wearables()
     wear_assets = ctx.repository.list_assets(AssetType.WEARABLE)
+    top_assets = _wearables_for_slot(wear_assets, "top")
+    bottom_assets = _wearables_for_slot(wear_assets, "bottom")
+    shoes_assets = _wearables_for_slot(wear_assets, "shoes")
+    hat_assets = _wearables_for_slot(wear_assets, "hat")
     default_top_id = draft.wearables.top_id or default_wearables["top"].asset_id
     default_bottom_id = draft.wearables.bottom_id or default_wearables["bottom"].asset_id
     st.caption("默认出发装 / Default outfit: 白色 T恤 + 蓝色牛仔裤，可随时更换。")
     w1, w2 = st.columns(2)
     with w1:
         top = _asset_selector(
-            "上衣 / Top", wear_assets, default_top_id, "wear_top"
+            "上衣 / Top", top_assets, default_top_id, "wear_top"
         )
         bottom = _asset_selector(
-            "下装 / Bottom", wear_assets, default_bottom_id, "wear_bottom"
+            "下装 / Bottom", bottom_assets, default_bottom_id, "wear_bottom"
         )
         shoes = _asset_selector(
-            "鞋子 / Shoes", wear_assets, draft.wearables.shoes_id, "wear_shoes"
+            "鞋子 / Shoes", shoes_assets, draft.wearables.shoes_id, "wear_shoes"
         )
     with w2:
         hat = _asset_selector(
-            "帽子 / Hat", wear_assets, draft.wearables.hat_id, "wear_hat"
+            "帽子 / Hat", hat_assets, draft.wearables.hat_id, "wear_hat"
         )
         default_accessories = [
             a for a in wear_assets if a.asset_id in draft.wearables.accessory_ids
