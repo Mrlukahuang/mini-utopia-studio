@@ -103,7 +103,7 @@ def build_world_runtime_html(
     <button id="reset">↺ Reset</button>
     <button id="tour" class="primary">🎬 Start Director Tour</button>
   </div>
-  <div class="tip">Click inside the world, then use WASD to explore · 方向键也可以</div>
+  <div class="tip">WASD / 方向键移动 · Hold Shift to Run / 按住 Shift 奔跑</div>
 </div>
 
 <script type="module">
@@ -377,10 +377,16 @@ resetPlayer();
 const keys = new Set();
 let manualMode = true;
 let tourState = null;
+let animationState = 'Idle';
+let animationTime = 0;
 
 window.addEventListener('keydown', e => {{
-  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','KeyW','KeyA','KeyS','KeyD'].includes(e.code)) {{
-    e.preventDefault(); keys.add(e.code);
+  if ([
+    'ArrowUp','ArrowDown','ArrowLeft','ArrowRight',
+    'KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight'
+  ].includes(e.code)) {{
+    if (e.code.startsWith('Arrow')) e.preventDefault();
+    keys.add(e.code);
   }}
 }});
 window.addEventListener('keyup', e => keys.delete(e.code));
@@ -389,20 +395,53 @@ const velocity = new THREE.Vector3();
 const cameraTarget = new THREE.Vector3();
 const clock = new THREE.Clock();
 
+function setAnimationState(next) {{
+  if (animationState === next) return;
+  animationState = next;
+  const label = document.getElementById('animState');
+  if (label) label.textContent = next;
+  playGltfState(next);
+}}
+
+function updateProceduralAnimation(dt) {{
+  if (!proceduralAvatar.visible) return;
+  animationTime += dt;
+  const p = proceduralAvatar.userData.parts || {{}};
+  const moving = animationState !== 'Idle';
+  const run = animationState === 'Run';
+  const speed = run ? 11.0 : moving ? 7.0 : 2.2;
+  const amplitude = run ? .8 : moving ? .52 : .06;
+  const swing = Math.sin(animationTime * speed) * amplitude;
+
+  if (p.la) p.la.rotation.x = moving ? swing : Math.sin(animationTime*2.2)*.04;
+  if (p.ra) p.ra.rotation.x = moving ? -swing : -Math.sin(animationTime*2.2)*.04;
+  if (p.lf) p.lf.rotation.x = moving ? -swing*.48 : 0;
+  if (p.rf) p.rf.rotation.x = moving ? swing*.48 : 0;
+  if (p.body) p.body.position.y = 1.18 + Math.abs(Math.sin(animationTime*speed)) * (run ? .11 : moving ? .06 : .025);
+  if (p.head) p.head.rotation.z = moving ? Math.sin(animationTime*speed*.5)*.025 : Math.sin(animationTime*1.7)*.018;
+}}
+
 function updatePlayer(dt) {{
-  if (!manualMode) return;
+  if (!manualMode) {{
+    setAnimationState('Idle');
+    return;
+  }}
   let dx = 0, dz = 0;
   if (keys.has('KeyW') || keys.has('ArrowUp')) dz -= 1;
   if (keys.has('KeyS') || keys.has('ArrowDown')) dz += 1;
   if (keys.has('KeyA') || keys.has('ArrowLeft')) dx -= 1;
   if (keys.has('KeyD') || keys.has('ArrowRight')) dx += 1;
   const len = Math.hypot(dx, dz);
+  const running = keys.has('ShiftLeft') || keys.has('ShiftRight');
   if (len > 0) {{
     dx /= len; dz /= len;
-    const speed = 7.0;
+    const speed = running ? 10.5 : 6.2;
+    setAnimationState(running ? 'Run' : 'Walk');
     player.position.x += dx * speed * dt;
     player.position.z += dz * speed * dt;
     player.rotation.y = Math.atan2(dx, dz);
+  }} else {{
+    setAnimationState('Idle');
   }}
   const margin = 1.5;
   player.position.x = THREE.MathUtils.clamp(player.position.x, margin, bp.grid.width*cell-margin);
@@ -487,6 +526,8 @@ function animate() {{
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), .05);
   updatePlayer(dt);
+  updateProceduralAnimation(dt);
+  if (gltfMixer) gltfMixer.update(dt);
   updateFollowCamera(dt);
   updateTour(dt);
   renderer.render(scene, camera);
