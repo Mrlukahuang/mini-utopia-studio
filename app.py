@@ -283,9 +283,10 @@ elif page == "🎭 My Characters":
         master_ref = ctx.character_masters.current_master(asset.asset_id)
 
         with st.container(border=True):
-            art_col, info_col, action_col = st.columns([1.35, 2.25, 0.72])
+            art_col, info_col = st.columns([1.0, 1.72], gap="large")
 
             with art_col:
+                st.markdown('<div class="mu-character-art-shell">', unsafe_allow_html=True)
                 if master_ref:
                     try:
                         st.image(
@@ -306,46 +307,94 @@ elif page == "🎭 My Characters":
                         '<span>No approved Master yet</span></div>',
                         unsafe_allow_html=True,
                     )
+                st.markdown('</div>', unsafe_allow_html=True)
+
+                edit_col, delete_col = st.columns(2)
+                with edit_col:
+                    st.button(
+                        "✏️ Edit / 编辑",
+                        key=f"edit_{asset.asset_id}",
+                        on_click=edit_character,
+                        args=(asset,),
+                        use_container_width=True,
+                    )
+                with delete_col:
+                    confirm_key = f"confirm_delete_{asset.asset_id}"
+                    if not st.session_state.get(confirm_key):
+                        if st.button(
+                            "🗑️ Delete / 删除",
+                            key=f"delete_{asset.asset_id}",
+                            use_container_width=True,
+                        ):
+                            st.session_state[confirm_key] = True
+                            st.rerun()
+
+                if st.session_state.get(f"confirm_delete_{asset.asset_id}"):
+                    st.warning("确定删除这个角色？")
+                    yes_col, no_col = st.columns(2)
+                    with yes_col:
+                        if st.button(
+                            "✅ Confirm",
+                            key=f"confirm_delete_button_{asset.asset_id}",
+                            type="primary",
+                            use_container_width=True,
+                        ):
+                            archive_character(asset.asset_id)
+                            st.rerun()
+                    with no_col:
+                        if st.button(
+                            "↩ Cancel",
+                            key=f"cancel_delete_{asset.asset_id}",
+                            use_container_width=True,
+                        ):
+                            st.session_state[f"confirm_delete_{asset.asset_id}"] = False
+                            st.rerun()
 
             with info_col:
-                st.markdown(f"### {asset.display_name}")
                 type_role = " · ".join(
                     part
                     for part in [profile.character_type, profile.story_role]
                     if part
                 )
+                personality_html = "".join(
+                    f'<span class="mu-pill">{item}</span>'
+                    for item in profile.personality_traits
+                )
+                st.markdown(
+                    f'<div class="mu-character-name-row"><h3>{asset.display_name}</h3>'
+                    f'<span class="mu-pill">v{asset.version}</span>{personality_html}</div>',
+                    unsafe_allow_html=True,
+                )
                 if type_role:
                     st.caption(type_role)
 
-                fact_a, fact_b = st.columns(2)
-                with fact_a:
-                    st.write(f"**Age / 年龄** · {profile.age or '—'}")
-                    height_text = (
-                        f"{profile.height_cm:.0f} cm"
-                        if profile.height_cm is not None
-                        else (profile.height or "—")
-                    )
-                    st.write(f"**Height / 身高** · {height_text}")
-                    st.write(f"**Eyes / 眼睛** · {profile.eyes.color or '—'}")
-                with fact_b:
-                    hair = profile.hair_style or profile.hair_or_fur or "—"
-                    st.write(f"**Hair / Fur / 发型毛发** · {hair}")
-                    st.write(
-                        f"**Build / 体型** · "
-                        f"{profile.body_build or profile.body_type or '—'}"
-                    )
-                    st.write(
-                        f"**Movement / 动作** · {profile.movement_style or '—'}"
-                    )
+                height_text = (
+                    f"{profile.height_cm:.0f} cm"
+                    if profile.height_cm is not None
+                    else (profile.height or "—")
+                )
+                hair = profile.hair_style or profile.hair_or_fur or "—"
+                build = profile.body_build or profile.body_type or "—"
+                movement = profile.movement_style or "—"
+                eyes = profile.eyes.color or "—"
 
-                if profile.personality_traits:
-                    st.markdown(
-                        "".join(
-                            f'<span class="mu-pill">{item}</span>'
-                            for item in profile.personality_traits
-                        ),
-                        unsafe_allow_html=True,
-                    )
+                fact_rows = [
+                    (("🗓️", "Age / 年龄", profile.age or "—"), ("📏", "Height / 身高", height_text)),
+                    (("🧸", "Hair / Fur / 发型毛发", hair), ("👁️", "Eyes / 眼睛", eyes)),
+                    (("🧊", "Build / 体型", build), ("🏃", "Movement / 动作", movement)),
+                ]
+                for left_fact, right_fact in fact_rows:
+                    fact_a, fact_b = st.columns(2)
+                    for col, fact in ((fact_a, left_fact), (fact_b, right_fact)):
+                        with col:
+                            icon, label, value = fact
+                            st.markdown(
+                                f'<div class="mu-character-fact-tile">'
+                                f'<div class="mu-character-fact-label">{icon} {label}</div>'
+                                f'<div class="mu-character-fact-value">{value}</div>'
+                                f'</div>',
+                                unsafe_allow_html=True,
+                            )
 
                 if profile.favorite_color_hexes:
                     swatches = "".join(
@@ -354,57 +403,23 @@ elif page == "🎭 My Characters":
                         for hex_value in profile.favorite_color_hexes
                     )
                     st.markdown(
-                        f'<div class="mu-card-fact"><strong>Favorite Colors / 喜爱颜色</strong>'
+                        f'<div class="mu-character-section-card">'
+                        f'<strong>🎨 Favorite Colors / 喜爱颜色</strong>'
                         f'<div class="mu-color-row">{swatches}</div></div>',
                         unsafe_allow_html=True,
                     )
 
                 if profile.distinctive_features:
-                    st.write(
-                        "**Distinctive / 标志特征** · "
-                        + " · ".join(profile.distinctive_features)
+                    distinctive = " · ".join(profile.distinctive_features)
+                    st.markdown(
+                        f'<div class="mu-character-section-card">'
+                        f'<strong>⭐ Distinctive Feature / 标志特征</strong><br>'
+                        f'{distinctive}</div>',
+                        unsafe_allow_html=True,
                     )
 
                 if asset.description:
                     st.caption(asset.description)
-
-            with action_col:
-                st.button(
-                    "✏️ Edit",
-                    key=f"edit_{asset.asset_id}",
-                    on_click=edit_character,
-                    args=(asset,),
-                    use_container_width=True,
-                )
-
-                confirm_key = f"confirm_delete_{asset.asset_id}"
-                if not st.session_state.get(confirm_key):
-                    if st.button(
-                        "🗑️ Delete",
-                        key=f"delete_{asset.asset_id}",
-                        use_container_width=True,
-                    ):
-                        st.session_state[confirm_key] = True
-                        st.rerun()
-                else:
-                    st.warning("确定删除？")
-                    if st.button(
-                        "✅ Confirm",
-                        key=f"confirm_delete_button_{asset.asset_id}",
-                        type="primary",
-                        use_container_width=True,
-                    ):
-                        archive_character(asset.asset_id)
-                        st.rerun()
-                    if st.button(
-                        "↩ Cancel",
-                        key=f"cancel_delete_{asset.asset_id}",
-                        use_container_width=True,
-                    ):
-                        st.session_state[confirm_key] = False
-                        st.rerun()
-
-                st.caption(f"v{asset.version}")
 
             if mode == "🛠 Studio" and studio_unlocked:
                 with st.expander("🎨 Character Master Prompt", expanded=False):
