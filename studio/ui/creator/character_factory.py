@@ -799,8 +799,8 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
     )
 
     st.markdown(
-        '<div class="mu-step-card"><div class="mu-step-kicker">STEP 7 · REVIEW & SAVE / 看一看再保存</div>'
-        '<h3>❤️ 这就是 TA</h3></div>',
+        '<div class="mu-step-card"><div class="mu-step-kicker">STEP 7 · CREATE / 让 TA 出现</div>'
+        '<h3>✨ Generate Your Mini Hero</h3></div>',
         unsafe_allow_html=True,
     )
     missing = final_profile.missing_core_fields()
@@ -811,47 +811,124 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
             + ", ".join(missing)
         )
 
+    with st.container(border=True):
+        st.markdown(f"### {escape(name) if name else '✨ New Character'}")
+        summary_cols = st.columns(3)
+        summary_cols[0].metric("TA是什么", character_type or "—")
+        summary_cols[1].metric("身高", f"{height_cm:.0f} cm")
+        summary_cols[2].metric("英语", f"{english_level}/10")
+        st.write(appearance or "还没有外形描述。")
+        if character_type_description:
+            st.caption("类型补充 · " + character_type_description)
+        if story_role:
+            st.caption("故事角色 · " + story_role)
+        if final_profile.personality_traits:
+            st.caption("性格 · " + " · ".join(final_profile.personality_traits))
+        if final_profile.favorite_colors:
+            st.caption("喜欢的颜色 · " + " · ".join(final_profile.favorite_colors))
+        st.caption(
+            "🎨 Canon: Mini Playable Avatar · Block-inspired · Toy-like · "
+            "Macaron Dreamscape · Cinematic"
+        )
+
+    if not ctx.character_masters.is_available:
+        st.info(
+            "🎨 Character image generation 还没有连接 API Key。"
+            "资料可以继续编辑和保存；Studio 管理员连接 OPENAI_API_KEY 后，"
+            "这里会直接生成 Character Master。"
+        )
+
+    generate_label = (
+        "✨ Generate Character / 生成角色"
+        if not st.session_state.get("character_master_candidate_path")
+        else "🎲 Regenerate / 再来一个"
+    )
+
     if st.button(
-        "✨ Generate Character Preview / 生成角色预览",
+        generate_label,
         type="primary",
-        disabled=(not name.strip()) or bool(missing),
+        disabled=(not name.strip()) or bool(missing) or not ctx.character_masters.is_available,
         use_container_width=True,
     ):
-        st.session_state.char_preview_ready = True
-
-    if st.session_state.get("char_preview_ready", False):
-        with st.container(border=True):
-            st.markdown(f"### {escape(name) if name else '✨ New Character'}")
-            summary_cols = st.columns(3)
-            summary_cols[0].metric("TA是什么", character_type or "—")
-            summary_cols[1].metric("身高", f"{height_cm:.0f} cm")
-            summary_cols[2].metric("英语", f"{english_level}/10")
-            st.write(appearance or "还没有外形描述。")
-            if character_type_description:
-                st.caption("类型补充 · " + character_type_description)
-            if story_role:
-                st.caption("故事角色 · " + story_role)
-            if final_profile.personality_traits:
-                st.caption("性格 · " + " · ".join(final_profile.personality_traits))
-            if final_profile.favorite_colors:
-                st.caption("喜欢的颜色 · " + " · ".join(final_profile.favorite_colors))
-            st.caption(
-                "🎨 Canon inherits: Miniature · Block-inspired · Toy-like · "
-                "Macaron Dreamscape · Cinematic"
+        try:
+            editing_id = st.session_state.get("editing_character_id")
+            asset = character_factory.save_character(
+                name=name,
+                description=st.session_state.get("char_source", description),
+                profile=final_profile,
+                asset_id=editing_id,
             )
-            st.info(
-                "当前阶段这里生成的是 Character Profile Preview。"
-                "真正的角色图片会在 Character Master 阶段生成。"
-            )
+            st.session_state.editing_character_id = asset.asset_id
 
+            style_asset = ctx.styles.ensure_mini_utopia_base()
+            with st.spinner("✨ Mini Utopia 正在把 TA 带到这个世界…"):
+                candidate = ctx.character_masters.generate_candidate(
+                    character_asset_id=asset.asset_id,
+                    style_asset_id=style_asset.asset_id,
+                )
+            st.session_state.character_master_candidate_path = candidate.path
+            st.session_state.character_master_character_id = asset.asset_id
+        except Exception as exc:
+            st.error(f"生成失败 / Generation failed: {exc}")
+
+    candidate_path = st.session_state.get("character_master_candidate_path")
+    candidate_character_id = st.session_state.get("character_master_character_id")
+
+    if candidate_path and candidate_character_id:
+        st.markdown("### 🌟 Meet Your Character / TA 来了！")
+        try:
+            st.image(
+                ctx.storage.get_bytes(candidate_path),
+                caption="Character Master Candidate · 还没锁定，可以继续再生成",
+                use_container_width=True,
+            )
+        except Exception:
+            st.warning("角色图片暂时无法读取，可以点击 Regenerate 再试一次。")
+
+        keep_col, reset_col = st.columns([2, 1])
+        with keep_col:
+            if st.button(
+                "💖 Keep This Look / 就要这个！",
+                type="primary",
+                use_container_width=True,
+            ):
+                try:
+                    approved = ctx.character_masters.approve_candidate(
+                        character_asset_id=candidate_character_id,
+                        candidate_path=candidate_path,
+                    )
+                    st.session_state.character_master_candidate_path = None
+                    st.session_state.character_master_character_id = None
+                    st.success(
+                        "角色正式加入 Mini Utopia！"
+                        f" · {candidate_character_id}"
+                    )
+                    st.balloons()
+                except Exception as exc:
+                    st.error(f"保存失败 / Approval failed: {exc}")
+
+        with reset_col:
+            if st.button(
+                "🆕 New Character / 新角色",
+                use_container_width=True,
+            ):
+                st.session_state.char_draft = None
+                st.session_state.char_source = ""
+                st.session_state.char_name = ""
+                st.session_state.editing_character_id = None
+                st.session_state.character_master_candidate_path = None
+                st.session_state.character_master_character_id = None
+                st.rerun()
+
+    if not ctx.character_masters.is_available:
         editing_id = st.session_state.get("editing_character_id")
-        save_label = (
-            "💾 Update Character / 更新角色"
+        fallback_label = (
+            "💾 Update Profile / 更新角色资料"
             if editing_id
-            else "❤️ Save Character / 保存角色"
+            else "❤️ Save Profile / 先保存角色资料"
         )
         if st.button(
-            save_label,
+            fallback_label,
             disabled=(not name.strip()) or bool(missing),
             use_container_width=True,
         ):
@@ -861,14 +938,6 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
                 profile=final_profile,
                 asset_id=editing_id,
             )
-            st.success(f"保存成功：{asset.display_name} · {asset.asset_id}")
-            st.balloons()
-            st.session_state.char_draft = None
-            st.session_state.char_source = ""
-            st.session_state.char_name = ""
-            st.session_state.editing_character_id = None
-            st.session_state.char_preview_ready = False
-            st.caption(
-                "永久 CHAR_ID 保持不变。下一阶段会把 Master Reference、"
-                "Front / Side / Back、表情和姿势挂在这个 CHAR_ID 下。"
-            )
+            st.session_state.editing_character_id = asset.asset_id
+            st.success(f"资料已保存：{asset.display_name} · {asset.asset_id}")
+
