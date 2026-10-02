@@ -3,6 +3,7 @@ import re
 from studio.core.enums import AssetType, ReviewStatus
 from studio.models.asset import Asset
 from studio.models.character import CharacterProfile
+from studio.models.world import WorldProfile
 from studio.repositories.base import StudioRepository
 
 
@@ -41,6 +42,41 @@ class AssetService:
         asset.slug = slugify(name)
         asset.description = description
         asset.metadata["character_profile"] = profile.model_dump(mode="json")
+        self.repository.save_asset(asset)
+        return asset
+
+    def create_world(
+        self,
+        *,
+        name: str,
+        description: str,
+        profile: WorldProfile,
+    ) -> Asset:
+        asset = Asset.create(
+            AssetType.LOCATION,
+            display_name=name,
+            slug=slugify(name),
+            description=description,
+            metadata={"world_profile": profile.model_dump(mode="json")},
+        )
+        self.repository.save_asset(asset)
+        return asset
+
+    def update_world(
+        self,
+        *,
+        asset_id: str,
+        name: str,
+        description: str,
+        profile: WorldProfile,
+    ) -> Asset:
+        asset = self.repository.get_asset(asset_id)
+        if asset is None or asset.asset_type != AssetType.LOCATION:
+            raise ValueError(f"World not found: {asset_id}")
+        asset.display_name = name
+        asset.slug = slugify(name)
+        asset.description = description
+        asset.metadata["world_profile"] = profile.model_dump(mode="json")
         self.repository.save_asset(asset)
         return asset
 
