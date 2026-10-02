@@ -593,7 +593,33 @@ elif page == "🎮 Explore World":
         blueprint = WorldBlueprint.model_validate(
             selected.metadata.get("world_blueprint", {})
         )
-        summary = runtime_summary(profile=profile, blueprint=blueprint)
+
+        playable_characters = [
+            asset
+            for asset in ctx.repository.list_assets(AssetType.CHARACTER)
+            if asset.status == ReviewStatus.APPROVED
+            and "character_profile" in asset.metadata
+        ]
+        selected_character = None
+        character_profile = None
+        if playable_characters:
+            selected_character = st.selectbox(
+                "Traveler / 选择进入世界的角色",
+                playable_characters,
+                format_func=lambda asset: asset.display_name,
+                key="runtime_character_asset",
+            )
+            character_profile = CharacterProfile.model_validate(
+                selected_character.metadata.get("character_profile", {})
+            )
+        else:
+            st.caption("还没有 Approved Character，Runtime 会使用 Mini Traveler placeholder。")
+
+        summary = runtime_summary(
+            profile=profile,
+            blueprint=blueprint,
+            character_profile=character_profile,
+        )
 
         a, b, c3, d = st.columns(4)
         a.metric("Grid", summary["grid"])
@@ -603,7 +629,7 @@ elif page == "🎮 Explore World":
 
         st.caption(
             "Controls: WASD / Arrow Keys · 第三人称跟随相机 · "
-            "右上角可启动 Director Tour。当前角色仍是 Mini Utopia placeholder，下一阶段接真实 Character。"
+            "右上角可启动 Director Tour。角色外观已开始读取 Character Profile；最终 GLB/动画模型下一阶段再接。"
         )
 
         components.html(
@@ -611,6 +637,12 @@ elif page == "🎮 Explore World":
                 world_name=selected.display_name,
                 profile=profile,
                 blueprint=blueprint,
+                character_name=(
+                    selected_character.display_name
+                    if selected_character is not None
+                    else "Mini Traveler"
+                ),
+                character_profile=character_profile,
             ),
             height=760,
             scrolling=False,
