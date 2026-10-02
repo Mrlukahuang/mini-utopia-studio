@@ -17,8 +17,16 @@ MINI_UTOPIA_CSS = r"""
     --mu-white: rgba(255,255,255,.90);
 }
 
-html, body, [class*="css"] {
+html, body, [class*="css"], [data-testid="stAppViewContainer"] {
     color: var(--mu-ink);
+    font-family: "Nunito", "Noto Sans SC", system-ui, -apple-system, sans-serif;
+}
+
+h1, h2, h3, h4,
+.mu-brand, .mu-game-hero h1, .mu-world-card h3,
+[data-testid="stSidebar"] label,
+.stButton > button {
+    font-family: "Fredoka", "ZCOOL KuaiLe", "Noto Sans SC", system-ui, sans-serif;
 }
 
 [data-testid="stAppViewContainer"] {
@@ -88,20 +96,28 @@ html, body, [class*="css"] {
 
 [data-testid="stSidebar"] {
     background:
-        linear-gradient(180deg, rgba(255,255,255,.92), rgba(249,244,255,.91));
+        radial-gradient(circle at 30% 2%, rgba(255,255,255,.98) 0 9%, transparent 10%),
+        linear-gradient(180deg, rgba(255,249,242,.96), rgba(249,242,255,.96) 52%, rgba(237,249,255,.95));
     border-right: 1px solid rgba(104,98,160,.10);
-    box-shadow: 12px 0 36px rgba(73,65,123,.06);
+    box-shadow: 16px 0 44px rgba(73,65,123,.08);
+}
+
+[data-testid="stSidebar"] > div:first-child {
+    padding-top: 1rem;
 }
 
 [data-testid="stSidebar"] [role="radiogroup"] label {
-    border-radius: 16px;
-    padding: .28rem .5rem;
+    border-radius: 18px;
+    padding: .46rem .68rem;
+    margin: .12rem 0;
     transition: .15s ease;
+    border: 1px solid transparent;
 }
 
 [data-testid="stSidebar"] [role="radiogroup"] label:hover {
-    background: rgba(215,194,243,.22);
-    transform: translateX(2px);
+    background: linear-gradient(90deg, rgba(247,183,210,.18), rgba(215,194,243,.22), rgba(185,231,208,.18));
+    border-color: rgba(126,108,180,.10);
+    transform: translateX(3px);
 }
 
 h1, h2, h3 {
@@ -329,6 +345,70 @@ h1, h2, h3 {
     padding:20px 22px;
     background:linear-gradient(135deg,rgba(255,232,239,.80),rgba(237,245,255,.88));
     border:1px solid rgba(244,143,177,.20);
+}
+
+.mu-sidebar-logo-shell {
+    margin: .15rem .2rem .5rem;
+    padding: 10px;
+    border-radius: 30px;
+    background: rgba(255,255,255,.62);
+    border: 1px solid rgba(255,255,255,.9);
+    box-shadow: 0 14px 32px rgba(89,74,140,.10);
+}
+.mu-sidebar-logo { width:100%; display:block; }
+.mu-sidebar-tagline {
+    text-align:center;
+    margin:-2px 0 18px;
+    font-family:"Fredoka","ZCOOL KuaiLe","Noto Sans SC",sans-serif;
+    color:#7A7196;
+    font-size:.78rem;
+}
+.mu-logo-word {
+    font-family:"Fredoka","ZCOOL KuaiLe","Noto Sans SC",sans-serif;
+    font-size:48px;
+    font-weight:700;
+    fill:url(#muWord);
+    letter-spacing:2px;
+}
+.mu-logo-small {
+    font-family:"Nunito","Noto Sans SC",sans-serif;
+    font-size:11px;
+    font-weight:800;
+    fill:#786F93;
+    letter-spacing:1.2px;
+}
+.mu-primary-logo-shell {
+    padding: 10px 16px 14px;
+    margin: -8px 0 8px;
+    border-radius: 28px;
+    background: rgba(255,255,255,.38);
+    border: 1px solid rgba(255,255,255,.62);
+    backdrop-filter: blur(12px);
+}
+.mu-primary-logo { width:min(760px, 100%); display:block; }
+.mu-logo-word-wide {
+    font-family:"Fredoka","ZCOOL KuaiLe","Noto Sans SC",sans-serif;
+    font-size:74px;
+    font-weight:700;
+    fill:url(#muWordWide);
+}
+.mu-logo-tagline {
+    font-family:"Nunito","Noto Sans SC",sans-serif;
+    font-size:24px;
+    font-weight:800;
+    fill:#746A93;
+}
+[data-testid="stSidebar"] .stButton > button {
+    min-height: 2.7rem;
+    border-radius: 16px;
+}
+[data-testid="stSelectbox"] label,
+[data-testid="stTextInput"] label,
+[data-testid="stTextArea"] label,
+[data-testid="stNumberInput"] label,
+[data-testid="stMultiSelect"] label {
+    font-weight:800 !important;
+    color:#514A71 !important;
 }
 
 hr {
