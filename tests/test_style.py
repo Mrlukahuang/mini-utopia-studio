@@ -68,7 +68,7 @@ def test_base_style_locks_mini_playable_avatar_language(tmp_path):
     style = StyleService(repo).ensure_mini_utopia_base()
     profile = style.metadata["style_profile"]
 
-    assert profile["schema_version"] == "1.1"
+    assert profile["schema_version"] == "1.2"
     assert "2.8 to 3.0 heads tall" in profile["character_scale_language"]
     assert "large readable eyes" in profile["face_language"]
     assert "voxel exploration world" in profile["shape_language"]
@@ -96,5 +96,16 @@ def test_existing_base_style_is_migrated_without_changing_asset_id(tmp_path):
     migrated = service.ensure_mini_utopia_base()
 
     assert migrated.asset_id == original_id
-    assert migrated.metadata["style_profile"]["schema_version"] == "1.1"
+    assert migrated.metadata["style_profile"]["schema_version"] == "1.2"
     assert "Mini Playable Avatar" in migrated.metadata["style_profile"]["character_scale_language"]
+
+
+def test_global_style_canon_includes_world_runtime_rules(tmp_path):
+    repo = SQLiteStudioRepository(tmp_path / "studio.db")
+    style = StyleService(repo).ensure_mini_utopia_base()
+    profile = style.metadata["style_profile"]
+
+    assert profile["world_geometry_language"]
+    assert profile["environment_scale_language"]
+    assert profile["color_harmony_rule"]
+    assert profile["runtime_material_rule"]
