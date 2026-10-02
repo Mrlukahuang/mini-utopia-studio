@@ -199,6 +199,14 @@ def _select_index(options: list[str], value: str) -> int:
     return options.index(value) if value in options else 0
 
 
+def _guided_index(options: list[str], value: str) -> int:
+    if value in options:
+        return options.index(value)
+    if value and "其他 / Other" in options:
+        return options.index("其他 / Other")
+    return 0
+
+
 def _asset_selector(label: str, assets: list[Any], current_id: str | None, key: str):
     default_index = 0
     options = [None, *assets]
@@ -411,12 +419,20 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
         character_type = st.selectbox(
             "TA是什么？ / Character Type",
             CHARACTER_TYPE_OPTIONS,
-            index=_select_index(CHARACTER_TYPE_OPTIONS, draft.character_type),
+            index=_guided_index(CHARACTER_TYPE_OPTIONS, draft.character_type),
             help="上层类型固定，保持角色体系稳定；细节可以在下面自由发挥。",
         )
         character_type_description = st.text_area(
             "这个类型有什么特别？ / Describe this character type",
-            value=draft.character_type_description,
+            value=(
+                draft.character_type_description
+                or (
+                    draft.character_type
+                    if draft.character_type
+                    and draft.character_type not in CHARACTER_TYPE_OPTIONS
+                    else ""
+                )
+            ),
             placeholder="例如：是一只会收集星星的圆滚滚熊猫；耳朵在开心时会发光……",
             height=92,
         )
@@ -429,12 +445,20 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
         story_role = st.selectbox(
             "故事角色定位 / Story Role（可选）",
             STORY_ROLE_OPTIONS,
-            index=_select_index(STORY_ROLE_OPTIONS, draft.story_role),
+            index=_guided_index(STORY_ROLE_OPTIONS, draft.story_role),
             help="先选一个稳定的故事功能，再用下面的描述增加个性。",
         )
         story_role_description = st.text_area(
             "角色定位补充 / Role Description（可选）",
-            value=draft.story_role_description,
+            value=(
+                draft.story_role_description
+                or (
+                    draft.story_role
+                    if draft.story_role
+                    and draft.story_role not in STORY_ROLE_OPTIONS
+                    else ""
+                )
+            ),
             placeholder="例如：平时胆小，但每次看到 Portal 都会第一个走进去……",
             height=92,
         )
