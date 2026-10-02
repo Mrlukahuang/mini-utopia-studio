@@ -13,6 +13,7 @@ from studio.services.character_master_prompt_service import CharacterMasterPromp
 from studio.services.character_master_service import CharacterMasterService
 from studio.services.world_concept_prompt_service import WorldConceptPromptService
 from studio.services.world_concept_service import WorldConceptService
+from studio.services.world_blueprint_service import WorldBlueprintService
 from studio.providers.openai_image import OpenAIImageProvider
 from studio.storage.local import LocalObjectStorage
 
@@ -32,6 +33,7 @@ class StudioContext:
     character_master_prompts: CharacterMasterPromptService
     character_masters: CharacterMasterService
     world_concept_prompts: WorldConceptPromptService
+    world_blueprints: WorldBlueprintService
     world_concepts: WorldConceptService
 
 
@@ -44,6 +46,7 @@ def build_context(settings: Settings) -> StudioContext:
 
     character_master_prompts = CharacterMasterPromptService()
     world_concept_prompts = WorldConceptPromptService()
+    world_blueprints = WorldBlueprintService()
     image_provider = (
         OpenAIImageProvider(
             settings.openai_api_key,
@@ -72,10 +75,12 @@ def build_context(settings: Settings) -> StudioContext:
             image_provider=image_provider,
         ),
         world_concept_prompts=world_concept_prompts,
+        world_blueprints=world_blueprints,
         world_concepts=WorldConceptService(
             repository,
             storage,
             world_concept_prompts,
+            world_blueprints,
             image_provider=image_provider,
         ),
     )
