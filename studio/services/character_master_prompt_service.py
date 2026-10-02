@@ -16,9 +16,10 @@ class CharacterMasterPromptService:
         name: str,
         profile: CharacterProfile,
         style_profile: dict,
+        wearable_descriptions: dict[str, str] | None = None,
     ) -> str:
         eyes = profile.eyes
-        wearables = profile.wearables
+        wearable_descriptions = wearable_descriptions or {}
 
         favorite_colors = ", ".join(profile.favorite_colors) or "use Mini Utopia macaron colors"
         personality = ", ".join(profile.personality_traits) or "warm, approachable"
@@ -73,16 +74,28 @@ class CharacterMasterPromptService:
                 f"Personality: {personality}.",
                 f"Distinctive features: {features}.",
                 (
-                    "Default outfit references: "
-                    f"top={wearables.top_id or 'none'}, "
-                    f"bottom={wearables.bottom_id or 'none'}, "
-                    f"shoes={wearables.shoes_id or 'none'}, "
-                    f"hat={wearables.hat_id or 'none'}."
+                    "Outfit: "
+                    f"top={wearable_descriptions.get('top', 'simple clean white T-shirt')}; "
+                    f"bottom={wearable_descriptions.get('bottom', 'classic blue jeans')}; "
+                    f"shoes={wearable_descriptions.get('shoes', 'simple white sneakers')}; "
+                    f"hat={wearable_descriptions.get('hat', 'none')}."
                 ),
-                "MASTER PRESENTATION: full-body single character, centered clean presentation, "
-                "clear silhouette, feet visible, neutral-to-cheerful three-quarter pose, "
-                "designed as the canonical identity reference for future turnaround, expressions, "
-                "animation and game-ready derivatives.",
+                (
+                    "COLOR SOURCE OF TRUTH: use the hexadecimal swatches exactly where supplied. "
+                    f"Hair/fur swatch={profile.hair_or_fur_color_hex}; "
+                    f"eye swatch={eyes.color_hex}; "
+                    f"favorite palette={', '.join(profile.favorite_color_hexes) or 'Mini Utopia macaron palette'}."
+                ),
+                "CHARACTER MASTER SHEET V1: one clean landscape visual reference sheet. "
+                "Include one larger hero three-quarter view plus a consistent turnaround row "
+                "(front, three-quarter, side, back) and five head-and-shoulder expressions "
+                "(neutral, happy, curious, excited, surprised). Keep exactly the same character, "
+                "hair/fur, colors, proportions and outfit in every view. Use a simple warm cream "
+                "or very light Mini Utopia studio backdrop with subtle block-world cues only.",
+                "IMPORTANT OUTPUT RULE: visual artwork only. Do NOT draw or render any words, "
+                "letters, labels, measurements, IDs, UI panels, logos, profile cards, captions, "
+                "watermarks, arrows or typography anywhere in the image. The application renders "
+                "all factual profile information separately from structured data.",
                 "MINI UTOPIA VISUAL DNA:",
                 " ".join(bit for bit in style_bits if bit),
                 "LOCKED CANON RULES:",
