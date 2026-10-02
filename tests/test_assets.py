@@ -69,3 +69,24 @@ def test_default_character_wearables_are_idempotent(tmp_path):
     assert first["bottom"].display_name == "Blue Jeans / 蓝色牛仔裤"
     assert first["top"].asset_id.startswith("WEAR_")
     assert first["bottom"].asset_id.startswith("WEAR_")
+
+
+def test_archive_character_is_soft_delete(tmp_path):
+    from studio.core.enums import ReviewStatus
+    from studio.models.character import CharacterProfile
+    from studio.repositories.sqlite import SQLiteStudioRepository
+    from studio.services.asset_service import AssetService
+
+    repo = SQLiteStudioRepository(tmp_path / "studio.db")
+    service = AssetService(repo)
+    character = service.create_character(
+        name="Archive Me",
+        description="test",
+        profile=CharacterProfile(),
+    )
+
+    archived = service.archive_character(character.asset_id)
+
+    assert archived.status == ReviewStatus.ARCHIVED
+    assert repo.get_asset(character.asset_id) is not None
+    assert repo.get_asset(character.asset_id).status == ReviewStatus.ARCHIVED
