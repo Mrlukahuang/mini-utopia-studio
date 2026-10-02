@@ -3,7 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
-STYLE_SCHEMA_VERSION = "1.1"
+STYLE_SCHEMA_VERSION = "1.2"
 
 
 class MacaronPaletteProfile(BaseModel):
@@ -39,6 +39,13 @@ class StyleProfile(BaseModel):
     camera_language: str = ""
     palette_notes: str = ""
     macaron_palette: MacaronPaletteProfile = Field(default_factory=MacaronPaletteProfile)
+
+    # Global visual constitution inherited by characters, worlds, props,
+    # portals and runtime rendering. These are Canon rules, not Character rules.
+    world_geometry_language: str = ""
+    environment_scale_language: str = ""
+    color_harmony_rule: str = ""
+    runtime_material_rule: str = ""
 
     locked_rules: list[str] = Field(default_factory=list)
     flexible_expression: list[str] = Field(default_factory=list)
