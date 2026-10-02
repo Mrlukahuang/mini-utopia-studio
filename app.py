@@ -63,6 +63,8 @@ def edit_character(asset) -> None:
     st.session_state.character_name_input = asset.display_name
     st.session_state.editing_character_id = asset.asset_id
     st.session_state.char_preview_ready = False
+    st.session_state.char_creation_mode = "design"
+    st.session_state.char_stage = 0
     st.session_state.character_master_candidate_path = None
     st.session_state.character_master_character_id = None
     st.session_state.app_page = "✨ Character Factory"
