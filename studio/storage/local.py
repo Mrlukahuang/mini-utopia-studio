@@ -21,3 +21,6 @@ class LocalObjectStorage(ObjectStorage):
 
     def exists(self, relative_path: str) -> bool:
         return self.resolve(relative_path).exists()
+
+    def get_bytes(self, relative_path: str) -> bytes:
+        return self.resolve(relative_path).read_bytes()

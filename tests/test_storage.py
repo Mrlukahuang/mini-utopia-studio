@@ -6,3 +6,4 @@ def test_local_storage_roundtrip(tmp_path):
     key = storage.put_bytes("assets/test/hello.txt", b"hello")
     assert storage.exists(key)
     assert storage.resolve(key).read_bytes() == b"hello"
+    assert storage.get_bytes(key) == b"hello"
