@@ -21,6 +21,9 @@ The following are inherited by Canon characters, worlds, props, portals, and sce
 - miniature diorama feeling
 - original block-inspired geometry
 - rounded, friendly, toy-like forms
+- **Mini Playable Avatar proportions**: large head, compact body, short limbs
+- cute simplified faces that read clearly at small size
+- run-ready game-character silhouettes rather than realistic human anatomy
 - soft tactile materials
 - dreamy macaron color behavior
 - soft cinematic lighting
@@ -30,6 +33,40 @@ The following are inherited by Canon characters, worlds, props, portals, and sce
 - refined stylization rather than hyper-realism
 
 Voxel / block-inspired does **not** mean copying Minecraft or another branded visual system. Mini Utopia must avoid branded characters, textures, logos, UI, or signature assets.
+
+## Mini Playable Avatar / 小型可操控角色
+
+Mini Utopia characters should look like they could **run, jump, wave, carry props, and travel through a game world**.
+
+For human-like characters, Canon defaults to roughly **2.75–3.25 heads tall**:
+
+- head is roughly one third of total height
+- compact torso
+- short arms and legs
+- slightly oversized hands and shoes
+- lower center of gravity
+- large readable eyes
+- tiny nose and mouth
+- soft cheeks
+- minimal realistic facial detail
+- no skin pores
+- no long-legged fashion-doll silhouette
+
+Non-human characters use the same principle rather than the same anatomy: **large identity-bearing head/face + compact playable body + readable limbs**.
+
+The target is a premium cozy-game avatar: more character-like than a realistic person, more rounded and expressive than a strict voxel figure, and still visibly built from the Mini Utopia block-world language.
+
+### Influence translation
+
+The desired feeling can combine:
+
+- modular block-world exploration
+- rounded friendly space-adventure mascot design
+- collectible-toy tactility
+- cozy platform-game readability
+- full macaron dreamscape color behavior
+
+These are translated into an original Mini Utopia language rather than copying branded characters, textures, costumes, UI, or signature shapes.
 
 ## Macaron Dreamscape
 
