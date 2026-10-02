@@ -208,13 +208,14 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
     st.session_state.world_draft = profile
 
     st.markdown("### 2. Visualize / 先把梦想画出来")
-    concept_count = st.segmented_control(
+    concept_count = st.radio(
         "How many directions? / 生成几个方向？",
         options=[1, 2, 3],
-        default=3,
+        index=2,
+        horizontal=True,
         help="1 = Playable, 2 = Playable + Dream, 3 = Playable + Dream + Story",
     )
-    concept_count = int(concept_count or 3)
+    concept_count = int(concept_count)
 
     count = int(st.session_state.get("creator_generation_count", 0))
     remaining = max(0, MAX_GENERATIONS_PER_SESSION - count)
