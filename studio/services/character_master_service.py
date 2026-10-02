@@ -40,10 +40,26 @@ class CharacterMasterService:
         profile = CharacterProfile.model_validate(
             character.metadata.get("character_profile", {})
         )
+        wearable_descriptions: dict[str, str] = {}
+        for slot, wearable_id in {
+            "top": profile.wearables.top_id,
+            "bottom": profile.wearables.bottom_id,
+            "shoes": profile.wearables.shoes_id,
+            "hat": profile.wearables.hat_id,
+        }.items():
+            if not wearable_id:
+                continue
+            wearable = self.repository.get_asset(wearable_id)
+            if wearable is not None and wearable.asset_type == AssetType.WEARABLE:
+                wearable_descriptions[slot] = (
+                    f"{wearable.display_name}. {wearable.description}".strip()
+                )
+
         return self.prompt_service.compose(
             name=character.display_name,
             profile=profile,
             style_profile=style.metadata.get("style_profile", {}),
+            wearable_descriptions=wearable_descriptions,
         )
 
     def generate_candidate(
@@ -51,7 +67,7 @@ class CharacterMasterService:
         *,
         character_asset_id: str,
         style_asset_id: str,
-        size: str = "1024x1536",
+        size: str = "1536x1024",
         quality: str = "medium",
     ) -> AssetFile:
         if self.image_provider is None:
