@@ -67,7 +67,7 @@ class CharacterMasterService:
         *,
         character_asset_id: str,
         style_asset_id: str,
-        size: str = "1536x1024",
+        size: str = "1024x1536",
         quality: str = "medium",
     ) -> AssetFile:
         if self.image_provider is None:
