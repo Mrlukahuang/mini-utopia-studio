@@ -5,6 +5,7 @@ import streamlit as st
 from studio.core.config import get_settings
 from studio.core.enums import AssetType, ReviewStatus, StoryMode
 from studio.models.character import CharacterProfile, EyeProfile
+from studio.models.world import WorldProfile
 from studio.recipes.character_factory import CharacterFactoryRecipe
 from studio.services.bootstrap import build_context
 from studio.services.style_service import StyleService
@@ -16,6 +17,7 @@ from studio.ui.auth import (
 )
 from studio.ui.brand import render_primary_brand, render_sidebar_brand
 from studio.ui.creator.character_factory import render_character_factory
+from studio.ui.creator.world_factory import render_world_factory
 from studio.ui.theme import apply_mini_utopia_theme, render_brandbar, render_game_hero, render_quest
 
 
@@ -63,6 +65,18 @@ def archive_character(asset_id: str) -> None:
     """Soft-delete a Character while preserving references for Stories/Worlds."""
     ctx.assets.archive_character(asset_id)
     st.session_state.pop(f"confirm_delete_{asset_id}", None)
+
+
+def edit_world(asset) -> None:
+    """Load an existing Mini World back into World Factory."""
+    profile = WorldProfile.model_validate(
+        asset.metadata.get("world_profile", {})
+    )
+    st.session_state.world_draft = profile
+    st.session_state.world_source = asset.description or profile.source_description
+    st.session_state.editing_world_id = asset.asset_id
+    st.session_state.world_concept_candidates = []
+    st.session_state.app_page = "🌍 World Factory"
 
 
 def edit_character(asset) -> None:
@@ -137,6 +151,8 @@ page = st.sidebar.radio(
         "🏠 Home",
         "🎭 My Characters",
         "✨ Character Factory",
+        "🗺️ My Worlds",
+        "🌍 World Factory",
         "🌎 Mini Utopia",
         "🧪 Playground",
         "📖 Stories",
@@ -145,7 +161,12 @@ page = st.sidebar.radio(
 )
 
 
-creator_protected_pages = {"🎭 My Characters", "✨ Character Factory"}
+creator_protected_pages = {
+    "🎭 My Characters",
+    "✨ Character Factory",
+    "🗺️ My Worlds",
+    "🌍 World Factory",
+}
 if mode == "🧒 Creator" and page in creator_protected_pages:
     if not require_creator_pin():
         st.stop()
@@ -399,6 +420,120 @@ elif page == "✨ Character Factory":
         ctx,
         character_factory,
         studio_mode=(mode == "🛠 Studio" and studio_unlocked),
+    )
+
+
+
+elif page == "🗺️ My Worlds":
+    render_game_hero(
+        "My Mini Worlds 🗺️",
+        "这些是你已经想象并选定视觉方向的世界。下一步会把它们真正搭成可以走进去的地方。",
+        kicker="WORLD LIBRARY",
+    )
+
+    worlds = [
+        asset
+        for asset in ctx.repository.list_assets(AssetType.LOCATION)
+        if asset.status != ReviewStatus.ARCHIVED
+        and "world_profile" in asset.metadata
+    ]
+
+    if not worlds:
+        st.info("还没有 Mini World。去 World Factory 创造第一个世界吧！")
+
+    for asset in worlds:
+        profile = WorldProfile.model_validate(
+            asset.metadata.get("world_profile", {})
+        )
+        concept = ctx.world_concepts.current_concept(asset.asset_id)
+
+        with st.container(border=True):
+            art_col, info_col, action_col = st.columns([1.45, 2.15, 0.7])
+
+            with art_col:
+                if concept:
+                    try:
+                        st.image(
+                            ctx.storage.get_bytes(concept.path),
+                            caption="✨ Approved World Concept",
+                            use_container_width=True,
+                        )
+                    except Exception:
+                        st.markdown(
+                            '<div class="mu-character-master-placeholder">🌍<br>'
+                            '<span>Concept image unavailable</span></div>',
+                            unsafe_allow_html=True,
+                        )
+                else:
+                    st.markdown(
+                        '<div class="mu-character-master-placeholder">🏝️<br>'
+                        '<span>No approved concept yet</span></div>',
+                        unsafe_allow_html=True,
+                    )
+
+            with info_col:
+                st.markdown(f"### {asset.display_name}")
+                if profile.world_type or profile.reality_mode:
+                    st.caption(
+                        " · ".join(
+                            x for x in [profile.world_type, profile.reality_mode] if x
+                        )
+                    )
+
+                left, right = st.columns(2)
+                with left:
+                    st.write(f"**Season / 季节** · {profile.season or '—'}")
+                    st.write(f"**Weather / 天气** · {profile.weather or '—'}")
+                    st.write(f"**Time / 时间** · {profile.time_of_day or '—'}")
+                with right:
+                    st.write(
+                        "**Terrain / 地形** · "
+                        + (", ".join(profile.terrain) if profile.terrain else "—")
+                    )
+                    st.write(
+                        "**Mood / 氛围** · "
+                        + (", ".join(profile.mood) if profile.mood else "—")
+                    )
+                    st.write(f"**Portal / 传送门** · {profile.portal_form or '—'}")
+
+                if profile.landmark_ideas:
+                    st.write(
+                        "**Landmarks / 地标** · " + " · ".join(profile.landmark_ideas)
+                    )
+
+                if profile.theme_color_hexes:
+                    swatches = "".join(
+                        f'<span class="mu-color-dot" style="background:{hex_value}" '
+                        f'title="{hex_value}"></span>'
+                        for hex_value in profile.theme_color_hexes
+                    )
+                    st.markdown(
+                        f'<div class="mu-card-fact"><strong>Theme Colors / 世界主题色</strong>'
+                        f'<div class="mu-color-row">{swatches}</div></div>',
+                        unsafe_allow_html=True,
+                    )
+
+                blueprint = asset.metadata.get("world_blueprint")
+                if blueprint:
+                    st.success("🧩 Blueprint seed ready · 50×50 expandable world")
+                else:
+                    st.caption("Concept stage · waiting for Blueprint")
+
+            with action_col:
+                st.button(
+                    "✏️ Edit",
+                    key=f"edit_world_{asset.asset_id}",
+                    on_click=edit_world,
+                    args=(asset,),
+                    use_container_width=True,
+                )
+                st.caption(f"v{asset.version}")
+
+
+elif page == "🌍 World Factory":
+    render_world_factory(
+        ctx,
+        style_asset_id=universe.style_asset_id,
     )
 
 
