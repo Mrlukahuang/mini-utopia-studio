@@ -16,9 +16,11 @@ class StyleService:
         self.repository = repository
 
     def ensure_mini_utopia_base(self) -> Asset:
+        existing = None
         for asset in self.repository.list_assets(AssetType.STYLE):
             if asset.slug == MINI_UTOPIA_BASE_STYLE_SLUG:
-                return asset
+                existing = asset
+                break
 
         profile = StyleProfile(
             visual_dna_pillars=[
@@ -31,7 +33,27 @@ class StyleService:
             medium="Miniature diorama with original block-inspired geometry",
             shape_language=(
                 "Rounded, friendly, modular toy-like forms with readable silhouettes; "
-                "block-inspired without copying branded game assets, textures, or UI."
+                "block-inspired without copying branded game assets, textures, or UI. "
+                "Characters must read as small playable game avatars rather than realistic people."
+            ),
+            character_scale_language=(
+                "Mini Playable Avatar proportions: approximately 2.75 to 3.25 heads tall for "
+                "human-like characters; head occupies roughly one third of total height; "
+                "compact torso, short limbs, slightly oversized hands and shoes, low center of "
+                "gravity, and a bouncy run-ready silhouette. Non-human characters preserve the "
+                "same large-head compact-body readability rather than realistic anatomy."
+            ),
+            face_language=(
+                "Cute simplified game-avatar face: large readable eyes, small nose and mouth, "
+                "soft cheeks, minimal facial micro-detail, no skin pores, no realistic adult "
+                "facial anatomy, no fashion-doll realism. Expressions must remain legible at "
+                "thumbnail size."
+            ),
+            gameplay_silhouette=(
+                "Designed to look controllable in a cozy exploration game: compact body, clear "
+                "silhouette, short stride, slightly oversized feet for grounded motion, and "
+                "simple appendages that animate cleanly while running, jumping, waving, or "
+                "carrying props."
             ),
             material_language=(
                 "Soft tactile toy materials, creamy surfaces, refined detail, "
@@ -77,6 +99,9 @@ class StyleService:
                 "Keep a miniature diorama feeling.",
                 "Keep original voxel/block-inspired geometry.",
                 "Keep rounded, friendly, toy-like forms.",
+                "Keep Mini Playable Avatar proportions: big head, compact body, short limbs.",
+                "Keep cute simplified faces with large readable eyes and minimal realistic detail.",
+                "Keep a run-ready game character silhouette readable at thumbnail size.",
                 "Keep soft tactile materials.",
                 "Keep dreamy macaron color behavior.",
                 "Keep soft cinematic lighting.",
@@ -100,12 +125,15 @@ class StyleService:
             ],
             positive_rules=[
                 "Translate any child-created idea into Mini Utopia visual language.",
+                "Translate human characters into stylized playable mini-avatars, not realistic people.",
                 "Preserve creative content even when the theme is dark, strange, or unexpected.",
                 "Let world identity vary while inheriting the base visual DNA.",
             ],
             negative_rules=[
                 "Do not reject an idea merely because its content is visually unusual.",
                 "Do not copy branded game characters, textures, logos, UI, or signature assets.",
+                "Avoid realistic human proportions, realistic facial anatomy, visible skin pores, "
+                "fashion-editorial posing, or long-legged doll-like silhouettes.",
                 "Do not let a world-specific style replace the Mini Utopia base DNA in Canon Mode.",
             ],
             portal_language=(
@@ -113,6 +141,17 @@ class StyleService:
                 "architecture, luminous dreamy energy, and macaron-compatible glow."
             ),
         )
+
+        if existing is not None:
+            existing.display_name = MINI_UTOPIA_BASE_STYLE_NAME
+            existing.description = (
+                "The locked visual constitution inherited by Mini Utopia Canon characters, "
+                "worlds, props, portals, and scenes."
+            )
+            existing.status = ReviewStatus.APPROVED
+            existing.metadata["style_profile"] = profile.model_dump(mode="json")
+            self.repository.save_asset(existing)
+            return existing
 
         asset = Asset.create(
             AssetType.STYLE,
