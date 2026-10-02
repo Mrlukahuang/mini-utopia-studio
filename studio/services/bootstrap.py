@@ -11,6 +11,8 @@ from studio.services.job_service import JobService
 from studio.services.reference_character_service import ReferenceCharacterService
 from studio.services.character_master_prompt_service import CharacterMasterPromptService
 from studio.services.character_master_service import CharacterMasterService
+from studio.services.world_concept_prompt_service import WorldConceptPromptService
+from studio.services.world_concept_service import WorldConceptService
 from studio.providers.openai_image import OpenAIImageProvider
 from studio.storage.local import LocalObjectStorage
 
@@ -29,6 +31,8 @@ class StudioContext:
     references: ReferenceCharacterService
     character_master_prompts: CharacterMasterPromptService
     character_masters: CharacterMasterService
+    world_concept_prompts: WorldConceptPromptService
+    world_concepts: WorldConceptService
 
 
 def build_context(settings: Settings) -> StudioContext:
@@ -39,6 +43,7 @@ def build_context(settings: Settings) -> StudioContext:
     registry.register(MockTurnaroundPlugin())
 
     character_master_prompts = CharacterMasterPromptService()
+    world_concept_prompts = WorldConceptPromptService()
     image_provider = (
         OpenAIImageProvider(
             settings.openai_api_key,
@@ -64,6 +69,13 @@ def build_context(settings: Settings) -> StudioContext:
             repository,
             storage,
             character_master_prompts,
+            image_provider=image_provider,
+        ),
+        world_concept_prompts=world_concept_prompts,
+        world_concepts=WorldConceptService(
+            repository,
+            storage,
+            world_concept_prompts,
             image_provider=image_provider,
         ),
     )
