@@ -15,6 +15,9 @@ def test_character_profile_v1_core_completion():
         character_type="机器人",
         age="10",
         appearance="银色的小机器人",
+        hair_or_fur_color="银灰色",
+        body_build="普通 / Average",
+        height="偏矮 / Short",
         eyes=EyeProfile(shape="圆形", color="蓝色"),
         personality_traits=["好奇", "勇敢"],
         speaking_tone="轻快、直接",
@@ -81,3 +84,16 @@ def test_wearable_asset_uses_wear_prefix():
     )
 
     assert asset.asset_id.startswith("WEAR_")
+
+
+def test_visual_difference_fields_are_preserved():
+    profile = CharacterProfile(
+        hair_or_fur="卷发",
+        hair_or_fur_color="紫色",
+        body_build="圆润 / Round",
+        height="很高 / Very tall",
+    )
+
+    assert profile.hair_or_fur_color == "紫色"
+    assert profile.body_build == "圆润 / Round"
+    assert profile.height == "很高 / Very tall"
