@@ -4,10 +4,11 @@ from uuid import uuid4
 
 from studio.core.enums import AssetType, ReviewStatus
 from studio.models.asset import AssetFile
-from studio.models.world import WorldBlueprint, WorldProfile, WorldVisualAnchor
+from studio.models.world import WorldProfile
 from studio.providers.base import ImageGenerationProvider
 from studio.repositories.base import StudioRepository
 from studio.services.world_concept_prompt_service import WorldConceptPromptService
+from studio.services.world_blueprint_service import WorldBlueprintService
 from studio.storage.base import ObjectStorage
 
 
@@ -17,11 +18,13 @@ class WorldConceptService:
         repository: StudioRepository,
         storage: ObjectStorage,
         prompt_service: WorldConceptPromptService,
+        blueprint_service: WorldBlueprintService,
         image_provider: ImageGenerationProvider | None = None,
     ):
         self.repository = repository
         self.storage = storage
         self.prompt_service = prompt_service
+        self.blueprint_service = blueprint_service
         self.image_provider = image_provider
 
     @property
@@ -107,15 +110,12 @@ class WorldConceptService:
         world.metadata["world_concept_path"] = selected.path
 
         profile = WorldProfile.model_validate(world.metadata.get("world_profile", {}))
-        blueprint = WorldBlueprint(
+        blueprint = self.blueprint_service.build(
             location_asset_id=world.asset_id,
             style_asset_id=style_asset_id,
-            visual_anchor=WorldVisualAnchor(
-                concept_image_roles=["world_concept_approved"],
-                concept_summary=profile.source_description or profile.world_name,
-                must_preserve=list(profile.landmark_ideas),
-                flexible_details=list(profile.surprise_elements),
-            ),
+            profile=profile,
+            concept_path=selected.path,
+            concept_direction=world.metadata.get("world_concept_last_direction", ""),
         )
         world.metadata["world_blueprint"] = blueprint.model_dump(mode="json")
         self.repository.save_asset(world)
