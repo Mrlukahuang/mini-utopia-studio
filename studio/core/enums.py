@@ -5,6 +5,7 @@ class AssetType(str, Enum):
     CHARACTER = "character"
     LOCATION = "location"
     PROP = "prop"
+    WEARABLE = "wearable"
     VEHICLE = "vehicle"
     STYLE = "style"
     VOICE = "voice"

@@ -14,6 +14,7 @@ ASSET_PREFIX = {
     AssetType.CHARACTER: "CHAR",
     AssetType.LOCATION: "LOC",
     AssetType.PROP: "PROP",
+    AssetType.WEARABLE: "WEAR",
     AssetType.VEHICLE: "VEH",
     AssetType.STYLE: "STYLE",
     AssetType.VOICE: "VOICE",
