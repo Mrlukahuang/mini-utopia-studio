@@ -427,6 +427,86 @@ elif page == "🎭 My Characters":
                         language="text",
                     )
 
+                runtime_meta = asset.metadata.get("runtime_3d", {}) or {}
+                with st.expander("🧍 Character 3D Runtime Asset", expanded=False):
+                    if runtime_meta.get("model_path"):
+                        st.success(
+                            "GLB attached · " + runtime_meta.get("model_path", "")
+                        )
+                    else:
+                        st.caption("No GLB attached · procedural avatar fallback is active.")
+
+                    uploaded_glb = st.file_uploader(
+                        "Upload Character GLB / 上传角色 GLB",
+                        type=["glb"],
+                        key=f"runtime_glb_{asset.asset_id}",
+                        help="Studio-only prototype flow. The file is saved to ObjectStorage.",
+                    )
+                    scale = st.number_input(
+                        "Runtime Scale",
+                        min_value=0.05,
+                        max_value=10.0,
+                        value=float(runtime_meta.get("scale", 1.0)),
+                        step=0.05,
+                        key=f"runtime_scale_{asset.asset_id}",
+                    )
+                    clips = runtime_meta.get("animation_clips", {}) or {}
+                    clip_a, clip_b, clip_c = st.columns(3)
+                    with clip_a:
+                        idle_clip = st.text_input(
+                            "Idle clip",
+                            value=clips.get("idle", "Idle"),
+                            key=f"runtime_idle_{asset.asset_id}",
+                        )
+                    with clip_b:
+                        walk_clip = st.text_input(
+                            "Walk clip",
+                            value=clips.get("walk", "Walk"),
+                            key=f"runtime_walk_{asset.asset_id}",
+                        )
+                    with clip_c:
+                        run_clip = st.text_input(
+                            "Run clip",
+                            value=clips.get("run", "Run"),
+                            key=f"runtime_run_{asset.asset_id}",
+                        )
+
+                    attach_col, detach_col = st.columns(2)
+                    with attach_col:
+                        if st.button(
+                            "💾 Attach GLB",
+                            key=f"attach_runtime_glb_{asset.asset_id}",
+                            disabled=uploaded_glb is None,
+                            use_container_width=True,
+                        ):
+                            try:
+                                ctx.character_runtime.attach_glb(
+                                    asset_id=asset.asset_id,
+                                    payload=uploaded_glb.getvalue(),
+                                    scale=scale,
+                                    idle_clip=idle_clip,
+                                    walk_clip=walk_clip,
+                                    run_clip=run_clip,
+                                )
+                                st.success("Character GLB attached.")
+                                st.rerun()
+                            except Exception as exc:
+                                st.error(f"GLB attach failed: {exc}")
+                    with detach_col:
+                        if st.button(
+                            "↩ Use Procedural",
+                            key=f"detach_runtime_glb_{asset.asset_id}",
+                            disabled=not bool(runtime_meta.get("model_path")),
+                            use_container_width=True,
+                        ):
+                            ctx.character_runtime.detach_glb(asset.asset_id)
+                            st.rerun()
+
+                    st.caption(
+                        "Prototype storage reminder: Streamlit local ObjectStorage is not durable yet. "
+                        "We will move these assets to persistent object storage before production use."
+                    )
+
 
 elif page == "✨ Character Factory":
     render_character_factory(
