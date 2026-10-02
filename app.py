@@ -20,6 +20,7 @@ st.set_page_config(
 
 ctx = build_context(get_settings(ROOT))
 universe = ctx.universes.ensure_mini_utopia()
+universe = ctx.styles.attach_base_style(universe)
 character_factory = CharacterFactoryRecipe(ctx.registry, ctx.assets)
 
 

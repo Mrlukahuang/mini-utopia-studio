@@ -5,6 +5,7 @@ from studio.plugins.mock.creative import MockCharacterParsePlugin, MockTurnaroun
 from studio.repositories.sqlite import SQLiteStudioRepository
 from studio.services.asset_service import AssetService
 from studio.services.story_service import StoryService
+from studio.services.style_service import StyleService
 from studio.services.universe_service import UniverseService
 from studio.services.job_service import JobService
 from studio.storage.local import LocalObjectStorage
@@ -18,6 +19,7 @@ class StudioContext:
     registry: PluginRegistry
     assets: AssetService
     stories: StoryService
+    styles: StyleService
     universes: UniverseService
     jobs: JobService
 
@@ -35,6 +37,7 @@ def build_context(settings: Settings) -> StudioContext:
         registry=registry,
         assets=AssetService(repository),
         stories=StoryService(repository),
+        styles=StyleService(repository),
         universes=UniverseService(repository),
         jobs=JobService(repository),
     )
