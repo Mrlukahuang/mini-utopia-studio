@@ -144,4 +144,15 @@ class CharacterMasterService:
         for file_ref in reversed(character.files):
             if file_ref.role == "character_master":
                 return file_ref
+
+        # Backward-compatibility fallback for older Character records where
+        # the approved master path was persisted in metadata but the file-role
+        # list is incomplete.
+        metadata_path = character.metadata.get("character_master_path")
+        if metadata_path:
+            return AssetFile(
+                role="character_master",
+                path=metadata_path,
+                mime_type="image/png",
+            )
         return None

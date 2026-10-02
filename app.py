@@ -3,7 +3,7 @@ from pathlib import Path
 import streamlit as st
 
 from studio.core.config import get_settings
-from studio.core.enums import AssetType, StoryMode
+from studio.core.enums import AssetType, ReviewStatus, StoryMode
 from studio.models.character import CharacterProfile, EyeProfile
 from studio.recipes.character_factory import CharacterFactoryRecipe
 from studio.services.bootstrap import build_context
@@ -51,6 +51,18 @@ render_sidebar_brand()
 
 if "char_draft" not in st.session_state:
     st.session_state.char_draft = None
+
+# Cross-page navigation is queued by creator workflows and applied before the
+# sidebar radio is instantiated. This avoids mutating a live widget key.
+pending_page = st.session_state.pop("pending_app_page", None)
+if pending_page:
+    st.session_state.app_page = pending_page
+
+
+def archive_character(asset_id: str) -> None:
+    """Soft-delete a Character while preserving references for Stories/Worlds."""
+    ctx.assets.archive_character(asset_id)
+    st.session_state.pop(f"confirm_delete_{asset_id}", None)
 
 
 def edit_character(asset) -> None:
@@ -219,7 +231,11 @@ elif page == "🎭 My Characters":
         kicker="CHARACTER LIBRARY",
     )
 
-    chars = ctx.repository.list_assets(AssetType.CHARACTER)
+    chars = [
+        asset
+        for asset in ctx.repository.list_assets(AssetType.CHARACTER)
+        if asset.status != ReviewStatus.ARCHIVED
+    ]
 
     if not chars:
         st.info(
@@ -227,53 +243,137 @@ elif page == "🎭 My Characters":
         )
 
     for asset in chars:
+        profile = CharacterProfile.model_validate(
+            asset.metadata.get("character_profile", {})
+        )
+        master_ref = ctx.character_masters.current_master(asset.asset_id)
+
         with st.container(border=True):
-            st.markdown(
-                '<div class="mu-character-card"><div class="mu-character-orb">🧸</div></div>',
-                unsafe_allow_html=True,
-            )
-            master_ref = ctx.character_masters.current_master(asset.asset_id)
-            if master_ref:
-                try:
-                    st.image(
-                        ctx.storage.get_bytes(master_ref.path),
-                        caption="✨ Character Master",
-                        use_container_width=True,
+            art_col, info_col, action_col = st.columns([1.35, 2.25, 0.72])
+
+            with art_col:
+                if master_ref:
+                    try:
+                        st.image(
+                            ctx.storage.get_bytes(master_ref.path),
+                            caption="✨ Character Master",
+                            use_container_width=True,
+                        )
+                    except Exception:
+                        st.markdown(
+                            '<div class="mu-character-master-placeholder">🎭<br>'
+                            '<span>Master image unavailable</span></div>',
+                            unsafe_allow_html=True,
+                        )
+                        st.caption("旧图片文件暂时无法读取；角色资料仍然安全。下次编辑并重新生成后会恢复预览。")
+                else:
+                    st.markdown(
+                        '<div class="mu-character-master-placeholder">🧸<br>'
+                        '<span>No approved Master yet</span></div>',
+                        unsafe_allow_html=True,
                     )
-                except Exception:
-                    st.caption("Character Master 图片暂时无法读取。")
 
-            st.subheader(asset.display_name)
-            st.caption(asset.asset_id)
-            st.write(asset.description or "等待描述")
-
-            profile = asset.metadata.get("character_profile", {})
-            personality = profile.get("personality_traits", [])
-
-            if personality:
-                st.markdown(
-                    "".join(
-                        f'<span class="mu-pill">{item}</span>'
-                        for item in personality
-                    ),
-                    unsafe_allow_html=True,
+            with info_col:
+                st.markdown(f"### {asset.display_name}")
+                type_role = " · ".join(
+                    part
+                    for part in [profile.character_type, profile.story_role]
+                    if part
                 )
-            else:
-                st.caption("等待性格设定")
+                if type_role:
+                    st.caption(type_role)
 
-            st.button(
-                "✏️ Edit Character / 编辑角色",
-                key=f"edit_{asset.asset_id}",
-                on_click=edit_character,
-                args=(asset,),
-                use_container_width=True,
-            )
+                fact_a, fact_b = st.columns(2)
+                with fact_a:
+                    st.write(f"**Age / 年龄** · {profile.age or '—'}")
+                    height_text = (
+                        f"{profile.height_cm:.0f} cm"
+                        if profile.height_cm is not None
+                        else (profile.height or "—")
+                    )
+                    st.write(f"**Height / 身高** · {height_text}")
+                    st.write(f"**Eyes / 眼睛** · {profile.eyes.color or '—'}")
+                with fact_b:
+                    hair = profile.hair_style or profile.hair_or_fur or "—"
+                    st.write(f"**Hair / Fur / 发型毛发** · {hair}")
+                    st.write(
+                        f"**Build / 体型** · "
+                        f"{profile.body_build or profile.body_type or '—'}"
+                    )
+                    st.write(
+                        f"**Movement / 动作** · {profile.movement_style or '—'}"
+                    )
+
+                if profile.personality_traits:
+                    st.markdown(
+                        "".join(
+                            f'<span class="mu-pill">{item}</span>'
+                            for item in profile.personality_traits
+                        ),
+                        unsafe_allow_html=True,
+                    )
+
+                if profile.favorite_color_hexes:
+                    swatches = "".join(
+                        f'<span class="mu-color-dot" style="background:{hex_value}" '
+                        f'title="{hex_value}"></span>'
+                        for hex_value in profile.favorite_color_hexes
+                    )
+                    st.markdown(
+                        f'<div class="mu-card-fact"><strong>Favorite Colors / 喜爱颜色</strong>'
+                        f'<div class="mu-color-row">{swatches}</div></div>',
+                        unsafe_allow_html=True,
+                    )
+
+                if profile.distinctive_features:
+                    st.write(
+                        "**Distinctive / 标志特征** · "
+                        + " · ".join(profile.distinctive_features)
+                    )
+
+                if asset.description:
+                    st.caption(asset.description)
+
+            with action_col:
+                st.button(
+                    "✏️ Edit",
+                    key=f"edit_{asset.asset_id}",
+                    on_click=edit_character,
+                    args=(asset,),
+                    use_container_width=True,
+                )
+
+                confirm_key = f"confirm_delete_{asset.asset_id}"
+                if not st.session_state.get(confirm_key):
+                    if st.button(
+                        "🗑️ Delete",
+                        key=f"delete_{asset.asset_id}",
+                        use_container_width=True,
+                    ):
+                        st.session_state[confirm_key] = True
+                        st.rerun()
+                else:
+                    st.warning("确定删除？")
+                    if st.button(
+                        "✅ Confirm",
+                        key=f"confirm_delete_button_{asset.asset_id}",
+                        type="primary",
+                        use_container_width=True,
+                    ):
+                        archive_character(asset.asset_id)
+                        st.rerun()
+                    if st.button(
+                        "↩ Cancel",
+                        key=f"cancel_delete_{asset.asset_id}",
+                        use_container_width=True,
+                    ):
+                        st.session_state[confirm_key] = False
+                        st.rerun()
+
+                st.caption(f"v{asset.version}")
 
             if mode == "🛠 Studio" and studio_unlocked:
                 with st.expander("🎨 Character Master Prompt", expanded=False):
-                    profile_obj = CharacterProfile.model_validate(
-                        asset.metadata.get("character_profile", {})
-                    )
                     style_asset = (
                         ctx.repository.get_asset(universe.style_asset_id)
                         if universe.style_asset_id
@@ -287,7 +387,7 @@ elif page == "🎭 My Characters":
                     st.code(
                         ctx.character_master_prompts.compose(
                             name=asset.display_name,
-                            profile=profile_obj,
+                            profile=profile,
                             style_profile=style_profile,
                         ),
                         language="text",

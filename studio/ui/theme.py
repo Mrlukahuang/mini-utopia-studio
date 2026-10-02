@@ -398,6 +398,45 @@ h1, h2, h3 {
     font-weight:800;
     fill:#746A93;
 }
+
+.mu-character-master-placeholder {
+    min-height: 250px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    border-radius:24px;
+    background:linear-gradient(145deg, rgba(255,255,255,.92), rgba(240,233,255,.88), rgba(226,246,255,.88));
+    border:1px dashed rgba(112,96,176,.18);
+    color:#756C92;
+    font-size:2.2rem;
+    text-align:center;
+}
+.mu-character-master-placeholder span {
+    font-size:.82rem;
+    font-weight:800;
+    font-family:"Nunito","Noto Sans SC",sans-serif;
+}
+.mu-color-row {
+    display:flex;
+    gap:7px;
+    margin-top:7px;
+    flex-wrap:wrap;
+}
+.mu-color-dot {
+    width:22px;
+    height:22px;
+    display:inline-block;
+    border-radius:50%;
+    border:2px solid rgba(255,255,255,.95);
+    box-shadow:0 2px 8px rgba(61,52,101,.16);
+}
+.mu-card-fact {
+    margin-top:10px;
+    color:#57566F;
+}
+
 [data-testid="stSidebar"] .stButton > button {
     min-height: 2.7rem;
     border-radius: 16px;

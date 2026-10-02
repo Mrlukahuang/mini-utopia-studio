@@ -158,3 +158,24 @@ def test_master_prompt_resolves_wearables_instead_of_exposing_ids(tmp_path):
     assert "White T-Shirt / 白色 T恤" in prompt
     assert "simple clean white cotton T-shirt" in prompt
     assert top.asset_id not in prompt
+
+
+def test_current_master_falls_back_to_metadata_path(tmp_path):
+    repo = SQLiteStudioRepository(tmp_path / "studio.db")
+    storage = LocalObjectStorage(tmp_path / "storage")
+    service = CharacterMasterService(
+        repo,
+        storage,
+        CharacterMasterPromptService(),
+        FakeImageProvider(),
+    )
+    character = _character(repo)
+    character.metadata["character_master_path"] = "assets/legacy/master.png"
+    character.files = []
+    repo.save_asset(character)
+
+    master = service.current_master(character.asset_id)
+
+    assert master is not None
+    assert master.role == "character_master"
+    assert master.path == "assets/legacy/master.png"
