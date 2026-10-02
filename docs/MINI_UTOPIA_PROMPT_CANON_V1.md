@@ -6,15 +6,17 @@ This document freezes the two basic outputs that all Canon character generation 
 
 The approved layout direction is a structured character design board, not a poster.
 
-Required visual zones:
-- one larger hero three-quarter view
-- one compact turnaround set: front, three-quarter, side, back
-- one compact expression set: neutral, happy, curious, excited, surprised
-- generous negative space
-- light neutral Mini Utopia studio backdrop
-- factual profile, palette, height, outfit names, IDs and brand marks are rendered by the application, not hallucinated by the image model
+Required visual zones (portrait Character Master v2):
+- top ~55%: exactly one larger full-body hero three-quarter view
+- middle ~25%: one compact turnaround row: front, three-quarter, side, back
+- bottom ~20%: one compact expression row: neutral, happy, curious, excited, surprised
+- generous negative space and regular spacing
+- light neutral Mini Utopia studio backdrop with only subtle block-world accents
+- no extra duplicate figures outside the required hero / turnaround / expression views
+- factual profile, palette, height, outfit names and IDs are rendered by the application
+- the official Mini Utopia square badge is composited by Python after generation; the image model never redraws the logo
 
-The image model must not render words, labels, measurements, IDs, UI cards, logos, watermarks or captions.
+The image model must not render words, labels, measurements, IDs, UI cards, logos, watermarks or captions. The source artwork is generated at 1024×1536 and then composed into a branded 1200×1800 portrait master with a fixed 150 px header.
 
 ## 2. Style Canon — Mini Utopia Character Identity
 
