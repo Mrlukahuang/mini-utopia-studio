@@ -30,15 +30,21 @@ class StyleService:
                 "Macaron Dreamscape / 马卡龙梦幻世界",
                 "Cinematic / 电影感",
             ],
-            medium="Miniature diorama with original block-inspired geometry",
+            medium=(
+                "Miniature diorama with original voxel-inspired and construction-toy-inspired "
+                "geometry, translated into a proprietary Mini Utopia look rather than any branded style"
+            ),
             shape_language=(
-                "Rounded, friendly, modular toy-like forms with readable silhouettes; "
-                "block-inspired without copying branded game assets, textures, or UI. "
-                "Characters must read as small playable game avatars rather than realistic people."
+                "Chunky modular forms, soft square and rounded-cuboid masses, simplified planes, "
+                "clean readable silhouettes, and gentle toy-like bevels. The identity should sit "
+                "between a voxel exploration world and a construction-toy diorama while remaining "
+                "original: no branded character anatomy, stud patterns, proprietary textures, "
+                "logos, UI, or signature assets. Characters must read as small playable game "
+                "avatars rather than realistic people."
             ),
             character_scale_language=(
-                "Mini Playable Avatar proportions: approximately 2.75 to 3.25 heads tall for "
-                "human-like characters; head occupies roughly one third of total height; "
+                "Mini Playable Avatar proportions: approximately 2.8 to 3.0 heads tall for "
+                "human-like characters; head occupies roughly one third of total height, with a deliberately compact lower body; "
                 "compact torso, short limbs, slightly oversized hands and shoes, low center of "
                 "gravity, and a bouncy run-ready silhouette. Non-human characters preserve the "
                 "same large-head compact-body readability rather than realistic anatomy."
@@ -56,8 +62,10 @@ class StyleService:
                 "carrying props."
             ),
             material_language=(
-                "Soft tactile toy materials, creamy surfaces, refined detail, "
-                "and gentle stylization rather than hyper-realism."
+                "Matte collectible-toy surfaces, soft vinyl and painted-toy tactility, creamy "
+                "finishes, restrained micro-detail, and clearly constructed geometric masses. "
+                "Avoid realistic hair strands, plush-heavy fuzz, glossy fashion-doll plastic, "
+                "or hyper-real material simulation unless the character concept explicitly needs it."
             ),
             lighting=(
                 "Soft cinematic light, dreamy glow, gentle shadows, luminous highlights, "
@@ -98,11 +106,12 @@ class StyleService:
             locked_rules=[
                 "Keep a miniature diorama feeling.",
                 "Keep original voxel/block-inspired geometry.",
-                "Keep rounded, friendly, toy-like forms.",
+                "Keep chunky modular block-built forms with soft rounded edges.",
+                "Keep the visual identity between voxel-world structure and construction-toy tactility, without branded imitation.",
                 "Keep Mini Playable Avatar proportions: big head, compact body, short limbs.",
                 "Keep cute simplified faces with large readable eyes and minimal realistic detail.",
                 "Keep a run-ready game character silhouette readable at thumbnail size.",
-                "Keep soft tactile materials.",
+                "Keep matte collectible-toy materials and simplified sculpted surfaces.",
                 "Keep dreamy macaron color behavior.",
                 "Keep soft cinematic lighting.",
                 "Keep clear foreground / midground / background depth.",
@@ -132,6 +141,8 @@ class StyleService:
             negative_rules=[
                 "Do not reject an idea merely because its content is visually unusual.",
                 "Do not copy branded game characters, textures, logos, UI, or signature assets.",
+                "Avoid drifting into generic 3D animation, plush-toy rendering, anime illustration, "
+                "or smooth cinematic character art without visible block-built geometric logic.",
                 "Avoid realistic human proportions, realistic facial anatomy, visible skin pores, "
                 "fashion-editorial posing, or long-legged doll-like silhouettes.",
                 "Do not let a world-specific style replace the Mini Utopia base DNA in Canon Mode.",

@@ -4,6 +4,7 @@ import hmac
 import streamlit as st
 
 SESSION_KEY = "studio_unlocked"
+CREATOR_SESSION_KEY = "creator_unlocked"
 
 
 def _get_expected_pin() -> str:
@@ -82,4 +83,65 @@ def require_studio_pin() -> bool:
 def lock_studio() -> None:
     """Lock Studio Mode for the current browser session."""
     st.session_state[SESSION_KEY] = False
+    st.rerun()
+
+
+def _get_expected_creator_pin() -> str:
+    """Read the child-facing Creator PIN from Streamlit Secrets."""
+    try:
+        return str(st.secrets.get("CREATOR_PIN", "")).strip()
+    except Exception:
+        return ""
+
+
+def is_creator_unlocked() -> bool:
+    """Return whether cost-bearing Creator pages are unlocked this session."""
+    return bool(st.session_state.get(CREATOR_SESSION_KEY, False))
+
+
+def require_creator_pin() -> bool:
+    """Protect Character Factory and Character Library with a separate PIN."""
+    if is_creator_unlocked():
+        return True
+
+    expected_pin = _get_expected_creator_pin()
+
+    st.markdown("## 🌟 Creator Pass")
+    st.caption(
+        "Character creation can generate paid AI images. "
+        "Enter the family Creator PIN to open the Character Factory."
+    )
+
+    if not expected_pin:
+        st.error(
+            "Creator PIN is not configured. "
+            "Add CREATOR_PIN in Streamlit Cloud → App settings → Secrets."
+        )
+        return False
+
+    with st.form("creator_unlock_form", clear_on_submit=True):
+        entered_pin = st.text_input(
+            "Creator PIN",
+            type="password",
+            placeholder="Enter Creator PIN",
+            autocomplete="off",
+        )
+        submitted = st.form_submit_button(
+            "🌈 Enter Mini Utopia",
+            type="primary",
+            use_container_width=True,
+        )
+
+    if submitted:
+        if hmac.compare_digest(entered_pin.strip(), expected_pin):
+            st.session_state[CREATOR_SESSION_KEY] = True
+            st.rerun()
+        else:
+            st.error("Incorrect PIN.")
+
+    return False
+
+
+def lock_creator() -> None:
+    st.session_state[CREATOR_SESSION_KEY] = False
     st.rerun()

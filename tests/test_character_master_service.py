@@ -13,7 +13,7 @@ class FakeImageProvider(ImageGenerationProvider):
     def __init__(self):
         self.calls = []
 
-    def generate(self, *, prompt: str, size: str = "1024x1536", quality: str = "medium") -> bytes:
+    def generate(self, *, prompt: str, size: str = "1536x1024", quality: str = "medium") -> bytes:
         self.calls.append({"prompt": prompt, "size": size, "quality": quality})
         return b"fake-png-bytes"
 
@@ -59,7 +59,7 @@ def test_generate_candidate_attaches_file_and_preserves_char_id(tmp_path):
     assert saved.status == ReviewStatus.NEEDS_REVIEW
     assert candidate.role == "character_master_candidate"
     assert storage.get_bytes(candidate.path) == b"fake-png-bytes"
-    assert provider.calls[0]["size"] == "1024x1536"
+    assert provider.calls[0]["size"] == "1536x1024"
     assert "Mini Utopia Character Master" in provider.calls[0]["prompt"]
 
 
@@ -119,3 +119,42 @@ def test_regeneration_keeps_previous_candidate_until_human_approval(tmp_path):
     assert first.path != second.path
     assert len(candidates) == 2
     assert service.current_master(character.asset_id) is None
+
+
+def test_master_prompt_resolves_wearables_instead_of_exposing_ids(tmp_path):
+    repo = SQLiteStudioRepository(tmp_path / "studio.db")
+    storage = LocalObjectStorage(tmp_path / "storage")
+    provider = FakeImageProvider()
+    service = CharacterMasterService(
+        repo,
+        storage,
+        CharacterMasterPromptService(),
+        provider,
+    )
+
+    top = Asset.create(
+        AssetType.WEARABLE,
+        display_name="White T-Shirt / 白色 T恤",
+        slug="white-shirt",
+        description="simple clean white cotton T-shirt",
+    )
+    repo.save_asset(top)
+
+    character = _character(repo)
+    profile = CharacterProfile.model_validate(
+        character.metadata["character_profile"]
+    )
+    profile.wearables.top_id = top.asset_id
+    character.metadata["character_profile"] = profile.model_dump(mode="json")
+    repo.save_asset(character)
+
+    style = StyleService(repo).ensure_mini_utopia_base()
+    service.generate_candidate(
+        character_asset_id=character.asset_id,
+        style_asset_id=style.asset_id,
+    )
+
+    prompt = provider.calls[0]["prompt"]
+    assert "White T-Shirt / 白色 T恤" in prompt
+    assert "simple clean white cotton T-shirt" in prompt
+    assert top.asset_id not in prompt
