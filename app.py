@@ -236,6 +236,30 @@ elif page == "🎭 My Characters":
                 use_container_width=True,
             )
 
+            if mode == "🛠 Studio" and studio_unlocked:
+                with st.expander("🎨 Character Master Prompt", expanded=False):
+                    profile_obj = CharacterProfile.model_validate(
+                        asset.metadata.get("character_profile", {})
+                    )
+                    style_asset = (
+                        ctx.repository.get_asset(universe.style_asset_id)
+                        if universe.style_asset_id
+                        else None
+                    )
+                    style_profile = (
+                        style_asset.metadata.get("style_profile", {})
+                        if style_asset
+                        else {}
+                    )
+                    st.code(
+                        ctx.character_master_prompts.compose(
+                            name=asset.display_name,
+                            profile=profile_obj,
+                            style_profile=style_profile,
+                        ),
+                        language="text",
+                    )
+
 
 elif page == "✨ Character Factory":
     render_character_factory(
