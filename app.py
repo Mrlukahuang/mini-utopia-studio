@@ -334,6 +334,20 @@ elif page == "✨ Character Factory":
                 "头发 / 毛发 / Hair or Fur",
                 value=draft.hair_or_fur,
             )
+            hair_or_fur_color = st.text_input(
+                "头发 / 毛发颜色 / Hair or Fur Color",
+                value=draft.hair_or_fur_color,
+            )
+            body_build = st.selectbox(
+                "体型 / Body Build",
+                ["", "很瘦 / Very slim", "偏瘦 / Slim", "普通 / Average", "圆润 / Round", "胖胖的 / Chubby", "壮壮的 / Strong"],
+                index=0 if not draft.body_build else 0,
+            )
+            height = st.selectbox(
+                "身高 / Height",
+                ["", "很矮 / Very short", "偏矮 / Short", "中等 / Medium", "偏高 / Tall", "很高 / Very tall"],
+                index=0 if not draft.height else 0,
+            )
             favorite_colors = st.text_input(
                 "喜爱的颜色 / Favorite Colors",
                 value="，".join(draft.favorite_colors),
@@ -471,6 +485,9 @@ elif page == "✨ Character Factory":
                     "age": age,
                     "appearance": appearance,
                     "hair_or_fur": hair_or_fur,
+                    "hair_or_fur_color": hair_or_fur_color,
+                    "body_build": body_build,
+                    "height": height,
                     "favorite_colors": split_items(favorite_colors),
                     "personality_traits": split_items(personality),
                     "speaking_tone": speaking_tone,
