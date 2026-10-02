@@ -865,6 +865,30 @@ if mode == "🛠 Studio" and studio_unlocked:
     st.divider()
     st.subheader("🛠 Studio Inspector")
 
+    with st.expander("Storage", expanded=False):
+        storage_backend = ctx.settings.object_storage_backend
+        if storage_backend == "supabase":
+            st.success("☁️ Durable Object Storage · Supabase")
+            st.write(f"**Bucket** · {ctx.settings.supabase_storage_bucket}")
+            st.caption(
+                "Character Masters, World Concepts and Character GLBs are stored remotely. "
+                "Service-role credentials remain server-side and are never sent to the browser."
+            )
+        else:
+            st.warning("💻 Local Object Storage · development / ephemeral")
+            st.caption(
+                "Binary assets are stored on the local filesystem. On Streamlit Community Cloud "
+                "they may disappear across redeploys or restarts."
+            )
+
+        st.write(
+            "**Metadata database** · SQLite (still local / ephemeral on Streamlit Community Cloud)"
+        )
+        st.caption(
+            "Next persistence milestone: move Studio metadata to durable Postgres so object keys "
+            "and asset records survive together."
+        )
+
     with st.expander(
         "Universe",
         expanded=False,
