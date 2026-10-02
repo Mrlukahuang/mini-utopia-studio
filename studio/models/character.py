@@ -3,7 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
-CHARACTER_SCHEMA_VERSION = "1.0"
+CHARACTER_SCHEMA_VERSION = "1.1"
 
 # These fields are expected before a Character is considered creator-ready.
 # The parser may leave them blank when the source description does not specify them;
@@ -24,6 +24,7 @@ class EyeProfile(BaseModel):
 
     shape: str = ""
     color: str = ""
+    color_hex: str = "#6B4F3A"
     size: str = ""
     special_features: list[str] = Field(default_factory=list)
 
@@ -59,16 +60,19 @@ class CharacterProfile(BaseModel):
 
     # Core / 核心
     character_type: str = ""
+    character_type_description: str = ""
     age: str = ""
     appearance: str = ""
     eyes: EyeProfile = Field(default_factory=EyeProfile)
     hair_or_fur: str = ""
     hair_style: str = ""
     hair_or_fur_color: str = ""
+    hair_or_fur_color_hex: str = "#F4E9D8"
     body_build: str = ""
     height: str = ""
     height_cm: float | None = Field(default=None, gt=0, le=1000)
     favorite_colors: list[str] = Field(default_factory=list)
+    favorite_color_hexes: list[str] = Field(default_factory=list)
     personality_traits: list[str] = Field(default_factory=list)
     speaking_tone: str = ""
     native_language: str = ""
@@ -76,6 +80,7 @@ class CharacterProfile(BaseModel):
 
     # Detail / 细节
     story_role: str = ""
+    story_role_description: str = ""
     body_type: str = ""
     proportions: str = ""
     face: str = ""
