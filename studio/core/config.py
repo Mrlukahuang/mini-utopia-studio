@@ -15,6 +15,7 @@ class Settings:
     app_env: str
     openai_api_key: str | None
     gemini_api_key: str | None
+    openai_image_model: str = "gpt-image-2"
 
 
 def get_settings(root_dir: Path | None = None) -> Settings:
@@ -28,4 +29,5 @@ def get_settings(root_dir: Path | None = None) -> Settings:
         app_env=os.getenv("APP_ENV", "development"),
         openai_api_key=os.getenv("OPENAI_API_KEY") or None,
         gemini_api_key=os.getenv("GEMINI_API_KEY") or None,
+        openai_image_model=os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-2"),
     )
