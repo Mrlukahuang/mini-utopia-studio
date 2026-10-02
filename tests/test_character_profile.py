@@ -81,3 +81,25 @@ def test_wearable_asset_uses_wear_prefix():
     )
 
     assert asset.asset_id.startswith("WEAR_")
+
+
+def test_character_visual_fields_are_preserved():
+    profile = CharacterProfile(
+        hair_or_fur="头发",
+        hair_style="双辫 / Twin braids",
+        hair_or_fur_color="深棕色",
+        body_build="圆润 / Round",
+        height="偏高 / Tall",
+        height_cm=165,
+    )
+
+    assert profile.hair_style == "双辫 / Twin braids"
+    assert profile.hair_or_fur_color == "深棕色"
+    assert profile.body_build == "圆润 / Round"
+    assert profile.height == "偏高 / Tall"
+    assert profile.height_cm == 165
+
+
+def test_height_cm_must_be_positive():
+    with pytest.raises(ValidationError):
+        CharacterProfile(height_cm=0)
