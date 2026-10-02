@@ -124,6 +124,20 @@ if "char_draft" not in st.session_state:
     st.session_state.char_draft = None
 
 
+def edit_character(asset) -> None:
+    """Load an existing Character Asset back into the Creator flow."""
+    profile = CharacterProfile.model_validate(
+        asset.metadata.get("character_profile", {})
+    )
+    st.session_state.char_draft = profile
+    st.session_state.char_source = asset.description or profile.source_description
+    st.session_state.char_name = asset.display_name
+    st.session_state.character_name_input = asset.display_name
+    st.session_state.editing_character_id = asset.asset_id
+    st.session_state.char_preview_ready = False
+    st.session_state.app_page = "✨ Character Factory"
+
+
 # ---------------------------------------------------------------------------
 # App title
 # ---------------------------------------------------------------------------
@@ -274,6 +288,14 @@ elif page == "🎭 My Characters":
                 )
             else:
                 st.caption("等待性格设定")
+
+            st.button(
+                "✏️ Edit Character / 编辑角色",
+                key=f"edit_{asset.asset_id}",
+                on_click=edit_character,
+                args=(asset,),
+                use_container_width=True,
+            )
 
 
 elif page == "✨ Character Factory":
