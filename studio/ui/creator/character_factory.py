@@ -226,7 +226,12 @@ def render_reference_settings(ctx) -> None:
                 st.rerun()
 
 
-def _start_over() -> None:
+def reset_character_creation_state() -> None:
+    """Clear only the active Character Builder state.
+
+    Session-level generation accounting intentionally survives so Creator
+    usage limits still apply across multiple characters in one session.
+    """
     for key in (
         "char_draft",
         "char_source",
@@ -239,6 +244,10 @@ def _start_over() -> None:
         "character_master_character_id",
     ):
         st.session_state.pop(key, None)
+
+
+def _start_over() -> None:
+    reset_character_creation_state()
     st.rerun()
 
 
@@ -826,9 +835,7 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
                         character_asset_id=candidate_character_id,
                         candidate_path=candidate_path,
                     )
-                    st.session_state.character_master_candidate_path = None
-                    st.session_state.character_master_character_id = None
-                    st.session_state.editing_character_id = None
+                    reset_character_creation_state()
                     st.session_state.pending_app_page = "🎭 My Characters"
                     st.success(
                         f"角色正式加入 Mini Utopia！ · {candidate_character_id}"
