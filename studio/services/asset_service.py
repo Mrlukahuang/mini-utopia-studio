@@ -81,3 +81,13 @@ class AssetService:
             result[slot] = asset
 
         return result
+
+
+    def archive_character(self, asset_id: str) -> Asset:
+        """Soft-delete a Character so existing Story/World references do not break."""
+        asset = self.repository.get_asset(asset_id)
+        if asset is None or asset.asset_type != AssetType.CHARACTER:
+            raise ValueError(f"Character not found: {asset_id}")
+        asset.status = ReviewStatus.ARCHIVED
+        self.repository.save_asset(asset)
+        return asset
