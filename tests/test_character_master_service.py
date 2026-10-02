@@ -1,3 +1,6 @@
+from io import BytesIO
+
+from PIL import Image
 from studio.core.enums import AssetType, ReviewStatus
 from studio.models.asset import Asset
 from studio.models.character import CharacterProfile
@@ -15,7 +18,10 @@ class FakeImageProvider(ImageGenerationProvider):
 
     def generate(self, *, prompt: str, size: str = "1536x1024", quality: str = "medium") -> bytes:
         self.calls.append({"prompt": prompt, "size": size, "quality": quality})
-        return b"fake-png-bytes"
+        image = Image.new("RGB", (1024, 1536), "#FFF8EE")
+        out = BytesIO()
+        image.save(out, format="PNG")
+        return out.getvalue()
 
 
 def _character(repo):
@@ -58,8 +64,11 @@ def test_generate_candidate_attaches_file_and_preserves_char_id(tmp_path):
     assert saved.asset_id == character.asset_id
     assert saved.status == ReviewStatus.NEEDS_REVIEW
     assert candidate.role == "character_master_candidate"
-    assert storage.get_bytes(candidate.path) == b"fake-png-bytes"
-    assert provider.calls[0]["size"] == "1536x1024"
+    branded = Image.open(BytesIO(storage.get_bytes(candidate.path)))
+    assert branded.size == (1200, 1800)
+    assert provider.calls[0]["size"] == "1024x1536"
+    assert saved.metadata["character_master_final_size"] == "1200x1800"
+    assert storage.exists(saved.metadata["character_master_last_source_path"])
     assert "Mini Utopia Character Master" in provider.calls[0]["prompt"]
 
 

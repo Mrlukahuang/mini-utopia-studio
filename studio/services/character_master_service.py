@@ -8,6 +8,7 @@ from studio.models.character import CharacterProfile
 from studio.providers.base import ImageGenerationProvider
 from studio.repositories.base import StudioRepository
 from studio.services.character_master_prompt_service import CharacterMasterPromptService
+from studio.services.character_master_layout_service import compose_branded_character_master
 from studio.storage.base import ObjectStorage
 
 
@@ -67,7 +68,7 @@ class CharacterMasterService:
         *,
         character_asset_id: str,
         style_asset_id: str,
-        size: str = "1536x1024",
+        size: str = "1024x1536",
         quality: str = "medium",
     ) -> AssetFile:
         if self.image_provider is None:
@@ -81,13 +82,19 @@ class CharacterMasterService:
             character_asset_id=character_asset_id,
             style_asset_id=style_asset_id,
         )
-        image_bytes = self.image_provider.generate(
+        source_image_bytes = self.image_provider.generate(
             prompt=prompt,
             size=size,
             quality=quality,
         )
+        image_bytes = compose_branded_character_master(source_image_bytes)
 
         candidate_id = uuid4().hex[:12]
+        source_path = self.storage.put_bytes(
+            f"assets/{character_asset_id}/master/candidates/"
+            f"{candidate_id}_source.png",
+            source_image_bytes,
+        )
         relative_path = (
             f"assets/{character_asset_id}/master/candidates/"
             f"{candidate_id}.png"
@@ -104,6 +111,8 @@ class CharacterMasterService:
         character.metadata["character_master_last_prompt"] = prompt
         character.metadata["character_master_last_size"] = size
         character.metadata["character_master_last_quality"] = quality
+        character.metadata["character_master_last_source_path"] = source_path
+        character.metadata["character_master_final_size"] = "1200x1800"
         self.repository.save_asset(character)
         return file_ref
 
