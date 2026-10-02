@@ -1,3 +1,5 @@
+from PIL import Image
+
 from studio.ui.brand import (
     BRAND_NAME,
     BRAND_TAGLINE,
@@ -16,3 +18,9 @@ def test_brand_canon_exposes_both_logo_files():
     assert HORIZONTAL_LOGO_PATH.exists()
     assert SQUARE_LOGO_PATH.suffix == ".webp"
     assert HORIZONTAL_LOGO_PATH.suffix == ".webp"
+
+
+def test_brand_logo_files_are_decodable_images():
+    for path in (SQUARE_LOGO_PATH, HORIZONTAL_LOGO_PATH):
+        with Image.open(path) as image:
+            image.verify()
