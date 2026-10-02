@@ -437,6 +437,60 @@ h1, h2, h3 {
     color:#57566F;
 }
 
+.mu-character-library-shell {
+    padding: 14px 14px 16px;
+    border-radius: 28px;
+    background:
+        linear-gradient(145deg, rgba(255,255,255,.82), rgba(249,241,255,.80));
+    border:1px solid rgba(113,100,176,.10);
+    box-shadow:0 14px 34px rgba(71,61,121,.075);
+}
+.mu-character-art-shell {
+    padding: 10px;
+    border-radius: 24px;
+    background: linear-gradient(180deg, rgba(255,249,236,.88), rgba(246,238,255,.86));
+    border:1px solid rgba(113,100,176,.10);
+}
+.mu-character-fact-tile {
+    min-height: 86px;
+    padding: 14px 16px;
+    border-radius: 20px;
+    background: rgba(255,255,255,.72);
+    border:1px solid rgba(112,96,176,.10);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.82);
+    margin-bottom: 10px;
+}
+.mu-character-fact-label {
+    font-size:.78rem;
+    color:#77718F;
+    font-weight:800;
+    margin-bottom:4px;
+}
+.mu-character-fact-value {
+    font-size:1.03rem;
+    color:#34334C;
+    font-weight:850;
+    line-height:1.32;
+}
+.mu-character-name-row {
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:4px;
+}
+.mu-character-name-row h3 {
+    margin:0;
+    font-size:2rem;
+}
+.mu-character-section-card {
+    padding: 14px 16px;
+    border-radius: 20px;
+    background: rgba(255,255,255,.62);
+    border:1px solid rgba(112,96,176,.09);
+    margin-top:10px;
+}
+
 [data-testid="stSidebar"] .stButton > button {
     min-height: 2.7rem;
     border-radius: 16px;
