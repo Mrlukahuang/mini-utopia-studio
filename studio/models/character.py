@@ -63,6 +63,11 @@ class CharacterProfile(BaseModel):
     appearance: str = ""
     eyes: EyeProfile = Field(default_factory=EyeProfile)
     hair_or_fur: str = ""
+    hair_style: str = ""
+    hair_or_fur_color: str = ""
+    body_build: str = ""
+    height: str = ""
+    height_cm: float | None = Field(default=None, gt=0, le=1000)
     favorite_colors: list[str] = Field(default_factory=list)
     personality_traits: list[str] = Field(default_factory=list)
     speaking_tone: str = ""
