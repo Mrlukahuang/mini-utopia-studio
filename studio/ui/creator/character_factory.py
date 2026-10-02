@@ -12,6 +12,7 @@ from studio.models.character import (
     WearableLoadout,
 )
 from studio.models.reference import ReferenceCharacterConfig
+from studio.ui.theme import render_game_hero, render_quest
 
 
 HAIRSTYLE_OPTIONS = [
@@ -369,10 +370,13 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
         unsafe_allow_html=True,
     )
 
-    st.header("✨ Character Factory / 角色工坊")
-    st.caption(
-        "你负责想象，Mini Utopia Studio 负责把想法整理成可以长期使用的角色。"
+    render_game_hero(
+        "Create Your Mini Hero ✨",
+        "选一选、画一画、改一改。你负责想象，Mini Utopia Studio "
+        "负责把 TA 变成可以一直带去冒险的小角色。",
+        kicker="CHARACTER FACTORY · LEVEL 1",
     )
+    render_quest("先不用想得完美。写一句你脑子里的角色，我们一起把 TA 做出来。")
 
     if studio_mode:
         render_reference_settings(ctx)
