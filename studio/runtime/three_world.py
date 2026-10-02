@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from html import escape
 
+from studio.models.character import CharacterProfile
 from studio.models.world import WorldBlueprint, WorldProfile
 
 
@@ -19,6 +20,8 @@ def build_world_runtime_html(
     world_name: str,
     profile: WorldProfile,
     blueprint: WorldBlueprint,
+    character_name: str = "Mini Traveler",
+    character_profile: CharacterProfile | None = None,
 ) -> str:
     """Build a self-contained Three.js playground for a saved WorldBlueprint.
 
@@ -30,6 +33,12 @@ def build_world_runtime_html(
         "worldName": world_name,
         "profile": profile.model_dump(mode="json"),
         "blueprint": blueprint.model_dump(mode="json"),
+        "characterName": character_name,
+        "character": (
+            character_profile.model_dump(mode="json")
+            if character_profile is not None
+            else None
+        ),
     }
     data_json = _safe_json(runtime_data)
 
@@ -78,7 +87,7 @@ def build_world_runtime_html(
     <h2>🌍 {escape(world_name)}</h2>
     <p><b>Explore Mode</b> · WASD / Arrow Keys</p>
     <p>Blueprint v{escape(blueprint.schema_version)} · {blueprint.grid.width}×{blueprint.grid.depth} · {len(blueprint.chunks)} chunks</p>
-    <span class="pill">🧸 Mini Avatar</span>
+    <span class="pill">🧸 {escape(character_name)}</span>
     <span class="pill">🌀 Portal</span>
     <span class="pill">🎬 Director Camera</span>
   </div>
@@ -95,6 +104,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@{THREE_VERSION}/build
 const DATA = {data_json};
 const profile = DATA.profile;
 const bp = DATA.blueprint;
+const character = DATA.character || {};
 const host = document.getElementById('canvas');
 
 const renderer = new THREE.WebGLRenderer({{ antialias:true, alpha:false }});
@@ -138,6 +148,76 @@ const cell = bp.grid.cell_size || 1;
 const cw = bp.grid.chunk_width * cell;
 const cd = bp.grid.chunk_depth * cell;
 
+function addToyTree(x, z, index=0) {{
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.BoxGeometry(.7, 2.2, .7), mat('#E8C9A8'));
+  trunk.position.y = 1.1; trunk.castShadow = true; g.add(trunk);
+  const crown = new THREE.Mesh(
+    new THREE.BoxGeometry(2.5, 2.2, 2.5),
+    mat(palette[(index+1) % palette.length])
+  );
+  crown.position.y = 3.0; crown.castShadow = true; g.add(crown);
+  g.position.set(x, 0, z); world.add(g);
+}}
+
+function addToyHouse(x, z, index=0) {{
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(
+    new THREE.BoxGeometry(3.6, 2.8, 3.4),
+    mat(palette[(index+2) % palette.length])
+  );
+  base.position.y = 1.4; base.castShadow = true; base.receiveShadow = true; g.add(base);
+  const roof = new THREE.Mesh(
+    new THREE.ConeGeometry(3.1, 1.8, 4),
+    mat(palette[(index+4) % palette.length])
+  );
+  roof.position.y = 3.7; roof.rotation.y = Math.PI/4; roof.castShadow = true; g.add(roof);
+  const door = new THREE.Mesh(new THREE.BoxGeometry(.9, 1.45, .18), mat('#FFF4D7'));
+  door.position.set(0,.75,1.79); g.add(door);
+  g.position.set(x,0,z); world.add(g);
+}}
+
+function addToyRock(x, z, index=0) {{
+  const rock = new THREE.Mesh(
+    new THREE.DodecahedronGeometry(1.15 + (index%3)*.18, 0),
+    mat(palette[(index+3) % palette.length])
+  );
+  rock.scale.y = .7; rock.position.set(x,.7,z); rock.castShadow = true; rock.receiveShadow = true;
+  world.add(rock);
+}}
+
+function addStarLamp(x, z, index=0) {{
+  const g = new THREE.Group();
+  const pole = new THREE.Mesh(new THREE.BoxGeometry(.2,1.8,.2), mat('#FFF4D7'));
+  pole.position.y=.9; g.add(pole);
+  const orb = new THREE.Mesh(
+    new THREE.OctahedronGeometry(.45,0),
+    new THREE.MeshStandardMaterial({{
+      color:new THREE.Color(palette[index % palette.length]),
+      emissive:new THREE.Color(palette[index % palette.length]),
+      emissiveIntensity:1.1,
+      roughness:.4
+    }})
+  );
+  orb.position.y=2.05; g.add(orb);
+  g.position.set(x,0,z); world.add(g);
+}}
+
+function decorateChunk(chunk, i, centerX, centerZ) {{
+  const biome = (chunk.biome || '').toLowerCase();
+  const worldType = (profile.world_type || '').toLowerCase();
+  if (biome.includes('forest') || worldType.includes('forest') || worldType.includes('garden')) {{
+    addToyTree(centerX-2.6, centerZ+2.2, i);
+    addToyTree(centerX+2.3, centerZ-1.8, i+1);
+  }} else if (worldType.includes('village') || worldType.includes('city') || worldType.includes('harbor')) {{
+    addToyHouse(centerX, centerZ, i);
+    addStarLamp(centerX-3.2, centerZ+2.6, i);
+  }} else {{
+    addToyRock(centerX-2.2, centerZ+1.8, i);
+    if ((i % 2) === 0) addStarLamp(centerX+2.2, centerZ-2.0, i);
+  }}
+}}
+
 (bp.chunks || []).forEach((chunk, i) => {{
   const color = palette[i % palette.length];
   const geo = new THREE.BoxGeometry(cw - .18, .8, cd - .18);
@@ -145,18 +225,7 @@ const cd = bp.grid.chunk_depth * cell;
   mesh.position.set(chunk.chunk_x * cw + cw/2, -.4, chunk.chunk_z * cd + cd/2);
   mesh.receiveShadow = true;
   world.add(mesh);
-
-  // Soft block-built scenery clusters: decorative only, not Canon geometry.
-  if ((i % 3) === 0) {{
-    const h = 1.1 + (i % 4) * .35;
-    const deco = new THREE.Mesh(
-      new THREE.BoxGeometry(2.2, h, 2.2),
-      mat(palette[(i+2) % palette.length])
-    );
-    deco.position.set(mesh.position.x - 2.3, h/2, mesh.position.z + 2.0);
-    deco.castShadow = true; deco.receiveShadow = true;
-    world.add(deco);
-  }}
+  decorateChunk(chunk, i, mesh.position.x, mesh.position.z);
 }});
 
 function addLandmark(spec, index) {{
@@ -199,14 +268,39 @@ if (bp.portal) {{
 
 function makeAvatar() {{
   const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.BoxGeometry(1.05, 1.45, .78), mat('#FFF4D7'));
-  body.position.y = 1.25; body.castShadow = true; g.add(body);
-  const head = new THREE.Mesh(new THREE.BoxGeometry(1.65, 1.55, 1.45), mat(palette[0] || '#F7B7D2'));
-  head.position.y = 2.65; head.castShadow = true; g.add(head);
-  const footGeo = new THREE.BoxGeometry(.55, .38, .9);
+  const favorite = (character.favorite_color_hexes && character.favorite_color_hexes.length)
+    ? character.favorite_color_hexes
+    : palette;
+  const bodyColor = favorite[0] || '#FFF4D7';
+  const accentColor = favorite[1] || palette[1] || '#B9E7D0';
+  const hairColor = character.hair_or_fur_color_hex || favorite[2] || '#D7C2F3';
+  const eyeColor = (character.eyes && character.eyes.color_hex) || '#7A5238';
+
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.35, .82), mat(bodyColor));
+  body.position.y = 1.18; body.castShadow = true; g.add(body);
+
+  const head = new THREE.Mesh(new THREE.BoxGeometry(1.78, 1.62, 1.52), mat('#F7E7D9'));
+  head.position.y = 2.58; head.castShadow = true; g.add(head);
+
+  const hair = new THREE.Mesh(new THREE.BoxGeometry(1.88, .72, 1.58), mat(hairColor));
+  hair.position.set(0,3.13,-.02); hair.castShadow = true; g.add(hair);
+
+  const eyeGeo = new THREE.BoxGeometry(.22,.27,.12);
+  const eyeMat = mat(eyeColor,.55);
+  const le = new THREE.Mesh(eyeGeo, eyeMat); le.position.set(-.38,2.64,.79); g.add(le);
+  const re = new THREE.Mesh(eyeGeo, eyeMat); re.position.set(.38,2.64,.79); g.add(re);
+
+  const armGeo = new THREE.BoxGeometry(.34,1.05,.34);
+  const armMat = mat(accentColor);
+  const la = new THREE.Mesh(armGeo, armMat); la.position.set(-.75,1.25,0); la.castShadow=true; g.add(la);
+  const ra = new THREE.Mesh(armGeo, armMat); ra.position.set(.75,1.25,0); ra.castShadow=true; g.add(ra);
+
+  const footGeo = new THREE.BoxGeometry(.58, .4, .92);
   const footMat = mat('#F6F7FB');
-  const lf = new THREE.Mesh(footGeo, footMat); lf.position.set(-.35,.25,.08); lf.castShadow=true; g.add(lf);
-  const rf = new THREE.Mesh(footGeo, footMat); rf.position.set(.35,.25,.08); rf.castShadow=true; g.add(rf);
+  const lf = new THREE.Mesh(footGeo, footMat); lf.position.set(-.36,.25,.08); lf.castShadow=true; g.add(lf);
+  const rf = new THREE.Mesh(footGeo, footMat); rf.position.set(.36,.25,.08); rf.castShadow=true; g.add(rf);
+
+  g.userData.characterName = DATA.characterName || 'Mini Traveler';
   return g;
 }}
 
@@ -347,6 +441,7 @@ def runtime_summary(
     *,
     profile: WorldProfile,
     blueprint: WorldBlueprint,
+    character_profile: CharacterProfile | None = None,
 ) -> dict[str, object]:
     """Small inspectable summary used by UI/tests without running a browser."""
 
@@ -357,4 +452,9 @@ def runtime_summary(
         "camera_points": len(blueprint.camera_points),
         "director_tours": len(blueprint.director_tours),
         "theme_colors": list(profile.theme_color_hexes),
+        "character_colors": (
+            list(character_profile.favorite_color_hexes)
+            if character_profile is not None
+            else []
+        ),
     }
