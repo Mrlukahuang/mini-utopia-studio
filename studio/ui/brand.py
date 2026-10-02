@@ -34,13 +34,16 @@ def render_sidebar_brand() -> None:
 
 
 def render_primary_brand() -> None:
-    """Render the approved horizontal Brand Canon asset above page content."""
-    st.markdown(
-        f"""
-        <div class="mu-primary-logo-shell">
-            <img class="mu-primary-logo" src="{_data_uri(HORIZONTAL_LOGO_PATH)}"
-                 alt="Mini Utopia logo">
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    """Render the approved horizontal Brand Canon asset above page content.
+
+    Use Streamlit's native image renderer here instead of embedding a large
+    base64 data URI in HTML. Streamlit Cloud can sanitize or fail to render
+    large data-URI images even when smaller sidebar images still work.
+    """
+    with st.container():
+        st.markdown('<div class="mu-primary-logo-shell">', unsafe_allow_html=True)
+        st.image(
+            str(HORIZONTAL_LOGO_PATH),
+            use_container_width=True,
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
