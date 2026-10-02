@@ -6,6 +6,7 @@ from studio.services.asset_service import AssetService
 from studio.services.style_service import StyleService
 from studio.services.world_concept_prompt_service import WorldConceptPromptService
 from studio.services.world_concept_service import WorldConceptService
+from studio.services.world_blueprint_service import WorldBlueprintService
 from studio.storage.local import LocalObjectStorage
 
 
@@ -81,6 +82,7 @@ def test_approve_world_concept_initializes_blueprint(tmp_path):
         repo,
         storage,
         WorldConceptPromptService(),
+        WorldBlueprintService(),
         provider,
     )
 
@@ -104,6 +106,10 @@ def test_approve_world_concept_initializes_blueprint(tmp_path):
     assert blueprint["grid"]["depth"] == 50
     assert blueprint["style_asset_id"] == style.asset_id
     assert blueprint["location_asset_id"] == world.asset_id
+    assert len(blueprint["chunks"]) == 25
+    assert blueprint["paths"][0]["path_id"] == "PATH_MAIN"
+    assert blueprint["camera_points"]
+    assert blueprint["director_tours"]
 
 
 def test_world_concept_generation_uses_wide_medium_image(tmp_path):
@@ -121,6 +127,7 @@ def test_world_concept_generation_uses_wide_medium_image(tmp_path):
         repo,
         storage,
         WorldConceptPromptService(),
+        WorldBlueprintService(),
         provider,
     )
 

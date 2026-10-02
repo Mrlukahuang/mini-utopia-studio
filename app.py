@@ -74,7 +74,10 @@ def edit_world(asset) -> None:
     )
     st.session_state.world_draft = profile
     st.session_state.world_source = asset.description or profile.source_description
+    st.session_state.world_name = asset.display_name
     st.session_state.editing_world_id = asset.asset_id
+    st.session_state.world_creation_mode = "custom"
+    st.session_state.world_stage = 0
     st.session_state.world_concept_candidates = []
     st.session_state.app_page = "🌍 World Factory"
 

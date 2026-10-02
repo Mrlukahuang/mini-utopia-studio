@@ -37,4 +37,31 @@ def test_world_profile_is_playable_and_keeps_theme_colors_separate_from_style_ca
 
 
 def test_blueprint_schema_version_is_explicit():
-    assert BLUEPRINT_SCHEMA_VERSION == "0.1"
+    assert BLUEPRINT_SCHEMA_VERSION == "0.2"
+
+
+def test_structural_blueprint_contains_paths_zones_and_director_tour():
+    from studio.services.world_blueprint_service import WorldBlueprintService
+
+    profile = WorldProfile(
+        world_name="Candy Cloud Valley",
+        world_type="Cloud Village / 云端小镇",
+        terrain=["Floating Land / 漂浮陆地"],
+        landmark_ideas=["Star Tower / 星星塔"],
+        portal_form="Star Arch / 星星拱门",
+    )
+    blueprint = WorldBlueprintService().build(
+        location_asset_id="LOC_TEST",
+        style_asset_id="STYLE_TEST",
+        profile=profile,
+        concept_path="assets/LOC_TEST/concept.png",
+        concept_direction="dream",
+    )
+
+    assert len(blueprint.chunks) == 25
+    assert blueprint.spawn.x == 6
+    assert blueprint.portal is not None
+    assert blueprint.paths[0].path_id == "PATH_MAIN"
+    assert "ZONE_CORE" in blueprint.walkable_zone_ids
+    assert blueprint.camera_points
+    assert blueprint.director_tours

@@ -8,7 +8,7 @@ from studio.models.location import LocationProfile
 
 
 WORLD_SCHEMA_VERSION = "0.1"
-BLUEPRINT_SCHEMA_VERSION = "0.1"
+BLUEPRINT_SCHEMA_VERSION = "0.2"
 
 
 class GridSpec(BaseModel):
@@ -71,6 +71,24 @@ class TourRoute(BaseModel):
     name: str = "World Tour"
     steps: list[TourStep] = Field(default_factory=list)
     character_route_point_ids: list[str] = Field(default_factory=list)
+
+
+class PathSpec(BaseModel):
+    path_id: str
+    name: str = ""
+    points: list[WorldPoint] = Field(default_factory=list)
+    width_cells: float = Field(default=2.0, gt=0)
+    walkable: bool = True
+
+
+class ZoneSpec(BaseModel):
+    zone_id: str
+    name: str = ""
+    kind: Literal["walkable", "blocked", "water", "landmark", "portal", "spawn"] = "walkable"
+    min_x: float
+    max_x: float
+    min_z: float
+    max_z: float
 
 
 class ChunkSpec(BaseModel):
@@ -149,6 +167,8 @@ class WorldBlueprint(BaseModel):
     chunks: list[ChunkSpec] = Field(default_factory=list)
     landmarks: list[LandmarkSpec] = Field(default_factory=list)
     portal: PortalSpec | None = None
+    paths: list[PathSpec] = Field(default_factory=list)
+    zones: list[ZoneSpec] = Field(default_factory=list)
 
     walkable_zone_ids: list[str] = Field(default_factory=list)
     blocked_zone_ids: list[str] = Field(default_factory=list)
