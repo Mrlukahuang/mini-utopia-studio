@@ -44,7 +44,7 @@ def test_character_master_prompt_includes_profile_and_locked_visual_dna(tmp_path
     assert "人类 / Human" in prompt
     assert "2.8 to 3.0 heads tall" in prompt
     assert "large readable eyes" in prompt
-    assert "CHARACTER MASTER SHEET V1" in prompt
+    assert "CHARACTER MASTER SHEET V2" in prompt
     assert "Do not imitate branded characters" in prompt
 
 
@@ -78,6 +78,8 @@ def test_character_master_prompt_forbids_generated_text_and_uses_swatches(tmp_pa
     assert "Do NOT draw or render any words" in prompt
     assert "front, three-quarter, side, back" in prompt
     assert "neutral, happy, curious, excited, surprised" in prompt
+    assert "PORTRAIT" in prompt
+    assert "TOP HERO ZONE" in prompt
     assert "#00FFE4" in prompt
     assert "#F6BF03" in prompt
     assert "pink hoodie" in prompt
