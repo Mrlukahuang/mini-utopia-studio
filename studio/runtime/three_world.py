@@ -278,13 +278,10 @@ if (bp.portal) {{
 
 function makeAvatar() {{
   const g = new THREE.Group();
-  const favorite = (character.favorite_color_hexes && character.favorite_color_hexes.length)
-    ? character.favorite_color_hexes
-    : palette;
-  const bodyColor = favorite[0] || '#FFF4D7';
-  const accentColor = favorite[1] || palette[1] || '#B9E7D0';
-  const hairColor = character.hair_or_fur_color_hex || favorite[2] || '#D7C2F3';
-  const eyeColor = (character.eyes && character.eyes.color_hex) || '#7A5238';
+  const bodyColor = characterRuntime.body_color_hex || '#FFF4D7';
+  const accentColor = characterRuntime.accent_color_hex || '#B9E7D0';
+  const hairColor = characterRuntime.hair_color_hex || '#5B4036';
+  const eyeColor = characterRuntime.eye_color_hex || '#7A5238';
 
   const body = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.35, .82), mat(bodyColor));
   body.position.y = 1.18; body.castShadow = true; g.add(body);
@@ -311,11 +308,64 @@ function makeAvatar() {{
   const rf = new THREE.Mesh(footGeo, footMat); rf.position.set(.36,.25,.08); rf.castShadow=true; g.add(rf);
 
   g.userData.characterName = DATA.characterName || 'Mini Traveler';
+  g.userData.parts = {{ body, head, la, ra, lf, rf }};
   return g;
 }}
 
-const player = makeAvatar();
+const player = new THREE.Group();
+const proceduralAvatar = makeAvatar();
+player.add(proceduralAvatar);
 scene.add(player);
+
+let gltfMixer = null;
+let gltfActions = {{}};
+let activeGltfAction = null;
+
+function findClip(clips, preferredName) {{
+  const target = (preferredName || '').toLowerCase();
+  return clips.find(clip => clip.name.toLowerCase() === target)
+    || clips.find(clip => clip.name.toLowerCase().includes(target));
+}}
+
+function playGltfState(state) {{
+  if (!gltfMixer) return;
+  const clipName = (characterRuntime.animation_clips || {{}})[state.toLowerCase()] || state;
+  const next = gltfActions[clipName] || gltfActions[state];
+  if (!next || next === activeGltfAction) return;
+  if (activeGltfAction) activeGltfAction.fadeOut(.18);
+  next.reset().fadeIn(.18).play();
+  activeGltfAction = next;
+}}
+
+if (characterRuntime.mode === 'glb' && characterRuntime.model_data_uri) {{
+  const loader = new GLTFLoader();
+  loader.load(characterRuntime.model_data_uri, gltf => {{
+    proceduralAvatar.visible = false;
+    const model = gltf.scene;
+    model.scale.setScalar(characterRuntime.scale || 1);
+    model.traverse(obj => {{
+      if (obj.isMesh) {{
+        obj.castShadow = true;
+        obj.receiveShadow = true;
+      }}
+    }});
+    player.add(model);
+    gltfMixer = new THREE.AnimationMixer(model);
+    const names = characterRuntime.animation_clips || {{}};
+    ['Idle','Walk','Run'].forEach(state => {{
+      const wanted = names[state.toLowerCase()] || state;
+      const clip = findClip(gltf.animations || [], wanted);
+      if (clip) {{
+        const action = gltfMixer.clipAction(clip);
+        gltfActions[wanted] = action;
+        gltfActions[state] = action;
+      }}
+    }});
+    playGltfState('Idle');
+  }}, undefined, () => {{
+    proceduralAvatar.visible = true;
+  }});
+}}
 
 const spawn = bp.spawn || {{x:6,y:0,z:25,facing_degrees:90}};
 function resetPlayer() {{
