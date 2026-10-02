@@ -1,12 +1,14 @@
 from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 from studio.core.config import get_settings
 from studio.core.enums import AssetType, ReviewStatus, StoryMode
 from studio.models.character import CharacterProfile, EyeProfile
-from studio.models.world import WorldProfile
+from studio.models.world import WorldBlueprint, WorldProfile
 from studio.recipes.character_factory import CharacterFactoryRecipe
+from studio.runtime.three_world import build_world_runtime_html, runtime_summary
 from studio.services.bootstrap import build_context
 from studio.services.style_service import StyleService
 from studio.ui.auth import (
@@ -65,6 +67,12 @@ def archive_character(asset_id: str) -> None:
     """Soft-delete a Character while preserving references for Stories/Worlds."""
     ctx.assets.archive_character(asset_id)
     st.session_state.pop(f"confirm_delete_{asset_id}", None)
+
+
+def explore_world(asset_id: str) -> None:
+    """Open an approved Blueprint in the browser 3D runtime."""
+    st.session_state.selected_world_id = asset_id
+    st.session_state.app_page = "🎮 Explore World"
 
 
 def edit_world(asset) -> None:
@@ -156,6 +164,7 @@ page = st.sidebar.radio(
         "✨ Character Factory",
         "🗺️ My Worlds",
         "🌍 World Factory",
+        "🎮 Explore World",
         "🌎 Mini Utopia",
         "🧪 Playground",
         "📖 Stories",
@@ -169,6 +178,7 @@ creator_protected_pages = {
     "✨ Character Factory",
     "🗺️ My Worlds",
     "🌍 World Factory",
+    "🎮 Explore World",
 }
 if mode == "🧒 Creator" and page in creator_protected_pages:
     if not require_creator_pin():
@@ -523,6 +533,15 @@ elif page == "🗺️ My Worlds":
                     st.caption("Concept stage · waiting for Blueprint")
 
             with action_col:
+                blueprint = asset.metadata.get("world_blueprint")
+                st.button(
+                    "🎮 Explore",
+                    key=f"explore_world_{asset.asset_id}",
+                    on_click=explore_world,
+                    args=(asset.asset_id,),
+                    disabled=not bool(blueprint),
+                    use_container_width=True,
+                )
                 st.button(
                     "✏️ Edit",
                     key=f"edit_world_{asset.asset_id}",
@@ -531,6 +550,74 @@ elif page == "🗺️ My Worlds":
                     use_container_width=True,
                 )
                 st.caption(f"v{asset.version}")
+
+
+elif page == "🎮 Explore World":
+    render_game_hero(
+        "Explore Mini World 🎮",
+        "这是第一版可玩的 3D Runtime：Blueprint 决定世界结构，Three.js 负责把它画出来。",
+        kicker="M4 · PLAYABLE RUNTIME v0.1",
+    )
+
+    playable_worlds = [
+        asset
+        for asset in ctx.repository.list_assets(AssetType.LOCATION)
+        if asset.status != ReviewStatus.ARCHIVED
+        and asset.metadata.get("world_blueprint")
+        and "world_profile" in asset.metadata
+    ]
+
+    if not playable_worlds:
+        st.info("还没有可探索的 World Blueprint。先在 World Factory 选择并保存一个 Concept。")
+    else:
+        selected_id = st.session_state.get("selected_world_id")
+        selected_index = next(
+            (
+                index
+                for index, asset in enumerate(playable_worlds)
+                if asset.asset_id == selected_id
+            ),
+            0,
+        )
+        selected = st.selectbox(
+            "World / 选择世界",
+            playable_worlds,
+            index=selected_index,
+            format_func=lambda asset: asset.display_name,
+        )
+        st.session_state.selected_world_id = selected.asset_id
+
+        profile = WorldProfile.model_validate(
+            selected.metadata.get("world_profile", {})
+        )
+        blueprint = WorldBlueprint.model_validate(
+            selected.metadata.get("world_blueprint", {})
+        )
+        summary = runtime_summary(profile=profile, blueprint=blueprint)
+
+        a, b, c3, d = st.columns(4)
+        a.metric("Grid", summary["grid"])
+        b.metric("Chunks", summary["chunks"])
+        c3.metric("Landmarks", summary["landmarks"])
+        d.metric("Director Shots", summary["camera_points"])
+
+        st.caption(
+            "Controls: WASD / Arrow Keys · 第三人称跟随相机 · "
+            "右上角可启动 Director Tour。当前角色仍是 Mini Utopia placeholder，下一阶段接真实 Character。"
+        )
+
+        components.html(
+            build_world_runtime_html(
+                world_name=selected.display_name,
+                profile=profile,
+                blueprint=blueprint,
+            ),
+            height=760,
+            scrolling=False,
+        )
+
+        with st.expander("🧩 Runtime Blueprint Inspector", expanded=False):
+            st.json(blueprint.model_dump(mode="json"))
 
 
 elif page == "🌍 World Factory":
