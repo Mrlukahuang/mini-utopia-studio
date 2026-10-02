@@ -1,3 +1,4 @@
+from studio.models.character import CharacterProfile
 from studio.models.world import (
     CameraPoint,
     ChunkSpec,
@@ -90,3 +91,47 @@ def test_runtime_html_escapes_script_breakout_from_world_name():
     # Visible title is HTML escaped and serialized runtime JSON cannot close the module script.
     assert "&lt;/script&gt;" in html
     assert "\\u003c/script>" in html
+
+
+def test_runtime_html_uses_character_profile_colors_and_modular_kit():
+    profile = WorldProfile(
+        world_name="Candy Cloud Valley",
+        world_type="Cloud Village / 云端小镇",
+        theme_color_hexes=["#F7B7D2", "#B9E7D0", "#D7C2F3"],
+    )
+    character = CharacterProfile(
+        favorite_color_hexes=["#F7B7D2", "#B9E7D0"],
+        hair_or_fur_color_hex="#5B4036",
+    )
+    character.eyes.color_hex = "#7A5238"
+
+    html = build_world_runtime_html(
+        world_name="Candy Cloud Valley",
+        profile=profile,
+        blueprint=_blueprint(),
+        character_name="Vivian",
+        character_profile=character,
+    )
+
+    assert "Vivian" in html
+    assert "#5B4036" in html
+    assert "#7A5238" in html
+    assert "addToyTree" in html
+    assert "addToyHouse" in html
+    assert "addToyRock" in html
+    assert "addStarLamp" in html
+
+
+def test_runtime_summary_exposes_character_identity_colors():
+    profile = WorldProfile(theme_color_hexes=["#BDE3F7"])
+    character = CharacterProfile(
+        favorite_color_hexes=["#F7B7D2", "#B9E7D0"],
+    )
+
+    summary = runtime_summary(
+        profile=profile,
+        blueprint=_blueprint(),
+        character_profile=character,
+    )
+
+    assert summary["character_colors"] == ["#F7B7D2", "#B9E7D0"]
