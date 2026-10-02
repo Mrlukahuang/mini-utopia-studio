@@ -488,7 +488,15 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
             )
             type_detail = st.text_area(
                 "这个类型有什么特别？ / Type Detail",
-                value=draft.character_type_description,
+                value=(
+                    draft.character_type_description
+                    or (
+                        draft.character_type
+                        if draft.character_type
+                        and draft.character_type not in CHARACTER_TYPE_OPTIONS
+                        else ""
+                    )
+                ),
                 placeholder="例如：一只会收集星星的圆滚滚熊猫",
                 height=90,
             )
@@ -501,7 +509,15 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
             )
             role_detail = st.text_area(
                 "角色定位补充 / Role Detail（可选）",
-                value=draft.story_role_description,
+                value=(
+                    draft.story_role_description
+                    or (
+                        draft.story_role
+                        if draft.story_role
+                        and draft.story_role not in STORY_ROLE_OPTIONS
+                        else ""
+                    )
+                ),
                 placeholder="例如：平时胆小，但看到 Portal 会第一个进去",
                 height=90,
             )
