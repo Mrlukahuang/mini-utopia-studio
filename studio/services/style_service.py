@@ -79,6 +79,27 @@ class StyleService:
                 "Use the full macaron color family. Color variety is free, but saturation, "
                 "lightness, contrast, gradients, and material response stay coherent."
             ),
+            world_geometry_language=(
+                "Worlds use the same original block-built language as characters: chunky modular terrain, "
+                "soft square and rounded-cuboid architecture, readable toy-scale forms, gentle bevels, "
+                "and simplified geometry that remains suitable for a playable 3D runtime."
+            ),
+            environment_scale_language=(
+                "Environment scale must make Mini Playable Avatars feel native to the world: paths, doors, "
+                "bridges, props and landmarks are proportioned for compact 2.8–3.0-head-tall avatars while "
+                "preserving a miniature-diorama sense of scale."
+            ),
+            color_harmony_rule=(
+                "All Canon assets inherit the Mini Utopia macaron color constitution: high lightness, "
+                "low-to-medium saturation, soft gradients and gentle contrast. Character-specific HEX colors "
+                "remain identity data; worlds harmonize with the same global color system rather than copying "
+                "a character palette mechanically."
+            ),
+            runtime_material_rule=(
+                "Playable runtime materials preserve matte collectible-toy tactility, creamy finishes, "
+                "soft-vinyl/painted-toy response and restrained micro-detail across characters, terrain, "
+                "architecture, props and portals."
+            ),
             macaron_palette=MacaronPaletteProfile(
                 enabled_families=[
                     "cream yellow",
