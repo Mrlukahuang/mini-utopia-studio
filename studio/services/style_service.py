@@ -37,8 +37,8 @@ class StyleService:
                 "Characters must read as small playable game avatars rather than realistic people."
             ),
             character_scale_language=(
-                "Mini Playable Avatar proportions: approximately 2.75 to 3.25 heads tall for "
-                "human-like characters; head occupies roughly one third of total height; "
+                "Mini Playable Avatar proportions: approximately 2.8 to 3.0 heads tall for "
+                "human-like characters; head occupies roughly one third of total height, with a deliberately compact lower body; "
                 "compact torso, short limbs, slightly oversized hands and shoes, low center of "
                 "gravity, and a bouncy run-ready silhouette. Non-human characters preserve the "
                 "same large-head compact-body readability rather than realistic anatomy."
