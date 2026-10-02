@@ -18,7 +18,7 @@ from studio.ui.auth import (
     require_studio_pin,
 )
 from studio.ui.brand import render_primary_brand, render_sidebar_brand
-from studio.ui.creator.character_factory import render_character_factory
+from studio.ui.creator.character_factory import render_character_factory, reset_character_creation_state
 from studio.ui.creator.world_factory import render_world_factory
 from studio.ui.theme import apply_mini_utopia_theme, render_brandbar, render_game_hero, render_quest
 
@@ -264,6 +264,16 @@ elif page == "🎭 My Characters":
         "这些都是你创造过的伙伴。随时回来换衣服、改设定，再带 TA 去新的世界。",
         kicker="CHARACTER LIBRARY",
     )
+
+    create_col, _ = st.columns([1, 3])
+    with create_col:
+        if st.button(
+            "✨ Create Another Character / 再创造一个",
+            use_container_width=True,
+        ):
+            reset_character_creation_state()
+            st.session_state.pending_app_page = "✨ Character Factory"
+            st.rerun()
 
     chars = [
         asset
