@@ -3,7 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
-STYLE_SCHEMA_VERSION = "1.0"
+STYLE_SCHEMA_VERSION = "1.1"
 
 
 class MacaronPaletteProfile(BaseModel):
@@ -31,6 +31,9 @@ class StyleProfile(BaseModel):
     visual_dna_pillars: list[str] = Field(default_factory=list)
     medium: str = ""
     shape_language: str = ""
+    character_scale_language: str = ""
+    face_language: str = ""
+    gameplay_silhouette: str = ""
     material_language: str = ""
     lighting: str = ""
     camera_language: str = ""

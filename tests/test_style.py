@@ -61,3 +61,37 @@ def test_base_style_attaches_to_mini_utopia_universe(tmp_path):
     style = repo.get_asset(attached.style_asset_id)
     assert style is not None
     assert style.asset_type == AssetType.STYLE
+
+
+def test_base_style_locks_mini_playable_avatar_language(tmp_path):
+    repo = SQLiteStudioRepository(tmp_path / "studio.db")
+    style = StyleService(repo).ensure_mini_utopia_base()
+    profile = style.metadata["style_profile"]
+
+    assert profile["schema_version"] == "1.1"
+    assert "2.75 to 3.25 heads tall" in profile["character_scale_language"]
+    assert "large readable eyes" in profile["face_language"]
+    assert "controllable in a cozy exploration game" in profile["gameplay_silhouette"]
+    assert any(
+        "Mini Playable Avatar proportions" in rule
+        for rule in profile["locked_rules"]
+    )
+
+
+def test_existing_base_style_is_migrated_without_changing_asset_id(tmp_path):
+    repo = SQLiteStudioRepository(tmp_path / "studio.db")
+    service = StyleService(repo)
+    original = service.ensure_mini_utopia_base()
+    original_id = original.asset_id
+
+    original.metadata["style_profile"] = {
+        "schema_version": "1.0",
+        "shape_language": "old",
+    }
+    repo.save_asset(original)
+
+    migrated = service.ensure_mini_utopia_base()
+
+    assert migrated.asset_id == original_id
+    assert migrated.metadata["style_profile"]["schema_version"] == "1.1"
+    assert "Mini Playable Avatar" in migrated.metadata["style_profile"]["character_scale_language"]
