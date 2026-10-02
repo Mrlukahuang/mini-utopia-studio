@@ -708,7 +708,15 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
         d1, d2 = st.columns(2)
         with d1:
             body_type = st.text_input("身体类型 / Body Type", value=draft.body_type)
-            proportions = st.text_input("身体比例 / Proportions", value=draft.proportions)
+            st.caption(
+                "🔒 Canon 比例锁定：Mini Playable Avatar · 大头、小身体、短四肢、"
+                "略大的手脚，适合跑跳和游戏动作。"
+            )
+            proportions = st.text_input(
+                "特殊比例备注 / Special Proportion Notes（可选）",
+                value=draft.proportions,
+                placeholder="只写角色特有差异，例如：手臂稍长、尾巴很短；不会覆盖 Canon 基础比例。",
+            )
             face = st.text_input("脸部 / Face", value=draft.face)
             eye_shape = st.text_input("眼睛形状 / Eye Shape", value=draft.eyes.shape)
             eye_size = st.text_input("眼睛大小 / Eye Size", value=draft.eyes.size)
