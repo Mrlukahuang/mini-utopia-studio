@@ -4,6 +4,7 @@ import json
 from html import escape
 
 from studio.models.character import CharacterProfile
+from studio.models.runtime_character import CharacterRuntimeSpec
 from studio.models.world import WorldBlueprint, WorldProfile
 
 
@@ -22,6 +23,7 @@ def build_world_runtime_html(
     blueprint: WorldBlueprint,
     character_name: str = "Mini Traveler",
     character_profile: CharacterProfile | None = None,
+    character_runtime: CharacterRuntimeSpec | None = None,
 ) -> str:
     """Build a self-contained Three.js playground for a saved WorldBlueprint.
 
@@ -38,6 +40,11 @@ def build_world_runtime_html(
             character_profile.model_dump(mode="json")
             if character_profile is not None
             else None
+        ),
+        "characterRuntime": (
+            character_runtime.model_dump(mode="json")
+            if character_runtime is not None
+            else CharacterRuntimeSpec().model_dump(mode="json")
         ),
     }
     data_json = _safe_json(runtime_data)
@@ -88,6 +95,7 @@ def build_world_runtime_html(
     <p><b>Explore Mode</b> · WASD / Arrow Keys</p>
     <p>Blueprint v{escape(blueprint.schema_version)} · {blueprint.grid.width}×{blueprint.grid.depth} · {len(blueprint.chunks)} chunks</p>
     <span class="pill">🧸 {escape(character_name)}</span>
+    <span class="pill" id="animState">Idle</span>
     <span class="pill">🌀 Portal</span>
     <span class="pill">🎬 Director Camera</span>
   </div>
@@ -100,11 +108,13 @@ def build_world_runtime_html(
 
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@{THREE_VERSION}/build/three.module.js';
+import {{ GLTFLoader }} from 'https://cdn.jsdelivr.net/npm/three@{THREE_VERSION}/examples/jsm/loaders/GLTFLoader.js';
 
 const DATA = {data_json};
 const profile = DATA.profile;
 const bp = DATA.blueprint;
 const character = DATA.character || {{}};
+const characterRuntime = DATA.characterRuntime || {{}};
 const host = document.getElementById('canvas');
 
 const renderer = new THREE.WebGLRenderer({{ antialias:true, alpha:false }});
