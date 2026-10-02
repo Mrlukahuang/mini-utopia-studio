@@ -8,6 +8,7 @@ from studio.services.story_service import StoryService
 from studio.services.style_service import StyleService
 from studio.services.universe_service import UniverseService
 from studio.services.job_service import JobService
+from studio.services.reference_character_service import ReferenceCharacterService
 from studio.storage.local import LocalObjectStorage
 
 
@@ -22,6 +23,7 @@ class StudioContext:
     styles: StyleService
     universes: UniverseService
     jobs: JobService
+    references: ReferenceCharacterService
 
 
 def build_context(settings: Settings) -> StudioContext:
@@ -40,4 +42,5 @@ def build_context(settings: Settings) -> StudioContext:
         styles=StyleService(repository),
         universes=UniverseService(repository),
         jobs=JobService(repository),
+        references=ReferenceCharacterService(repository, storage),
     )
