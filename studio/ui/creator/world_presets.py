@@ -97,3 +97,64 @@ THEME_COLORS = {
     "Peach": "#F8CBAE",
     "Cream": "#FFF4D7",
 }
+
+
+STORY_FUNCTION_OPTIONS = [
+    "Explore / 探索",
+    "Adventure / 冒险",
+    "Mystery / 谜题",
+    "Rest & Wonder / 放松与发现",
+    "Portal Hub / 传送枢纽",
+    "Discovery / 发现",
+]
+
+ARCHITECTURE_OPTIONS = [
+    "Tiny Toy Village / 玩具小镇",
+    "Rounded Block Castle / 圆润方块城堡",
+    "Tree Houses / 树屋",
+    "Cloud Buildings / 云朵建筑",
+    "Crystal Structures / 水晶建筑",
+    "Future Toy City / 未来玩具城市",
+    "Ancient Mini Ruins / 微缩古遗迹",
+    "Nature-led / 自然为主",
+    "Custom / 自定义",
+]
+
+WATER_OPTIONS = [
+    "None / 无",
+    "River / 河流",
+    "Lake / 湖泊",
+    "Waterfall / 瀑布",
+    "Ocean / 海洋",
+    "Floating Water / 漂浮水体",
+]
+
+LANDSCAPE_OPTIONS = [
+    "Flowers / 花海",
+    "Giant Trees / 巨树",
+    "Cloud Layers / 云层",
+    "Rock Arches / 岩石拱门",
+    "Star Fields / 星星原野",
+    "Crystal Gardens / 水晶花园",
+    "Tiny Farms / 微型农场",
+    "Glow Plants / 发光植物",
+]
+
+SURPRISE_OPTIONS = [
+    "Hidden Cave / 隐藏洞穴",
+    "Sleeping Houses Grow Stars / 睡着的房子长出星星",
+    "Flying Whales / 飞行鲸鱼",
+    "Secret Bridge / 秘密桥",
+    "Talking Trees / 会说话的树",
+    "Moving Islands / 会移动的岛",
+    "Glow Path / 发光小路",
+    "Custom / 自定义",
+]
+
+TRAVERSABILITY_OPTIONS = [
+    "Clear Loop / 清晰环线",
+    "Hub & Spokes / 中心向外",
+    "Linear Adventure / 线性冒险",
+    "Open Exploration / 自由探索",
+    "Vertical Climb / 高低探索",
+]
