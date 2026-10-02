@@ -8,7 +8,13 @@ from studio.models.character import CharacterProfile, EyeProfile
 from studio.recipes.character_factory import CharacterFactoryRecipe
 from studio.services.bootstrap import build_context
 from studio.services.style_service import StyleService
-from studio.ui.auth import lock_studio, require_studio_pin
+from studio.ui.auth import (
+    is_creator_unlocked,
+    lock_creator,
+    lock_studio,
+    require_creator_pin,
+    require_studio_pin,
+)
 from studio.ui.creator.character_factory import render_character_factory
 from studio.ui.theme import apply_mini_utopia_theme, render_brandbar, render_game_hero, render_quest
 
@@ -121,6 +127,16 @@ page = st.sidebar.radio(
     ],
     key="app_page",
 )
+
+
+creator_protected_pages = {"🎭 My Characters", "✨ Character Factory"}
+if mode == "🧒 Creator" and page in creator_protected_pages:
+    if not require_creator_pin():
+        st.stop()
+
+    st.sidebar.success("🌈 Creator unlocked")
+    if st.sidebar.button("🔒 Lock Creator", use_container_width=True):
+        lock_creator()
 
 
 # ---------------------------------------------------------------------------
