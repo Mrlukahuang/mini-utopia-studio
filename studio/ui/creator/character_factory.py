@@ -345,6 +345,14 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
         st.session_state.char_source = description
         st.session_state.char_draft = character_factory.parse_description(description)
         st.session_state.char_name = ""
+        st.session_state.character_name_input = ""
+        for widget_key in (
+            "wear_top",
+            "wear_bottom",
+            "wear_shoes",
+            "wear_hat",
+        ):
+            st.session_state.pop(widget_key, None)
 
     draft: CharacterProfile | None = st.session_state.get("char_draft")
     if not draft:
@@ -688,6 +696,7 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
         st.session_state.char_draft = None
         st.session_state.char_source = ""
         st.session_state.char_name = ""
+        st.session_state.character_name_input = ""
         st.caption(
             "下一阶段会把 Master Reference、Front / Side / Back、"
             "表情和姿势都挂在这个永久 CHAR_ID 下。"
