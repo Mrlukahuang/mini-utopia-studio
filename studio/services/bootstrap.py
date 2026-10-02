@@ -16,14 +16,16 @@ from studio.services.world_concept_prompt_service import WorldConceptPromptServi
 from studio.services.world_concept_service import WorldConceptService
 from studio.services.world_blueprint_service import WorldBlueprintService
 from studio.providers.openai_image import OpenAIImageProvider
+from studio.storage.base import ObjectStorage
 from studio.storage.local import LocalObjectStorage
+from studio.storage.supabase import SupabaseObjectStorage
 
 
 @dataclass
 class StudioContext:
     settings: Settings
     repository: SQLiteStudioRepository
-    storage: LocalObjectStorage
+    storage: ObjectStorage
     registry: PluginRegistry
     assets: AssetService
     stories: StoryService
@@ -39,9 +41,28 @@ class StudioContext:
     world_concepts: WorldConceptService
 
 
+def _build_storage(settings: Settings) -> ObjectStorage:
+    if settings.object_storage_backend == "supabase":
+        if not settings.supabase_url or not settings.supabase_service_role_key:
+            raise RuntimeError(
+                "OBJECT_STORAGE_BACKEND=supabase requires SUPABASE_URL and "
+                "SUPABASE_SERVICE_ROLE_KEY."
+            )
+        return SupabaseObjectStorage(
+            url=settings.supabase_url,
+            service_role_key=settings.supabase_service_role_key,
+            bucket=settings.supabase_storage_bucket,
+        )
+    if settings.object_storage_backend != "local":
+        raise RuntimeError(
+            f"Unsupported OBJECT_STORAGE_BACKEND: {settings.object_storage_backend}"
+        )
+    return LocalObjectStorage(settings.data_dir)
+
+
 def build_context(settings: Settings) -> StudioContext:
     repository = SQLiteStudioRepository(settings.database_path)
-    storage = LocalObjectStorage(settings.data_dir)
+    storage = _build_storage(settings)
     registry = PluginRegistry()
     registry.register(MockCharacterParsePlugin())
     registry.register(MockTurnaroundPlugin())
