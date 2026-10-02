@@ -1,4 +1,5 @@
 from studio.models.character import CharacterProfile
+from studio.models.runtime_character import CharacterRuntimeSpec, RuntimeAnimationSpec
 from studio.models.world import (
     CameraPoint,
     ChunkSpec,
@@ -135,3 +136,31 @@ def test_runtime_summary_exposes_character_identity_colors():
     )
 
     assert summary["character_colors"] == ["#F7B7D2", "#B9E7D0"]
+
+
+def test_runtime_html_has_idle_walk_run_and_glb_loader_path():
+    runtime = CharacterRuntimeSpec(
+        mode="glb",
+        model_data_uri="data:model/gltf-binary;base64,AAAA",
+        animation_clips=RuntimeAnimationSpec(
+            idle="Idle_Breath",
+            walk="Walk_Cycle",
+            run="Run_Cycle",
+        ),
+    )
+    html = build_world_runtime_html(
+        world_name="Candy Cloud Valley",
+        profile=WorldProfile(theme_color_hexes=["#F7B7D2"]),
+        blueprint=_blueprint(),
+        character_name="Vivian",
+        character_runtime=runtime,
+    )
+
+    assert "GLTFLoader" in html
+    assert "AnimationMixer" in html
+    assert "Idle_Breath" in html
+    assert "Walk_Cycle" in html
+    assert "Run_Cycle" in html
+    assert "ShiftLeft" in html
+    assert "setAnimationState" in html
+    assert "updateProceduralAnimation" in html
