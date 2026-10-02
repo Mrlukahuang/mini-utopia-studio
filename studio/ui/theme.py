@@ -63,10 +63,27 @@ html, body, [class*="css"] {
 
 .block-container {
     max-width: 1160px;
-    padding-top: 1.1rem;
+    padding-top: 3.25rem;
     padding-bottom: 5rem;
     position: relative;
     z-index: 1;
+}
+
+[data-testid="stHeader"] {
+    background: rgba(205,235,255,.72);
+    backdrop-filter: blur(10px);
+}
+
+[data-testid="stToolbar"] {
+    top: .35rem;
+}
+
+@media (max-width: 768px) {
+    .block-container {
+        padding-top: 3.75rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
 }
 
 [data-testid="stSidebar"] {
@@ -143,7 +160,8 @@ h1, h2, h3 {
     justify-content:space-between;
     align-items:center;
     gap:16px;
-    padding:10px 4px 18px 4px;
+    padding:4px 4px 18px 4px;
+    margin-top:.25rem;
 }
 
 .mu-brand {

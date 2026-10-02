@@ -57,6 +57,8 @@ def edit_character(asset) -> None:
     st.session_state.character_name_input = asset.display_name
     st.session_state.editing_character_id = asset.asset_id
     st.session_state.char_preview_ready = False
+    st.session_state.character_master_candidate_path = None
+    st.session_state.character_master_character_id = None
     st.session_state.app_page = "✨ Character Factory"
 
 
@@ -210,6 +212,17 @@ elif page == "🎭 My Characters":
                 '<div class="mu-character-card"><div class="mu-character-orb">🧸</div></div>',
                 unsafe_allow_html=True,
             )
+            master_ref = ctx.character_masters.current_master(asset.asset_id)
+            if master_ref:
+                try:
+                    st.image(
+                        ctx.storage.get_bytes(master_ref.path),
+                        caption="✨ Character Master",
+                        use_container_width=True,
+                    )
+                except Exception:
+                    st.caption("Character Master 图片暂时无法读取。")
+
             st.subheader(asset.display_name)
             st.caption(asset.asset_id)
             st.write(asset.description or "等待描述")
