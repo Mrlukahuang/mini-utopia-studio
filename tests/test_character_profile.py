@@ -22,7 +22,7 @@ def test_character_profile_v1_core_completion():
         english_level=6,
     )
 
-    assert profile.schema_version == "1.0"
+    assert profile.schema_version == "1.1"
     assert profile.missing_core_fields() == []
 
 
@@ -103,3 +103,24 @@ def test_character_visual_fields_are_preserved():
 def test_height_cm_must_be_positive():
     with pytest.raises(ValidationError):
         CharacterProfile(height_cm=0)
+
+
+def test_guided_character_taxonomy_and_color_samples_are_preserved():
+    profile = CharacterProfile(
+        character_type="动物 / Animal",
+        character_type_description="一只会收集星星的圆滚滚熊猫",
+        story_role="探险家 / Explorer",
+        story_role_description="看到 Portal 就会第一个进去",
+        hair_or_fur_color="奶油白",
+        hair_or_fur_color_hex="#F4E9D8",
+        favorite_colors=["粉色", "薄荷绿"],
+        favorite_color_hexes=["#F7B7D2", "#B9E7D0"],
+        eyes=EyeProfile(color="焦糖棕", color_hex="#6B4F3A"),
+    )
+
+    assert profile.character_type == "动物 / Animal"
+    assert "熊猫" in profile.character_type_description
+    assert profile.story_role == "探险家 / Explorer"
+    assert profile.hair_or_fur_color_hex == "#F4E9D8"
+    assert profile.eyes.color_hex == "#6B4F3A"
+    assert profile.favorite_color_hexes == ["#F7B7D2", "#B9E7D0"]
