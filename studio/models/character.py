@@ -3,7 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
-CHARACTER_SCHEMA_VERSION = "1.1"
+CHARACTER_SCHEMA_VERSION = "1.2"
 
 # These fields are expected before a Character is considered creator-ready.
 # The parser may leave them blank when the source description does not specify them;
@@ -57,6 +57,7 @@ class CharacterProfile(BaseModel):
     # Studio / provenance
     schema_version: str = CHARACTER_SCHEMA_VERSION
     source_description: str = ""
+    creator_extra_details: str = ""
 
     # Core / 核心
     character_type: str = ""
