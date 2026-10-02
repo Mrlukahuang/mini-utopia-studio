@@ -99,3 +99,17 @@ def test_visual_difference_fields_are_preserved():
     assert profile.hair_or_fur_color == "紫色"
     assert profile.body_build == "圆润 / Round"
     assert profile.height == "很高 / Very tall"
+
+
+def test_height_cm_supports_reference_scale():
+    profile = CharacterProfile(
+        height="偏高 / Tall",
+        height_cm=175,
+    )
+
+    assert profile.height_cm == 175
+
+
+def test_height_cm_must_be_positive():
+    with pytest.raises(ValidationError):
+        CharacterProfile(height_cm=0)
