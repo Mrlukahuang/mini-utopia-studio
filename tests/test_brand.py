@@ -17,7 +17,7 @@ def test_brand_canon_exposes_both_logo_files():
     assert SQUARE_LOGO_PATH.exists()
     assert HORIZONTAL_LOGO_PATH.exists()
     assert SQUARE_LOGO_PATH.suffix == ".webp"
-    assert HORIZONTAL_LOGO_PATH.suffix == ".webp"
+    assert HORIZONTAL_LOGO_PATH.suffix == ".png"
 
 
 def test_brand_logo_files_are_decodable_images():
