@@ -334,6 +334,93 @@ elif page == "✨ Character Factory":
                 "头发 / 毛发 / Hair or Fur",
                 value=draft.hair_or_fur,
             )
+
+            hairstyle_options = [
+                "",
+                "长直发 / Long straight",
+                "长卷发 / Long curly",
+                "短发 / Short hair",
+                "波波头 / Bob",
+                "高马尾 / High ponytail",
+                "低马尾 / Low ponytail",
+                "双马尾 / Pigtails",
+                "丸子头 / Bun",
+                "双丸子头 / Double buns",
+                "单辫 / Single braid",
+                "双辫 / Twin braids",
+                "法式辫 / French braid",
+                "荷兰辫 / Dutch braid",
+                "鱼骨辫 / Fishtail braid",
+                "侧辫 / Side braid",
+                "皇冠辫 / Crown braid",
+                "半扎发 / Half-up",
+                "精灵短发 / Pixie cut",
+                "其他 / Other",
+            ]
+            hairstyle_index = (
+                hairstyle_options.index(draft.hair_style)
+                if draft.hair_style in hairstyle_options
+                else 0
+            )
+            hair_style = st.selectbox(
+                "发型 / Hairstyle",
+                hairstyle_options,
+                index=hairstyle_index,
+            )
+
+            hair_or_fur_color = st.text_input(
+                "头发 / 毛发颜色 / Hair or Fur Color",
+                value=draft.hair_or_fur_color,
+            )
+
+            body_build_options = [
+                "",
+                "很瘦 / Very slim",
+                "偏瘦 / Slim",
+                "普通 / Average",
+                "圆润 / Round",
+                "胖胖的 / Chubby",
+                "壮壮的 / Strong",
+            ]
+            body_build_index = (
+                body_build_options.index(draft.body_build)
+                if draft.body_build in body_build_options
+                else 0
+            )
+            body_build = st.selectbox(
+                "体型 / Body Build",
+                body_build_options,
+                index=body_build_index,
+            )
+
+            height_options = [
+                "",
+                "很矮 / Very short",
+                "偏矮 / Short",
+                "中等 / Medium",
+                "偏高 / Tall",
+                "很高 / Very tall",
+            ]
+            height_index = (
+                height_options.index(draft.height)
+                if draft.height in height_options
+                else 0
+            )
+            height = st.selectbox(
+                "身高感觉 / Height Category",
+                height_options,
+                index=height_index,
+            )
+
+            height_cm = st.number_input(
+                "精确身高 / Exact Height (cm, optional)",
+                min_value=1.0,
+                max_value=1000.0,
+                value=float(draft.height_cm or 120.0),
+                step=1.0,
+                help="SECTION 1.2 会用 Reference Characters 做相对身高尺。",
+            )
+
             favorite_colors = st.text_input(
                 "喜爱的颜色 / Favorite Colors",
                 value="，".join(draft.favorite_colors),
@@ -471,6 +558,11 @@ elif page == "✨ Character Factory":
                     "age": age,
                     "appearance": appearance,
                     "hair_or_fur": hair_or_fur,
+                    "hair_style": hair_style,
+                    "hair_or_fur_color": hair_or_fur_color,
+                    "body_build": body_build,
+                    "height": height,
+                    "height_cm": height_cm,
                     "favorite_colors": split_items(favorite_colors),
                     "personality_traits": split_items(personality),
                     "speaking_tone": speaking_tone,
