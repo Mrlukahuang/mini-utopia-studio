@@ -92,6 +92,35 @@ The project should **not** depend on copied Minecraft characters, logos, texture
 
 The goal is to create our own block / voxel miniature language.
 
+### 4.1.1 Brand Canon, UI Shell & Typography
+
+Mini Utopia also has a locked **Brand Canon** so the product UI and generated assets feel like one coherent creative game rather than unrelated screens.
+
+**Logo system**
+- Primary horizontal logo: main page header, Home, Character Factory, future Mini World Factory, Stories, covers and presentation headers.
+- Square badge logo: top of the Streamlit sidebar, compact cards, app/avatar contexts, future image corner marks and future video watermark.
+- Official logos are application assets. Image-generation models must not invent or redraw the logo.
+
+**Typography Canon**
+- Display / headings (English): **Fredoka**
+- Display / headings (Chinese): **ZCOOL KuaiLe**
+- Body / UI (English): **Nunito**
+- Body / UI (Chinese): **Noto Sans SC**
+- Unrelated decorative fonts should not be introduced into Canon UI.
+
+**UI Shell Canon**
+- Sidebar starts with the square badge logo and compact tagline.
+- Main content starts with the primary horizontal logo.
+- Soft cream / lavender / sky gradients, rounded navigation rows, consistent rounded cards, pill-like controls and gentle shadows.
+- Core UI colors stay within the Mini Utopia macaron family: Strawberry Pink, Mint, Lavender, Sky Blue, Peach, Cream and Ink.
+- Brand styling should stay playful, block-built, collectible and child-friendly without becoming visually cluttered.
+
+The detailed source of truth is:
+
+**[Mini Utopia Brand Canon v1.0](docs/MINI_UTOPIA_BRAND_CANON_V1.md)**
+
+Changes to the Logo system, Typography Canon, or core UI shell require an explicit Brand Canon version bump.
+
 ---
 
 ### 4.2 The Traveler
