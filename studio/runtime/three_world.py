@@ -104,7 +104,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@{THREE_VERSION}/build
 const DATA = {data_json};
 const profile = DATA.profile;
 const bp = DATA.blueprint;
-const character = DATA.character || {};
+const character = DATA.character || {{}};
 const host = document.getElementById('canvas');
 
 const renderer = new THREE.WebGLRenderer({{ antialias:true, alpha:false }});
