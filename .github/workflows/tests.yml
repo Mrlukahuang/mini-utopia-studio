@@ -28,5 +28,11 @@ jobs:
       - name: Compile Python
         run: python -m compileall studio app.py
 
+      - name: Smoke-test production imports
+        run: |
+          python -c "from studio.models.character import CharacterProfile, EyeProfile, WearableLoadout"
+          python -c "from studio.models.reference import ReferenceCharacterConfig"
+          python -c "from studio.core.enums import AssetType; assert AssetType.WEARABLE.value == 'wearable'"
+
       - name: Run tests
         run: python -m pytest -q
