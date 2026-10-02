@@ -9,12 +9,12 @@ from studio.recipes.character_factory import CharacterFactoryRecipe
 from studio.services.bootstrap import build_context
 from studio.services.style_service import StyleService
 from studio.ui.auth import (
-    is_creator_unlocked,
     lock_creator,
     lock_studio,
     require_creator_pin,
     require_studio_pin,
 )
+from studio.ui.brand import render_primary_brand, render_sidebar_brand
 from studio.ui.creator.character_factory import render_character_factory
 from studio.ui.theme import apply_mini_utopia_theme, render_brandbar, render_game_hero, render_quest
 
@@ -42,6 +42,7 @@ character_factory = CharacterFactoryRecipe(ctx.registry, ctx.assets)
 # ---------------------------------------------------------------------------
 
 apply_mini_utopia_theme()
+render_sidebar_brand()
 
 
 # ---------------------------------------------------------------------------
@@ -109,6 +110,7 @@ if mode == "🛠 Studio":
         lock_studio()
 
 
+render_primary_brand()
 render_brandbar(studio=(mode == "🛠 Studio"))
 
 
