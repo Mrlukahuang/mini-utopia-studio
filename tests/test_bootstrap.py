@@ -10,6 +10,9 @@ def test_build_context_exposes_style_service(tmp_path):
         root_dir=tmp_path,
         data_dir=tmp_path / "data",
         database_path=tmp_path / "data" / "studio.db",
+        app_env="test",
+        openai_api_key=None,
+        gemini_api_key=None,
     )
     settings.data_dir.mkdir(parents=True, exist_ok=True)
 
