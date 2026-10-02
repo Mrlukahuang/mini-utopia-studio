@@ -71,6 +71,9 @@ def test_base_style_locks_mini_playable_avatar_language(tmp_path):
     assert profile["schema_version"] == "1.1"
     assert "2.8 to 3.0 heads tall" in profile["character_scale_language"]
     assert "large readable eyes" in profile["face_language"]
+    assert "voxel exploration world" in profile["shape_language"]
+    assert "construction-toy diorama" in profile["shape_language"]
+    assert "generic 3D animation" in " ".join(profile["negative_rules"])
     assert "controllable in a cozy exploration game" in profile["gameplay_silhouette"]
     assert any(
         "Mini Playable Avatar proportions" in rule

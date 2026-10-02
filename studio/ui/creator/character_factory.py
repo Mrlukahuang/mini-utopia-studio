@@ -1,157 +1,40 @@
 from __future__ import annotations
 
 from html import escape
-import random
 from typing import Any
 
 import streamlit as st
 
 from studio.core.enums import AssetType
-from studio.models.character import (
-    CharacterProfile,
-    EyeProfile,
-    WearableLoadout,
-)
+from studio.models.character import CharacterProfile, WearableLoadout
 from studio.models.reference import ReferenceCharacterConfig
+from studio.ui.creator.character_presets import (
+    CUSTOM,
+    AGE_OPTIONS,
+    BODY_BUILD_OPTIONS,
+    CHARACTER_TYPE_OPTIONS,
+    COLOR_PRESETS,
+    DISTINCTIVE_OPTIONS,
+    EYE_SHAPE_OPTIONS,
+    FACE_STYLE_OPTIONS,
+    FAVORITE_COLOR_HEX,
+    FAVORITE_COLOR_OPTIONS,
+    HAIR_FUR_KIND_OPTIONS,
+    HAIR_FUR_TEXTURE_OPTIONS,
+    HAIRSTYLE_OPTIONS,
+    HEIGHT_OPTIONS,
+    LANGUAGE_OPTIONS,
+    PERSONALITY_OPTIONS,
+    SPEAKING_TONE_OPTIONS,
+    STORY_ROLE_OPTIONS,
+    STRENGTH_OPTIONS,
+    WEAKNESS_OPTIONS,
+)
 from studio.ui.theme import render_game_hero, render_quest
 
 
-HAIRSTYLE_OPTIONS = [
-    "",
-    "长直发 / Long straight",
-    "长卷发 / Long curly",
-    "短发 / Short hair",
-    "波波头 / Bob",
-    "高马尾 / High ponytail",
-    "低马尾 / Low ponytail",
-    "双马尾 / Pigtails",
-    "丸子头 / Bun",
-    "双丸子头 / Double buns",
-    "单辫 / Single braid",
-    "双辫 / Twin braids",
-    "法式辫 / French braid",
-    "荷兰辫 / Dutch braid",
-    "鱼骨辫 / Fishtail braid",
-    "侧辫 / Side braid",
-    "皇冠辫 / Crown braid",
-    "半扎发 / Half-up",
-    "精灵短发 / Pixie cut",
-    "其他 / Other",
-]
-
-BODY_BUILD_OPTIONS = [
-    "",
-    "很瘦 / Very slim",
-    "偏瘦 / Slim",
-    "普通 / Average",
-    "圆润 / Round",
-    "胖胖的 / Chubby",
-    "壮壮的 / Strong",
-]
-
-HEIGHT_OPTIONS = [
-    "",
-    "很矮 / Very short",
-    "偏矮 / Short",
-    "中等 / Medium",
-    "偏高 / Tall",
-    "很高 / Very tall",
-]
-
-
-CHARACTER_TYPE_OPTIONS = [
-    "人类 / Human",
-    "动物 / Animal",
-    "机器人 / Robot",
-    "奇幻生物 / Fantasy Creature",
-    "精灵 / Spirit",
-    "云朵生物 / Cloud Creature",
-    "外星生物 / Alien",
-    "玩具角色 / Toy Character",
-    "植物生物 / Plant Creature",
-    "交通工具角色 / Vehicle Character",
-    "其他 / Other",
-]
-
-STORY_ROLE_OPTIONS = [
-    "",
-    "旅行者 / Traveler",
-    "探险家 / Explorer",
-    "发明家 / Inventor",
-    "守护者 / Guardian",
-    "伙伴 / Friend",
-    "向导 / Guide",
-    "收藏家 / Collector",
-    "梦想家 / Dreamer",
-    "科学家 / Scientist",
-    "艺术家 / Artist",
-    "信使 / Messenger",
-    "神秘角色 / Mystery Role",
-    "其他 / Other",
-]
-
 DEFAULT_FAVORITE_COLOR_HEXES = ["#F7B7D2", "#B9E7D0", "#D7C2F3"]
 MAX_GENERATIONS_PER_SESSION = 20
-
-SURPRISE_TEMPLATES = [
-    CharacterProfile(
-        character_type="动物 / Animal",
-        character_type_description="一只圆滚滚、喜欢收集发光石头的小熊猫",
-        age="7",
-        appearance="small round explorer with a huge friendly head",
-        hair_or_fur="soft fluffy fur",
-        hair_or_fur_color="cream white and soft charcoal",
-        hair_or_fur_color_hex="#F2EBDD",
-        body_build="圆润 / Round",
-        height="偏矮 / Short",
-        height_cm=105,
-        favorite_colors=["薄荷绿", "杏桃色", "天空蓝"],
-        favorite_color_hexes=["#B9E7D0", "#F6C69A", "#BDE3F5"],
-        personality_traits=["好奇", "谨慎", "幽默"],
-        speaking_tone="轻快、可爱",
-        native_language="中文",
-        english_level=5,
-        story_role="探险家 / Explorer",
-    ),
-    CharacterProfile(
-        character_type="机器人 / Robot",
-        character_type_description="会在开心时投影小蝴蝶的圆角小机器人",
-        age="10",
-        appearance="compact friendly modular robot with a large expressive face screen",
-        hair_or_fur="soft toy-like shell",
-        hair_or_fur_color="cream white",
-        hair_or_fur_color_hex="#F6F1E8",
-        body_build="普通 / Average",
-        height="偏矮 / Short",
-        height_cm=90,
-        favorite_colors=["婴儿蓝", "薰衣草紫", "开心果绿"],
-        favorite_color_hexes=["#BFDFF5", "#D7C2F3", "#C8E4B2"],
-        personality_traits=["聪明", "热情", "有点健忘"],
-        speaking_tone="兴奋、直接",
-        native_language="中文",
-        english_level=6,
-        story_role="发明家 / Inventor",
-    ),
-    CharacterProfile(
-        character_type="奇幻生物 / Fantasy Creature",
-        character_type_description="一只会感应 Portal 的小星光龙",
-        age="6",
-        appearance="tiny gentle dragon with rounded wings and a very large cute head",
-        hair_or_fur="soft rounded scales",
-        hair_or_fur_color="lavender",
-        hair_or_fur_color_hex="#CDB4E8",
-        body_build="普通 / Average",
-        height="中等 / Medium",
-        height_cm=112,
-        favorite_colors=["薰衣草紫", "薄荷绿", "柔和珊瑚"],
-        favorite_color_hexes=["#D7C2F3", "#B9E7D0", "#F3B3A7"],
-        personality_traits=["忠诚", "温柔", "爱玩"],
-        speaking_tone="温柔、慢慢的",
-        native_language="中文",
-        english_level=4,
-        story_role="守护者 / Guardian",
-    ),
-]
 
 ENGLISH_LEVELS = {
     1: "几乎不会英语 / Almost no English",
@@ -165,14 +48,6 @@ ENGLISH_LEVELS = {
     9: "接近母语 / Near-native",
     10: "母语水平 / Native",
 }
-
-
-def split_items(value: str) -> list[str]:
-    return [
-        item.strip()
-        for item in value.replace("，", ",").split(",")
-        if item.strip()
-    ]
 
 
 def english_level_label(level: int) -> str:
@@ -249,33 +124,39 @@ def render_height_ruler(
                 <span>{minimum:.0f} cm</span>
                 <span>{maximum:.0f} cm</span>
             </div>
-            <div class="mu-ruler-track">
-                {''.join(markers)}
-            </div>
+            <div class="mu-ruler-track">{''.join(markers)}</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 
-def _select_index(options: list[str], value: str) -> int:
-    return options.index(value) if value in options else 0
-
-
-def _guided_index(options: list[str], value: str) -> int:
+def _preset_index(options: list[str], value: str, default: int = 0) -> int:
     if value in options:
         return options.index(value)
-    if value and "其他 / Other" in options:
-        return options.index("其他 / Other")
-    return 0
+    if value and CUSTOM in options:
+        return options.index(CUSTOM)
+    return max(0, min(default, len(options) - 1))
+
+
+def _choice(selected: str, previous: str, options: list[str]) -> str:
+    if selected != CUSTOM:
+        return selected
+    if previous and previous not in options:
+        return previous
+    return CUSTOM
+
+
+def _color_name(hex_value: str, text_value: str) -> str:
+    for name, value in COLOR_PRESETS.items():
+        if value and value.lower() == (hex_value or "").lower():
+            return name
+    if text_value in COLOR_PRESETS:
+        return text_value
+    return CUSTOM
 
 
 def _wearables_for_slot(assets: list[Any], slot: str) -> list[Any]:
-    """Keep typed default wearables out of unrelated slots.
-
-    Legacy/user-created wearables without a subtype remain available everywhere
-    until the dedicated Wearable Factory adds stricter categories.
-    """
     return [
         asset
         for asset in assets
@@ -285,17 +166,16 @@ def _wearables_for_slot(assets: list[Any], slot: str) -> list[Any]:
 
 
 def _asset_selector(label: str, assets: list[Any], current_id: str | None, key: str):
-    default_index = 0
     options = [None, *assets]
-    if current_id:
-        for idx, asset in enumerate(options):
-            if asset is not None and asset.asset_id == current_id:
-                default_index = idx
-                break
+    index = 0
+    for idx, asset in enumerate(options):
+        if asset is not None and asset.asset_id == current_id:
+            index = idx
+            break
     return st.selectbox(
         label,
         options,
-        index=default_index,
+        index=index,
         format_func=lambda item: "— 未选择 / None —" if item is None else item.display_name,
         key=key,
     )
@@ -313,10 +193,7 @@ def render_reference_settings(ctx) -> None:
         defaults = [a for a in eligible if a.asset_id in current_ids]
 
         if len(eligible) < 2:
-            st.info(
-                "至少需要两个已经填写精确身高的角色，才能设置 Reference Anchors。"
-                "可以先创建角色，再回来设置。"
-            )
+            st.info("至少需要两个已经填写精确身高的角色，才能设置 Reference Anchors。")
             return
 
         selected = st.multiselect(
@@ -330,8 +207,7 @@ def render_reference_settings(ctx) -> None:
             ),
             key="reference_anchor_selector",
         )
-
-        c1, c2 = st.columns([1, 1])
+        c1, c2 = st.columns(2)
         with c1:
             if st.button(
                 "💾 Save Reference Anchors / 保存参考角色",
@@ -345,104 +221,106 @@ def render_reference_settings(ctx) -> None:
                 )
                 st.success("Reference Anchors 已保存。")
         with c2:
-            if current and st.button(
-                "清除 / Clear",
-                use_container_width=True,
-            ):
+            if current and st.button("清除 / Clear", use_container_width=True):
                 ctx.references.clear()
-                st.success("Reference Anchors 已清除。")
                 st.rerun()
 
 
-def render_character_factory(ctx, character_factory, *, studio_mode: bool = False) -> None:
-    """Child-facing Character Factory v1.
+def _start_over() -> None:
+    for key in (
+        "char_draft",
+        "char_source",
+        "char_name",
+        "character_name_input",
+        "char_creation_mode",
+        "char_stage",
+        "editing_character_id",
+        "character_master_candidate_path",
+        "character_master_character_id",
+    ):
+        st.session_state.pop(key, None)
+    st.rerun()
 
-    The creator sees one decision group at a time. Production complexity stays
-    behind the structured Character Profile and Studio tools.
-    """
+
+def render_character_factory(ctx, character_factory, *, studio_mode: bool = False) -> None:
+    """Character Factory v1 final: two entry modes, preset-first Custom Build."""
+
     render_game_hero(
         "Create Your Mini Hero ✨",
-        "像游戏捏人一样，一步一步创造 TA。你决定角色是谁，Mini Utopia "
-        "负责让 TA 属于同一个世界。",
-        kicker="CHARACTER FACTORY · CREATE A HERO",
+        "两种方式开始，同一套 Mini Utopia 规则完成。选项负责稳定，想象力留在最后的 Extra Details。",
+        kicker="CHARACTER FACTORY · FINAL V1",
     )
 
     if studio_mode:
         render_reference_settings(ctx)
 
     draft: CharacterProfile | None = st.session_state.get("char_draft")
-    creation_mode = st.session_state.get("char_creation_mode")
+    mode = st.session_state.get("char_creation_mode")
 
-    # ------------------------------------------------------------------
-    # Start screen — exactly three ways to begin.
-    # ------------------------------------------------------------------
-    if draft is None and creation_mode is None:
+    if draft is None and mode is None:
         render_quest("你想怎么开始？ / How do you want to start?")
-        a, b, c = st.columns(3)
+        left, right = st.columns(2)
 
-        with a:
+        with left:
             st.markdown(
                 '<div class="mu-world-card"><div class="emoji">✨📝</div>'
-                '<h3>Describe & Create</h3><p>描述生成 · 把脑子里的角色讲出来，系统帮你整理。</p></div>',
+                '<h3>Prompt Generate</h3>'
+                '<p>描述生成 · 用一句话说出脑海里的角色，系统先整理，再让你确认。</p></div>',
                 unsafe_allow_html=True,
             )
-            if st.button("✨ 描述生成", key="start_describe", use_container_width=True):
-                st.session_state.char_creation_mode = "describe"
+            if st.button(
+                "✨ Prompt Generate / 描述生成",
+                key="start_prompt_generate",
+                use_container_width=True,
+            ):
+                st.session_state.char_creation_mode = "prompt"
                 st.rerun()
 
-        with b:
+        with right:
             st.markdown(
-                '<div class="mu-world-card"><div class="emoji">🎨🧸</div>'
-                '<h3>Design My Own</h3><p>我来设计 · 从类型、眼睛、头发、衣服一步一步捏。</p></div>',
+                '<div class="mu-world-card"><div class="emoji">🎨🧩</div>'
+                '<h3>Custom Build</h3>'
+                '<p>自定义搭建 · 像游戏捏人一样，从预设选项一步步搭出来。</p></div>',
                 unsafe_allow_html=True,
             )
-            if st.button("🎨 我来设计", key="start_design", use_container_width=True):
-                st.session_state.char_creation_mode = "design"
+            if st.button(
+                "🎨 Custom Build / 自定义搭建",
+                key="start_custom_build",
+                use_container_width=True,
+            ):
+                st.session_state.char_creation_mode = "custom"
                 st.session_state.char_draft = CharacterProfile()
-                st.session_state.char_stage = 0
-                st.rerun()
-
-        with c:
-            st.markdown(
-                '<div class="mu-world-card"><div class="emoji">🎲🌈</div>'
-                '<h3>Surprise Me</h3><p>随机一个 · 先得到一个惊喜角色，再把 TA 改成自己的。</p></div>',
-                unsafe_allow_html=True,
-            )
-            if st.button("🎲 随机一个", key="start_surprise", use_container_width=True):
-                st.session_state.char_creation_mode = "surprise"
-                st.session_state.char_draft = random.choice(SURPRISE_TEMPLATES).model_copy(deep=True)
-                st.session_state.char_name = ""
                 st.session_state.char_stage = 0
                 st.rerun()
         return
 
-    if draft is None and creation_mode == "describe":
-        render_quest("像讲故事一样说一句就够了，后面每个细节都还能改。")
+    if draft is None and mode == "prompt":
+        render_quest("把脑海里的角色讲出来。下一步会自动变成同一套可编辑选项。")
         description = st.text_area(
             "描述 TA / Describe your character",
             value=st.session_state.get("char_source", ""),
             placeholder=(
-                "例如：一只胖胖的大熊猫，喜欢收集星星，有点胆小，"
-                "但每次看到新的 Portal 都忍不住想进去。"
+                "例如：一个8岁的女孩，长卷棕发，大大的焦糖色眼睛，"
+                "喜欢星星，有点害羞但很爱冒险。"
             ),
             height=150,
             key="character_source_text",
         )
-        c1, c2 = st.columns([2, 1])
-        with c1:
+        a, b = st.columns([2, 1])
+        with a:
             if st.button(
-                "✨ Turn This Into a Character / 帮我变成角色",
+                "✨ Build My Character / 帮我整理",
                 type="primary",
                 disabled=not description.strip(),
                 use_container_width=True,
             ):
                 st.session_state.char_source = description
                 st.session_state.char_draft = character_factory.parse_description(description)
-                st.session_state.char_name = ""
+                st.session_state.char_creation_mode = "custom"
                 st.session_state.char_stage = 0
                 st.rerun()
-        with c2:
-            if st.button("← 换一种开始方式", use_container_width=True):
+        with b:
+            if st.button("← Back / 返回", use_container_width=True):
                 st.session_state.char_creation_mode = None
                 st.rerun()
         return
@@ -452,255 +330,261 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
         return
 
     stages = [
-        "1 · Who / TA是谁",
-        "2 · Look / 长什么样",
+        "1 · Identity / 身份",
+        "2 · Look / 外形",
         "3 · Personality / 性格",
-        "4 · Outfit & Size / 穿什么多高",
+        "4 · Outfit & Details / 装备",
         "5 · Create / 生成",
     ]
-    stage = int(st.session_state.get("char_stage", 0))
-    stage = max(0, min(stage, len(stages) - 1))
+    stage = max(0, min(int(st.session_state.get("char_stage", 0)), 4))
+    st.progress((stage + 1) / 5, text=f"{stages[stage]} · {stage + 1}/5")
+    st.caption("Custom Build 以选择题为主。只有最后的 Extra Details 是自由描述。")
 
-    st.progress((stage + 1) / len(stages), text=f"{stages[stage]}  ·  {stage + 1}/5")
-    st.caption("一次只做几件事。随时可以返回修改，角色的永久 CHAR_ID 不会因为编辑而改变。")
-
-    def go(next_stage: int) -> None:
-        st.session_state.char_stage = max(0, min(next_stage, 4))
+    def go(value: int) -> None:
+        st.session_state.char_stage = max(0, min(value, 4))
         st.rerun()
 
-    # ------------------------------------------------------------------
-    # Stage 1: identity
-    # ------------------------------------------------------------------
     if stage == 0:
-        st.markdown("### 👤 TA 是谁？")
-        c1, c2 = st.columns(2)
-        with c1:
+        st.markdown("### 👤 Identity / TA 是谁？")
+        a, b = st.columns(2)
+        with a:
             name = st.text_input(
                 "名字 / Name",
                 value=st.session_state.get("char_name", ""),
                 placeholder="给 TA 取一个名字",
                 key="character_name_input",
             )
-            character_type = st.selectbox(
-                "TA是什么？ / Character Type",
+            ctype = st.selectbox(
+                "Character Type / 角色类型",
                 CHARACTER_TYPE_OPTIONS,
-                index=_guided_index(CHARACTER_TYPE_OPTIONS, draft.character_type),
+                index=_preset_index(CHARACTER_TYPE_OPTIONS, draft.character_type),
             )
-            type_detail = st.text_area(
-                "这个类型有什么特别？ / Type Detail",
-                value=(
-                    draft.character_type_description
-                    or (
-                        draft.character_type
-                        if draft.character_type
-                        and draft.character_type not in CHARACTER_TYPE_OPTIONS
-                        else ""
-                    )
-                ),
-                placeholder="例如：一只会收集星星的圆滚滚熊猫",
-                height=90,
+            age = st.selectbox(
+                "Age / 年龄",
+                AGE_OPTIONS,
+                index=_preset_index(AGE_OPTIONS, draft.age, default=4),
             )
-        with c2:
-            age = st.text_input("年龄 / Age", value=draft.age, placeholder="例如：8")
-            story_role = st.selectbox(
-                "故事角色定位 / Story Role",
+        with b:
+            role = st.selectbox(
+                "Story Role / 故事角色",
                 STORY_ROLE_OPTIONS,
-                index=_guided_index(STORY_ROLE_OPTIONS, draft.story_role),
+                index=_preset_index(STORY_ROLE_OPTIONS, draft.story_role),
             )
-            role_detail = st.text_area(
-                "角色定位补充 / Role Detail（可选）",
-                value=(
-                    draft.story_role_description
-                    or (
-                        draft.story_role
-                        if draft.story_role
-                        and draft.story_role not in STORY_ROLE_OPTIONS
-                        else ""
-                    )
-                ),
-                placeholder="例如：平时胆小，但看到 Portal 会第一个进去",
-                height=90,
+            build = st.selectbox(
+                "Body Build / 体型",
+                BODY_BUILD_OPTIONS,
+                index=_preset_index(BODY_BUILD_OPTIONS, draft.body_build, default=2),
+            )
+            face = st.selectbox(
+                "Face Style / 脸部感觉",
+                FACE_STYLE_OPTIONS,
+                index=_preset_index(FACE_STYLE_OPTIONS, draft.face),
             )
 
-        if st.button("Next → 继续", type="primary", use_container_width=True):
+        if draft.source_description:
+            st.info("✨ Prompt 已整理成选项。你可以继续修改；原始描述会保留在 Profile。")
+
+        if st.button("Next → Look", type="primary", use_container_width=True):
             st.session_state.char_name = name
-            st.session_state.char_draft = draft.model_copy(update={
-                "character_type": character_type,
-                "character_type_description": type_detail,
-                "age": age,
-                "story_role": story_role,
-                "story_role_description": role_detail,
-            })
+            st.session_state.char_draft = draft.model_copy(
+                update={
+                    "character_type": _choice(ctype, draft.character_type, CHARACTER_TYPE_OPTIONS),
+                    "age": _choice(age, draft.age, AGE_OPTIONS),
+                    "story_role": _choice(role, draft.story_role, STORY_ROLE_OPTIONS),
+                    "body_build": _choice(build, draft.body_build, BODY_BUILD_OPTIONS),
+                    "face": _choice(face, draft.face, FACE_STYLE_OPTIONS),
+                }
+            )
             go(1)
         return
 
-    # ------------------------------------------------------------------
-    # Stage 2: look
-    # ------------------------------------------------------------------
     if stage == 1:
-        st.markdown("### 🎨 TA 长什么样？")
-        c1, c2 = st.columns(2)
-        with c1:
-            appearance = st.text_area(
-                "外形 / Appearance",
-                value=draft.appearance,
-                placeholder="例如：大大的头、圆圆的脸、软软的轮廓",
-                height=95,
+        st.markdown("### 🎨 Look / TA 长什么样？")
+        a, b = st.columns(2)
+        with a:
+            hair_kind = st.selectbox(
+                "Hair or Fur / 头发或毛发",
+                HAIR_FUR_KIND_OPTIONS,
+                index=_preset_index(HAIR_FUR_KIND_OPTIONS, draft.hair_or_fur),
             )
-            hair_or_fur = st.text_input(
-                "头发 / 毛发特征 / Hair or Fur",
-                value=draft.hair_or_fur,
-                placeholder="蓬松短毛、柔软卷发、机械纤维……",
+            texture = st.selectbox(
+                "Texture / 质感",
+                HAIR_FUR_TEXTURE_OPTIONS,
+                index=_preset_index(HAIR_FUR_TEXTURE_OPTIONS, draft.skin_fur_material),
             )
-            hair_style = st.selectbox(
-                "发型 / Hairstyle",
+            hairstyle = st.selectbox(
+                "Hairstyle / 发型",
                 HAIRSTYLE_OPTIONS,
-                index=_select_index(HAIRSTYLE_OPTIONS, draft.hair_style),
+                index=_preset_index(HAIRSTYLE_OPTIONS, draft.hair_style),
             )
-            hair_name = st.text_input(
-                "颜色名字 / Hair Color Name（可选）",
-                value=draft.hair_or_fur_color,
-                placeholder="例如：焦糖棕",
+            hair_color = st.selectbox(
+                "Hair / Fur Color / 头发毛发颜色",
+                list(COLOR_PRESETS),
+                index=list(COLOR_PRESETS).index(
+                    _color_name(draft.hair_or_fur_color_hex, draft.hair_or_fur_color)
+                ),
             )
-            hair_hex = st.color_picker(
-                "真正使用的头发 / 毛发颜色",
-                value=draft.hair_or_fur_color_hex,
-                key="hair_color_sample",
-                help="这个色块是生成图片时的颜色 source of truth。",
+        with b:
+            eye_shape = st.selectbox(
+                "Eye Shape / 眼睛形状",
+                EYE_SHAPE_OPTIONS,
+                index=_preset_index(EYE_SHAPE_OPTIONS, draft.eyes.shape),
             )
-
-        with c2:
-            body_build = st.selectbox(
-                "体型 / Body Build",
-                BODY_BUILD_OPTIONS,
-                index=_select_index(BODY_BUILD_OPTIONS, draft.body_build),
+            eye_color = st.selectbox(
+                "Eye Color / 眼睛颜色",
+                list(COLOR_PRESETS),
+                index=list(COLOR_PRESETS).index(
+                    _color_name(draft.eyes.color_hex, draft.eyes.color)
+                ),
             )
-            eye_name = st.text_input(
-                "眼睛颜色名字 / Eye Color Name（可选）",
-                value=draft.eyes.color,
-                placeholder="例如：焦糖棕",
+            favorite_colors = st.multiselect(
+                "Favorite Colors / 最喜欢的颜色（最多 3 个）",
+                FAVORITE_COLOR_OPTIONS,
+                default=[
+                    value for value in draft.favorite_colors
+                    if value in FAVORITE_COLOR_OPTIONS
+                ][:3],
+                max_selections=3,
             )
-            eye_hex = st.color_picker(
-                "真正使用的眼睛颜色",
-                value=draft.eyes.color_hex,
-                key="eye_color_sample",
-                help="这个色块是生成图片时的颜色 source of truth。",
-            )
-            favorite_colors = st.text_input(
-                "最喜欢的颜色 / Favorite Colors",
-                value="，".join(draft.favorite_colors),
-                placeholder="粉色，薄荷绿，薰衣草紫",
-            )
-            favs = list(draft.favorite_color_hexes[:3] or DEFAULT_FAVORITE_COLOR_HEXES)
-            while len(favs) < 3:
-                favs.append(DEFAULT_FAVORITE_COLOR_HEXES[len(favs)])
-            f1, f2, f3 = st.columns(3)
-            with f1:
-                fav1 = st.color_picker("Color 1", favs[0], key="fav_color_1")
-            with f2:
-                fav2 = st.color_picker("Color 2", favs[1], key="fav_color_2")
-            with f3:
-                fav3 = st.color_picker("Color 3", favs[2], key="fav_color_3")
-            distinctive = st.text_input(
-                "特别特征 / Distinctive Feature",
-                value="，".join(draft.distinctive_features),
-                placeholder="例如：左脸有一颗小星星",
+            distinctive = st.selectbox(
+                "Distinctive Feature / 特别特征",
+                DISTINCTIVE_OPTIONS,
+                index=_preset_index(
+                    DISTINCTIVE_OPTIONS,
+                    draft.distinctive_features[0]
+                    if draft.distinctive_features else "",
+                ),
             )
 
         back, nxt = st.columns([1, 2])
         with back:
-            if st.button("← Back", use_container_width=True):
+            if st.button("← Back", key="look_back", use_container_width=True):
                 go(0)
         with nxt:
-            if st.button("Next → 继续", type="primary", use_container_width=True):
-                st.session_state.char_draft = draft.model_copy(update={
-                    "appearance": appearance,
-                    "hair_or_fur": hair_or_fur,
-                    "hair_style": hair_style,
-                    "hair_or_fur_color": hair_name,
-                    "hair_or_fur_color_hex": hair_hex,
-                    "body_build": body_build,
-                    "eyes": draft.eyes.model_copy(update={
-                        "color": eye_name,
-                        "color_hex": eye_hex,
-                    }),
-                    "favorite_colors": split_items(favorite_colors),
-                    "favorite_color_hexes": [fav1, fav2, fav3],
-                    "distinctive_features": split_items(distinctive),
-                })
+            if st.button("Next → Personality", type="primary", use_container_width=True):
+                hair_hex = COLOR_PRESETS.get(hair_color) or draft.hair_or_fur_color_hex
+                eye_hex = COLOR_PRESETS.get(eye_color) or draft.eyes.color_hex
+                fav_hexes = [
+                    FAVORITE_COLOR_HEX[value]
+                    for value in favorite_colors
+                    if value in FAVORITE_COLOR_HEX
+                ]
+                st.session_state.char_draft = draft.model_copy(
+                    update={
+                        "hair_or_fur": _choice(
+                            hair_kind, draft.hair_or_fur, HAIR_FUR_KIND_OPTIONS
+                        ),
+                        "skin_fur_material": _choice(
+                            texture,
+                            draft.skin_fur_material,
+                            HAIR_FUR_TEXTURE_OPTIONS,
+                        ),
+                        "hair_style": _choice(
+                            hairstyle, draft.hair_style, HAIRSTYLE_OPTIONS
+                        ),
+                        "hair_or_fur_color": hair_color,
+                        "hair_or_fur_color_hex": hair_hex,
+                        "eyes": draft.eyes.model_copy(
+                            update={
+                                "shape": _choice(
+                                    eye_shape, draft.eyes.shape, EYE_SHAPE_OPTIONS
+                                ),
+                                "color": eye_color,
+                                "color_hex": eye_hex,
+                            }
+                        ),
+                        "favorite_colors": favorite_colors,
+                        "favorite_color_hexes": (
+                            fav_hexes or DEFAULT_FAVORITE_COLOR_HEXES
+                        ),
+                        "distinctive_features": (
+                            [] if not distinctive else [distinctive]
+                        ),
+                        "appearance": (
+                            draft.appearance
+                            or "cute Mini Utopia playable avatar with clean block-built toy forms"
+                        ),
+                    }
+                )
                 go(2)
         return
 
-    # ------------------------------------------------------------------
-    # Stage 3: personality
-    # ------------------------------------------------------------------
     if stage == 2:
-        st.markdown("### 💬 TA 是什么性格？")
-        c1, c2 = st.columns(2)
-        with c1:
-            personality = st.text_input(
-                "性格 / Personality",
-                value="，".join(draft.personality_traits),
-                placeholder="好奇，勇敢，有点害羞",
+        st.markdown("### 💬 Personality / TA 是什么性格？")
+        a, b = st.columns(2)
+        with a:
+            personality = st.multiselect(
+                "Personality / 性格（最多 3 个）",
+                PERSONALITY_OPTIONS,
+                default=[
+                    value for value in draft.personality_traits
+                    if value in PERSONALITY_OPTIONS
+                ][:3],
+                max_selections=3,
             )
-            strengths = st.text_input("擅长 / Strengths", value="，".join(draft.strengths))
-            weaknesses = st.text_input("弱点 / Weaknesses", value="，".join(draft.weaknesses))
-            fears = st.text_input("害怕什么 / Fears", value="，".join(draft.fears))
-        with c2:
-            tone = st.text_input(
-                "说话语气 / Speaking Tone",
-                value=draft.speaking_tone,
-                placeholder="温柔、兴奋、慢慢的……",
+            strength = st.selectbox(
+                "Strength / 擅长",
+                STRENGTH_OPTIONS,
+                index=_preset_index(
+                    STRENGTH_OPTIONS,
+                    draft.strengths[0] if draft.strengths else "",
+                ),
             )
-            language = st.text_input(
-                "母语 / Native Language",
-                value=draft.native_language or "中文",
+            weakness = st.selectbox(
+                "Little Weakness / 小弱点",
+                WEAKNESS_OPTIONS,
+                index=_preset_index(
+                    WEAKNESS_OPTIONS,
+                    draft.weaknesses[0] if draft.weaknesses else "",
+                ),
             )
-            english = st.slider(
-                "英语水平 / English Level",
-                1, 10, value=draft.english_level or 5,
+        with b:
+            tone = st.selectbox(
+                "Speaking Tone / 说话语气",
+                SPEAKING_TONE_OPTIONS,
+                index=_preset_index(SPEAKING_TONE_OPTIONS, draft.speaking_tone),
             )
-            st.info(english_level_label(english))
-
-        with st.expander("✨ More personality details / 更多性格细节", expanded=False):
-            habits = st.text_input("小习惯 / Habits", value="，".join(draft.habits))
-            likes = st.text_input("喜欢 / Likes", value="，".join(draft.likes))
-            dislikes = st.text_input("不喜欢 / Dislikes", value="，".join(draft.dislikes))
-            abilities = st.text_input("能力 / Abilities", value="，".join(draft.abilities))
-            limitations = st.text_input("限制 / Limitations", value="，".join(draft.limitations))
+            language = st.selectbox(
+                "Native Language / 母语",
+                LANGUAGE_OPTIONS,
+                index=_preset_index(LANGUAGE_OPTIONS, draft.native_language),
+            )
+            english = st.selectbox(
+                "English Level / 英语水平",
+                list(range(1, 11)),
+                index=max(0, min((draft.english_level or 5) - 1, 9)),
+                format_func=lambda level: f"{level} · {english_level_label(level)}",
+            )
 
         back, nxt = st.columns([1, 2])
         with back:
-            if st.button("← Back", use_container_width=True):
+            if st.button("← Back", key="personality_back", use_container_width=True):
                 go(1)
         with nxt:
-            if st.button("Next → 继续", type="primary", use_container_width=True):
-                st.session_state.char_draft = draft.model_copy(update={
-                    "personality_traits": split_items(personality),
-                    "strengths": split_items(strengths),
-                    "weaknesses": split_items(weaknesses),
-                    "fears": split_items(fears),
-                    "speaking_tone": tone,
-                    "native_language": language,
-                    "english_level": english,
-                    "habits": split_items(habits),
-                    "likes": split_items(likes),
-                    "dislikes": split_items(dislikes),
-                    "abilities": split_items(abilities),
-                    "limitations": split_items(limitations),
-                })
+            if st.button("Next → Outfit", type="primary", use_container_width=True):
+                st.session_state.char_draft = draft.model_copy(
+                    update={
+                        "personality_traits": personality,
+                        "strengths": [] if not strength else [strength],
+                        "weaknesses": [] if not weakness else [weakness],
+                        "speaking_tone": _choice(
+                            tone, draft.speaking_tone, SPEAKING_TONE_OPTIONS
+                        ),
+                        "native_language": _choice(
+                            language, draft.native_language, LANGUAGE_OPTIONS
+                        ),
+                        "english_level": english,
+                    }
+                )
                 go(3)
         return
 
-    # ------------------------------------------------------------------
-    # Stage 4: size and outfit
-    # ------------------------------------------------------------------
     if stage == 3:
-        st.markdown("### 👕📏 TA 穿什么？有多高？")
+        st.markdown("### 👕📏 Outfit & Details / 穿什么、有多高？")
         height = st.selectbox(
-            "身高感觉 / Height Category",
+            "Height Category / 身高感觉",
             HEIGHT_OPTIONS,
-            index=_select_index(HEIGHT_OPTIONS, draft.height),
+            index=_preset_index(HEIGHT_OPTIONS, draft.height, default=2),
         )
 
         resolved = ctx.references.resolved_anchors()
@@ -710,156 +594,172 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
             initial = float(draft.height_cm or sum(anchor_heights) / len(anchor_heights))
             initial = min(max(initial, minimum), maximum)
             height_cm = st.slider(
-                "精确身高 / Exact Height",
+                "Exact Height / 精确身高",
                 min_value=float(round(minimum, 1)),
                 max_value=float(round(maximum, 1)),
                 value=float(round(initial, 1)),
                 step=1.0,
                 format="%.0f cm",
             )
-            names = [asset.display_name for asset in anchor_assets]
             render_height_ruler(
                 minimum=minimum,
                 maximum=maximum,
                 height_cm=height_cm,
-                anchor_names=names,
+                anchor_names=[asset.display_name for asset in anchor_assets],
                 anchor_heights=anchor_heights,
             )
         else:
             height_cm = st.number_input(
-                "精确身高 / Exact Height (cm)",
+                "Exact Height / 精确身高 (cm)",
                 min_value=1.0,
                 max_value=1000.0,
                 value=float(draft.height_cm or 120.0),
                 step=1.0,
             )
-            st.caption("Studio 设置两个 Reference Anchors 后，这里会出现相对身高尺。")
 
         defaults = ctx.assets.ensure_default_character_wearables()
         wear_assets = ctx.repository.list_assets(AssetType.WEARABLE)
-        top_assets = _wearables_for_slot(wear_assets, "top")
-        bottom_assets = _wearables_for_slot(wear_assets, "bottom")
-        shoes_assets = _wearables_for_slot(wear_assets, "shoes")
-        hat_assets = _wearables_for_slot(wear_assets, "hat")
-
-        st.caption("默认：白色 T恤 + 蓝色牛仔裤。以后可以在 Wearable Factory 增加更多衣服。")
         c1, c2 = st.columns(2)
         with c1:
             top = _asset_selector(
-                "上衣 / Top",
-                top_assets,
+                "Top / 上衣",
+                _wearables_for_slot(wear_assets, "top"),
                 draft.wearables.top_id or defaults["top"].asset_id,
                 "wear_top",
             )
             bottom = _asset_selector(
-                "下装 / Bottom",
-                bottom_assets,
+                "Bottom / 下装",
+                _wearables_for_slot(wear_assets, "bottom"),
                 draft.wearables.bottom_id or defaults["bottom"].asset_id,
                 "wear_bottom",
             )
         with c2:
-            shoes = _asset_selector("鞋子 / Shoes", shoes_assets, draft.wearables.shoes_id, "wear_shoes")
-            hat = _asset_selector("帽子 / Hat", hat_assets, draft.wearables.hat_id, "wear_hat")
+            shoes = _asset_selector(
+                "Shoes / 鞋子",
+                _wearables_for_slot(wear_assets, "shoes"),
+                draft.wearables.shoes_id,
+                "wear_shoes",
+            )
+            hat = _asset_selector(
+                "Hat / 帽子",
+                _wearables_for_slot(wear_assets, "hat"),
+                draft.wearables.hat_id,
+                "wear_hat",
+            )
 
         prop_assets = ctx.repository.list_assets(AssetType.PROP)
         selected_props = st.multiselect(
-            "🎒 初始道具 / Starting Props（最多 2 个）",
+            "Starting Props / 初始道具（最多 2 个）",
             prop_assets,
-            default=[p for p in prop_assets if p.asset_id in draft.starting_prop_ids],
+            default=[
+                prop for prop in prop_assets
+                if prop.asset_id in draft.starting_prop_ids
+            ],
             format_func=lambda asset: asset.display_name,
             max_selections=2,
         )
 
-        with st.expander("🛠 Advanced body details / 高级身体细节", expanded=False):
-            st.caption("🔒 Canon 比例：Mini Playable Avatar，约 2.8–3.0 头身。")
-            body_type = st.text_input("身体类型 / Body Type", value=draft.body_type)
-            proportions = st.text_input("特殊比例备注 / Proportion Notes", value=draft.proportions)
-            face = st.text_input("脸部备注 / Face Notes", value=draft.face)
-            eye_shape = st.text_input("眼睛形状 / Eye Shape", value=draft.eyes.shape or "round")
-            eye_size = st.text_input("眼睛大小 / Eye Size", value=draft.eyes.size or "large")
-            movement = st.text_input("动作风格 / Movement Style", value=draft.movement_style)
+        st.divider()
+        extra = st.text_area(
+            "✨ Extra Details / 额外补充",
+            value=draft.creator_extra_details,
+            placeholder=(
+                "只有这里自由发挥：TA 来自哪里？有什么特殊能力？"
+                "如果上面某项选了 Custom，也在这里说明。"
+            ),
+            height=120,
+            help="Custom Build 唯一的自由描述区。",
+        )
 
         back, nxt = st.columns([1, 2])
         with back:
-            if st.button("← Back", use_container_width=True):
+            if st.button("← Back", key="outfit_back", use_container_width=True):
                 go(2)
         with nxt:
             if st.button("Next → Create", type="primary", use_container_width=True):
-                st.session_state.char_draft = draft.model_copy(update={
-                    "height": height,
-                    "height_cm": height_cm,
-                    "body_type": body_type,
-                    "proportions": proportions,
-                    "face": face,
-                    "eyes": draft.eyes.model_copy(update={
-                        "shape": eye_shape,
-                        "size": eye_size,
-                    }),
-                    "movement_style": movement,
-                    "wearables": WearableLoadout(
-                        top_id=top.asset_id if top else None,
-                        bottom_id=bottom.asset_id if bottom else None,
-                        shoes_id=shoes.asset_id if shoes else None,
-                        hat_id=hat.asset_id if hat else None,
-                        accessory_ids=draft.wearables.accessory_ids,
-                    ),
-                    "starting_prop_ids": [p.asset_id for p in selected_props],
-                })
+                st.session_state.char_draft = draft.model_copy(
+                    update={
+                        "height": _choice(height, draft.height, HEIGHT_OPTIONS),
+                        "height_cm": height_cm,
+                        "creator_extra_details": extra,
+                        "wearables": WearableLoadout(
+                            top_id=top.asset_id if top else None,
+                            bottom_id=bottom.asset_id if bottom else None,
+                            shoes_id=shoes.asset_id if shoes else None,
+                            hat_id=hat.asset_id if hat else None,
+                            accessory_ids=draft.wearables.accessory_ids,
+                        ),
+                        "starting_prop_ids": [
+                            prop.asset_id for prop in selected_props
+                        ],
+                    }
+                )
                 go(4)
         return
 
-    # ------------------------------------------------------------------
-    # Stage 5: create + approve
-    # ------------------------------------------------------------------
     final_profile = draft
     name = st.session_state.get("char_name", "").strip()
     missing = final_profile.missing_core_fields()
 
-    st.markdown("### ✨ Ready to Create")
-    left, right = st.columns([1, 1])
-    with left:
+    st.markdown("### ✨ Create / 生成角色设定图")
+    info, palette_col = st.columns([1.4, 1])
+    with info:
         st.markdown(f"#### {escape(name) if name else 'New Character'}")
-        st.write(final_profile.appearance or "还没有外形描述。")
-        st.caption(f"Type · {final_profile.character_type or '—'}")
-        st.caption(f"Role · {final_profile.story_role or '—'}")
-        st.caption(f"Height · {final_profile.height_cm or '—'} cm")
-        st.caption("Personality · " + (" · ".join(final_profile.personality_traits) or "—"))
-    with right:
-        palette = final_profile.favorite_color_hexes or DEFAULT_FAVORITE_COLOR_HEXES
-        swatches = "".join(
-            f'<span style="display:inline-block;width:34px;height:34px;border-radius:12px;'
-            f'background:{color};margin:4px;border:1px solid rgba(0,0,0,.08)"></span>'
-            for color in palette[:3]
+        st.write(f"**Type** · {final_profile.character_type or '—'}")
+        st.write(f"**Role** · {final_profile.story_role or '—'}")
+        st.write(f"**Height** · {final_profile.height_cm or '—'} cm")
+        st.write(
+            "**Personality** · "
+            + (" · ".join(final_profile.personality_traits) or "—")
         )
-        st.markdown("#### 🎨 Palette")
+        if final_profile.creator_extra_details:
+            st.caption("Extra · " + final_profile.creator_extra_details)
+    with palette_col:
+        st.markdown("#### 🎨 Canon Colors")
+        colors = final_profile.favorite_color_hexes or DEFAULT_FAVORITE_COLOR_HEXES
+        swatches = "".join(
+            (
+                '<span style="display:inline-block;width:34px;height:34px;'
+                f'border-radius:12px;background:{color};margin:4px;'
+                'border:1px solid rgba(0,0,0,.08)"></span>'
+            )
+            for color in colors[:3]
+        )
         st.markdown(swatches, unsafe_allow_html=True)
         st.caption(
             f"Hair/Fur {final_profile.hair_or_fur_color_hex} · "
             f"Eyes {final_profile.eyes.color_hex}"
         )
-        st.caption("🔒 Canon · Mini Playable Avatar · 2.8–3.0 heads tall")
+        st.caption("🔒 Mini Playable Avatar · 2.8–3.0 heads tall")
 
     if missing:
         st.warning("还差这些核心设定：" + ", ".join(missing))
     if not name:
-        st.warning("还没有名字。返回 Step 1 给 TA 取一个名字。")
+        st.warning("请返回 Identity 给 TA 取一个名字。")
 
     count = int(st.session_state.get("creator_generation_count", 0))
     remaining = max(0, MAX_GENERATIONS_PER_SESSION - count)
-    st.caption(f"🎟️ 本次浏览器会话还可以生成 {remaining}/{MAX_GENERATIONS_PER_SESSION} 次。")
+    st.caption(f"🎟️ 本次会话剩余生成次数：{remaining}/{MAX_GENERATIONS_PER_SESSION}")
 
     candidate_path = st.session_state.get("character_master_candidate_path")
-    generate_label = "✨ Generate Master Sheet / 生成角色设定图" if not candidate_path else "🎲 Regenerate / 再来一个"
-
     back, generate = st.columns([1, 2])
     with back:
         if st.button("← Back to Edit", use_container_width=True):
             go(3)
     with generate:
         if st.button(
-            generate_label,
+            (
+                "✨ Generate Master Sheet / 生成角色设定图"
+                if not candidate_path
+                else "🎲 Regenerate / 再生成"
+            ),
             type="primary",
-            disabled=bool(missing) or not name or not ctx.character_masters.is_available or remaining <= 0,
+            disabled=(
+                bool(missing)
+                or not name
+                or not ctx.character_masters.is_available
+                or remaining <= 0
+            ),
             use_container_width=True,
         ):
             try:
@@ -889,46 +789,54 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
     if candidate_path and candidate_character_id:
         st.divider()
         st.markdown("### 🌟 Character Master Sheet")
-
-        art, facts = st.columns([2.1, 1])
+        art, facts = st.columns([2.2, 1])
         with art:
             try:
                 st.image(
                     ctx.storage.get_bytes(candidate_path),
-                    caption="Visual Master · Hero + Turnaround + Expressions",
+                    caption=(
+                        "Visual Master · Hero + Front + 3/4 + Side + Back + Expressions"
+                    ),
                     use_container_width=True,
                 )
             except Exception:
-                st.warning("角色图片暂时无法读取，可以点击 Regenerate 再试一次。")
-
+                st.warning("图片暂时无法读取，可以点击 Regenerate。")
         with facts:
             st.markdown("#### 📋 Canon Profile")
             st.write(f"**Name** · {name}")
             st.write(f"**Type** · {final_profile.character_type}")
             st.write(f"**Age** · {final_profile.age}")
             st.write(f"**Role** · {final_profile.story_role or '—'}")
-            st.write(f"**Height** · {final_profile.height_cm:.0f} cm" if final_profile.height_cm else "**Height** · —")
-            st.write(f"**Hair/Fur** · {final_profile.hair_or_fur_color or final_profile.hair_or_fur_color_hex}")
-            st.write(f"**Eyes** · {final_profile.eyes.color or final_profile.eyes.color_hex}")
-            st.write("**Personality** · " + (" · ".join(final_profile.personality_traits) or "—"))
-            st.caption("所有文字来自结构化 Character Profile，不由图片模型生成。")
+            st.write(
+                f"**Height** · {final_profile.height_cm:.0f} cm"
+                if final_profile.height_cm else
+                "**Height** · —"
+            )
+            st.caption("所有文字和数据由系统渲染，不允许图片模型自己编写。")
 
-        if st.button(
-            "💖 Keep This Look / 就要这个！",
-            type="primary",
-            use_container_width=True,
-        ):
-            try:
-                ctx.character_masters.approve_candidate(
-                    character_asset_id=candidate_character_id,
-                    candidate_path=candidate_path,
-                )
-                st.session_state.character_master_candidate_path = None
-                st.session_state.character_master_character_id = None
-                st.success(f"角色正式加入 Mini Utopia！ · {candidate_character_id}")
-                st.balloons()
-            except Exception as exc:
-                st.error(f"保存失败 / Approval failed: {exc}")
+        keep, new = st.columns([2, 1])
+        with keep:
+            if st.button(
+                "💖 Keep This Look / 就要这个！",
+                type="primary",
+                use_container_width=True,
+            ):
+                try:
+                    ctx.character_masters.approve_candidate(
+                        character_asset_id=candidate_character_id,
+                        candidate_path=candidate_path,
+                    )
+                    st.session_state.character_master_candidate_path = None
+                    st.session_state.character_master_character_id = None
+                    st.success(
+                        f"角色正式加入 Mini Utopia！ · {candidate_character_id}"
+                    )
+                    st.balloons()
+                except Exception as exc:
+                    st.error(f"保存失败 / Approval failed: {exc}")
+        with new:
+            if st.button("🆕 New Character / 新角色", use_container_width=True):
+                _start_over()
 
     if not ctx.character_masters.is_available:
-        st.info("Image API 尚未连接；目前只能保存 Profile。")
+        st.info("Image API 尚未连接；当前只能保存 Character Profile。")

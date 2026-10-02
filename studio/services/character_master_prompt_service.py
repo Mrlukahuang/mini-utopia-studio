@@ -74,6 +74,11 @@ class CharacterMasterPromptService:
                 f"Personality: {personality}.",
                 f"Distinctive features: {features}.",
                 (
+                    f"Creator extra details: {profile.creator_extra_details}."
+                    if profile.creator_extra_details
+                    else ""
+                ),
+                (
                     "Outfit: "
                     f"top={wearable_descriptions.get('top', 'simple clean white T-shirt')}; "
                     f"bottom={wearable_descriptions.get('bottom', 'classic blue jeans')}; "
@@ -86,12 +91,20 @@ class CharacterMasterPromptService:
                     f"eye swatch={eyes.color_hex}; "
                     f"favorite palette={', '.join(profile.favorite_color_hexes) or 'Mini Utopia macaron palette'}."
                 ),
+                "STYLE PRIORITY: preserve the locked Mini Utopia block-built toy-game identity "
+                "before adding decorative detail. Use chunky modular geometry, softly rounded "
+                "edges, simplified sculpted hair/fur masses, matte collectible-toy surfaces, "
+                "and a clear playable silhouette. It should sit between a voxel exploration "
+                "world and a construction-toy diorama without copying any branded character, "
+                "brick system, texture, stud pattern, UI, or signature asset.",
                 "CHARACTER MASTER SHEET V1: one clean landscape visual reference sheet. "
                 "Include one larger hero three-quarter view plus a consistent turnaround row "
                 "(front, three-quarter, side, back) and five head-and-shoulder expressions "
                 "(neutral, happy, curious, excited, surprised). Keep exactly the same character, "
-                "hair/fur, colors, proportions and outfit in every view. Use a simple warm cream "
-                "or very light Mini Utopia studio backdrop with subtle block-world cues only.",
+                "hair/fur, colors, proportions and outfit in every view. Keep the layout stable: "
+                "large hero area, compact turnaround strip, compact expression strip, generous "
+                "negative space. Use a simple warm cream or very light Mini Utopia studio backdrop "
+                "with subtle block-world cues only. Do not turn the sheet into a poster or scene.",
                 "IMPORTANT OUTPUT RULE: visual artwork only. Do NOT draw or render any words, "
                 "letters, labels, measurements, IDs, UI panels, logos, profile cards, captions, "
                 "watermarks, arrows or typography anywhere in the image. The application renders "
