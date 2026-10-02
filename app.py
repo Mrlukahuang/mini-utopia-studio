@@ -10,6 +10,7 @@ from studio.services.bootstrap import build_context
 from studio.services.style_service import StyleService
 from studio.ui.auth import lock_studio, require_studio_pin
 from studio.ui.creator.character_factory import render_character_factory
+from studio.ui.theme import apply_mini_utopia_theme, render_brandbar, render_game_hero, render_quest
 
 
 ROOT = Path(__file__).parent
@@ -34,86 +35,7 @@ character_factory = CharacterFactoryRecipe(ctx.registry, ctx.assets)
 # Visual layer
 # ---------------------------------------------------------------------------
 
-st.markdown(
-    """
-    <style>
-    .block-container {
-        max-width: 1180px;
-        padding-top: 2rem;
-        padding-bottom: 4rem;
-    }
-
-    .stButton > button {
-        border-radius: 16px;
-        min-height: 2.8rem;
-        font-weight: 650;
-    }
-
-    [data-testid="stMetric"] {
-        background: rgba(255,255,255,.94);
-        border: 1px solid rgba(108,92,231,.14);
-        padding: 16px;
-        border-radius: 20px;
-        box-shadow: 0 8px 30px rgba(38,32,72,.06);
-    }
-
-    [data-testid="stMetric"] label,
-    [data-testid="stMetric"] [data-testid="stMetricValue"] {
-        color: #20243a !important;
-    }
-
-    .mu-hero {
-        padding: 28px 30px;
-        border-radius: 28px;
-        background: linear-gradient(
-            135deg,
-            rgba(255,244,208,.96),
-            rgba(236,245,255,.96)
-        );
-        border: 1px solid rgba(108,92,231,.10);
-        margin-bottom: 22px;
-    }
-
-    .mu-hero h1 {
-        color: #25233b;
-        margin: 0 0 8px 0;
-        font-size: 2.35rem;
-        line-height: 1.12;
-    }
-
-    .mu-hero p {
-        color: #55546b;
-        font-size: 1.05rem;
-        margin: 0;
-    }
-
-    .mu-note {
-        padding: 16px 18px;
-        border-radius: 18px;
-        background: rgba(226,245,255,.72);
-        border: 1px solid rgba(43,143,216,.12);
-        color: #23415c;
-    }
-
-    .mu-pill {
-        display: inline-block;
-        padding: 5px 10px;
-        margin-right: 6px;
-        margin-bottom: 6px;
-        border-radius: 999px;
-        background: rgba(108,92,231,.10);
-        color: #5b50be;
-        font-size: .85rem;
-        font-weight: 600;
-    }
-
-    div[data-testid="stSidebar"] {
-        border-right: 1px solid rgba(125,125,145,.12);
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+apply_mini_utopia_theme()
 
 
 # ---------------------------------------------------------------------------
@@ -141,9 +63,6 @@ def edit_character(asset) -> None:
 # ---------------------------------------------------------------------------
 # App title
 # ---------------------------------------------------------------------------
-
-st.title("❤️✨ Charlotte & Chelsea ✨❤️ 的 Utopia (乌托邦) ✨☁️")
-
 
 # ---------------------------------------------------------------------------
 # Mode selection — IMPORTANT:
@@ -180,6 +99,9 @@ if mode == "🛠 Studio":
         lock_studio()
 
 
+render_brandbar(studio=(mode == "🛠 Studio"))
+
+
 # ---------------------------------------------------------------------------
 # Page navigation
 # Only appears after Studio is authenticated, or immediately in Creator Mode.
@@ -204,13 +126,13 @@ page = st.sidebar.radio(
 # ---------------------------------------------------------------------------
 
 if page == "🏠 Home":
-    st.markdown(
-        """<div class="mu-hero">
-<h1>Small Worlds. Big Imagination. ✨</h1>
-<p>Create a character once, keep it forever, and take it anywhere. Today Auckland. Tomorrow the Moon. Next week — who knows?</p>
-</div>""",
-        unsafe_allow_html=True,
+    render_game_hero(
+        "Charlotte & Chelsea’s Mini Utopia ✨",
+        "Create a tiny hero, give them a world, and send them through a Portal. "
+        "今天创造角色，明天一起去新的世界。",
+        kicker="WELCOME BACK, CREATOR",
     )
+    render_quest("今日任务 / Today’s Quest：创造一个让你一看到就想带去冒险的小伙伴。")
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric(
@@ -242,25 +164,38 @@ if page == "🏠 Home":
     )
 
     st.write("")
-    st.subheader("Where should we create today?")
+    st.subheader("Choose Your Adventure / 今天想创造什么？")
 
     a, b, c = st.columns(3)
 
     with a:
-        st.markdown("### 🎭 Character")
-        st.caption("创造一个可以反复使用的角色。")
+        st.markdown(
+            '<div class="mu-world-card"><div class="emoji">🧸✨</div>'
+            '<h3>Create a Character</h3><p>捏一个属于你的 Mini Playable Avatar。</p></div>',
+            unsafe_allow_html=True,
+        )
 
     with b:
-        st.markdown("### 🌍 Mini World")
-        st.caption("创造一个新的地点、星球或奇怪世界。")
+        st.markdown(
+            '<div class="mu-world-card"><div class="emoji">🏝️🌈</div>'
+            '<h3>Build a Mini World</h3><p>创造漂浮岛、城堡、月球或任何世界。</p></div>',
+            unsafe_allow_html=True,
+        )
 
     with c:
-        st.markdown("### 🧪 Playground")
-        st.caption("No rules. No canon. Just create.")
+        st.markdown(
+            '<div class="mu-world-card"><div class="emoji">🪄🧪</div>'
+            '<h3>Playground</h3><p>没有规则，先把疯狂想法放出来。</p></div>',
+            unsafe_allow_html=True,
+        )
 
 
 elif page == "🎭 My Characters":
-    st.header("🎭 My Characters")
+    render_game_hero(
+        "My Little Heroes 🎭",
+        "这些都是你创造过的伙伴。随时回来换衣服、改设定，再带 TA 去新的世界。",
+        kicker="CHARACTER LIBRARY",
+    )
 
     chars = ctx.repository.list_assets(AssetType.CHARACTER)
 
@@ -271,6 +206,10 @@ elif page == "🎭 My Characters":
 
     for asset in chars:
         with st.container(border=True):
+            st.markdown(
+                '<div class="mu-character-card"><div class="mu-character-orb">🧸</div></div>',
+                unsafe_allow_html=True,
+            )
             st.subheader(asset.display_name)
             st.caption(asset.asset_id)
             st.write(asset.description or "等待描述")
@@ -296,6 +235,30 @@ elif page == "🎭 My Characters":
                 args=(asset,),
                 use_container_width=True,
             )
+
+            if mode == "🛠 Studio" and studio_unlocked:
+                with st.expander("🎨 Character Master Prompt", expanded=False):
+                    profile_obj = CharacterProfile.model_validate(
+                        asset.metadata.get("character_profile", {})
+                    )
+                    style_asset = (
+                        ctx.repository.get_asset(universe.style_asset_id)
+                        if universe.style_asset_id
+                        else None
+                    )
+                    style_profile = (
+                        style_asset.metadata.get("style_profile", {})
+                        if style_asset
+                        else {}
+                    )
+                    st.code(
+                        ctx.character_master_prompts.compose(
+                            name=asset.display_name,
+                            profile=profile_obj,
+                            style_profile=style_profile,
+                        ),
+                        language="text",
+                    )
 
 
 elif page == "✨ Character Factory":

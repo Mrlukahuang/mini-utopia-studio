@@ -9,6 +9,7 @@ from studio.services.style_service import StyleService
 from studio.services.universe_service import UniverseService
 from studio.services.job_service import JobService
 from studio.services.reference_character_service import ReferenceCharacterService
+from studio.services.character_master_prompt_service import CharacterMasterPromptService
 from studio.storage.local import LocalObjectStorage
 
 
@@ -24,6 +25,7 @@ class StudioContext:
     universes: UniverseService
     jobs: JobService
     references: ReferenceCharacterService
+    character_master_prompts: CharacterMasterPromptService
 
 
 def build_context(settings: Settings) -> StudioContext:
@@ -43,4 +45,5 @@ def build_context(settings: Settings) -> StudioContext:
         universes=UniverseService(repository),
         jobs=JobService(repository),
         references=ReferenceCharacterService(repository, storage),
+        character_master_prompts=CharacterMasterPromptService(),
     )
