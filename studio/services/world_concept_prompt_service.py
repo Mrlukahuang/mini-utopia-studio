@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from studio.models.world import WorldProfile
+from studio.models.world import WorldBlueprint, WorldProfile
 
 
 DIRECTION_NOTES = {
@@ -94,3 +94,48 @@ STRICT OUTPUT RULES
 NEGATIVE RULES
 {negative_rules}
 """.strip()
+
+    def compose_from_blueprint(
+        self,
+        *,
+        profile: WorldProfile,
+        blueprint: WorldBlueprint,
+        style_profile: dict,
+    ) -> str:
+        """Render one beauty preview from an already authoritative Blueprint."""
+        base = self.compose(
+            profile=profile,
+            style_profile=style_profile,
+            direction="playable",
+        )
+        layout_lines = []
+        for element in blueprint.layout_elements:
+            layout_lines.append(
+                f"- {element.kind}: {element.name} at x={element.position.x:.1f}, "
+                f"z={element.position.z:.1f}; footprint {element.width:.1f} x "
+                f"{element.depth:.1f}; height {element.height:.1f}"
+            )
+        path_lines = []
+        for path in blueprint.paths[:2]:
+            coords = " -> ".join(
+                f"({point.x:.1f},{point.z:.1f})" for point in path.points
+            )
+            path_lines.append(f"- {path.name or path.path_id}: {coords}")
+
+        return (
+            base
+            + "\n\nBLUEPRINT IS AUTHORITATIVE\n"
+            + "The spatial plan below already defines the world. Render this same world; "
+              "do not redesign, reorder, add a competing main landmark, or move the Portal, "
+              "water, bridges, terrain masses, or major structures to different relative positions.\n\n"
+            + "50x50 PLAYABLE LAYOUT\n"
+            + ("\n".join(layout_lines) or "- No explicit layout elements")
+            + "\n\nDISCOVERY PATH\n"
+            + ("\n".join(path_lines) or "- No explicit path")
+            + "\n\nVISUALIZATION RULES\n"
+            + "- Interpret x/z coordinates as relative left-right and near-far composition, not visible labels.\n"
+            + "- Preserve relative positions and major scale hierarchy from the Blueprint.\n"
+            + "- You may enrich small decoration, foliage, lighting, atmospheric depth and surface detail.\n"
+            + "- Do not draw a top-down map, grid, coordinate labels, measurements or blueprint UI.\n"
+            + "- Produce one cinematic wide World Preview that looks like the finished playable world."
+        )
