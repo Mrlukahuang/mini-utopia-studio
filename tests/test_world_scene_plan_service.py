@@ -128,6 +128,9 @@ def test_prompt_plan_preserves_explicit_objects_and_caps_enrichment():
             "visual_dna_pillars": ["Miniature", "Macaron Dreamscape"],
             "portal_language": "Rounded toy-like luminous Portal",
             "color_harmony_rule": "High lightness, soft contrast",
+            "macaron_palette": {
+                "enabled_families": ["strawberry pink", "mint", "lavender"]
+            },
         },
     )
 
@@ -158,6 +161,8 @@ def test_prompt_plan_preserves_explicit_objects_and_caps_enrichment():
     assert profile.theme_color_hexes == ["#F7B7D2", "#B9E7D0", "#D7C2F3"]
     assert provider.calls
     assert "CONTROLLED UTOPIA ENRICHMENT" in provider.calls[0]["system"]
+    assert "creator explicitly names colors" in provider.calls[0]["system"]
+    assert "strawberry pink" in provider.calls[0]["user"]
 
 
 def test_custom_build_creates_scene_plan_without_prompt_provider():
@@ -322,3 +327,30 @@ def test_prompt_normalizes_portal_plaza_away_from_main_portal():
     assert len(
         [item for item in result.scene_plan.elements if item.kind == "portal"]
     ) == 1
+
+
+class FailingStructuredProvider(StructuredTextProvider):
+    def generate_structured(self, *, system: str, user: str, schema):
+        raise RuntimeError("provider unavailable")
+
+
+def test_custom_extra_details_fall_back_to_deterministic_plan_on_ai_failure():
+    profile = WorldProfile(
+        world_name="Resilient Garden",
+        world_type="Dream Garden / 梦境花园",
+        terrain=["Meadow / 草地"],
+        water_features=["Lake / 湖泊"],
+        landmark_ideas=["Castle / 城堡"],
+        portal_form="Star Arch / 星星拱门",
+        creator_extra_details="Put a tiny observatory near the castle.",
+    )
+    service = WorldScenePlanService(
+        structured_provider=FailingStructuredProvider()
+    )
+
+    plan = service.plan_from_profile(profile=profile)
+
+    assert any("Lake" in item.name for item in plan.elements)
+    assert any("Castle" in item.name for item in plan.elements)
+    assert any(item.kind == "portal" for item in plan.elements)
+    assert plan.source_mode == "custom"
