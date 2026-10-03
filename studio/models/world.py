@@ -8,7 +8,7 @@ from studio.models.location import LocationProfile
 
 
 WORLD_SCHEMA_VERSION = "0.1"
-BLUEPRINT_SCHEMA_VERSION = "0.2"
+BLUEPRINT_SCHEMA_VERSION = "0.3"
 
 
 class GridSpec(BaseModel):
@@ -113,9 +113,13 @@ class WorldVisualAnchor(BaseModel):
     """
 
     concept_image_roles: list[str] = Field(default_factory=list)
+    concept_path: str = ""
+    concept_direction: str = ""
+    extraction_method: str = ""
     concept_summary: str = ""
     must_preserve: list[str] = Field(default_factory=list)
     flexible_details: list[str] = Field(default_factory=list)
+    palette_hexes: list[str] = Field(default_factory=list)
 
 
 class WorldProfile(LocationProfile):
