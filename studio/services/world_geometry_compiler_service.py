@@ -87,8 +87,20 @@ class WorldGeometryCompilerService:
     ) -> ThreeObjectSpec:
         parts = [appearance.main_body, *appearance.parts]
         nodes: list[ThreeMeshNodeSpec] = []
+        seen_part_ids: set[str] = set()
 
-        for part in parts:
+        for index, part in enumerate(parts):
+            raw_part_id = part.part_id.strip() or f"part_{index:02d}"
+            part_id = raw_part_id
+            if part_id in seen_part_ids:
+                part_id = f"{raw_part_id}_{index:02d}"
+            parent_part_id = (
+                part.parent_part_id
+                if part.parent_part_id in seen_part_ids
+                else ""
+            )
+            seen_part_ids.add(part_id)
+
             material_id = self._material_id(
                 palette_role=part.palette_role,
                 material_role=part.material_role,
@@ -103,10 +115,10 @@ class WorldGeometryCompilerService:
 
             nodes.append(
                 ThreeMeshNodeSpec(
-                    node_id=f"{element.element_id}:{part.part_id}",
+                    node_id=f"{element.element_id}:{part_id}",
                     parent_node_id=(
-                        f"{element.element_id}:{part.parent_part_id}"
-                        if part.parent_part_id
+                        f"{element.element_id}:{parent_part_id}"
+                        if parent_part_id
                         else ""
                     ),
                     geometry=ThreeGeometrySpec(
