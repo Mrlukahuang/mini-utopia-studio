@@ -5,6 +5,7 @@ from studio.models.world import (
     ChunkSpec,
     TourRoute,
     TourStep,
+    PortalSpec,
     WorldBlueprint,
     WorldPoint,
     WorldProfile,
@@ -188,7 +189,10 @@ def test_runtime_html_has_floating_garden_world_identity_kit():
         theme_color_hexes=["#F7B7D2", "#B9E7D0", "#D7C2F3"],
     )
     blueprint = _blueprint()
-    blueprint.portal.form = "Star Arch / 星星拱门" if blueprint.portal else "Star Arch / 星星拱门"
+    blueprint.portal = PortalSpec(
+        position=WorldPoint(x=25, y=0, z=25),
+        form="Star Arch / 星星拱门",
+    )
 
     html = build_world_runtime_html(
         world_name="Pastel Star Garden",
