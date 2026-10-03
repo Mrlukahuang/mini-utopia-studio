@@ -602,17 +602,21 @@ elif page == "🗺️ My Worlds":
         profile = WorldProfile.model_validate(
             asset.metadata.get("world_profile", {})
         )
-        concept = ctx.world_concepts.current_concept(asset.asset_id)
         pipeline = asset.metadata.get("world_pipeline", "legacy")
+        world_visual = (
+            ctx.world_concepts.current_preview(asset.asset_id)
+            if pipeline == "blueprint_first_v1"
+            else ctx.world_concepts.current_concept(asset.asset_id)
+        )
 
         with st.container(border=True):
             art_col, info_col, action_col = st.columns([1.45, 2.15, 0.7])
 
             with art_col:
-                if concept:
+                if world_visual:
                     try:
                         st.image(
-                            ctx.storage.get_bytes(concept.path),
+                            ctx.storage.get_bytes(world_visual.path),
                             caption=(
                                 "✨ Blueprint World Preview"
                                 if pipeline == "blueprint_first_v1"
@@ -696,7 +700,10 @@ elif page == "🗺️ My Worlds":
                 if blueprint:
                     st.success("🎮 Ready to Explore / 可以进入世界")
                     st.caption("50×50 Mini World · Blueprint + Portal + Landmarks + Director Tour ready")
-                    if pipeline == "blueprint_first_v1" and not approved_concept:
+                    if (
+                        pipeline == "blueprint_first_v1"
+                        and not asset.metadata.get("world_preview_path")
+                    ):
                         st.caption("🎨 World Preview 尚未渲染；不影响进入 3D 世界。")
                     if legacy_blueprint:
                         st.warning(
@@ -838,16 +845,21 @@ elif page == "🎮 Explore World":
             profile = WorldProfile.model_validate(
                 selected.metadata.get("world_profile", {})
             )
-            concept = ctx.world_concepts.current_concept(selected.asset_id)
-            if concept:
+            selected_pipeline = selected.metadata.get("world_pipeline", "legacy")
+            world_visual = (
+                ctx.world_concepts.current_preview(selected.asset_id)
+                if selected_pipeline == "blueprint_first_v1"
+                else ctx.world_concepts.current_concept(selected.asset_id)
+            )
+            if world_visual:
                 try:
                     st.image(
-                        ctx.storage.get_bytes(concept.path),
+                        ctx.storage.get_bytes(world_visual.path),
                         caption=f"✨ {selected.display_name}",
                         use_container_width=True,
                     )
                 except Exception:
-                    st.caption("World concept preview 暂时无法读取。")
+                    st.caption("World preview 暂时无法读取。")
 
         playable_characters = [
             asset
