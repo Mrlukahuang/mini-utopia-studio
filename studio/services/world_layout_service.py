@@ -80,9 +80,11 @@ class WorldLayoutService:
 
         for scene in plan.elements:
             for relation in scene.relation_hints:
-                self._apply_relation(elements, relation, grid)
+                for clause in self._relation_clauses(relation):
+                    self._apply_relation(elements, clause, grid)
         for relation in plan.spatial_relations:
-            self._apply_relation(elements, relation, grid)
+            for clause in self._relation_clauses(relation):
+                self._apply_relation(elements, clause, grid)
 
         for element in elements:
             element.position.x = self._clamp(element.position.x, 5.0, grid.width - 5.0)
@@ -380,6 +382,14 @@ class WorldLayoutService:
             if any(keyword.lower() in lowered for keyword in _KIND_KEYWORDS[kind]):
                 return kind
         return "landmark"
+
+    @staticmethod
+    def _relation_clauses(value: str) -> list[str]:
+        return [
+            part.strip()
+            for part in re.split(r"[.;,，。；]+", value or "")
+            if part.strip()
+        ]
 
     @staticmethod
     def _default_position(*, kind: str, index: int, grid: GridSpec) -> WorldPoint:
