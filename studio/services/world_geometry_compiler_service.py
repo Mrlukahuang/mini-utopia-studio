@@ -139,6 +139,10 @@ class WorldGeometryCompilerService:
         return ThreeObjectSpec(
             element_id=element.element_id,
             name=element.name,
+            kind=element.kind,
+            semantic_key=element.semantic_key,
+            spatial_mode=element.spatial_mode,
+            traversability=element.traversability,
             transform=ThreeObjectTransformSpec(
                 position=element.position.model_copy(deep=True),
                 quaternion=self._orientation_quaternion(element.orientation),
