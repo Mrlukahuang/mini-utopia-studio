@@ -99,6 +99,14 @@ class WorldConceptService:
 
         profile = WorldProfile.model_validate(world.metadata.get("world_profile", {}))
         blueprint = WorldBlueprint.model_validate(raw_blueprint)
+        if world.metadata.get("world_pipeline") != "blueprint_first_v1":
+            raise ValueError(
+                "World Preview requires a Blueprint-first plan. Rebuild the Blueprint first."
+            )
+        if not blueprint.layout_elements:
+            raise ValueError(
+                "World Preview requires a current Blueprint with layout elements."
+            )
         blueprint_snapshot = blueprint.model_dump(mode="json")
         prompt = self.prompt_service.compose_from_blueprint(
             profile=profile,
