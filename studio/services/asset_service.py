@@ -127,3 +127,13 @@ class AssetService:
         asset.status = ReviewStatus.ARCHIVED
         self.repository.save_asset(asset)
         return asset
+
+
+    def archive_world(self, asset_id: str) -> Asset:
+        """Soft-delete a World while preserving Story/Asset references and history."""
+        asset = self.repository.get_asset(asset_id)
+        if asset is None or asset.asset_type != AssetType.LOCATION:
+            raise ValueError(f"World not found: {asset_id}")
+        asset.status = ReviewStatus.ARCHIVED
+        self.repository.save_asset(asset)
+        return asset
