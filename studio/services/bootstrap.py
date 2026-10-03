@@ -19,8 +19,10 @@ from studio.services.world_concept_service import WorldConceptService
 from studio.services.world_blueprint_service import WorldBlueprintService
 from studio.services.world_concept_match_service import WorldConceptMatchService
 from studio.services.world_visual_anchor_service import WorldVisualAnchorService
+from studio.services.world_scene_plan_service import WorldScenePlanService
 from studio.providers.openai_image import OpenAIImageProvider
 from studio.providers.openai_vision import OpenAIVisionProvider
+from studio.providers.openai_text import OpenAIStructuredTextProvider
 from studio.storage.base import ObjectStorage
 from studio.storage.local import LocalObjectStorage
 from studio.storage.supabase import SupabaseObjectStorage
@@ -44,6 +46,7 @@ class StudioContext:
     world_concept_prompts: WorldConceptPromptService
     world_blueprints: WorldBlueprintService
     world_concepts: WorldConceptService
+    world_scene_plans: WorldScenePlanService
     world_concept_match: WorldConceptMatchService
 
 
@@ -111,6 +114,14 @@ def build_context(settings: Settings) -> StudioContext:
         if settings.openai_api_key
         else None
     )
+    text_provider = (
+        OpenAIStructuredTextProvider(
+            settings.openai_api_key,
+            model=settings.openai_text_model,
+        )
+        if settings.openai_api_key
+        else None
+    )
     world_visual_anchors = WorldVisualAnchorService(
         image_analysis_provider=vision_provider
     )
@@ -145,6 +156,9 @@ def build_context(settings: Settings) -> StudioContext:
             world_concept_prompts,
             world_blueprints,
             image_provider=image_provider,
+        ),
+        world_scene_plans=WorldScenePlanService(
+            structured_provider=text_provider,
         ),
         world_concept_match=WorldConceptMatchService(repository),
     )
