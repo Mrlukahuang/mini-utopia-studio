@@ -966,3 +966,19 @@ def test_grounded_scene_regression_stays_grounded():
     )
 
     assert all(element.position.y == 0 for element in blueprint.layout_elements)
+
+
+def test_prompt_system_maps_living_creatures_to_organic_geometry():
+    provider = FakeStructuredProvider(_prompt_payload())
+    service = WorldScenePlanService(structured_provider=provider)
+
+    service.plan_from_prompt(
+        description="A gentle living creature carries a station in the sky.",
+        style_profile={},
+    )
+
+    system = provider.calls[0]["system"]
+    assert "living creatures" in system
+    assert "biological carriers" in system
+    assert "geometry_role=organic" not in system
+    assert "Use organic for living creatures" in system
