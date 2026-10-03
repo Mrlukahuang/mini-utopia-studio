@@ -162,12 +162,27 @@ const anchorText = [
   visualAnchor.concept_summary || ''
 ].join(' ').toLowerCase();
 const host = document.getElementById('canvas');
+const renderSettings = renderSpec?.renderer || {{}};
+const cameraSettings = renderSpec?.camera || {{}};
 
-const renderer = new THREE.WebGLRenderer({{ antialias:true, alpha:false }});
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-renderer.shadowMap.enabled = true;
+const renderer = new THREE.WebGLRenderer({{
+  antialias: renderSettings.antialias !== false,
+  alpha:false
+}});
+renderer.setPixelRatio(
+  Math.min(window.devicePixelRatio || 1, renderSettings.pixel_ratio_cap || 2)
+);
+renderer.shadowMap.enabled = renderSettings.shadows_enabled !== false;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+if (renderSettings.tone_mapping === 'linear') {{
+  renderer.toneMapping = THREE.LinearToneMapping;
+}} else if (renderSettings.tone_mapping === 'none') {{
+  renderer.toneMapping = THREE.NoToneMapping;
+}} else {{
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+}}
+renderer.toneMappingExposure = renderSettings.exposure || 1;
 host.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -184,7 +199,15 @@ scene.fog = new THREE.Fog(
   renderEnv.fog_far || 95
 );
 
-const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 180);
+const camera = new THREE.PerspectiveCamera(
+  cameraSettings.fov_degrees || 48,
+  1,
+  cameraSettings.near || .1,
+  cameraSettings.far || 180
+);
+camera.zoom = cameraSettings.zoom || 1;
+camera.filmGauge = cameraSettings.film_gauge_mm || 35;
+camera.updateProjectionMatrix();
 
 function addRenderLight(spec) {{
   const intensityScale = renderEnv.environment_intensity ?? 1;
@@ -209,7 +232,8 @@ function addRenderLight(spec) {{
   light.position.set(spec.position?.x || 0, spec.position?.y || 20, spec.position?.z || 0);
   light.castShadow = Boolean(spec.cast_shadow);
   if (light.shadow) {{
-    light.shadow.mapSize.set(2048,2048);
+    const shadowSize = renderSettings.shadow_map_size || 2048;
+    light.shadow.mapSize.set(shadowSize,shadowSize);
     if (light.shadow.camera) {{
       light.shadow.camera.left = -55; light.shadow.camera.right = 55;
       light.shadow.camera.top = 55; light.shadow.camera.bottom = -55;
@@ -226,7 +250,8 @@ if (renderSpec?.environment?.lights?.length) {{
   const sun = new THREE.DirectionalLight(0xfff4df, 3.2);
   sun.position.set(24, 34, 18);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  const shadowSize = renderSettings.shadow_map_size || 2048;
+  sun.shadow.mapSize.set(shadowSize, shadowSize);
   sun.shadow.camera.left = -55; sun.shadow.camera.right = 55;
   sun.shadow.camera.top = 55; sun.shadow.camera.bottom = -55;
   scene.add(sun);
