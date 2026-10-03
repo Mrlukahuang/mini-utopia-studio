@@ -9,6 +9,7 @@ from studio.services.style_service import StyleService
 from studio.services.world_concept_prompt_service import WorldConceptPromptService
 from studio.services.world_concept_service import WorldConceptService
 from studio.services.world_blueprint_service import WorldBlueprintService
+from studio.services.world_scene_plan_service import WorldScenePlanService
 from studio.storage.local import LocalObjectStorage
 
 
@@ -168,16 +169,19 @@ def test_blueprint_first_plan_is_playable_before_any_preview(tmp_path):
         image_provider=None,
     )
 
+    scene_plan = WorldScenePlanService().plan_from_profile(profile=profile)
     blueprint = service.plan_blueprint(
         location_asset_id=world.asset_id,
         style_asset_id=style.asset_id,
+        scene_plan=scene_plan,
     )
 
     saved = repo.get_asset(world.asset_id)
     assert saved is not None
     assert saved.status == ReviewStatus.APPROVED
     assert saved.metadata["world_pipeline"] == "blueprint_first_v1"
-    assert saved.metadata["world_blueprint_source"] == "creator_profile"
+    assert saved.metadata["world_blueprint_source"] == "scene_plan:custom"
+    assert saved.metadata["world_scene_plan"]["source_mode"] == "custom"
     assert "world_concept_path" not in saved.metadata
     assert blueprint.layout_elements
     assert blueprint.portal is not None
@@ -206,9 +210,11 @@ def test_blueprint_preview_render_never_mutates_blueprint(tmp_path):
         provider,
     )
 
+    scene_plan = WorldScenePlanService().plan_from_profile(profile=_profile())
     service.plan_blueprint(
         location_asset_id=world.asset_id,
         style_asset_id=style.asset_id,
+        scene_plan=scene_plan,
     )
     planned = repo.get_asset(world.asset_id)
     assert planned is not None
@@ -325,9 +331,11 @@ def test_blueprint_preview_rejects_missing_layout_elements(tmp_path):
         WorldBlueprintService(),
         FakeWorldImageProvider(),
     )
+    scene_plan = WorldScenePlanService().plan_from_profile(profile=_profile())
     service.plan_blueprint(
         location_asset_id=world.asset_id,
         style_asset_id=style.asset_id,
+        scene_plan=scene_plan,
     )
     saved = repo.get_asset(world.asset_id)
     assert saved is not None
@@ -359,9 +367,11 @@ def test_replanning_archives_old_preview_and_clears_preview_metadata(tmp_path):
         FakeWorldImageProvider(),
     )
 
+    scene_plan = WorldScenePlanService().plan_from_profile(profile=_profile())
     service.plan_blueprint(
         location_asset_id=world.asset_id,
         style_asset_id=style.asset_id,
+        scene_plan=scene_plan,
     )
     preview = service.render_blueprint_preview(
         location_asset_id=world.asset_id,
@@ -372,6 +382,7 @@ def test_replanning_archives_old_preview_and_clears_preview_metadata(tmp_path):
     service.plan_blueprint(
         location_asset_id=world.asset_id,
         style_asset_id=style.asset_id,
+        scene_plan=scene_plan,
     )
 
     saved = repo.get_asset(world.asset_id)
@@ -384,3 +395,61 @@ def test_replanning_archives_old_preview_and_clears_preview_metadata(tmp_path):
         file_ref.path == preview.path and file_ref.role == "world_preview_archive"
         for file_ref in saved.files
     )
+
+
+def test_blueprint_preview_rejects_stale_profile_or_scene_plan(tmp_path):
+    repo = SQLiteStudioRepository(tmp_path / "studio.db")
+    storage = LocalObjectStorage(tmp_path / "storage")
+    assets = AssetService(repo)
+    style = StyleService(repo).ensure_mini_utopia_base()
+    profile = _profile()
+    world = assets.create_world(
+        name="Fingerprint Garden",
+        description=profile.source_description,
+        profile=profile,
+    )
+    service = WorldConceptService(
+        repo,
+        storage,
+        WorldConceptPromptService(),
+        WorldBlueprintService(),
+        FakeWorldImageProvider(),
+    )
+    scene_plan = WorldScenePlanService().plan_from_profile(profile=profile)
+    service.plan_blueprint(
+        location_asset_id=world.asset_id,
+        style_asset_id=style.asset_id,
+        scene_plan=scene_plan,
+    )
+
+    stale_profile = repo.get_asset(world.asset_id)
+    assert stale_profile is not None
+    stale_profile.metadata["world_profile"]["mood"] = ["Mysterious / 神秘"]
+    repo.save_asset(stale_profile)
+    with pytest.raises(ValueError, match="current Scene Plan and Profile"):
+        service.render_blueprint_preview(
+            location_asset_id=world.asset_id,
+            style_asset_id=style.asset_id,
+        )
+
+    # Restore by rebuilding, then prove Scene Plan drift is guarded too.
+    assets.update_world(
+        asset_id=world.asset_id,
+        name=profile.world_name,
+        description=profile.source_description,
+        profile=profile,
+    )
+    service.plan_blueprint(
+        location_asset_id=world.asset_id,
+        style_asset_id=style.asset_id,
+        scene_plan=scene_plan,
+    )
+    stale_scene = repo.get_asset(world.asset_id)
+    assert stale_scene is not None
+    stale_scene.metadata["world_scene_plan"]["summary"] = "Changed without rebuild"
+    repo.save_asset(stale_scene)
+    with pytest.raises(ValueError, match="current Scene Plan and Profile"):
+        service.render_blueprint_preview(
+            location_asset_id=world.asset_id,
+            style_asset_id=style.asset_id,
+        )

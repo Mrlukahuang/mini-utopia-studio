@@ -8,6 +8,7 @@ from studio.models.world import (
     WorldLayoutElement,
     WorldPoint,
     WorldProfile,
+    WorldScenePlan,
     WorldVisualAnchor,
 )
 
@@ -47,6 +48,51 @@ class WorldLayoutService:
     what is visible; this service decides how those relations map into executable
     world coordinates without delegating runtime layout to a black-box model.
     """
+
+    def compile_scene_plan(
+        self,
+        *,
+        plan: WorldScenePlan,
+        grid: GridSpec,
+    ) -> WorldLayoutPlan:
+        """Compile a semantic Scene Plan into deterministic runtime positions."""
+        elements: list[WorldLayoutElement] = []
+        for index, scene in enumerate(plan.elements):
+            pos = self._default_position(kind=scene.kind, index=index, grid=grid)
+            width, depth, height = self._default_footprint(scene.kind)
+            element = WorldLayoutElement(
+                element_id=scene.scene_id,
+                name=scene.name,
+                kind=scene.kind,
+                position=pos,
+                width=width,
+                depth=depth,
+                height=height,
+                source_evidence=[
+                    f"scene_plan:{scene.source}",
+                    *scene.relation_hints,
+                ],
+            )
+            if scene.placement_hint:
+                self._apply_element_hint(element, scene.placement_hint, grid)
+                element.source_evidence.append(scene.placement_hint)
+            elements.append(element)
+
+        for scene in plan.elements:
+            for relation in scene.relation_hints:
+                for clause in self._relation_clauses(relation):
+                    self._apply_composition_note(elements, clause, grid)
+                    self._apply_relation(elements, clause, grid)
+        for relation in plan.spatial_relations:
+            for clause in self._relation_clauses(relation):
+                self._apply_composition_note(elements, clause, grid)
+                self._apply_relation(elements, clause, grid)
+
+        for element in elements:
+            element.position.x = self._clamp(element.position.x, 5.0, grid.width - 5.0)
+            element.position.z = self._clamp(element.position.z, 5.0, grid.depth - 5.0)
+
+        return WorldLayoutPlan(elements=elements)
 
     def compile(
         self,
@@ -151,6 +197,8 @@ class WorldLayoutService:
     ) -> None:
         text = relation.strip()
         lowered = text.lower()
+        if self._apply_connection_relation(elements, text, lowered, grid):
+            return
         relation_defs = [
             ("in front of", "front"),
             ("behind", "behind"),
@@ -227,6 +275,69 @@ class WorldLayoutService:
         subject.source_evidence.append(text)
         target.source_evidence.append(text)
 
+    def _apply_element_hint(
+        self,
+        element: WorldLayoutElement,
+        hint: str,
+        grid: GridSpec,
+    ) -> None:
+        text = hint.lower()
+        if any(token in text for token in ("left", "left side", "左")):
+            element.position.x = grid.width * .28
+        elif any(token in text for token in ("right", "right side", "右")):
+            element.position.x = grid.width * .72
+        elif any(token in text for token in ("center", "centre", "central", "中央", "中心")):
+            element.position.x = grid.width * .5
+
+        if any(token in text for token in ("front", "foreground", "入口", "前景")):
+            element.position.z = grid.depth * .72
+        elif any(token in text for token in ("behind", "rear", "background", "后面", "后方", "背景")):
+            element.position.z = grid.depth * .28
+        elif any(token in text for token in ("middle", "midground", "中部", "中景")):
+            element.position.z = grid.depth * .5
+
+    def _apply_connection_relation(
+        self,
+        elements: list[WorldLayoutElement],
+        text: str,
+        lowered: str,
+        grid: GridSpec,
+    ) -> bool:
+        marker = None
+        for candidate in (" connects ", " connecting ", " between ", "连接", "位于"):
+            if candidate in lowered:
+                marker = candidate
+                break
+        if marker is None:
+            return False
+
+        before, after = lowered.split(marker, 1)
+        subject = self._resolve_element(elements, before)
+        if subject is None or subject.kind != "bridge":
+            return False
+
+        parts = [
+            part.strip()
+            for part in re.split(r"\band\b|\bto\b|和|与|到", after)
+            if part.strip()
+        ]
+        targets: list[WorldLayoutElement] = []
+        for part in parts:
+            target = self._resolve_element(elements, part)
+            if target is not None and target is not subject and target not in targets:
+                targets.append(target)
+            if len(targets) == 2:
+                break
+        if len(targets) < 2:
+            return False
+
+        subject.position.x = (targets[0].position.x + targets[1].position.x) / 2
+        subject.position.z = (targets[0].position.z + targets[1].position.z) / 2
+        subject.source_evidence.append(text)
+        targets[0].source_evidence.append(text)
+        targets[1].source_evidence.append(text)
+        return True
+
     def _resolve_element(
         self,
         elements: list[WorldLayoutElement],
@@ -273,6 +384,14 @@ class WorldLayoutService:
             if any(keyword.lower() in lowered for keyword in _KIND_KEYWORDS[kind]):
                 return kind
         return "landmark"
+
+    @staticmethod
+    def _relation_clauses(value: str) -> list[str]:
+        return [
+            part.strip()
+            for part in re.split(r"[.;,，。；]+", value or "")
+            if part.strip()
+        ]
 
     @staticmethod
     def _default_position(*, kind: str, index: int, grid: GridSpec) -> WorldPoint:

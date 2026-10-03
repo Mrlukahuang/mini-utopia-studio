@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import hashlib
+
 from uuid import uuid4
 
 from studio.core.enums import AssetType, ReviewStatus
 from studio.models.asset import AssetFile, now_utc
-from studio.models.world import WorldBlueprint, WorldProfile
+from studio.models.world import WorldBlueprint, WorldProfile, WorldScenePlan
 from studio.providers.base import ImageGenerationProvider
 from studio.repositories.base import StudioRepository
 from studio.services.world_concept_prompt_service import WorldConceptPromptService
@@ -36,21 +38,47 @@ class WorldConceptService:
         *,
         location_asset_id: str,
         style_asset_id: str | None,
+        scene_plan: WorldScenePlan | None = None,
     ) -> WorldBlueprint:
-        """Create the executable world before any beauty render exists."""
+        """Create executable runtime truth from the shared semantic Scene Plan."""
         world = self.repository.get_asset(location_asset_id)
         if world is None or world.asset_type != AssetType.LOCATION:
             raise ValueError(f"World not found: {location_asset_id}")
 
         profile = WorldProfile.model_validate(world.metadata.get("world_profile", {}))
-        blueprint = self.blueprint_service.plan(
-            location_asset_id=world.asset_id,
-            style_asset_id=style_asset_id,
-            profile=profile,
-        )
+        if scene_plan is None:
+            stored_plan = world.metadata.get("world_scene_plan")
+            if stored_plan:
+                scene_plan = WorldScenePlan.model_validate(stored_plan)
+
+        if scene_plan is not None:
+            blueprint = self.blueprint_service.plan_from_scene_plan(
+                location_asset_id=world.asset_id,
+                style_asset_id=style_asset_id,
+                profile=profile,
+                scene_plan=scene_plan,
+            )
+            scene_fingerprint = self._fingerprint(scene_plan.model_dump_json())
+            profile_fingerprint = self._fingerprint(profile.model_dump_json())
+            world.metadata["world_scene_plan"] = scene_plan.model_dump(mode="json")
+            world.metadata["world_scene_plan_version"] = scene_plan.schema_version
+            world.metadata["world_scene_plan_fingerprint"] = scene_fingerprint
+            world.metadata["world_blueprint_scene_plan_fingerprint"] = scene_fingerprint
+            world.metadata["world_blueprint_profile_fingerprint"] = profile_fingerprint
+            world.metadata["world_blueprint_source"] = (
+                f"scene_plan:{scene_plan.source_mode}"
+            )
+        else:
+            # Compatibility fallback for Worlds created before Scene Plan v0.1.
+            blueprint = self.blueprint_service.plan(
+                location_asset_id=world.asset_id,
+                style_asset_id=style_asset_id,
+                profile=profile,
+            )
+            world.metadata["world_blueprint_source"] = "legacy_creator_profile"
+
         world.metadata["world_blueprint"] = blueprint.model_dump(mode="json")
         world.metadata["world_pipeline"] = "blueprint_first_v1"
-        world.metadata["world_blueprint_source"] = "creator_profile"
         # A rebuilt Blueprint invalidates any older beauty render. Keep the file
         # as archive history, but require the next preview to be rendered from
         # the new authoritative layout.
@@ -107,6 +135,23 @@ class WorldConceptService:
             raise ValueError(
                 "World Preview requires a Blueprint-first plan. Rebuild the Blueprint first."
             )
+        raw_scene_plan = world.metadata.get("world_scene_plan")
+        if not raw_scene_plan:
+            raise ValueError(
+                "World Preview requires a Scene Plan. Rebuild this World with the current planner."
+            )
+        current_scene = WorldScenePlan.model_validate(raw_scene_plan)
+        current_scene_fingerprint = self._fingerprint(current_scene.model_dump_json())
+        current_profile_fingerprint = self._fingerprint(profile.model_dump_json())
+        if (
+            world.metadata.get("world_blueprint_scene_plan_fingerprint")
+            != current_scene_fingerprint
+            or world.metadata.get("world_blueprint_profile_fingerprint")
+            != current_profile_fingerprint
+        ):
+            raise ValueError(
+                "World Preview requires a Blueprint rebuilt from the current Scene Plan and Profile."
+            )
         if not blueprint.layout_elements:
             raise ValueError(
                 "World Preview requires a current Blueprint with layout elements."
@@ -155,6 +200,10 @@ class WorldConceptService:
         if persisted.metadata.get("world_blueprint") != blueprint_snapshot:
             raise RuntimeError("World Blueprint changed while rendering Preview.")
         return file_ref
+
+    @staticmethod
+    def _fingerprint(value: str) -> str:
+        return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
     def current_preview(self, location_asset_id: str) -> AssetFile | None:
         """Return the current Blueprint-first beauty preview, if one exists."""
@@ -265,6 +314,10 @@ class WorldConceptService:
             concept_mime_type=selected.mime_type or "image/png",
         )
         world.metadata["world_blueprint"] = blueprint.model_dump(mode="json")
+        world.metadata["world_pipeline"] = "legacy_concept_v1"
+        world.metadata["world_blueprint_source"] = "approved_concept"
+        world.metadata.pop("world_blueprint_scene_plan_fingerprint", None)
+        world.metadata.pop("world_blueprint_profile_fingerprint", None)
         world.updated_at = now_utc()
         self.repository.save_asset(world)
 
@@ -315,6 +368,10 @@ class WorldConceptService:
         )
 
         world.metadata["world_blueprint"] = blueprint.model_dump(mode="json")
+        world.metadata["world_pipeline"] = "legacy_concept_v1"
+        world.metadata["world_blueprint_source"] = "legacy_approved_concept"
+        world.metadata.pop("world_blueprint_scene_plan_fingerprint", None)
+        world.metadata.pop("world_blueprint_profile_fingerprint", None)
         world.metadata["world_concept_match_reviewed"] = False
         world.metadata.pop("world_concept_match_reviewed_at", None)
         world.metadata["world_concept_match_history"] = []

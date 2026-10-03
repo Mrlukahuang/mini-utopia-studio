@@ -3,7 +3,7 @@ from __future__ import annotations
 import streamlit as st
 import streamlit.components.v1 as components
 
-from studio.models.world import WorldBlueprint, WorldProfile
+from studio.models.world import WorldBlueprint, WorldProfile, WorldScenePlan
 from studio.ui.creator.world_presets import (
     ARCHITECTURE_OPTIONS,
     LANDMARK_OPTIONS,
@@ -27,13 +27,6 @@ from studio.ui.theme import render_game_hero, render_quest
 
 
 MAX_GENERATIONS_PER_SESSION = 20
-DIRECTION_LABELS = {
-    "playable": "🧭 Playable / 清晰可探索",
-    "dream": "✨ Dream / 最梦幻",
-    "story": "📖 Story / 最有故事感",
-}
-
-
 def _default_profile() -> WorldProfile:
     return WorldProfile(
         world_type=WORLD_TYPE_OPTIONS[0],
@@ -66,62 +59,11 @@ def _safe_index(options: list[str], value: str, default: int = 0) -> int:
         return default
 
 
-def _draft_from_prompt(description: str) -> WorldProfile:
-    """Seed the structured builder from a child's description.
-
-    M2.1 keeps this deterministic and transparent. The original description is
-    always preserved and drives Concept Art. Later a structured-text provider
-    can improve the seeding without changing the UI or WorldProfile contract.
-    """
-    draft = _default_profile()
-    text = description.lower()
-
-    def choose(current: str, mapping: list[tuple[tuple[str, ...], str]]) -> str:
-        for keywords, option in mapping:
-            if any(keyword in text for keyword in keywords):
-                return option
-        return current
-
-    world_type = choose(
-        draft.world_type,
-        [
-            (("cloud", "云"), "Cloud Village / 云端小镇"),
-            (("candy", "糖果"), "Candy Forest / 糖果森林"),
-            (("star", "星"), "Star Harbor / 星光港湾"),
-            (("mushroom", "蘑菇"), "Mushroom Valley / 蘑菇秘境"),
-            (("underwater", "海底"), "Underwater Utopia / 海底乌托邦"),
-            (("future", "未来"), "Future City / 未来城市"),
-            (("floating", "漂浮"), "Floating Islands / 漂浮岛"),
-        ],
-    )
-    time_of_day = choose(
-        draft.time_of_day,
-        [
-            (("night", "夜"), "Night / 夜晚"),
-            (("sunset", "日落"), "Sunset / 日落"),
-            (("morning", "清晨"), "Morning / 清晨"),
-        ],
-    )
-    mood = list(draft.mood)
-    if any(k in text for k in ("mystery", "mysterious", "神秘")):
-        mood = ["Mysterious / 神秘"]
-    elif any(k in text for k in ("happy", "joy", "快乐")):
-        mood = ["Joyful / 快乐"]
-
-    return draft.model_copy(
-        update={
-            "source_description": description,
-            "world_type": world_type,
-            "time_of_day": time_of_day,
-            "mood": mood,
-        }
-    )
-
-
-def _reset_world() -> None:
+def _clear_world_state() -> None:
     for key in (
         "world_draft",
         "world_source",
+        "world_source_text",
         "world_name",
         "world_name_input",
         "world_creation_mode",
@@ -130,11 +72,15 @@ def _reset_world() -> None:
         "editing_world_id",
     ):
         st.session_state.pop(key, None)
+
+
+def _reset_world() -> None:
+    _clear_world_state()
     st.rerun()
 
 
 def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
-    """World Factory M2.1: same interaction grammar as Character Factory."""
+    """Blueprint-first World Factory with independent Prompt and Custom entry paths."""
 
     render_game_hero(
         "Build a Mini World 🌍",
@@ -153,7 +99,7 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
             st.markdown(
                 '<div class="mu-world-card"><div class="emoji">✨📝</div>'
                 '<h3>Prompt Generate</h3>'
-                '<p>描述生成 · 把脑海里的世界讲出来，系统先整理，再让你一步步确认。</p></div>',
+                '<p>一句话描述 · GPT 理解、适度加入 Mini Utopia 元素，并直接规划 Scene Plan + Blueprint。</p></div>',
                 unsafe_allow_html=True,
             )
             if st.button(
@@ -183,33 +129,85 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
         return
 
     if draft is None and mode == "prompt":
-        render_quest("把脑海里的世界讲出来。原始描述会一直保留，并成为 Concept Art 的创意核心。")
+        render_quest(
+            "把脑海里的世界讲出来。GPT 会先忠实提取你要求的元素，再做少量 Mini Utopia "
+            "风格补充，并直接规划探索与拍照路线；不会再让你重复填写 Custom Build。"
+        )
         description = st.text_area(
             "Describe your world / 描述你的世界",
             value=st.session_state.get("world_source", ""),
             placeholder=(
-                "例如：一个只有晚上才会出现的云朵村，房子睡着以后屋顶会长出星星，"
-                "桥下面有会发光的鲸鱼……"
+                "例如：一个粉色漂浮岛世界，中央有湖，星星传送门在湖后面，"
+                "右边有城堡，一座桥连接湖和城堡，周围有花和发光植物。"
             ),
-            height=160,
+            height=180,
             key="world_source_text",
         )
+        if not ctx.world_scene_plans.prompt_available:
+            st.info(
+                "Structured text planning API 尚未连接。Prompt Generate 暂不可用，"
+                "但 Custom Build 仍然可以使用。"
+            )
+
         a, b = st.columns([2, 1])
         with a:
             if st.button(
-                "✨ Build My World / 帮我整理",
+                "✨ Plan & Build World / 生成世界蓝图",
                 type="primary",
-                disabled=not description.strip(),
+                disabled=(
+                    not description.strip()
+                    or not style_asset_id
+                    or not ctx.world_scene_plans.prompt_available
+                ),
                 use_container_width=True,
             ):
-                st.session_state.world_source = description
-                st.session_state.world_draft = _draft_from_prompt(description)
-                st.session_state.world_creation_mode = "custom"
-                st.session_state.world_stage = 0
-                st.rerun()
+                try:
+                    style = ctx.repository.get_asset(style_asset_id)
+                    if style is None:
+                        raise RuntimeError("Mini Utopia Global Style Canon is missing.")
+                    with st.spinner(
+                        "🧠 正在理解你的世界、加入受控 Utopia 细节，并规划探索路线…"
+                    ):
+                        interpretation = ctx.world_scene_plans.plan_from_prompt(
+                            description=description,
+                            style_profile=style.metadata.get("style_profile", {}),
+                        )
+                        profile = interpretation.to_profile(
+                            source_description=description
+                        )
+                        editing_id = st.session_state.get("editing_world_id")
+                        if editing_id:
+                            asset = ctx.assets.update_world(
+                                asset_id=editing_id,
+                                name=profile.world_name,
+                                description=description,
+                                profile=profile,
+                            )
+                        else:
+                            asset = ctx.assets.create_world(
+                                name=profile.world_name,
+                                description=description,
+                                profile=profile,
+                            )
+                        ctx.world_concepts.plan_blueprint(
+                            location_asset_id=asset.asset_id,
+                            style_asset_id=style_asset_id,
+                            scene_plan=interpretation.scene_plan,
+                        )
+
+                    st.session_state.world_source = description
+                    st.session_state.world_draft = profile
+                    st.session_state.world_name = profile.world_name
+                    st.session_state.editing_world_id = asset.asset_id
+                    st.session_state.world_creation_mode = "prompt"
+                    st.session_state.world_stage = 4
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Prompt planning failed / 世界规划失败: {exc}")
         with b:
             if st.button("← Back / 返回", use_container_width=True):
                 st.session_state.world_creation_mode = None
+                st.session_state.pop("editing_world_id", None)
                 st.rerun()
         return
 
@@ -224,9 +222,19 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
         "4 · Landmarks & Portal / 地标",
         "5 · Create / 生成",
     ]
-    stage = max(0, min(int(st.session_state.get("world_stage", 0)), 4))
-    st.progress((stage + 1) / 5, text=f"{stages[stage]} · {stage + 1}/5")
-    st.caption("和 Character Factory 一样：选择题优先，只有最后的 Extra Details 自由发挥。")
+    if mode == "prompt":
+        stage = 4
+        st.progress(
+            1.0,
+            text="Prompt → GPT Scene Plan → Blueprint · 完成结构规划",
+        )
+        st.caption(
+            "Prompt 路线不会经过 Custom Build。下方可以检查 Scene Plan、Blueprint，再决定是否渲染 Preview。"
+        )
+    else:
+        stage = max(0, min(int(st.session_state.get("world_stage", 0)), 4))
+        st.progress((stage + 1) / 5, text=f"{stages[stage]} · {stage + 1}/5")
+        st.caption("Custom Build：选择题优先，只有最后的 Extra Details 自由发挥。")
 
     def go(value: int) -> None:
         st.session_state.world_stage = max(0, min(value, 4))
@@ -484,6 +492,16 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
         if raw_blueprint
         else None
     )
+    raw_scene_plan = (
+        saved_world.metadata.get("world_scene_plan")
+        if saved_world is not None
+        else None
+    )
+    scene_plan = (
+        WorldScenePlan.model_validate(raw_scene_plan)
+        if raw_scene_plan
+        else None
+    )
     desired_profile = final_profile.model_copy(update={"world_name": name})
     saved_profile = (
         WorldProfile.model_validate(saved_world.metadata.get("world_profile", {}))
@@ -499,57 +517,117 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
         saved_world is not None
         and blueprint is not None
         and saved_world.metadata.get("world_pipeline") == "blueprint_first_v1"
+        and scene_plan is not None
         and blueprint.layout_elements
         and not profile_changed
     )
 
-    st.markdown("#### 1 · Blueprint / 先确定世界结构")
+    st.markdown("#### 1 · Scene Plan → Blueprint / 先理解，再搭世界")
     st.caption(
-        "Blueprint 决定这个世界里有什么、在哪里、怎么走。"
+        "Scene Plan 先确认世界里有什么、彼此关系和探索顺序；Blueprint 再把它变成精确可玩的 50×50 结构。"
         " World Preview 只负责把这个已经确定的世界画漂亮。"
     )
 
-    back, plan_col = st.columns([1, 2])
-    with back:
-        if st.button("← Back to Edit", use_container_width=True):
-            go(3)
-    with plan_col:
-        plan_label = (
-            "🔄 Rebuild Playable Blueprint / 重建可玩蓝图"
-            if blueprint is not None
-            else "🧩 Build Playable Blueprint / 生成可玩蓝图"
-        )
+    if mode == "prompt":
         if st.button(
-            plan_label,
-            type="primary",
-            disabled=not bool(name and style_asset_id),
+            "← Modify Prompt / 修改描述并重新规划",
             use_container_width=True,
         ):
-            try:
-                st.session_state.world_draft = desired_profile
-                if editing_id:
-                    asset = ctx.assets.update_world(
-                        asset_id=editing_id,
-                        name=name,
-                        description=desired_profile.source_description,
+            st.session_state.world_draft = None
+            st.session_state.world_stage = 4
+            st.rerun()
+    else:
+        back, plan_col = st.columns([1, 2])
+        with back:
+            if st.button("← Back to Edit", use_container_width=True):
+                go(3)
+        with plan_col:
+            plan_label = (
+                "🔄 Rebuild Playable Blueprint / 重建可玩蓝图"
+                if blueprint is not None
+                else "🧩 Build Playable Blueprint / 生成可玩蓝图"
+            )
+            if st.button(
+                plan_label,
+                type="primary",
+                disabled=not bool(name and style_asset_id),
+                use_container_width=True,
+            ):
+                try:
+                    st.session_state.world_draft = desired_profile
+                    style = ctx.repository.get_asset(style_asset_id)
+                    if style is None:
+                        raise RuntimeError("Mini Utopia Global Style Canon is missing.")
+                    scene_plan_for_build = ctx.world_scene_plans.plan_from_profile(
                         profile=desired_profile,
+                        style_profile=style.metadata.get("style_profile", {}),
                     )
-                else:
-                    asset = ctx.assets.create_world(
-                        name=name,
-                        description=desired_profile.source_description,
-                        profile=desired_profile,
-                    )
-                    st.session_state.editing_world_id = asset.asset_id
+                    if editing_id:
+                        asset = ctx.assets.update_world(
+                            asset_id=editing_id,
+                            name=name,
+                            description=desired_profile.source_description,
+                            profile=desired_profile,
+                        )
+                    else:
+                        asset = ctx.assets.create_world(
+                            name=name,
+                            description=desired_profile.source_description,
+                            profile=desired_profile,
+                        )
+                        st.session_state.editing_world_id = asset.asset_id
 
-                ctx.world_concepts.plan_blueprint(
-                    location_asset_id=asset.asset_id,
-                    style_asset_id=style_asset_id,
-                )
-                st.success("Playable Blueprint ready / 可玩蓝图已生成。")
-                st.rerun()
-            except Exception as exc:
-                st.error(f"Blueprint planning failed / 蓝图生成失败: {exc}")
+                    ctx.world_concepts.plan_blueprint(
+                        location_asset_id=asset.asset_id,
+                        style_asset_id=style_asset_id,
+                        scene_plan=scene_plan_for_build,
+                    )
+                    st.success("Scene Plan + Playable Blueprint ready / 世界规划与可玩蓝图已生成。")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Blueprint planning failed / 蓝图生成失败: {exc}")
+
+    if scene_plan is not None:
+        st.markdown("#### 🧠 Scene Plan / 世界清单")
+        st.caption(
+            "Creator Required 是你明确要求、必须保留的内容；Utopia Enrichment 是系统为品牌感、"
+            "探索感和拍照体验加入的少量可调整细节。"
+        )
+        required_col, enrich_col = st.columns(2)
+        with required_col:
+            st.markdown("**🔒 Creator / Required**")
+            required_items = [
+                item
+                for item in scene_plan.elements
+                if item.source != "utopia_enrichment"
+            ]
+            for item in required_items:
+                hint = f" · {item.placement_hint}" if item.placement_hint else ""
+                st.write(f"• **{item.name}** · {item.kind}{hint}")
+        with enrich_col:
+            st.markdown("**✨ Mini Utopia Enrichment**")
+            enrichment = [
+                item
+                for item in scene_plan.elements
+                if item.source == "utopia_enrichment"
+            ]
+            if enrichment:
+                for item in enrichment:
+                    st.write(f"• **{item.name}** · {item.kind}")
+            else:
+                st.caption("No extra enrichment / 没有额外补充")
+
+        by_scene_id = {item.scene_id: item for item in scene_plan.elements}
+        route_names = [
+            by_scene_id[scene_id].name
+            for scene_id in scene_plan.exploration_order
+            if scene_id in by_scene_id
+        ]
+        if route_names:
+            st.write("**🚶 Exploration Route / 探索路线**")
+            st.caption(" → ".join(["Spawn / 出生点", *route_names]))
+        if scene_plan.route_intent:
+            st.caption("🎬 " + scene_plan.route_intent)
 
     if blueprint is not None:
         if profile_changed:
@@ -632,8 +710,7 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
                 disabled=profile_changed,
                 use_container_width=True,
             ):
-                st.session_state.world_concept_candidates = []
-                st.session_state.editing_world_id = None
+                _clear_world_state()
                 st.session_state.pending_app_page = "🗺️ My Worlds"
                 st.rerun()
 
