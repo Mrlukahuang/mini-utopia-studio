@@ -3,6 +3,7 @@ from __future__ import annotations
 from studio.models.world import (
     CameraPoint,
     ChunkSpec,
+    GridSpec,
     LandmarkSpec,
     PathSpec,
     PortalSpec,
@@ -15,13 +16,19 @@ from studio.models.world import (
     ZoneSpec,
 )
 from studio.services.world_visual_anchor_service import WorldVisualAnchorService
+from studio.services.world_layout_service import WorldLayoutService
 
 
 class WorldBlueprintService:
     """Build a deterministic structural Blueprint from an approved World concept."""
 
-    def __init__(self, visual_anchor_service: WorldVisualAnchorService | None = None):
+    def __init__(
+        self,
+        visual_anchor_service: WorldVisualAnchorService | None = None,
+        layout_service: WorldLayoutService | None = None,
+    ):
         self.visual_anchor_service = visual_anchor_service or WorldVisualAnchorService()
+        self.layout_service = layout_service or WorldLayoutService()
 
     def build(
         self,
@@ -34,6 +41,7 @@ class WorldBlueprintService:
         concept_image_bytes: bytes | None = None,
         concept_mime_type: str = "image/png",
     ) -> WorldBlueprint:
+        grid = GridSpec()
         chunks = [
             ChunkSpec(
                 chunk_x=x,
@@ -46,30 +54,49 @@ class WorldBlueprintService:
             for x in range(5)
         ]
 
+        visual_anchor = self.visual_anchor_service.extract(
+            profile=profile,
+            concept_direction=concept_direction,
+            concept_path=concept_path,
+            image_bytes=concept_image_bytes,
+            mime_type=concept_mime_type,
+        )
+        layout_plan = self.layout_service.compile(
+            profile=profile,
+            anchor=visual_anchor,
+            grid=grid,
+        )
+
         spawn = SpawnPoint(x=6, y=0, z=25, facing_degrees=90)
 
-        landmark_positions = [
-            WorldPoint(x=25, y=0, z=25),
-            WorldPoint(x=36, y=0, z=15),
-            WorldPoint(x=35, y=0, z=36),
-            WorldPoint(x=18, y=0, z=38),
-        ]
+        landmark_elements = [
+            element
+            for element in layout_plan.elements
+            if element.kind in {"structure", "landmark", "bridge"}
+        ][:6]
         landmarks = [
             LandmarkSpec(
                 landmark_id=f"LANDMARK_{index+1:02d}",
-                name=name,
-                position=landmark_positions[index],
-                kind=name,
+                name=element.name,
+                position=element.position.model_copy(deep=True),
+                kind=element.kind,
                 required_for_concept_match=True,
             )
-            for index, name in enumerate(profile.landmark_ideas[:4])
+            for index, element in enumerate(landmark_elements)
         ]
 
-        portal_position = WorldPoint(x=44, y=0, z=25)
+        portal_element = layout_plan.first("portal")
+        portal_position = (
+            portal_element.position.model_copy(deep=True)
+            if portal_element is not None
+            else WorldPoint(x=44, y=0, z=25)
+        )
         portal = PortalSpec(
             position=portal_position,
             facing_degrees=270,
-            form=profile.portal_form,
+            form=profile.portal_form or (
+                portal_element.name if portal_element is not None else "Portal"
+            ),
             destination_hint="Next Mini World",
         )
 
@@ -108,12 +135,29 @@ class WorldBlueprintService:
                 zone_id="ZONE_PORTAL",
                 name="Portal Area",
                 kind="portal",
-                min_x=41,
-                max_x=48,
-                min_z=21,
-                max_z=29,
+                min_x=max(0, portal_position.x - 4),
+                max_x=min(grid.width, portal_position.x + 4),
+                min_z=max(0, portal_position.z - 4),
+                max_z=min(grid.depth, portal_position.z + 4),
             ),
         ]
+        water_zone_ids: list[str] = []
+        for index, element in enumerate(
+            item for item in layout_plan.elements if item.kind == "water"
+        ):
+            zone_id = f"ZONE_WATER_{index+1:02d}"
+            water_zone_ids.append(zone_id)
+            zones.append(
+                ZoneSpec(
+                    zone_id=zone_id,
+                    name=element.name,
+                    kind="water",
+                    min_x=max(0, element.position.x - element.width / 2),
+                    max_x=min(grid.width, element.position.x + element.width / 2),
+                    min_z=max(0, element.position.z - element.depth / 2),
+                    max_z=min(grid.depth, element.position.z + element.depth / 2),
+                )
+            )
 
         camera_points = [
             CameraPoint(
@@ -181,6 +225,7 @@ class WorldBlueprintService:
         return WorldBlueprint(
             location_asset_id=location_asset_id,
             style_asset_id=style_asset_id,
+            grid=grid,
             spawn=spawn,
             chunks=chunks,
             landmarks=landmarks,
@@ -188,14 +233,9 @@ class WorldBlueprintService:
             paths=[main_path],
             zones=zones,
             walkable_zone_ids=["ZONE_SPAWN", "ZONE_CORE", "ZONE_PORTAL"],
-            blocked_zone_ids=[],
-            visual_anchor=self.visual_anchor_service.extract(
-                profile=profile,
-                concept_direction=concept_direction,
-                concept_path=concept_path,
-                image_bytes=concept_image_bytes,
-                mime_type=concept_mime_type,
-            ),
+            blocked_zone_ids=water_zone_ids,
+            visual_anchor=visual_anchor,
+            layout_elements=layout_plan.elements,
             camera_points=camera_points,
             director_tours=[director_tour],
         )
