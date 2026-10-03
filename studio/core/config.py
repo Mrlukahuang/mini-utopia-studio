@@ -20,6 +20,8 @@ class Settings:
     supabase_url: str | None = None
     supabase_service_role_key: str | None = None
     supabase_storage_bucket: str = "mini-utopia-assets"
+    studio_repository_backend: str = "sqlite"
+    supabase_metadata_table: str = "studio_records"
 
 
 def get_settings(root_dir: Path | None = None) -> Settings:
@@ -40,4 +42,10 @@ def get_settings(root_dir: Path | None = None) -> Settings:
         supabase_storage_bucket=os.getenv(
             "SUPABASE_STORAGE_BUCKET", "mini-utopia-assets"
         ),
+        studio_repository_backend=os.getenv(
+            "STUDIO_REPOSITORY_BACKEND", "sqlite"
+        ).strip().lower(),
+        supabase_metadata_table=os.getenv(
+            "SUPABASE_METADATA_TABLE", "studio_records"
+        ).strip(),
     )
