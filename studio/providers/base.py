@@ -24,3 +24,19 @@ class ImageGenerationProvider(ABC):
         quality: str = "medium",
     ) -> bytes:
         raise NotImplementedError
+
+
+
+class ImageAnalysisProvider(ABC):
+    """Provider-neutral image -> validated structured data boundary."""
+
+    @abstractmethod
+    def analyze_structured(
+        self,
+        *,
+        image_bytes: bytes,
+        mime_type: str,
+        prompt: str,
+        schema: Type[T],
+    ) -> T:
+        raise NotImplementedError
