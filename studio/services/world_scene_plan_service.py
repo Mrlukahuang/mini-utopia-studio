@@ -4,6 +4,7 @@ import json
 import re
 
 from studio.models.world import (
+    SCENE_PLAN_SCHEMA_VERSION,
     WorldPromptInterpretation,
     WorldProfile,
     WorldSceneElement,
@@ -485,6 +486,34 @@ Return a complete WorldScenePlan."""
             if len(elements) >= max_before_portal:
                 break
 
+        # Scene IDs are normalized above; typed relation targets must follow
+        # the same mapping or the deterministic compiler cannot resolve them.
+        remapped_elements: list[WorldSceneElement] = []
+        valid_ids = {item.scene_id for item in elements}
+        for element in elements:
+            relations = []
+            for relation in element.relations:
+                target_ids = [
+                    old_to_new.get(target_id, target_id)
+                    for target_id in relation.target_scene_ids
+                ]
+                target_ids = [
+                    target_id
+                    for target_id in target_ids
+                    if target_id in valid_ids and target_id != element.scene_id
+                ][:2]
+                if not target_ids:
+                    continue
+                relations.append(
+                    relation.model_copy(
+                        update={"target_scene_ids": target_ids}
+                    )
+                )
+            remapped_elements.append(
+                element.model_copy(update={"relations": relations})
+            )
+        elements = remapped_elements
+
         if not any(item.kind == "portal" for item in elements):
             elements.append(
                 WorldSceneElement(
@@ -515,6 +544,7 @@ Return a complete WorldScenePlan."""
         ]
         return plan.model_copy(
             update={
+                "schema_version": SCENE_PLAN_SCHEMA_VERSION,
                 "source_mode": source_mode,
                 "elements": elements,
                 "exploration_order": order,
