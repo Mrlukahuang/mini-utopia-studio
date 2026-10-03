@@ -87,12 +87,12 @@ def build_world_runtime_html(
   .dot {{ width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:6px; }}
 </style>
 <script type="importmap">
-{
-  "imports": {
+{{
+  "imports": {{
     "three": "https://cdn.jsdelivr.net/npm/three@{THREE_VERSION}/build/three.module.js",
     "three/addons/": "https://cdn.jsdelivr.net/npm/three@{THREE_VERSION}/examples/jsm/"
-  }
-}
+  }}
+}}
 </script>
 </head>
 <body>
