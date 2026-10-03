@@ -127,16 +127,31 @@ class WorldGeometryCompilerService:
                         source_type="primitive",
                         primitive=part.primitive,
                         primitive_size=RenderVec3(
-                            x=max(.08, element.width * abs(part.relative_scale.x)),
-                            y=max(.08, element.height * abs(part.relative_scale.y)),
-                            z=max(.08, element.depth * abs(part.relative_scale.z)),
+                            x=max(
+                                .08,
+                                element.width
+                                * self._clamp(abs(part.relative_scale.x), .05, 2.5),
+                            ),
+                            y=max(
+                                .08,
+                                element.height
+                                * self._clamp(abs(part.relative_scale.y), .05, 2.5),
+                            ),
+                            z=max(
+                                .08,
+                                element.depth
+                                * self._clamp(abs(part.relative_scale.z), .05, 2.5),
+                            ),
                         ),
                     ),
                     material_id=material_id,
                     local_position=RenderVec3(
-                        x=part.local_position.x * element.width,
-                        y=part.local_position.y * element.height,
-                        z=part.local_position.z * element.depth,
+                        x=self._clamp(part.local_position.x, -1.5, 1.5)
+                        * element.width,
+                        y=self._clamp(part.local_position.y, -1.5, 1.5)
+                        * element.height,
+                        z=self._clamp(part.local_position.z, -1.5, 1.5)
+                        * element.depth,
                     ),
                     local_quaternion=self._quaternion_from_euler_degrees(
                         part.rotation_degrees.x,
@@ -280,6 +295,10 @@ class WorldGeometryCompilerService:
                 ),
             ],
         )
+
+    @staticmethod
+    def _clamp(value: float, low: float, high: float) -> float:
+        return max(low, min(high, value))
 
     @classmethod
     def _orientation_quaternion(cls, orientation: str) -> RenderQuaternion:
