@@ -3,7 +3,7 @@ from __future__ import annotations
 import streamlit as st
 import streamlit.components.v1 as components
 
-from studio.models.world import WorldBlueprint, WorldProfile
+from studio.models.world import WorldBlueprint, WorldProfile, WorldScenePlan
 from studio.ui.creator.world_presets import (
     ARCHITECTURE_OPTIONS,
     LANDMARK_OPTIONS,
@@ -134,7 +134,7 @@ def _reset_world() -> None:
 
 
 def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
-    """World Factory M2.1: same interaction grammar as Character Factory."""
+    """Blueprint-first World Factory with independent Prompt and Custom entry paths."""
 
     render_game_hero(
         "Build a Mini World 🌍",
@@ -153,7 +153,7 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
             st.markdown(
                 '<div class="mu-world-card"><div class="emoji">✨📝</div>'
                 '<h3>Prompt Generate</h3>'
-                '<p>描述生成 · 把脑海里的世界讲出来，系统先整理，再让你一步步确认。</p></div>',
+                '<p>一句话描述 · GPT 理解、适度加入 Mini Utopia 元素，并直接规划 Scene Plan + Blueprint。</p></div>',
                 unsafe_allow_html=True,
             )
             if st.button(
@@ -183,33 +183,85 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
         return
 
     if draft is None and mode == "prompt":
-        render_quest("把脑海里的世界讲出来。原始描述会一直保留，并成为 Concept Art 的创意核心。")
+        render_quest(
+            "把脑海里的世界讲出来。GPT 会先忠实提取你要求的元素，再做少量 Mini Utopia "
+            "风格补充，并直接规划探索与拍照路线；不会再让你重复填写 Custom Build。"
+        )
         description = st.text_area(
             "Describe your world / 描述你的世界",
             value=st.session_state.get("world_source", ""),
             placeholder=(
-                "例如：一个只有晚上才会出现的云朵村，房子睡着以后屋顶会长出星星，"
-                "桥下面有会发光的鲸鱼……"
+                "例如：一个粉色漂浮岛世界，中央有湖，星星传送门在湖后面，"
+                "右边有城堡，一座桥连接湖和城堡，周围有花和发光植物。"
             ),
-            height=160,
+            height=180,
             key="world_source_text",
         )
+        if not ctx.world_scene_plans.prompt_available:
+            st.info(
+                "Structured text planning API 尚未连接。Prompt Generate 暂不可用，"
+                "但 Custom Build 仍然可以使用。"
+            )
+
         a, b = st.columns([2, 1])
         with a:
             if st.button(
-                "✨ Build My World / 帮我整理",
+                "✨ Plan & Build World / 生成世界蓝图",
                 type="primary",
-                disabled=not description.strip(),
+                disabled=(
+                    not description.strip()
+                    or not style_asset_id
+                    or not ctx.world_scene_plans.prompt_available
+                ),
                 use_container_width=True,
             ):
-                st.session_state.world_source = description
-                st.session_state.world_draft = _draft_from_prompt(description)
-                st.session_state.world_creation_mode = "custom"
-                st.session_state.world_stage = 0
-                st.rerun()
+                try:
+                    style = ctx.repository.get_asset(style_asset_id)
+                    if style is None:
+                        raise RuntimeError("Mini Utopia Global Style Canon is missing.")
+                    with st.spinner(
+                        "🧠 正在理解你的世界、加入受控 Utopia 细节，并规划探索路线…"
+                    ):
+                        interpretation = ctx.world_scene_plans.plan_from_prompt(
+                            description=description,
+                            style_profile=style.metadata.get("style_profile", {}),
+                        )
+                        profile = interpretation.to_profile(
+                            source_description=description
+                        )
+                        editing_id = st.session_state.get("editing_world_id")
+                        if editing_id:
+                            asset = ctx.assets.update_world(
+                                asset_id=editing_id,
+                                name=profile.world_name,
+                                description=description,
+                                profile=profile,
+                            )
+                        else:
+                            asset = ctx.assets.create_world(
+                                name=profile.world_name,
+                                description=description,
+                                profile=profile,
+                            )
+                        ctx.world_concepts.plan_blueprint(
+                            location_asset_id=asset.asset_id,
+                            style_asset_id=style_asset_id,
+                            scene_plan=interpretation.scene_plan,
+                        )
+
+                    st.session_state.world_source = description
+                    st.session_state.world_draft = profile
+                    st.session_state.world_name = profile.world_name
+                    st.session_state.editing_world_id = asset.asset_id
+                    st.session_state.world_creation_mode = "prompt"
+                    st.session_state.world_stage = 4
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Prompt planning failed / 世界规划失败: {exc}")
         with b:
             if st.button("← Back / 返回", use_container_width=True):
                 st.session_state.world_creation_mode = None
+                st.session_state.pop("editing_world_id", None)
                 st.rerun()
         return
 
@@ -224,9 +276,19 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
         "4 · Landmarks & Portal / 地标",
         "5 · Create / 生成",
     ]
-    stage = max(0, min(int(st.session_state.get("world_stage", 0)), 4))
-    st.progress((stage + 1) / 5, text=f"{stages[stage]} · {stage + 1}/5")
-    st.caption("和 Character Factory 一样：选择题优先，只有最后的 Extra Details 自由发挥。")
+    if mode == "prompt":
+        stage = 4
+        st.progress(
+            1.0,
+            text="Prompt → GPT Scene Plan → Blueprint · 完成结构规划",
+        )
+        st.caption(
+            "Prompt 路线不会经过 Custom Build。下方可以检查 Scene Plan、Blueprint，再决定是否渲染 Preview。"
+        )
+    else:
+        stage = max(0, min(int(st.session_state.get("world_stage", 0)), 4))
+        st.progress((stage + 1) / 5, text=f"{stages[stage]} · {stage + 1}/5")
+        st.caption("Custom Build：选择题优先，只有最后的 Extra Details 自由发挥。")
 
     def go(value: int) -> None:
         st.session_state.world_stage = max(0, min(value, 4))
