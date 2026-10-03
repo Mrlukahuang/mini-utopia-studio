@@ -108,6 +108,13 @@ NEGATIVE RULES
             style_profile=style_profile,
             direction="playable",
         )
+        base = base.replace(
+            "MINI UTOPIA WORLD CONCEPT ART",
+            "MINI UTOPIA BLUEPRINT WORLD PREVIEW",
+        ).replace(
+            "This image is a visual anchor for a future 50x50 expandable playable world, not a final matte painting.",
+            "This image is a beauty preview of an already-defined 50x50 playable world.",
+        )
         layout_lines = []
         for element in blueprint.layout_elements:
             layout_lines.append(
