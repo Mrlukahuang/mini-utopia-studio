@@ -86,6 +86,14 @@ def build_world_runtime_html(
   }}
   .dot {{ width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:6px; }}
 </style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@{THREE_VERSION}/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@{THREE_VERSION}/examples/jsm/"
+  }
+}
+</script>
 </head>
 <body>
 <div id="wrap">
@@ -104,11 +112,32 @@ def build_world_runtime_html(
     <button id="tour" class="primary">🎬 Start Director Tour</button>
   </div>
   <div class="tip">WASD / 方向键移动 · Hold Shift to Run / 按住 Shift 奔跑</div>
+  <div id="runtimeError" style="
+    display:none; position:absolute; inset:120px 24px auto 24px; z-index:20;
+    padding:16px 18px; border-radius:18px; background:rgba(255,235,238,.96);
+    color:#8b2e3a; border:1px solid rgba(180,60,80,.2); font-size:13px;
+    box-shadow:0 12px 30px rgba(100,40,55,.14);">
+  </div>
 </div>
 
+<script>
+window.addEventListener('error', event => {{
+  const box = document.getElementById('runtimeError');
+  if (!box) return;
+  box.style.display = 'block';
+  box.textContent = '3D Runtime error: ' + (event.message || 'Unknown browser error');
+}});
+window.addEventListener('unhandledrejection', event => {{
+  const box = document.getElementById('runtimeError');
+  if (!box) return;
+  box.style.display = 'block';
+  box.textContent = '3D Runtime error: ' + String(event.reason || 'Module failed to load');
+}});
+</script>
+
 <script type="module">
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@{THREE_VERSION}/build/three.module.js';
-import {{ GLTFLoader }} from 'https://cdn.jsdelivr.net/npm/three@{THREE_VERSION}/examples/jsm/loaders/GLTFLoader.js';
+import * as THREE from 'three';
+import {{ GLTFLoader }} from 'three/addons/loaders/GLTFLoader.js';
 
 const DATA = {data_json};
 const profile = DATA.profile;
