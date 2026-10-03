@@ -331,6 +331,10 @@ Return a complete WorldScenePlan."""
         enrichment_count = 0
         elements: list[WorldSceneElement] = []
         old_to_new: dict[str, str] = {}
+        needs_system_portal = not any(
+            item.kind == "portal" for item in plan.elements
+        )
+        max_before_portal = 15 if needs_system_portal else 16
 
         for item in plan.elements:
             name = item.name.strip()
@@ -341,6 +345,12 @@ Return a complete WorldScenePlan."""
                 if enrichment_count >= 3:
                     continue
                 enrichment_count += 1
+            if any(
+                existing.kind == item.kind
+                and self._equivalent(existing.name, name)
+                for existing in elements
+            ):
+                continue
             new_id = f"SCENE_{len(elements)+1:02d}"
             old_to_new[item.scene_id] = new_id
             elements.append(
@@ -348,13 +358,11 @@ Return a complete WorldScenePlan."""
                     update={
                         "scene_id": new_id,
                         "name": name,
-                        "required": (
-                            False if source == "utopia_enrichment" else item.required
-                        ),
+                        "required": source != "utopia_enrichment",
                     }
                 )
             )
-            if len(elements) >= 16:
+            if len(elements) >= max_before_portal:
                 break
 
         if not any(item.kind == "portal" for item in elements):
@@ -406,6 +414,18 @@ Return a complete WorldScenePlan."""
                 for item in elements
             ):
                 continue
+            if len(elements) >= 16:
+                removable = next(
+                    (
+                        index
+                        for index in range(len(elements) - 1, -1, -1)
+                        if elements[index].source == "utopia_enrichment"
+                    ),
+                    None,
+                )
+                if removable is None:
+                    continue
+                elements.pop(removable)
             elements.append(
                 WorldSceneElement(
                     scene_id=f"SCENE_{len(elements)+1:02d}",
@@ -419,8 +439,6 @@ Return a complete WorldScenePlan."""
                     notes="Deterministic safeguard for an explicit creator object.",
                 )
             )
-            if len(elements) >= 16:
-                break
 
         normalized = plan.model_copy(
             update={
