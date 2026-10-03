@@ -102,6 +102,7 @@ class OpenAIStructuredTextProvider(StructuredTextProvider):
             result = {
                 key: cls._strict_schema(item)
                 for key, item in value.items()
+                if key != "default"
             }
             properties = result.get("properties")
             if isinstance(properties, dict):
