@@ -484,6 +484,24 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
         if raw_blueprint
         else None
     )
+    desired_profile = final_profile.model_copy(update={"world_name": name})
+    saved_profile = (
+        WorldProfile.model_validate(saved_world.metadata.get("world_profile", {}))
+        if saved_world is not None
+        else None
+    )
+    profile_changed = bool(
+        saved_profile is not None
+        and desired_profile.model_dump(mode="json")
+        != saved_profile.model_dump(mode="json")
+    )
+    blueprint_first_current = bool(
+        saved_world is not None
+        and blueprint is not None
+        and saved_world.metadata.get("world_pipeline") == "blueprint_first_v1"
+        and blueprint.layout_elements
+        and not profile_changed
+    )
 
     st.markdown("#### 1 · Blueprint / 先确定世界结构")
     st.caption(
@@ -508,20 +526,19 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
             use_container_width=True,
         ):
             try:
-                final_profile = final_profile.model_copy(update={"world_name": name})
-                st.session_state.world_draft = final_profile
+                st.session_state.world_draft = desired_profile
                 if editing_id:
                     asset = ctx.assets.update_world(
                         asset_id=editing_id,
                         name=name,
-                        description=final_profile.source_description,
-                        profile=final_profile,
+                        description=desired_profile.source_description,
+                        profile=desired_profile,
                     )
                 else:
                     asset = ctx.assets.create_world(
                         name=name,
-                        description=final_profile.source_description,
-                        profile=final_profile,
+                        description=desired_profile.source_description,
+                        profile=desired_profile,
                     )
                     st.session_state.editing_world_id = asset.asset_id
 
@@ -535,6 +552,17 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
                 st.error(f"Blueprint planning failed / 蓝图生成失败: {exc}")
 
     if blueprint is not None:
+        if profile_changed:
+            st.warning(
+                "⚠️ World Profile 已修改，但当前 Blueprint 还是旧版本。"
+                " 请先 Rebuild Blueprint，避免丢失这次修改。"
+            )
+        elif not blueprint_first_current:
+            st.warning(
+                "🧩 这是旧版 Blueprint。进入新的 Blueprint-first 流程前，"
+                "请先 Rebuild Blueprint。"
+            )
+
         st.markdown("#### 🗺️ Playable Blueprint / 可玩蓝图")
         map_col, detail_col = st.columns([1.2, 1])
         with map_col:
@@ -555,7 +583,11 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
             )
 
         st.markdown("#### 2 · World Preview / 根据 Blueprint 渲染一张世界图")
-        current_preview = ctx.world_concepts.current_concept(saved_world.asset_id)
+        current_preview = (
+            ctx.world_concepts.current_concept(saved_world.asset_id)
+            if blueprint_first_current
+            else None
+        )
         if current_preview:
             try:
                 st.image(
@@ -576,7 +608,8 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
                 "🎨 Render World Preview / 渲染世界预览",
                 type="primary",
                 disabled=(
-                    not ctx.world_concepts.is_available
+                    not blueprint_first_current
+                    or not ctx.world_concepts.is_available
                     or not style_asset_id
                     or remaining < 1
                 ),
@@ -596,6 +629,7 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
         with finish_col:
             if st.button(
                 "✅ Finish / 完成",
+                disabled=profile_changed,
                 use_container_width=True,
             ):
                 st.session_state.world_concept_candidates = []
