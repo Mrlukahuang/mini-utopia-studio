@@ -27,8 +27,8 @@ def test_openai_vision_provider_sends_image_and_parses_structured_output(monkeyp
         "spatial_relations": ["castle behind portal"],
     }
 
-    def fake_post(url, *, headers, json: payload, timeout):
-        captured.update({"url": url, "headers": headers, "json": payload, "timeout": timeout})
+    def fake_post(url, *, headers, json, timeout):
+        captured.update({"url": url, "headers": headers, "json": json, "timeout": timeout})
         return FakeResponse(
             200,
             {
