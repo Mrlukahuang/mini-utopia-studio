@@ -355,12 +355,22 @@ STYLE SAFETY
                         f"{element.element_id} ({element.name}): {exc}"
                     ) from exc
                 continue
-            by_id[element.element_id] = repaired.model_copy(
+            repaired = repaired.model_copy(
                 update={
                     "element_id": element.element_id,
                     "name": element.name,
                 }
             )
+            if self._is_weak_hero(element=element, item=repaired):
+                if strict_provider:
+                    raise WorldAppearancePlanningError(
+                        f"Focused Hero appearance repair remained too weak for "
+                        f"{element.element_id} ({element.name}): "
+                        f"expected at least 2 silhouette parts, got "
+                        f"{len(repaired.parts)}."
+                    )
+                continue
+            by_id[element.element_id] = repaired
             changed = True
 
         if not changed:
@@ -424,12 +434,22 @@ STYLE SAFETY
                         f"{element.element_id} ({element.name}): {exc}"
                     ) from exc
                 continue
-            by_id[element.element_id] = repaired.model_copy(
+            repaired = repaired.model_copy(
                 update={
                     "element_id": element.element_id,
                     "name": element.name,
                 }
             )
+            if self._is_weak_hero(element=element, item=repaired):
+                if strict_provider:
+                    raise WorldAppearancePlanningError(
+                        f"Focused Hero Vision repair remained too weak for "
+                        f"{element.element_id} ({element.name}): "
+                        f"expected at least 2 silhouette parts, got "
+                        f"{len(repaired.parts)}."
+                    )
+                continue
+            by_id[element.element_id] = repaired
             changed = True
 
         if not changed:
