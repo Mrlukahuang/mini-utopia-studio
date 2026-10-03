@@ -218,7 +218,7 @@ def test_appearance_planner_keeps_blueprint_ids_and_fills_missing_objects():
     assert plan.objects[0].name == "Gentle Sky Whale"
     assert plan.objects[0].main_body.primitive == "ellipsoid"
     assert plan.objects[1].name == "Whale Back Garden"
-    assert "Mini Utopia Style Constitution" in provider.calls[0]["system"]
+    assert "MINI UTOPIA STYLE CONSTITUTION" in provider.calls[0]["system"]
     assert "Never move" not in provider.calls[0]["user"]
     assert '"element_id": "SCENE_WHALE"' in provider.calls[0]["user"]
 
