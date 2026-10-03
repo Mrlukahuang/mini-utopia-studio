@@ -264,6 +264,11 @@ class WorldLayoutService:
 
     def _kind(self, name: str) -> str:
         lowered = name.lower()
+        # A place named after the Portal is not necessarily the Portal itself.
+        # e.g. "Portal Plaza / 传送门广场" is a landmark/structure around the
+        # actual Star Arch, and must not create a second executable Portal.
+        if any(token in lowered for token in ("plaza", "square", "广场")):
+            return "structure"
         for kind in ("portal", "water", "bridge", "structure", "terrain"):
             if any(keyword.lower() in lowered for keyword in _KIND_KEYWORDS[kind]):
                 return kind
