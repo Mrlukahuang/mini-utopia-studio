@@ -1,3 +1,4 @@
+from studio.models.render import WorldAppearancePlan
 from studio.models.world import WorldPromptInterpretation
 from studio.providers.openai_text import OpenAIStructuredTextProvider
 
@@ -39,3 +40,17 @@ def test_strict_schema_requires_nested_fields_and_removes_defaults():
         return False
 
     assert not contains_default(schema)
+
+
+def test_text_strict_schema_supports_nested_appearance_contract():
+    schema = OpenAIStructuredTextProvider._strict_schema(
+        WorldAppearancePlan.model_json_schema()
+    )
+    object_ref = schema["properties"]["objects"]["items"]["$ref"]
+    object_name = object_ref.rsplit("/", 1)[-1]
+    object_schema = schema["$defs"][object_name]
+    assert set(object_schema["required"]) == set(object_schema["properties"])
+    part_ref = object_schema["properties"]["parts"]["items"]["$ref"]
+    part_name = part_ref.rsplit("/", 1)[-1]
+    part_schema = schema["$defs"][part_name]
+    assert set(part_schema["required"]) == set(part_schema["properties"])
