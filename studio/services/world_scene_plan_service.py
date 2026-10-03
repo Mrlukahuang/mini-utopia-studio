@@ -341,12 +341,17 @@ Return a complete WorldScenePlan."""
             if not name:
                 continue
             source = item.source
+            kind = item.kind
+            if kind == "portal" and any(
+                token in name.lower() for token in ("plaza", "square", "广场")
+            ):
+                kind = "structure"
             if source == "utopia_enrichment":
                 if enrichment_count >= 3:
                     continue
                 enrichment_count += 1
             if any(
-                existing.kind == item.kind
+                existing.kind == kind
                 and self._equivalent(existing.name, name)
                 for existing in elements
             ):
@@ -358,6 +363,7 @@ Return a complete WorldScenePlan."""
                     update={
                         "scene_id": new_id,
                         "name": name,
+                        "kind": kind,
                         "required": source != "utopia_enrichment",
                     }
                 )
