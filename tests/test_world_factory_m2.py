@@ -1,7 +1,7 @@
 import pytest
 
 from studio.core.enums import AssetType, ReviewStatus
-from studio.models.world import WorldProfile
+from studio.models.world import WorldProfile, WorldSceneElement, WorldScenePlan
 from studio.providers.base import ImageGenerationProvider
 from studio.repositories.sqlite import SQLiteStudioRepository
 from studio.services.asset_service import AssetService
@@ -507,3 +507,65 @@ def test_archive_world_hides_library_card_but_preserves_record(tmp_path):
     assert saved is not None
     assert saved.status == ReviewStatus.ARCHIVED
     assert saved.metadata["world_profile"]["world_name"] == "Candy Cloud Valley"
+
+
+def test_blueprint_preview_prompt_includes_vertical_spatial_semantics(tmp_path):
+    repo = SQLiteStudioRepository(tmp_path / "studio.db")
+    style = StyleService(repo).ensure_mini_utopia_base()
+    profile = _profile().model_copy(
+        update={
+            "world_name": "Aerial Garden",
+            "source_description": "A floating vertical flow in the sky.",
+        }
+    )
+    scene_plan = WorldScenePlan(
+        source_mode="prompt",
+        summary="Aerial vertical world",
+        route_intent="Approach the high scenic feature, then the portal.",
+        elements=[
+            WorldSceneElement(
+                scene_id="SCENE_FLOW",
+                name="Sky Flow",
+                semantic_key="sky_flow",
+                kind="water",
+                source="creator_required",
+                spatial_mode="aerial",
+                elevation="high",
+                orientation="vertical",
+                geometry_role="vertical_flow",
+                traversability="blocked",
+                photo_opportunity=True,
+            ),
+            WorldSceneElement(
+                scene_id="SCENE_PORTAL",
+                name="Moon Portal",
+                semantic_key="moon_portal",
+                kind="portal",
+                source="creator_required",
+                spatial_mode="elevated",
+                elevation="medium",
+                geometry_role="arch",
+                traversability="walkable",
+            ),
+        ],
+        exploration_order=["SCENE_FLOW", "SCENE_PORTAL"],
+    )
+    blueprint = WorldBlueprintService().plan_from_scene_plan(
+        location_asset_id="LOC_PROMPT_3D",
+        style_asset_id=style.asset_id,
+        profile=profile,
+        scene_plan=scene_plan,
+    )
+
+    prompt = WorldConceptPromptService().compose_from_blueprint(
+        profile=profile,
+        blueprint=blueprint,
+        style_profile=style.metadata["style_profile"],
+    )
+
+    assert "y=" in prompt
+    assert "spatial_mode=aerial" in prompt
+    assert "orientation=vertical" in prompt
+    assert "geometry_role=vertical_flow" in prompt
+    assert "y is real elevation" in prompt
+    assert "Floating/aerial/suspended/inverted elements must remain that way" in prompt

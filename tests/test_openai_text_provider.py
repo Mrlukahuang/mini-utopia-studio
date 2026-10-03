@@ -22,6 +22,13 @@ def test_strict_schema_requires_nested_fields_and_removes_defaults():
     assert set(element_schema["required"]) == set(element_schema["properties"])
     assert element_schema["additionalProperties"] is False
 
+
+    relation_ref = element_schema["properties"]["relations"]["items"]["$ref"]
+    relation_name = relation_ref.rsplit("/", 1)[-1]
+    relation_schema = schema["$defs"][relation_name]
+    assert set(relation_schema["required"]) == set(relation_schema["properties"])
+    assert relation_schema["additionalProperties"] is False
+
     def contains_default(value):
         if isinstance(value, dict):
             return "default" in value or any(

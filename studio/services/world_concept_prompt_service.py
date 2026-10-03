@@ -118,14 +118,19 @@ NEGATIVE RULES
         layout_lines = []
         for element in blueprint.layout_elements:
             layout_lines.append(
-                f"- {element.kind}: {element.name} at x={element.position.x:.1f}, "
+                f"- {element.kind}: {element.name} at "
+                f"x={element.position.x:.1f}, y={element.position.y:.1f}, "
                 f"z={element.position.z:.1f}; footprint {element.width:.1f} x "
-                f"{element.depth:.1f}; height {element.height:.1f}"
+                f"{element.depth:.1f}; height {element.height:.1f}; "
+                f"spatial_mode={element.spatial_mode}; "
+                f"orientation={element.orientation}; "
+                f"geometry_role={element.geometry_role}; "
+                f"traversability={element.traversability}"
             )
         path_lines = []
         for path in blueprint.paths[:2]:
             coords = " -> ".join(
-                f"({point.x:.1f},{point.z:.1f})" for point in path.points
+                f"({point.x:.1f},{point.y:.1f},{point.z:.1f})" for point in path.points
             )
             path_lines.append(f"- {path.name or path.path_id}: {coords}")
 
@@ -140,8 +145,9 @@ NEGATIVE RULES
             + "\n\nDISCOVERY PATH\n"
             + ("\n".join(path_lines) or "- No explicit path")
             + "\n\nVISUALIZATION RULES\n"
-            + "- Interpret x/z coordinates as relative left-right and near-far composition, not visible labels.\n"
-            + "- Preserve relative positions and major scale hierarchy from the Blueprint.\n"
+            + "- Interpret x/y/z coordinates as spatial composition, not visible labels; y is real elevation.\n"
+            + "- Preserve spatial_mode, orientation and geometry_role. Floating/aerial/suspended/inverted elements must remain that way.\n"
+            + "- Preserve relative positions, vertical hierarchy and major scale hierarchy from the Blueprint.\n"
             + "- You may enrich small decoration, foliage, lighting, atmospheric depth and surface detail.\n"
             + "- Do not draw a top-down map, grid, coordinate labels, measurements or blueprint UI.\n"
             + "- Produce one cinematic wide World Preview that looks like the finished playable world."

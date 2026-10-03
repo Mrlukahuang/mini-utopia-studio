@@ -59,17 +59,42 @@ class WorldLayoutService:
         elements: list[WorldLayoutElement] = []
         for index, scene in enumerate(plan.elements):
             pos = self._default_position(kind=scene.kind, index=index, grid=grid)
-            width, depth, height = self._default_footprint(scene.kind)
+            pos.y = self._semantic_y(scene.spatial_mode, scene.elevation)
+            geometry_role = (
+                scene.geometry_role
+                if "geometry_role" in scene.model_fields_set
+                else self._default_geometry_role(scene.kind)
+            )
+            traversability = (
+                scene.traversability
+                if "traversability" in scene.model_fields_set
+                else self._default_traversability(scene.kind)
+            )
+            width, depth, height = self._semantic_footprint(
+                kind=scene.kind,
+                geometry_role=geometry_role,
+            )
             element = WorldLayoutElement(
                 element_id=scene.scene_id,
                 name=scene.name,
                 kind=scene.kind,
+                semantic_key=scene.semantic_key,
+                spatial_mode=scene.spatial_mode,
+                elevation=scene.elevation,
+                orientation=scene.orientation,
+                geometry_role=geometry_role,
+                traversability=traversability,
                 position=pos,
                 width=width,
                 depth=depth,
                 height=height,
                 source_evidence=[
                     f"scene_plan:{scene.source}",
+                    f"spatial_mode:{scene.spatial_mode}",
+                    f"elevation:{scene.elevation}",
+                    f"orientation:{scene.orientation}",
+                    f"geometry_role:{geometry_role}",
+                    f"traversability:{traversability}",
                     *scene.relation_hints,
                 ],
             )
@@ -102,9 +127,29 @@ class WorldLayoutService:
             for clause in self._relation_clauses(relation):
                 self._apply_relation(elements, clause, grid)
 
+        # Typed v0.2 relations are authoritative. Two passes settle simple
+        # support chains such as Garden on_top_of Whale while the Whale itself
+        # is positioned relative to another aerial element.
+        scene_by_id = {scene.scene_id: scene for scene in plan.elements}
+        element_by_id = {element.element_id: element for element in elements}
+        for _ in range(2):
+            for scene_id, scene in scene_by_id.items():
+                subject = element_by_id.get(scene_id)
+                if subject is None:
+                    continue
+                for relation in scene.relations:
+                    self._apply_structured_relation(
+                        subject=subject,
+                        relation=relation.relation,
+                        target_ids=relation.target_scene_ids,
+                        element_by_id=element_by_id,
+                        grid=grid,
+                    )
+
         for element in elements:
             element.position.x = self._clamp(element.position.x, 5.0, grid.width - 5.0)
             element.position.z = self._clamp(element.position.z, 5.0, grid.depth - 5.0)
+            element.position.y = self._clamp(element.position.y, -12.0, 30.0)
 
         return WorldLayoutPlan(elements=elements)
 
@@ -141,6 +186,12 @@ class WorldLayoutService:
                     element_id=f"LAYOUT_{index+1:02d}",
                     name=name,
                     kind=kind,
+                    semantic_key="",
+                    spatial_mode="grounded",
+                    elevation="ground",
+                    orientation="normal",
+                    geometry_role=self._default_geometry_role(kind),
+                    traversability=self._default_traversability(kind),
                     position=pos,
                     width=width,
                     depth=depth,
@@ -155,6 +206,12 @@ class WorldLayoutService:
                     element_id=f"LAYOUT_{len(elements)+1:02d}",
                     name=profile.portal_form or "Portal",
                     kind="portal",
+                    semantic_key="",
+                    spatial_mode="grounded",
+                    elevation="ground",
+                    orientation="normal",
+                    geometry_role="arch",
+                    traversability="walkable",
                     position=WorldPoint(x=grid.width * .78, y=0, z=grid.depth * .5),
                     width=5.5,
                     depth=3.0,
@@ -557,6 +614,164 @@ class WorldLayoutService:
             for part in re.split(r"[.;,，。；]+", value or "")
             if part.strip()
         ]
+
+    @staticmethod
+    def _default_geometry_role(kind: str) -> str:
+        return {
+            "water": "surface",
+            "bridge": "bridge",
+            "terrain": "terrain_mass",
+            "portal": "arch",
+            "decoration": "decorative",
+            "structure": "volume",
+            "landmark": "volume",
+        }.get(kind, "volume")
+
+    @staticmethod
+    def _default_traversability(kind: str) -> str:
+        return {
+            "water": "blocked",
+            "bridge": "walkable",
+            "terrain": "walkable",
+            "portal": "walkable",
+            "decoration": "decorative",
+            "structure": "scenic",
+            "landmark": "scenic",
+        }.get(kind, "scenic")
+
+    @staticmethod
+    def _semantic_y(spatial_mode: str, elevation: str) -> float:
+        elevation_y = {
+            "ground": 0.0,
+            "low": 4.0,
+            "medium": 9.0,
+            "high": 16.0,
+        }.get(elevation, 0.0)
+        minimum_by_mode = {
+            "grounded": 0.0,
+            "elevated": 4.0,
+            "floating": 8.0,
+            "aerial": 16.0,
+            "underground": -5.0,
+            "suspended": 10.0,
+        }.get(spatial_mode, 0.0)
+        if spatial_mode == "underground":
+            return -max(4.0, elevation_y or 4.0)
+        return max(elevation_y, minimum_by_mode)
+
+    @classmethod
+    def _semantic_footprint(
+        cls,
+        *,
+        kind: str,
+        geometry_role: str,
+    ) -> tuple[float, float, float]:
+        by_role = {
+            "surface": (12.0, 10.0, .3),
+            "platform": (9.0, 8.0, 1.2),
+            "bridge": (10.0, 3.0, 1.0),
+            "vertical_flow": (5.0, 4.0, 14.0),
+            "path": (8.0, 2.2, .4),
+            "organic": (10.0, 6.5, 6.5),
+            "arch": (5.5, 3.0, 6.0),
+            "terrain_mass": (11.0, 11.0, 4.0),
+            "decorative": (3.0, 3.0, 2.2),
+        }
+        return by_role.get(geometry_role, cls._default_footprint(kind))
+
+    def _apply_structured_relation(
+        self,
+        *,
+        subject: WorldLayoutElement,
+        relation: str,
+        target_ids: list[str],
+        element_by_id: dict[str, WorldLayoutElement],
+        grid: GridSpec,
+    ) -> None:
+        targets = [
+            element_by_id[target_id]
+            for target_id in target_ids
+            if target_id in element_by_id and element_by_id[target_id] is not subject
+        ]
+        if not targets:
+            return
+
+        target = targets[0]
+        step_x = grid.width * .20
+        step_z = grid.depth * .20
+        gap = 1.0
+
+        if relation == "left_of":
+            subject.position.x = target.position.x - step_x
+            subject.position.z = target.position.z
+        elif relation == "right_of":
+            subject.position.x = target.position.x + step_x
+            subject.position.z = target.position.z
+        elif relation == "behind":
+            subject.position.z = target.position.z - step_z
+            subject.position.x = target.position.x
+        elif relation == "in_front_of":
+            subject.position.z = target.position.z + step_z
+            subject.position.x = target.position.x
+        elif relation == "near":
+            subject.position.x = target.position.x + grid.width * .09
+            subject.position.z = target.position.z + grid.depth * .04
+        elif relation == "above":
+            subject.position.x = target.position.x
+            subject.position.z = target.position.z
+            subject.position.y = max(
+                subject.position.y,
+                target.position.y + target.height + gap,
+            )
+        elif relation == "below":
+            subject.position.x = target.position.x
+            subject.position.z = target.position.z
+            subject.position.y = target.position.y - subject.height - gap
+        elif relation == "on_top_of":
+            subject.position.x = target.position.x
+            subject.position.z = target.position.z
+            subject.position.y = target.position.y + target.height + .6
+        elif relation in {"under", "suspended_from"}:
+            subject.position.x = target.position.x
+            subject.position.z = target.position.z
+            subject.position.y = target.position.y - subject.height - (
+                1.5 if relation == "suspended_from" else .8
+            )
+        elif relation == "inside":
+            subject.position.x = target.position.x
+            subject.position.z = target.position.z
+            subject.position.y = target.position.y + max(.3, target.height * .2)
+        elif relation == "attached_to":
+            subject.position.x = target.position.x + (
+                target.width + subject.width
+            ) * .5
+            subject.position.z = target.position.z
+            subject.position.y = target.position.y + target.height * .35
+        elif relation == "around":
+            subject.position.x = target.position.x + (
+                target.width + subject.width
+            ) * .55
+            subject.position.z = target.position.z + target.depth * .25
+            subject.position.y = target.position.y
+        elif relation in {"between", "connects_to"} and len(targets) >= 2:
+            other = targets[1]
+            subject.position.x = (target.position.x + other.position.x) / 2
+            subject.position.z = (target.position.z + other.position.z) / 2
+            subject.position.y = (target.position.y + other.position.y) / 2
+        elif relation == "flows_to":
+            subject.position.x = target.position.x
+            subject.position.z = target.position.z
+            # A vertical flow is based at the receiving surface and extends
+            # upward by its height; no waterfall-specific branch is needed.
+            subject.position.y = target.position.y + max(.2, target.height * .35)
+
+        subject.source_evidence.append(
+            f"relation:{relation}:{','.join(target_ids)}"
+        )
+        for item in targets:
+            item.source_evidence.append(
+                f"relation_target:{relation}:{subject.element_id}"
+            )
 
     @staticmethod
     def _default_position(*, kind: str, index: int, grid: GridSpec) -> WorldPoint:

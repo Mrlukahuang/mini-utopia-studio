@@ -4,6 +4,7 @@ import json
 import re
 
 from studio.models.world import (
+    SCENE_PLAN_SCHEMA_VERSION,
     WorldPromptInterpretation,
     WorldProfile,
     WorldSceneElement,
@@ -16,25 +17,25 @@ from studio.services.world_route_planner_service import WorldRoutePlannerService
 _DEFAULT_PORTAL = "Star Arch / 星星拱门"
 _DEFAULT_COLORS = ["#F7B7D2", "#B9E7D0", "#D7C2F3"]
 
-_OBVIOUS_OBJECTS: tuple[tuple[tuple[str, ...], str, str], ...] = (
-    (("lake", "湖泊", "湖"), "Lake / 湖泊", "water"),
-    (("river", "河流", "河"), "River / 河流", "water"),
-    (("waterfall", "瀑布"), "Waterfall / 瀑布", "water"),
-    (("ocean", "海洋", "大海"), "Ocean / 海洋", "water"),
-    (("pond", "池塘"), "Pond / 池塘", "water"),
-    (("castle", "城堡"), "Castle / 城堡", "structure"),
-    (("tower", "塔"), "Tower / 塔", "structure"),
-    (("temple", "神殿", "寺庙"), "Temple / 神殿", "structure"),
-    (("tree house", "treehouse", "树屋"), "Tree House / 树屋", "structure"),
-    (("bridge", "桥"), "Bridge / 桥", "bridge"),
-    (("portal", "传送门"), "Portal / 传送门", "portal"),
-    (("star arch", "星星拱门", "星门"), "Star Arch / 星星拱门", "portal"),
-    (("flower", "flowers", "花海", "花朵"), "Flowers / 花海", "decoration"),
-    (("glow plant", "glowing plant", "发光植物"), "Glow Plants / 发光植物", "decoration"),
-    (("floating island", "floating islands", "漂浮岛"), "Floating Islands / 漂浮岛", "terrain"),
-    (("forest", "森林"), "Forest / 森林", "terrain"),
-    (("mountain", "mountains", "山地", "山"), "Mountains / 山地", "terrain"),
-    (("cave", "洞穴"), "Cave / 洞穴", "landmark"),
+_OBVIOUS_OBJECTS: tuple[tuple[tuple[str, ...], str, str, str], ...] = (
+    (("lake", "湖泊", "湖"), "Lake / 湖泊", "water", "lake"),
+    (("river", "河流", "河"), "River / 河流", "water", "river"),
+    (("waterfall", "瀑布"), "Waterfall / 瀑布", "water", "waterfall"),
+    (("ocean", "海洋", "大海"), "Ocean / 海洋", "water", "ocean"),
+    (("pond", "池塘"), "Pond / 池塘", "water", "pond"),
+    (("castle", "城堡"), "Castle / 城堡", "structure", "castle"),
+    (("tower", "塔"), "Tower / 塔", "structure", "tower"),
+    (("temple", "神殿", "寺庙"), "Temple / 神殿", "structure", "temple"),
+    (("tree house", "treehouse", "树屋"), "Tree House / 树屋", "structure", "tree_house"),
+    (("bridge", "桥"), "Bridge / 桥", "bridge", "bridge"),
+    (("portal", "传送门"), "Portal / 传送门", "portal", "portal"),
+    (("star arch", "星星拱门", "星门"), "Star Arch / 星星拱门", "portal", "star_arch"),
+    (("flower", "flowers", "花海", "花朵"), "Flowers / 花海", "decoration", "flowers"),
+    (("glow plant", "glowing plant", "发光植物"), "Glow Plants / 发光植物", "decoration", "glow_plants"),
+    (("floating island", "floating islands", "漂浮岛"), "Floating Islands / 漂浮岛", "terrain", "floating_islands"),
+    (("forest", "森林"), "Forest / 森林", "terrain", "forest"),
+    (("mountain", "mountains", "山地", "山"), "Mountains / 山地", "terrain", "mountains"),
+    (("cave", "洞穴"), "Cave / 洞穴", "landmark", "cave"),
 )
 
 
@@ -68,9 +69,19 @@ class WorldScenePlanService:
         system = """You are the Mini Utopia World Planner.
 
 Convert one creator prompt into a structured, playable Scene Plan BEFORE any
-image is generated. The creator's explicit idea is sacred. First identify every
-important object, place, terrain/water feature and spatial relationship they
-asked for. Mark those elements source=creator_required and required=true.
+image is generated.
+
+CREATOR WORLD LAW:
+The creator's explicit imaginative rule is sacred. Do not "correct" impossible
+ideas back to normal real-world physics. If the creator says a waterfall floats
+in the sky, a forest grows upside-down, or a creature carries a station on its
+back, accept that as the physics of this world. Your job is to make the nearby
+world coherent, traversable and visually supportive of that rule.
+
+First identify every important object, place, terrain/water feature and spatial
+relationship they asked for. Mark those elements source=creator_required and
+required=true. Respect explicit negation: if the creator says "not a lake",
+"没有湖", "不是湖", "不要湖" or equivalent, do not create that negated object.
 
 Then perform CONTROLLED UTOPIA ENRICHMENT: add at most 3 small supporting
 elements that make the world feel unmistakably Mini Utopia without replacing
@@ -98,16 +109,37 @@ exploration_order should begin with welcoming discoveries, visit the creator's
 important landmarks in a satisfying sequence, include useful photo/video moments,
 and normally end with the main Portal reveal.
 
-Use relative semantic placement, not exact runtime coordinates. Examples:
-"center", "right side", "behind Lake", "between Lake and Castle". Think about
-walkable approach direction, camera sightlines and reveal order while writing
-placement hints and spatial relations. The deterministic 50x50 compiler will
-assign and validate exact coordinates later.
+Use relative semantic placement, not exact runtime coordinates. The deterministic
+compiler will assign exact x/y/z coordinates later.
 
-Return concise names and stable scene_id values such as SCENE_LAKE,
-SCENE_CASTLE, SCENE_PORTAL. There should be one clear main Portal. If the creator
-did not mention a Portal, add one as source=system_required so the world remains
-connected to Mini Utopia.
+For EVERY Scene element also describe its generic spatial semantics:
+- semantic_key: short lower_snake_case concept identity used for dedupe.
+- spatial_mode: grounded, elevated, floating, aerial, underground or suspended.
+- elevation: ground, low, medium or high.
+- orientation: normal, inverted, vertical, horizontal or tilted.
+- geometry_role: surface, volume, platform, bridge, vertical_flow, path, organic,
+  arch, terrain_mass or decorative.
+- traversability: walkable, scenic, blocked, decorative or rideable.
+- relations: typed relationships to other scene_id values, using left_of,
+  right_of, behind, in_front_of, near, above, below, on_top_of, under, inside,
+  attached_to, suspended_from, around, between, connects_to or flows_to.
+
+Examples of the LANGUAGE, not object-specific rules:
+- A high floating vertical flow can be spatial_mode=aerial,
+  geometry_role=vertical_flow and relation flows_to a lower target.
+- Something growing from the underside of a floating mass can be
+  spatial_mode=suspended, orientation=inverted, relation=under or suspended_from.
+- A walkable garden carried by another object can be geometry_role=platform,
+  traversability=walkable and relation=on_top_of that object.
+
+Use placement_hint for coarse composition such as "center", "right side",
+"behind the lake". Use typed relations whenever another Scene element is the
+reference. Think about walkable approach direction, camera sightlines and reveal
+order.
+
+Return concise names and stable scene_id values such as SCENE_01, SCENE_02.
+There should be one clear main Portal. If the creator did not mention a Portal,
+add one as source=system_required so the world remains connected to Mini Utopia.
 
 COLOR RULES:
 - If the creator explicitly names colors, preserve those as the world identity.
@@ -227,9 +259,15 @@ branded game/world. Do not invent a second competing theme."""
                 WorldSceneElement(
                     scene_id=f"SCENE_{len(elements)+1:02d}",
                     name=clean,
+                    semantic_key=self._semantic_key(clean, kind),
                     kind=kind,
                     source="custom_selection",
                     required=True,
+                    spatial_mode="grounded",
+                    elevation="ground",
+                    orientation="normal",
+                    geometry_role=self._default_geometry_role(kind),
+                    traversability=self._default_traversability(kind),
                     placement_hint=placement_hint,
                     photo_opportunity=photo,
                 )
@@ -390,6 +428,11 @@ Return a complete WorldScenePlan."""
             source = item.source
             kind = item.kind
             notes = item.notes
+            semantic_key = (
+                item.semantic_key.strip().lower().replace(" ", "_")
+                if item.semantic_key.strip()
+                else self._semantic_key(name, kind)
+            )
             if (
                 source == "utopia_enrichment"
                 and kind == "structure"
@@ -414,8 +457,15 @@ Return a complete WorldScenePlan."""
                     continue
                 enrichment_count += 1
             if any(
-                existing.kind == kind
-                and self._equivalent(existing.name, name)
+                (
+                    semantic_key
+                    and existing.semantic_key
+                    and semantic_key == existing.semantic_key
+                )
+                or (
+                    existing.kind == kind
+                    and self._equivalent(existing.name, name)
+                )
                 for existing in elements
             ):
                 continue
@@ -426,6 +476,7 @@ Return a complete WorldScenePlan."""
                     update={
                         "scene_id": new_id,
                         "name": name,
+                        "semantic_key": semantic_key,
                         "kind": kind,
                         "notes": notes,
                         "required": source != "utopia_enrichment",
@@ -435,14 +486,48 @@ Return a complete WorldScenePlan."""
             if len(elements) >= max_before_portal:
                 break
 
+        # Scene IDs are normalized above; typed relation targets must follow
+        # the same mapping or the deterministic compiler cannot resolve them.
+        remapped_elements: list[WorldSceneElement] = []
+        valid_ids = {item.scene_id for item in elements}
+        for element in elements:
+            relations = []
+            for relation in element.relations:
+                target_ids = [
+                    old_to_new.get(target_id, target_id)
+                    for target_id in relation.target_scene_ids
+                ]
+                target_ids = [
+                    target_id
+                    for target_id in target_ids
+                    if target_id in valid_ids and target_id != element.scene_id
+                ][:2]
+                if not target_ids:
+                    continue
+                relations.append(
+                    relation.model_copy(
+                        update={"target_scene_ids": target_ids}
+                    )
+                )
+            remapped_elements.append(
+                element.model_copy(update={"relations": relations})
+            )
+        elements = remapped_elements
+
         if not any(item.kind == "portal" for item in elements):
             elements.append(
                 WorldSceneElement(
                     scene_id=f"SCENE_{len(elements)+1:02d}",
                     name=fallback_portal or _DEFAULT_PORTAL,
+                    semantic_key="main_portal",
                     kind="portal",
                     source="system_required",
                     required=True,
+                    spatial_mode="grounded",
+                    elevation="ground",
+                    orientation="normal",
+                    geometry_role="arch",
+                    traversability="walkable",
                     placement_hint="final reveal area",
                     photo_opportunity=True,
                     notes="Mini Utopia continuity Portal",
@@ -459,6 +544,7 @@ Return a complete WorldScenePlan."""
         ]
         return plan.model_copy(
             update={
+                "schema_version": SCENE_PLAN_SCHEMA_VERSION,
                 "source_mode": source_mode,
                 "elements": elements,
                 "exploration_order": order,
@@ -473,13 +559,17 @@ Return a complete WorldScenePlan."""
     ) -> WorldScenePlan:
         text = description.lower()
         elements = list(plan.elements)
-        for keywords, canonical, kind in _OBVIOUS_OBJECTS:
-            if not any(keyword in text for keyword in keywords):
+        for keywords, canonical, kind, semantic_key in _OBVIOUS_OBJECTS:
+            if not any(
+                self._has_affirmed_keyword(text, keyword)
+                for keyword in keywords
+            ):
                 continue
             if kind == "portal" and any(item.kind == "portal" for item in elements):
                 continue
             if any(
-                self._equivalent(item.name, canonical)
+                item.semantic_key == semantic_key
+                or self._equivalent(item.name, canonical)
                 or any(keyword in item.name.lower() for keyword in keywords)
                 for item in elements
             ):
@@ -500,9 +590,15 @@ Return a complete WorldScenePlan."""
                 WorldSceneElement(
                     scene_id=f"SCENE_{len(elements)+1:02d}",
                     name=canonical,
+                    semantic_key=semantic_key,
                     kind=kind,
                     source="creator_required",
                     required=True,
+                    spatial_mode="grounded",
+                    elevation="ground",
+                    orientation="normal",
+                    geometry_role=self._default_geometry_role(kind),
+                    traversability=self._default_traversability(kind),
                     placement_hint="",
                     relation_hints=[],
                     photo_opportunity=kind in {"portal", "water", "structure", "landmark"},
@@ -527,6 +623,80 @@ Return a complete WorldScenePlan."""
                 _DEFAULT_PORTAL,
             ),
         )
+
+    @classmethod
+    def _semantic_key(cls, name: str, kind: str) -> str:
+        lowered = name.lower()
+        for keywords, _canonical, candidate_kind, key in _OBVIOUS_OBJECTS:
+            if candidate_kind == kind and any(keyword in lowered for keyword in keywords):
+                return key
+        normalized = cls._norm(name)
+        tokens = [
+            token
+            for token in normalized.split()
+            if token not in {"the", "a", "an", "of", "and", "with"}
+        ]
+        if not tokens:
+            return kind
+        return "_".join(tokens[:5])
+
+    @staticmethod
+    def _default_geometry_role(kind: str) -> str:
+        return {
+            "water": "surface",
+            "bridge": "bridge",
+            "terrain": "terrain_mass",
+            "portal": "arch",
+            "decoration": "decorative",
+            "structure": "volume",
+            "landmark": "volume",
+        }.get(kind, "volume")
+
+    @staticmethod
+    def _default_traversability(kind: str) -> str:
+        return {
+            "water": "blocked",
+            "bridge": "walkable",
+            "terrain": "walkable",
+            "portal": "walkable",
+            "decoration": "decorative",
+            "structure": "scenic",
+            "landmark": "scenic",
+        }.get(kind, "scenic")
+
+    @staticmethod
+    def _has_affirmed_keyword(text: str, keyword: str) -> bool:
+        """Return true when at least one occurrence is not explicitly negated."""
+        start = 0
+        while True:
+            index = text.find(keyword, start)
+            if index < 0:
+                return False
+            before = text[max(0, index - 18):index]
+            before_compact = re.sub(r"\s+", " ", before)
+            negated = any(
+                marker in before_compact
+                for marker in (
+                    "not a ",
+                    "not an ",
+                    "not ",
+                    "no ",
+                    "without a ",
+                    "without ",
+                    "instead of a ",
+                    "instead of ",
+                    "不是",
+                    "并不是",
+                    "不要",
+                    "没有",
+                    "并没有",
+                    "无需",
+                    "无",
+                )
+            )
+            if not negated:
+                return True
+            start = index + len(keyword)
 
     @staticmethod
     def _infer_kind(name: str, default: str = "landmark") -> str:

@@ -9,7 +9,7 @@ from studio.models.location import LocationProfile
 
 WORLD_SCHEMA_VERSION = "0.1"
 BLUEPRINT_SCHEMA_VERSION = "0.4"
-SCENE_PLAN_SCHEMA_VERSION = "0.1"
+SCENE_PLAN_SCHEMA_VERSION = "0.2"
 
 
 class GridSpec(BaseModel):
@@ -35,6 +35,10 @@ class LandmarkSpec(BaseModel):
     name: str
     position: WorldPoint
     kind: str = ""
+    geometry_role: str = "volume"
+    orientation: str = "normal"
+    spatial_mode: str = "grounded"
+    traversability: str = "scenic"
     asset_id: str | None = None
     required_for_concept_match: bool = True
 
@@ -121,6 +125,36 @@ class WorldLayoutElement(BaseModel):
         "bridge",
         "decoration",
     ] = "landmark"
+    semantic_key: str = ""
+    spatial_mode: Literal[
+        "grounded",
+        "elevated",
+        "floating",
+        "aerial",
+        "underground",
+        "suspended",
+    ] = "grounded"
+    elevation: Literal["ground", "low", "medium", "high"] = "ground"
+    orientation: Literal["normal", "inverted", "vertical", "horizontal", "tilted"] = "normal"
+    geometry_role: Literal[
+        "surface",
+        "volume",
+        "platform",
+        "bridge",
+        "vertical_flow",
+        "path",
+        "organic",
+        "arch",
+        "terrain_mass",
+        "decorative",
+    ] = "volume"
+    traversability: Literal[
+        "walkable",
+        "scenic",
+        "blocked",
+        "decorative",
+        "rideable",
+    ] = "scenic"
     position: WorldPoint
     width: float = Field(default=6.0, gt=0)
     depth: float = Field(default=6.0, gt=0)
@@ -196,11 +230,36 @@ class WorldProfile(LocationProfile):
     playable: bool = True
 
 
+class WorldSceneRelation(BaseModel):
+    """Typed relationship between Scene elements before exact coordinates exist."""
+
+    relation: Literal[
+        "left_of",
+        "right_of",
+        "behind",
+        "in_front_of",
+        "near",
+        "above",
+        "below",
+        "on_top_of",
+        "under",
+        "inside",
+        "attached_to",
+        "suspended_from",
+        "around",
+        "between",
+        "connects_to",
+        "flows_to",
+    ]
+    target_scene_ids: list[str] = Field(min_length=1, max_length=2)
+
+
 class WorldSceneElement(BaseModel):
     """Semantic object in a creator world before runtime coordinates are assigned."""
 
     scene_id: str
     name: str
+    semantic_key: str = ""
     kind: Literal[
         "portal",
         "landmark",
@@ -217,8 +276,38 @@ class WorldSceneElement(BaseModel):
         "system_required",
     ]
     required: bool = True
+    spatial_mode: Literal[
+        "grounded",
+        "elevated",
+        "floating",
+        "aerial",
+        "underground",
+        "suspended",
+    ] = "grounded"
+    elevation: Literal["ground", "low", "medium", "high"] = "ground"
+    orientation: Literal["normal", "inverted", "vertical", "horizontal", "tilted"] = "normal"
+    geometry_role: Literal[
+        "surface",
+        "volume",
+        "platform",
+        "bridge",
+        "vertical_flow",
+        "path",
+        "organic",
+        "arch",
+        "terrain_mass",
+        "decorative",
+    ] = "volume"
+    traversability: Literal[
+        "walkable",
+        "scenic",
+        "blocked",
+        "decorative",
+        "rideable",
+    ] = "scenic"
     placement_hint: str = ""
     relation_hints: list[str] = Field(default_factory=list)
+    relations: list[WorldSceneRelation] = Field(default_factory=list, max_length=8)
     photo_opportunity: bool = False
     notes: str = ""
 
@@ -226,7 +315,7 @@ class WorldSceneElement(BaseModel):
 class WorldScenePlan(BaseModel):
     """Shared semantic contract between Prompt/Custom creation and Blueprint."""
 
-    schema_version: Literal["0.1"] = SCENE_PLAN_SCHEMA_VERSION
+    schema_version: str = SCENE_PLAN_SCHEMA_VERSION
     source_mode: Literal["prompt", "custom"]
     summary: str
     route_intent: str

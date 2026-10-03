@@ -333,29 +333,102 @@ if (floatingWorld) {{
   addCloud(14, 16, 36, .7);
 }}
 
+function applySemanticOrientation(object, orientation) {{
+  if (orientation === 'inverted') object.rotation.z = Math.PI;
+  else if (orientation === 'vertical') object.rotation.x = Math.PI / 2;
+  else if (orientation === 'tilted') object.rotation.z = Math.PI / 7;
+}}
+
+function semanticMaterial(index, transparent=false) {{
+  const color = palette[(index+3) % palette.length] || '#BDE3F7';
+  return new THREE.MeshStandardMaterial({{
+    color:new THREE.Color(color),
+    transparent,
+    opacity: transparent ? .72 : 1,
+    roughness:.3,
+    metalness:.03,
+    emissive:new THREE.Color(color),
+    emissiveIntensity: transparent ? .13 : .04
+  }});
+}}
+
 (bp.layout_elements || []).forEach((element, index) => {{
+  const role = element.geometry_role || '';
+  const y = element.position.y || 0;
+
   if (element.kind === 'water') {{
-    const water = new THREE.Mesh(
-      new THREE.CylinderGeometry(
-        Math.max(element.width || 10, element.depth || 8) * .5,
-        Math.max(element.width || 10, element.depth || 8) * .5,
-        .16,
-        36
-      ),
-      new THREE.MeshStandardMaterial({{
-        color:new THREE.Color(palette[(index+3) % palette.length] || '#BDE3F7'),
-        transparent:true,
-        opacity:.72,
-        roughness:.28,
-        metalness:.04,
-        emissive:new THREE.Color(palette[(index+3) % palette.length] || '#BDE3F7'),
-        emissiveIntensity:.12
-      }})
-    );
-    water.scale.z = Math.max(.35, (element.depth || 8) / Math.max(element.width || 10, element.depth || 8));
-    water.position.set(element.position.x, .05, element.position.z);
-    water.receiveShadow = true;
-    world.add(water);
+    if (role === 'vertical_flow') {{
+      const flow = new THREE.Mesh(
+        new THREE.BoxGeometry(
+          Math.max(1.5, element.width || 4),
+          Math.max(4, element.height || 12),
+          Math.max(1.2, element.depth || 3)
+        ),
+        semanticMaterial(index, true)
+      );
+      flow.position.set(
+        element.position.x,
+        y + Math.max(4, element.height || 12) / 2,
+        element.position.z
+      );
+      flow.castShadow = true;
+      world.add(flow);
+    }} else {{
+      const water = new THREE.Mesh(
+        new THREE.CylinderGeometry(
+          Math.max(element.width || 10, element.depth || 8) * .5,
+          Math.max(element.width || 10, element.depth || 8) * .5,
+          .16,
+          36
+        ),
+        semanticMaterial(index, true)
+      );
+      water.scale.z = Math.max(.35, (element.depth || 8) / Math.max(element.width || 10, element.depth || 8));
+      water.position.set(element.position.x, y + .05, element.position.z);
+      water.receiveShadow = true;
+      world.add(water);
+    }}
+  }}
+
+  if (element.kind === 'terrain' || element.kind === 'decoration') {{
+    const g = new THREE.Group();
+    if (element.kind === 'terrain') {{
+      const platform = new THREE.Mesh(
+        new THREE.BoxGeometry(
+          Math.max(3, element.width || 8),
+          Math.max(.8, element.height || 3),
+          Math.max(3, element.depth || 8)
+        ),
+        semanticMaterial(index, false)
+      );
+      platform.position.y = Math.max(.8, element.height || 3) / 2;
+      platform.castShadow = true; platform.receiveShadow = true; g.add(platform);
+      if (['floating','aerial','suspended'].includes(element.spatial_mode || '')) {{
+        const underside = new THREE.Mesh(
+          new THREE.CylinderGeometry(
+            Math.max(1.4, (element.width || 8) * .3),
+            .8,
+            3.2,
+            6
+          ),
+          mat('#D9CBE8')
+        );
+        underside.position.y = -2.0;
+        underside.castShadow = true;
+        g.add(underside);
+      }}
+    }} else {{
+      const deco = new THREE.Mesh(
+        new THREE.OctahedronGeometry(Math.max(.65, (element.width || 2) * .3), 0),
+        semanticMaterial(index, false)
+      );
+      deco.position.y = Math.max(1.0, element.height || 2) * .5;
+      deco.castShadow = true; g.add(deco);
+    }}
+    applySemanticOrientation(g, element.orientation || 'normal');
+    g.position.set(element.position.x, y, element.position.z);
+    g.userData.label = element.name;
+    world.add(g);
   }}
 }});
 
@@ -363,15 +436,21 @@ if (floatingWorld) {{
   const points = path.points || [];
   for (let i=0; i<points.length-1; i++) {{
     const a = points[i], b = points[i+1];
-    const dx = b.x-a.x, dz = b.z-a.z;
-    const length = Math.hypot(dx,dz);
+    const dx = b.x-a.x, dy=(b.y||0)-(a.y||0), dz = b.z-a.z;
+    const horizontal = Math.hypot(dx,dz);
+    const length = Math.hypot(dx,dy,dz);
     if (length < .01) continue;
     const walkway = new THREE.Mesh(
       new THREE.BoxGeometry(path.width_cells || 2.0, .14, length),
       mat(pathIndex % 2 ? '#FFF4D7' : '#FFE5EF')
     );
-    walkway.position.set((a.x+b.x)/2,.08,(a.z+b.z)/2);
+    walkway.position.set(
+      (a.x+b.x)/2,
+      ((a.y||0)+(b.y||0))/2 + .08,
+      (a.z+b.z)/2
+    );
     walkway.rotation.y = Math.atan2(dx,dz);
+    walkway.rotation.x = -Math.atan2(dy, Math.max(.001, horizontal));
     walkway.receiveShadow = true;
     world.add(walkway);
   }}
@@ -381,14 +460,26 @@ function addLandmark(spec, index) {{
   const g = new THREE.Group();
   const c1 = palette[(index + 1) % palette.length];
   const c2 = palette[(index + 3) % palette.length];
+  const role = spec.geometry_role || ((spec.kind || '').toLowerCase() === 'bridge' ? 'bridge' : 'volume');
 
-  if ((spec.kind || '').toLowerCase() === 'bridge') {{
+  if (role === 'bridge' || (spec.kind || '').toLowerCase() === 'bridge') {{
     const deck = new THREE.Mesh(new THREE.BoxGeometry(8.5,.55,2.4), mat(c1));
     deck.position.y=.85; deck.castShadow=true; deck.receiveShadow=true; g.add(deck);
     [-3.5,3.5].forEach(x => {{
       const post = new THREE.Mesh(new THREE.BoxGeometry(.35,1.7,.35), mat(c2));
       post.position.set(x,1.55,0); post.castShadow=true; g.add(post);
     }});
+  }} else if (role === 'organic') {{
+    const body = new THREE.Mesh(new THREE.SphereGeometry(3.4, 24, 16), mat(c1));
+    body.scale.set(1.55,.72,.88);
+    body.position.y=2.8; body.castShadow=true; body.receiveShadow=true; g.add(body);
+    const top = new THREE.Mesh(new THREE.BoxGeometry(5.2,.7,3.8), mat(c2));
+    top.position.y=5.1; top.castShadow=true; top.receiveShadow=true; g.add(top);
+  }} else if (role === 'platform') {{
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(6.8,.8,6.0), mat(c1));
+    deck.position.y=.4; deck.castShadow=true; deck.receiveShadow=true; g.add(deck);
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(6.3,.35,.35), mat(c2));
+    rail.position.set(0,1.1,-2.7); rail.castShadow=true; g.add(rail);
   }} else {{
     const base = new THREE.Mesh(new THREE.BoxGeometry(4.4, 1.2, 4.4), mat(c1));
     base.position.y = .6; base.castShadow = true; base.receiveShadow = true;
@@ -399,6 +490,7 @@ function addLandmark(spec, index) {{
     cap.scale.y = .7; cap.position.y = 6.0; cap.castShadow = true; g.add(cap);
   }}
 
+  applySemanticOrientation(g, spec.orientation || 'normal');
   g.position.set(spec.position.x, spec.position.y || 0, spec.position.z);
   g.userData.label = spec.name;
   world.add(g);
@@ -541,7 +633,7 @@ if (characterRuntime.mode === 'glb' && characterRuntime.model_data_uri) {{
 
 const spawn = bp.spawn || {{x:6,y:0,z:25,facing_degrees:90}};
 function resetPlayer() {{
-  player.position.set(spawn.x, .02, spawn.z);
+  player.position.set(spawn.x, (spawn.y || 0) + .02, spawn.z);
   player.rotation.y = THREE.MathUtils.degToRad(-(spawn.facing_degrees || 0));
 }}
 resetPlayer();
@@ -593,6 +685,30 @@ function updateProceduralAnimation(dt) {{
   if (p.head) p.head.rotation.z = moving ? Math.sin(animationTime*speed*.5)*.025 : Math.sin(animationTime*1.7)*.018;
 }}
 
+function pathHeightAt(x, z) {{
+  let best = null;
+  (bp.paths || []).forEach(path => {{
+    const points = path.points || [];
+    const halfWidth = Math.max(1.5, (path.width_cells || 2) * .8);
+    for (let i=0; i<points.length-1; i++) {{
+      const a=points[i], b=points[i+1];
+      const vx=b.x-a.x, vz=b.z-a.z;
+      const len2=vx*vx+vz*vz;
+      if (len2 < .0001) continue;
+      const t=THREE.MathUtils.clamp(((x-a.x)*vx+(z-a.z)*vz)/len2,0,1);
+      const px=a.x+vx*t, pz=a.z+vz*t;
+      const dist=Math.hypot(x-px,z-pz);
+      if (dist <= halfWidth && (!best || dist < best.dist)) {{
+        best={{
+          dist,
+          y:(a.y||0)+((b.y||0)-(a.y||0))*t
+        }};
+      }}
+    }}
+  }});
+  return best ? best.y : 0;
+}}
+
 function updatePlayer(dt) {{
   if (!manualMode) {{
     setAnimationState('Idle');
@@ -618,6 +734,8 @@ function updatePlayer(dt) {{
   const margin = 1.5;
   player.position.x = THREE.MathUtils.clamp(player.position.x, margin, bp.grid.width*cell-margin);
   player.position.z = THREE.MathUtils.clamp(player.position.z, margin, bp.grid.depth*cell-margin);
+  const routeY = pathHeightAt(player.position.x, player.position.z);
+  player.position.y += ((routeY + .02) - player.position.y) * Math.min(1, dt * 9);
 }}
 
 const followOffset = new THREE.Vector3(-7, 7, 9);
