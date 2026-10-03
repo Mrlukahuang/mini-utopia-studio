@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Type
 
+import pytest
+
 from pydantic import BaseModel
 
 from studio.models.render import (
