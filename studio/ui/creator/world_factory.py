@@ -88,6 +88,22 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
         kicker="WORLD FACTORY · BLUEPRINT FIRST",
     )
 
+    nav_col, _ = st.columns([1, 3])
+    with nav_col:
+        if st.button(
+            "← Back to My Worlds / 返回我的世界",
+            key="world_factory_back_to_library",
+            use_container_width=True,
+        ):
+            _clear_world_state()
+            st.session_state.pending_app_page = "🗺️ My Worlds"
+            st.rerun()
+
+    st.caption(
+        "💾 Draft mode / 草稿模式：创建过程中可以随时离开；只有点击 Finish / 完成 后，"
+        "这个 World 才会出现在 My Worlds 和 Explore World。"
+    )
+
     draft: WorldProfile | None = st.session_state.get("world_draft")
     mode = st.session_state.get("world_creation_mode")
 
@@ -710,6 +726,8 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
                 disabled=profile_changed,
                 use_container_width=True,
             ):
+                if saved_world is not None:
+                    ctx.assets.complete_world(saved_world.asset_id)
                 _clear_world_state()
                 st.session_state.pending_app_page = "🗺️ My Worlds"
                 st.rerun()
