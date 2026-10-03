@@ -959,13 +959,20 @@ if mode == "🛠 Studio" and studio_unlocked:
                 "they may disappear across redeploys or restarts."
             )
 
-        st.write(
-            "**Metadata database** · SQLite (still local / ephemeral on Streamlit Community Cloud)"
-        )
-        st.caption(
-            "Next persistence milestone: move Studio metadata to durable Postgres so object keys "
-            "and asset records survive together."
-        )
+        repository_backend = ctx.settings.studio_repository_backend
+        if repository_backend == "supabase":
+            st.success("🗄️ Durable Metadata Repository · Supabase Postgres")
+            st.write(f"**Table** · {ctx.settings.supabase_metadata_table}")
+            st.caption(
+                "Character profiles, World profiles, Blueprints, Stories and runtime metadata "
+                "are stored durably in Supabase."
+            )
+        else:
+            st.warning("🗄️ Metadata Repository · SQLite / ephemeral on Streamlit Cloud")
+            st.caption(
+                "Character and World records can disappear across redeploys or restarts. "
+                "Use STUDIO_REPOSITORY_BACKEND=supabase for durable metadata."
+            )
 
     with st.expander(
         "Universe",
