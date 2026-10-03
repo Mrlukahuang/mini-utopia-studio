@@ -78,14 +78,28 @@ class WorldLayoutService:
                 element.source_evidence.append(scene.placement_hint)
             elements.append(element)
 
+        # Resolve each element's own relative placement hint after every target
+        # exists. This keeps hints like "湖的右侧" attached to the Castle, rather
+        # than accidentally moving the Lake itself.
+        by_scene_id = {scene.scene_id: scene for scene in plan.elements}
+        by_element_id = {element.element_id: element for element in elements}
+        for scene_id, scene in by_scene_id.items():
+            element = by_element_id.get(scene_id)
+            if element is None or not scene.placement_hint:
+                continue
+            self._apply_owned_hint_relation(
+                elements,
+                element,
+                scene.placement_hint,
+                grid,
+            )
+
         for scene in plan.elements:
             for relation in scene.relation_hints:
                 for clause in self._relation_clauses(relation):
-                    self._apply_composition_note(elements, clause, grid)
                     self._apply_relation(elements, clause, grid)
         for relation in plan.spatial_relations:
             for clause in self._relation_clauses(relation):
-                self._apply_composition_note(elements, clause, grid)
                 self._apply_relation(elements, clause, grid)
 
         for element in elements:
@@ -179,6 +193,7 @@ class WorldLayoutService:
             element.position.x = grid.width * .72
         elif any(token in text for token in ("center", "centre", "central", "中央", "中心")):
             element.position.x = grid.width * .5
+            element.position.z = grid.depth * .5
 
         if any(token in text for token in ("foreground", "front of frame", "前景")):
             element.position.z = grid.depth * .72
@@ -199,6 +214,8 @@ class WorldLayoutService:
         lowered = text.lower()
         if self._apply_connection_relation(elements, text, lowered, grid):
             return
+        if self._apply_chinese_relative_relation(elements, text, grid):
+            return
         relation_defs = [
             ("in front of", "front"),
             ("behind", "behind"),
@@ -208,9 +225,13 @@ class WorldLayoutService:
             ("beside", "near"),
             ("near", "near"),
             ("前面", "front"),
+            ("前方", "front"),
             ("后面", "behind"),
+            ("后方", "behind"),
             ("左边", "left"),
+            ("左侧", "left"),
             ("右边", "right"),
+            ("右侧", "right"),
             ("旁边", "near"),
             ("附近", "near"),
         ]
@@ -295,6 +316,150 @@ class WorldLayoutService:
             element.position.z = grid.depth * .28
         elif any(token in text for token in ("middle", "midground", "中部", "中景")):
             element.position.z = grid.depth * .5
+
+    def _apply_owned_hint_relation(
+        self,
+        elements: list[WorldLayoutElement],
+        subject: WorldLayoutElement,
+        hint: str,
+        grid: GridSpec,
+    ) -> bool:
+        """Resolve a placement hint relative to another named Scene element."""
+        text = hint.strip()
+        lowered = text.lower()
+
+        if subject.kind == "bridge":
+            synthetic = f"{subject.name} {text}"
+            if self._apply_connection_relation(
+                elements,
+                synthetic,
+                synthetic.lower(),
+                grid,
+            ):
+                return True
+
+        direction_defs = (
+            ("right of", "right"),
+            ("left of", "left"),
+            ("behind", "behind"),
+            ("in front of", "front"),
+            ("next to", "near"),
+            ("beside", "near"),
+            ("右侧", "right"),
+            ("右边", "right"),
+            ("左侧", "left"),
+            ("左边", "left"),
+            ("后方", "behind"),
+            ("后面", "behind"),
+            ("前方", "front"),
+            ("前面", "front"),
+            ("旁边", "near"),
+            ("附近", "near"),
+        )
+        marker = None
+        mode = None
+        target_phrase = ""
+        for phrase, relation_mode in direction_defs:
+            if phrase not in lowered:
+                continue
+            marker = phrase
+            mode = relation_mode
+            if phrase in {"右侧", "右边", "左侧", "左边", "后方", "后面", "前方", "前面", "旁边", "附近"}:
+                target_phrase = text.split(phrase, 1)[0]
+                target_phrase = re.sub(r"[的\s]+$", "", target_phrase)
+            else:
+                target_phrase = text.split(phrase, 1)[1]
+            break
+
+        if marker is None or mode is None or not target_phrase.strip():
+            return False
+        target = self._resolve_element(elements, target_phrase)
+        if target is None or target is subject:
+            return False
+
+        step_x = grid.width * .20
+        step_z = grid.depth * .20
+        if mode == "right":
+            subject.position.x = target.position.x + step_x
+            subject.position.z = target.position.z
+        elif mode == "left":
+            subject.position.x = target.position.x - step_x
+            subject.position.z = target.position.z
+        elif mode == "behind":
+            subject.position.z = target.position.z - step_z
+            subject.position.x = target.position.x
+        elif mode == "front":
+            subject.position.z = target.position.z + step_z
+            subject.position.x = target.position.x
+        else:
+            subject.position.x = target.position.x + grid.width * .09
+            subject.position.z = target.position.z + grid.depth * .04
+
+        if "偏左" in text:
+            subject.position.x -= step_x
+        elif "偏右" in text:
+            subject.position.x += step_x
+
+        subject.source_evidence.append(text)
+        target.source_evidence.append(text)
+        return True
+
+    def _apply_chinese_relative_relation(
+        self,
+        elements: list[WorldLayoutElement],
+        text: str,
+        grid: GridSpec,
+    ) -> bool:
+        """Handle common Chinese subject/target word orders without moving the target."""
+        patterns = (
+            re.compile(
+                r"(?P<subject>.+?)(?:在|位于)(?P<target>.+?)的?"
+                r"(?P<direction>右侧|左侧|后方|前方|右边|左边|后面|前面|旁边|附近)"
+                r"(?P<offset>偏左|偏右)?"
+            ),
+            re.compile(
+                r"(?P<target>.+?)的?"
+                r"(?P<direction>右侧|左侧|后方|前方|右边|左边|后面|前面|旁边|附近)"
+                r"(?:有|放着|放置|是)(?P<subject>.+)"
+            ),
+        )
+        match = next((pattern.search(text) for pattern in patterns if pattern.search(text)), None)
+        if match is None:
+            return False
+
+        subject = self._resolve_element(elements, match.group("subject"))
+        target = self._resolve_element(elements, match.group("target"))
+        if subject is None or target is None or subject is target:
+            return False
+
+        direction = match.group("direction")
+        offset = match.groupdict().get("offset") or ""
+        step_x = grid.width * .20
+        step_z = grid.depth * .20
+        if direction in {"右侧", "右边"}:
+            subject.position.x = target.position.x + step_x
+            subject.position.z = target.position.z
+        elif direction in {"左侧", "左边"}:
+            subject.position.x = target.position.x - step_x
+            subject.position.z = target.position.z
+        elif direction in {"后方", "后面"}:
+            subject.position.z = target.position.z - step_z
+            subject.position.x = target.position.x
+        elif direction in {"前方", "前面"}:
+            subject.position.z = target.position.z + step_z
+            subject.position.x = target.position.x
+        else:
+            subject.position.x = target.position.x + grid.width * .09
+            subject.position.z = target.position.z + grid.depth * .04
+
+        if offset == "偏左":
+            subject.position.x -= step_x
+        elif offset == "偏右":
+            subject.position.x += step_x
+
+        subject.source_evidence.append(text)
+        target.source_evidence.append(text)
+        return True
 
     def _apply_connection_relation(
         self,
