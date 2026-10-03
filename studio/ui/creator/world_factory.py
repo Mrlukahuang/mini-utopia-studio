@@ -122,6 +122,7 @@ def _reset_world() -> None:
     for key in (
         "world_draft",
         "world_source",
+        "world_source_text",
         "world_name",
         "world_name_input",
         "world_creation_mode",
