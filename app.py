@@ -6,6 +6,7 @@ import streamlit.components.v1 as components
 from studio.core.config import get_settings
 from studio.core.enums import AssetType, ReviewStatus, StoryMode
 from studio.models.character import CharacterProfile, EyeProfile
+from studio.models.render import WorldRenderSpec
 from studio.models.world import WorldBlueprint, WorldProfile
 from studio.recipes.character_factory import CharacterFactoryRecipe
 from studio.runtime.three_world import build_world_runtime_html, runtime_summary
@@ -946,6 +947,12 @@ elif page == "🎮 Explore World":
         blueprint = WorldBlueprint.model_validate(
             selected.metadata.get("world_blueprint", {})
         )
+        raw_render_spec = selected.metadata.get("world_render_spec")
+        render_spec = (
+            WorldRenderSpec.model_validate(raw_render_spec)
+            if raw_render_spec
+            else None
+        )
         summary = runtime_summary(
             profile=profile,
             blueprint=blueprint,
@@ -981,6 +988,7 @@ elif page == "🎮 Explore World":
                 ),
                 character_profile=character_profile,
                 character_runtime=character_runtime,
+                render_spec=render_spec,
             ),
             height=760,
             scrolling=False,
@@ -1001,6 +1009,9 @@ elif page == "🎮 Explore World":
             )
             with st.expander("🧩 Runtime Blueprint Inspector", expanded=False):
                 st.json(blueprint.model_dump(mode="json"))
+                if render_spec is not None:
+                    st.markdown("**🎨 RenderSpec / Three.js contract**")
+                    st.json(render_spec.model_dump(mode="json"))
 
 
 elif page == "🌍 World Factory":
