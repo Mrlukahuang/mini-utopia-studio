@@ -136,6 +136,58 @@ class WorldConceptService:
 
         return selected
 
+    def rebuild_blueprint_from_current_concept(
+        self,
+        *,
+        location_asset_id: str,
+        style_asset_id: str | None,
+    ):
+        """Upgrade a legacy approved World using its existing Concept image.
+
+        This does not generate new Concept Art. It rebuilds the executable
+        Blueprint with the current compiler so older worlds gain visual anchors,
+        layout elements, synchronized zones, paths and cameras.
+        """
+        world = self.repository.get_asset(location_asset_id)
+        if world is None or world.asset_type != AssetType.LOCATION:
+            raise ValueError(f"World not found: {location_asset_id}")
+
+        concept = self.current_concept(location_asset_id)
+        if concept is None:
+            raise ValueError("World does not have an approved Concept image.")
+
+        profile = WorldProfile.model_validate(world.metadata.get("world_profile", {}))
+        concept_direction = (
+            world.metadata.get("world_concept_last_direction")
+            or concept.path.rsplit("/", 1)[-1].split("_", 1)[0]
+        )
+        concept_image_bytes = self.storage.get_bytes(concept.path)
+        blueprint = self.blueprint_service.build(
+            location_asset_id=world.asset_id,
+            style_asset_id=style_asset_id,
+            profile=profile,
+            concept_path=concept.path,
+            concept_direction=concept_direction,
+            concept_image_bytes=concept_image_bytes,
+            concept_mime_type=concept.mime_type or "image/png",
+        )
+
+        world.metadata["world_blueprint"] = blueprint.model_dump(mode="json")
+        world.metadata["world_concept_match_reviewed"] = False
+        world.metadata.pop("world_concept_match_reviewed_at", None)
+        world.metadata["world_concept_match_history"] = []
+        world.metadata["world_blueprint_legacy_upgraded"] = True
+        world.updated_at = now_utc()
+        self.repository.save_asset(world)
+
+        persisted = self.repository.get_asset(world.asset_id)
+        if persisted is None:
+            raise RuntimeError("World disappeared after Blueprint upgrade.")
+        persisted_blueprint = persisted.metadata.get("world_blueprint") or {}
+        if not persisted_blueprint.get("layout_elements"):
+            raise RuntimeError("Blueprint upgrade did not persist layout elements.")
+        return blueprint
+
     def current_concept(self, location_asset_id: str) -> AssetFile | None:
         world = self.repository.get_asset(location_asset_id)
         if world is None:

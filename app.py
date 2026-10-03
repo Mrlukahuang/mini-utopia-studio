@@ -676,9 +676,35 @@ elif page == "🗺️ My Worlds":
                     file_ref.role == "world_concept_candidate"
                     for file_ref in asset.files
                 )
+                legacy_blueprint = bool(
+                    blueprint
+                    and approved_concept
+                    and not (blueprint.get("layout_elements") or [])
+                )
                 if blueprint and approved_concept:
                     st.success("🎮 Ready to Explore / 可以进入世界")
                     st.caption("50×50 Mini World · Portal + Landmarks + Director Tour ready")
+                    if legacy_blueprint:
+                        st.warning(
+                            "🧩 Legacy Blueprint detected / 旧版 Blueprint："
+                            "这个世界可以探索，但还没有 Concept Match Review 需要的新版布局数据。"
+                        )
+                        if st.button(
+                            "🔄 Upgrade Blueprint / 升级可玩布局",
+                            key=f"upgrade_world_blueprint_{asset.asset_id}",
+                            disabled=not bool(universe.style_asset_id),
+                            use_container_width=True,
+                        ):
+                            try:
+                                with st.spinner("正在用已批准的 Concept 升级 Blueprint…"):
+                                    ctx.world_concepts.rebuild_blueprint_from_current_concept(
+                                        location_asset_id=asset.asset_id,
+                                        style_asset_id=universe.style_asset_id,
+                                    )
+                                st.success("Blueprint 已升级，可以进行 Concept Match Review。")
+                                st.rerun()
+                            except Exception as exc:
+                                st.error(f"Blueprint upgrade failed / 升级失败: {exc}")
                     if mode == "🛠 Studio" and studio_unlocked:
                         anchor = blueprint.get("visual_anchor", {}) or {}
                         with st.expander("🎯 Concept Visual Anchor", expanded=False):
@@ -738,7 +764,7 @@ elif page == "🗺️ My Worlds":
                 )
                 st.caption(f"v{asset.version}")
 
-            if blueprint and approved_concept:
+            if blueprint and approved_concept and not legacy_blueprint:
                 render_concept_match_review(
                     ctx,
                     asset=asset,
