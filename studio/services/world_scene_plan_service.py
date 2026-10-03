@@ -79,14 +79,30 @@ wonder, warm discovery, miniature toy-like details, macaron-compatible glow,
 environmental storytelling, a scenic/photo moment, or a connective path detail.
 Mark those source=utopia_enrichment and required=false.
 
-Design a natural exploration experience. exploration_order should start with
-welcoming discoveries, visit the creator's important landmarks, include useful
-photo opportunities, and end with a satisfying main Portal reveal. Do not put
-the walking route through the center of lakes or other blocked water.
+Design a natural exploration experience, not merely the shortest connection
+between objects. The route must work for PLAYABILITY, PHOTOGRAPHY and VIDEO:
+
+- Keep walking progression naturally traversable; never route through the center
+  of blocked water or other non-walkable obstacles.
+- Create 2-4 meaningful scenic/photo stopping moments where the world supports it.
+- Design useful video beats: establishing arrival, follow movement, landmark
+  reveal, scenic pause/photo moment, final Portal reveal, and an ending view.
+- Preserve sightlines and breathing room between major landmarks. Avoid placing
+  every important object on one straight line or crowding everything into one area.
+- Use turns, foreground/background layering, height changes or gentle detours when
+  they improve discovery without making the route confusing.
+- The Portal should remain a satisfying late/final reveal unless the creator
+  explicitly asks otherwise.
+
+exploration_order should begin with welcoming discoveries, visit the creator's
+important landmarks in a satisfying sequence, include useful photo/video moments,
+and normally end with the main Portal reveal.
 
 Use relative semantic placement, not exact runtime coordinates. Examples:
-"center", "right side", "behind Lake", "between Lake and Castle". The deterministic
-50x50 compiler will assign and validate exact coordinates later.
+"center", "right side", "behind Lake", "between Lake and Castle". Think about
+walkable approach direction, camera sightlines and reveal order while writing
+placement hints and spatial relations. The deterministic 50x50 compiler will
+assign and validate exact coordinates later.
 
 Return concise names and stable scene_id values such as SCENE_LAKE,
 SCENE_CASTLE, SCENE_PORTAL. There should be one clear main Portal. If the creator
@@ -374,6 +390,15 @@ Return a complete WorldScenePlan."""
             source = item.source
             kind = item.kind
             notes = item.notes
+            if (
+                source == "utopia_enrichment"
+                and kind == "structure"
+                and any(
+                    token in name.lower()
+                    for token in ("path", "trail", "walkway", "小径", "步道", "小路")
+                )
+            ):
+                kind = "decoration"
             if kind == "portal" and any(
                 token in name.lower() for token in ("plaza", "square", "广场")
             ):

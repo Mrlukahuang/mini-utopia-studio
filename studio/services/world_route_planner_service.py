@@ -65,7 +65,8 @@ class WorldRoutePlannerService:
 
         route_intent = plan.route_intent.strip() or (
             "Create a natural, walkable discovery route from Spawn through major "
-            "landmarks and scenic viewpoints, ending with a memorable Portal reveal."
+            "landmarks, with scenic/photo pauses and useful video reveal beats, "
+            "ending with a memorable Portal reveal."
         )
 
         return plan.model_copy(

@@ -389,3 +389,126 @@ def test_prompt_keeps_only_one_executable_main_portal():
         item for item in result.scene_plan.elements if item.name == "Moon Gate"
     )
     assert moon_gate.kind == "landmark"
+
+
+def test_relative_placement_hints_compile_without_moving_the_target():
+    plan = WorldScenePlan(
+        source_mode="prompt",
+        summary="Floating garden with lake, castle, bridge and portal.",
+        route_intent=(
+            "Playable discovery route with scenic/photo stops and a final Portal reveal."
+        ),
+        elements=[
+            WorldSceneElement(
+                scene_id="SCENE_LAKE",
+                name="蓝色湖泊",
+                kind="water",
+                source="creator_required",
+                required=True,
+                placement_hint="世界中央",
+                photo_opportunity=True,
+            ),
+            WorldSceneElement(
+                scene_id="SCENE_CASTLE",
+                name="奶油白小城堡",
+                kind="structure",
+                source="creator_required",
+                required=True,
+                placement_hint="湖的右侧",
+                photo_opportunity=True,
+            ),
+            WorldSceneElement(
+                scene_id="SCENE_BRIDGE",
+                name="湖畔拱桥",
+                kind="bridge",
+                source="creator_required",
+                required=True,
+                placement_hint="连接湖边与奶油白小城堡",
+                photo_opportunity=True,
+            ),
+            WorldSceneElement(
+                scene_id="SCENE_PORTAL",
+                name="星星传送门",
+                kind="portal",
+                source="creator_required",
+                required=True,
+                placement_hint="湖的后方偏左",
+                photo_opportunity=True,
+            ),
+        ],
+        exploration_order=[
+            "SCENE_LAKE",
+            "SCENE_BRIDGE",
+            "SCENE_CASTLE",
+            "SCENE_PORTAL",
+        ],
+        photo_spot_ids=[
+            "SCENE_LAKE",
+            "SCENE_CASTLE",
+            "SCENE_PORTAL",
+        ],
+    )
+    profile = WorldProfile(
+        world_name="草莓薄荷漂浮花园",
+        source_description="中央湖、右侧城堡、连接桥、后方偏左传送门",
+        terrain=["Floating Islands / 漂浮岛"],
+        portal_form="Star Portal / 星星传送门",
+        theme_color_hexes=["#F7B7D2", "#B9E7D0", "#D7C2F3"],
+    )
+
+    blueprint = WorldBlueprintService().plan_from_scene_plan(
+        location_asset_id="LOC_RELATIVE",
+        style_asset_id="STYLE_MINI",
+        profile=profile,
+        scene_plan=plan,
+    )
+
+    elements = {item.element_id: item for item in blueprint.layout_elements}
+    lake = elements["SCENE_LAKE"]
+    castle = elements["SCENE_CASTLE"]
+    bridge = elements["SCENE_BRIDGE"]
+    portal = elements["SCENE_PORTAL"]
+
+    assert lake.position.x == 25.0
+    assert lake.position.z == 25.0
+    assert castle.position.x > lake.position.x
+    assert castle.position.z == lake.position.z
+    assert lake.position.x < bridge.position.x < castle.position.x
+    assert portal.position.x < lake.position.x
+    assert portal.position.z < lake.position.z
+
+
+def test_prompt_system_designs_routes_for_playability_photo_and_video():
+    provider = FakeStructuredProvider(_prompt_payload())
+    service = WorldScenePlanService(structured_provider=provider)
+
+    service.plan_from_prompt(
+        description="A lake, castle and Star Arch world.",
+        style_profile={},
+    )
+
+    system = provider.calls[0]["system"]
+    assert "PLAYABILITY, PHOTOGRAPHY and VIDEO" in system
+    assert "2-4 meaningful scenic/photo stopping moments" in system
+    assert "establishing arrival" in system
+    assert "final Portal reveal" in system
+    assert "Avoid placing" in system
+
+
+def test_utopia_path_enrichment_is_not_an_executable_structure():
+    payload = _prompt_payload()
+    payload["scene_plan"]["elements"][2]["name"] = "湖畔漫步小径"
+    payload["scene_plan"]["elements"][2]["kind"] = "structure"
+    provider = FakeStructuredProvider(payload)
+    service = WorldScenePlanService(structured_provider=provider)
+
+    result = service.plan_from_prompt(
+        description="A Lake with a Star Arch.",
+        style_profile={},
+    )
+
+    path = next(
+        item for item in result.scene_plan.elements
+        if item.name == "湖畔漫步小径"
+    )
+    assert path.kind == "decoration"
