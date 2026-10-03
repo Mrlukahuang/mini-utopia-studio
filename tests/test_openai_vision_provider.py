@@ -36,7 +36,7 @@ def test_openai_vision_provider_sends_image_and_parses_structured_output(monkeyp
                     {
                         "type": "message",
                         "content": [
-                            {"type": "output_text", "text": json.dumps(output)}
+                            {"type": "output_text", "text": __import__("json").dumps(output)}
                         ],
                     }
                 ]
