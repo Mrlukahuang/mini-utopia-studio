@@ -193,7 +193,11 @@ class WorldBlueprintService:
             [
                 CameraPoint(
                     camera_id="CAM_PORTAL",
-                    position=WorldPoint(x=38, y=5, z=25),
+                    position=WorldPoint(
+                        x=max(2, portal_position.x - 6),
+                        y=5,
+                        z=portal_position.z,
+                    ),
                     look_at=portal_position,
                     lens_mm=40,
                     role="portal_reveal",
