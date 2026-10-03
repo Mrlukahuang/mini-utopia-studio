@@ -225,6 +225,39 @@ function addToyRock(x, z, index=0) {{
   world.add(rock);
 }}
 
+function addFlowerPatch(x, z, index=0) {{
+  const g = new THREE.Group();
+  for (let i=0; i<5; i++) {{
+    const a = (i / 5) * Math.PI * 2;
+    const stem = new THREE.Mesh(new THREE.BoxGeometry(.08,.55,.08), mat('#9FD5A8'));
+    stem.position.set(Math.cos(a)*.55,.28,Math.sin(a)*.55);
+    g.add(stem);
+    const bloom = new THREE.Mesh(
+      new THREE.BoxGeometry(.34,.22,.34),
+      mat(palette[(index+i) % palette.length])
+    );
+    bloom.position.set(Math.cos(a)*.55,.62,Math.sin(a)*.55);
+    bloom.rotation.y = a;
+    bloom.castShadow = true;
+    g.add(bloom);
+  }}
+  const center = new THREE.Mesh(new THREE.BoxGeometry(.28,.2,.28), mat('#FFF4A8'));
+  center.position.y=.62; g.add(center);
+  g.position.set(x,0,z); world.add(g);
+}}
+
+function addCloud(x, y, z, scale=1) {{
+  const g = new THREE.Group();
+  [[0,0,0,1.4],[1.0,.15,.1,1.0],[-1.0,.1,.05,.9],[.35,.5,0,.85]].forEach(p => {{
+    const puff = new THREE.Mesh(
+      new THREE.SphereGeometry(p[3], 12, 8),
+      new THREE.MeshStandardMaterial({{color:0xffffff, roughness:.95, transparent:true, opacity:.92}})
+    );
+    puff.position.set(p[0],p[1],p[2]); g.add(puff);
+  }});
+  g.position.set(x,y,z); g.scale.setScalar(scale); world.add(g);
+}}
+
 function addStarLamp(x, z, index=0) {{
   const g = new THREE.Group();
   const pole = new THREE.Mesh(new THREE.BoxGeometry(.2,1.8,.2), mat('#FFF4D7'));
@@ -245,9 +278,13 @@ function addStarLamp(x, z, index=0) {{
 function decorateChunk(chunk, i, centerX, centerZ) {{
   const biome = (chunk.biome || '').toLowerCase();
   const worldType = (profile.world_type || '').toLowerCase();
-  if (biome.includes('forest') || worldType.includes('forest') || worldType.includes('garden')) {{
+  const worldName = (profile.world_name || DATA.worldName || '').toLowerCase();
+  const gardenLike = biome.includes('forest') || worldType.includes('forest') || worldType.includes('garden') || worldName.includes('garden');
+  if (gardenLike) {{
     addToyTree(centerX-2.6, centerZ+2.2, i);
     addToyTree(centerX+2.3, centerZ-1.8, i+1);
+    addFlowerPatch(centerX+2.4, centerZ+2.4, i);
+    if ((i % 3) === 0) addToyHouse(centerX-.3, centerZ-.2, i);
   }} else if (worldType.includes('village') || worldType.includes('city') || worldType.includes('harbor')) {{
     addToyHouse(centerX, centerZ, i);
     addStarLamp(centerX-3.2, centerZ+2.6, i);
@@ -257,6 +294,7 @@ function decorateChunk(chunk, i, centerX, centerZ) {{
   }}
 }}
 
+const floatingWorld = (profile.world_type || '').toLowerCase().includes('floating');
 (bp.chunks || []).forEach((chunk, i) => {{
   const color = palette[i % palette.length];
   const geo = new THREE.BoxGeometry(cw - .18, .8, cd - .18);
@@ -264,7 +302,46 @@ function decorateChunk(chunk, i, centerX, centerZ) {{
   mesh.position.set(chunk.chunk_x * cw + cw/2, -.4, chunk.chunk_z * cd + cd/2);
   mesh.receiveShadow = true;
   world.add(mesh);
+
+  if (floatingWorld) {{
+    const depth = 2.4 + (i % 4) * .45;
+    const underside = new THREE.Mesh(
+      new THREE.CylinderGeometry(Math.min(cw,cd)*.28, Math.min(cw,cd)*.10, depth, 6),
+      mat(i % 2 ? '#E8D3D8' : '#D9CBE8')
+    );
+    underside.position.set(mesh.position.x, -1.15-depth/2, mesh.position.z);
+    underside.rotation.y = (i % 6) * .18;
+    underside.castShadow = true;
+    underside.receiveShadow = true;
+    world.add(underside);
+  }}
+
   decorateChunk(chunk, i, mesh.position.x, mesh.position.z);
+}});
+
+if (floatingWorld) {{
+  addCloud(7, 11, 9, 1.1);
+  addCloud(39, 15, 14, .8);
+  addCloud(31, 12, 43, 1.0);
+  addCloud(14, 16, 36, .7);
+}}
+
+(bp.paths || []).forEach((path, pathIndex) => {{
+  const points = path.points || [];
+  for (let i=0; i<points.length-1; i++) {{
+    const a = points[i], b = points[i+1];
+    const dx = b.x-a.x, dz = b.z-a.z;
+    const length = Math.hypot(dx,dz);
+    if (length < .01) continue;
+    const walkway = new THREE.Mesh(
+      new THREE.BoxGeometry(path.width_cells || 2.0, .14, length),
+      mat(pathIndex % 2 ? '#FFF4D7' : '#FFE5EF')
+    );
+    walkway.position.set((a.x+b.x)/2,.08,(a.z+b.z)/2);
+    walkway.rotation.y = Math.atan2(dx,dz);
+    walkway.receiveShadow = true;
+    world.add(walkway);
+  }}
 }});
 
 function addLandmark(spec, index) {{
@@ -286,19 +363,39 @@ function addLandmark(spec, index) {{
 
 if (bp.portal) {{
   const portal = new THREE.Group();
-  const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(2.3, .42, 14, 36),
-    new THREE.MeshStandardMaterial({{
-      color:new THREE.Color(palette[2] || '#D7C2F3'),
-      emissive:new THREE.Color(palette[2] || '#D7C2F3'),
-      emissiveIntensity:1.4,
-      roughness:.35
-    }})
-  );
-  ring.rotation.y = Math.PI / 2;
-  ring.position.y = 3.0;
-  ring.castShadow = true;
-  portal.add(ring);
+  const portalColor = palette[2] || '#D7C2F3';
+  const portalMat = new THREE.MeshStandardMaterial({{
+    color:new THREE.Color(portalColor),
+    emissive:new THREE.Color(portalColor),
+    emissiveIntensity:1.4,
+    roughness:.35
+  }});
+  const portalForm = (bp.portal.form || profile.portal_form || '').toLowerCase();
+
+  if (portalForm.includes('star')) {{
+    const shape = new THREE.Shape();
+    const outer=2.75, inner=1.28, points=5;
+    for (let i=0;i<points*2;i++) {{
+      const r = i%2===0 ? outer : inner;
+      const angle = -Math.PI/2 + i*Math.PI/points;
+      const x = Math.cos(angle)*r, y = Math.sin(angle)*r;
+      if (i===0) shape.moveTo(x,y); else shape.lineTo(x,y);
+    }}
+    shape.closePath();
+    const hole = new THREE.Path();
+    hole.absellipse(0,0,1.05,1.05,0,Math.PI*2,false,0);
+    shape.holes.push(hole);
+    const star = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, {{depth:.38, bevelEnabled:true, bevelSize:.12, bevelThickness:.10, bevelSegments:2}}), portalMat);
+    star.position.set(0,3.0,-.18);
+    star.castShadow = true;
+    portal.add(star);
+  }} else {{
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(2.3,.42,14,36), portalMat);
+    ring.rotation.y = Math.PI/2;
+    ring.position.y = 3.0;
+    ring.castShadow = true;
+    portal.add(ring);
+  }}
   const glow = new THREE.PointLight(palette[2] || '#D7C2F3', 12, 12);
   glow.position.y = 3.0; portal.add(glow);
   portal.position.set(bp.portal.position.x, bp.portal.position.y || 0, bp.portal.position.z);
