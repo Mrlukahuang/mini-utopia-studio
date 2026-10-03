@@ -178,3 +178,28 @@ def test_runtime_html_has_import_map_and_error_overlay():
     assert "three/addons/loaders/GLTFLoader.js" in html
     assert 'id="runtimeError"' in html
     assert "3D Runtime error:" in html
+
+
+def test_runtime_html_has_floating_garden_world_identity_kit():
+    profile = WorldProfile(
+        world_name="Pastel Star Garden",
+        world_type="Floating Islands / 漂浮岛",
+        portal_form="Star Arch / 星星拱门",
+        theme_color_hexes=["#F7B7D2", "#B9E7D0", "#D7C2F3"],
+    )
+    blueprint = _blueprint()
+    blueprint.portal.form = "Star Arch / 星星拱门" if blueprint.portal else "Star Arch / 星星拱门"
+
+    html = build_world_runtime_html(
+        world_name="Pastel Star Garden",
+        profile=profile,
+        blueprint=blueprint,
+    )
+
+    assert "floatingWorld" in html
+    assert "addFlowerPatch" in html
+    assert "addCloud" in html
+    assert "CylinderGeometry" in html
+    assert "ExtrudeGeometry" in html
+    assert "portalForm.includes('star')" in html
+    assert "(bp.paths || []).forEach" in html
