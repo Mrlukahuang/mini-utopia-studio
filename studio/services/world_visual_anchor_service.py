@@ -115,8 +115,25 @@ class WorldVisualAnchorService:
         ]
         summary = " · ".join(part.strip() for part in summary_parts if part and part.strip())
 
+        composition_notes = [
+            item.strip()
+            for item in [
+                profile.portal_placement_idea,
+                profile.traversability_notes,
+            ]
+            if item and item.strip()
+        ]
+        spatial_relations = [
+            item.strip()
+            for item in [
+                profile.source_description,
+                profile.creator_extra_details,
+            ]
+            if item and item.strip()
+        ]
+
         return WorldVisualAnchor(
-            concept_image_roles=["world_concept_approved"],
+            concept_image_roles=(["world_concept_approved"] if concept_path else []),
             concept_path=concept_path,
             concept_direction=concept_direction,
             extraction_method="deterministic_profile_v1",
@@ -124,6 +141,6 @@ class WorldVisualAnchorService:
             must_preserve=must_preserve,
             flexible_details=flexible,
             palette_hexes=list(profile.theme_color_hexes),
-            composition_notes=[],
-            spatial_relations=[],
+            composition_notes=composition_notes,
+            spatial_relations=spatial_relations,
         )
