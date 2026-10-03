@@ -700,6 +700,46 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
             except Exception:
                 st.caption("World Preview 暂时无法读取。")
 
+        appearance_diagnostics = (
+            saved_world.metadata.get("world_appearance_diagnostics", {})
+            if saved_world is not None
+            else {}
+        )
+        render_diagnostics = (
+            saved_world.metadata.get("world_render_diagnostics", {})
+            if saved_world is not None
+            else {}
+        )
+        if appearance_diagnostics or render_diagnostics:
+            with st.expander("🧪 3D Build Check / 外观与 RenderSpec 检查", expanded=False):
+                st.caption(
+                    "这里显示 GPT/Vision 实际给 Three.js 的外观部件。"
+                    " Hero 如果仍是 0 parts，就不是 Three.js 丢了，而是上游外观没有生成完整。"
+                )
+                source = saved_world.metadata.get("world_appearance_source", "—")
+                weak_count = appearance_diagnostics.get("weak_hero_count", 0)
+                st.write(f"**Appearance Source** · {source}")
+                st.write(f"**Weak Hero Objects** · {weak_count}")
+                render_by_id = {
+                    item.get("element_id"): item
+                    for item in render_diagnostics.get("objects", [])
+                }
+                for item in appearance_diagnostics.get("objects", []):
+                    if (
+                        item.get("geometry_role") != "organic"
+                        and item.get("part_count", 0) == 0
+                    ):
+                        continue
+                    rendered = render_by_id.get(item.get("element_id"), {})
+                    roles = ", ".join(item.get("part_roles", [])) or "—"
+                    st.write(
+                        f"**{item.get('name', 'Unnamed')}** · "
+                        f"{item.get('silhouette_family', '—')} · "
+                        f"main={item.get('main_primitive', '—')} · "
+                        f"parts={item.get('part_count', 0)} [{roles}] · "
+                        f"Three.js nodes={rendered.get('node_count', 0)}"
+                    )
+
         count = int(st.session_state.get("creator_generation_count", 0))
         remaining = max(0, MAX_GENERATIONS_PER_SESSION - count)
         st.caption(f"🎟️ 本次会话剩余图片渲染次数：{remaining}/{MAX_GENERATIONS_PER_SESSION}")
