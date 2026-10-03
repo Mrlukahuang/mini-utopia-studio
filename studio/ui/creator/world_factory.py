@@ -59,7 +59,7 @@ def _safe_index(options: list[str], value: str, default: int = 0) -> int:
         return default
 
 
-def _reset_world() -> None:
+def _clear_world_state() -> None:
     for key in (
         "world_draft",
         "world_source",
@@ -72,6 +72,10 @@ def _reset_world() -> None:
         "editing_world_id",
     ):
         st.session_state.pop(key, None)
+
+
+def _reset_world() -> None:
+    _clear_world_state()
     st.rerun()
 
 
@@ -706,8 +710,7 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
                 disabled=profile_changed,
                 use_container_width=True,
             ):
-                st.session_state.world_concept_candidates = []
-                st.session_state.editing_world_id = None
+                _clear_world_state()
                 st.session_state.pending_app_page = "🗺️ My Worlds"
                 st.rerun()
 
