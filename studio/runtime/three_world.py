@@ -5,6 +5,7 @@ from html import escape
 
 from studio.models.character import CharacterProfile
 from studio.models.runtime_character import CharacterRuntimeSpec
+from studio.models.render import WorldRenderSpec
 from studio.models.world import WorldBlueprint, WorldProfile
 
 
@@ -24,6 +25,7 @@ def build_world_runtime_html(
     character_name: str = "Mini Traveler",
     character_profile: CharacterProfile | None = None,
     character_runtime: CharacterRuntimeSpec | None = None,
+    render_spec: WorldRenderSpec | None = None,
 ) -> str:
     """Build a self-contained Three.js playground for a saved WorldBlueprint.
 
@@ -35,6 +37,11 @@ def build_world_runtime_html(
         "worldName": world_name,
         "profile": profile.model_dump(mode="json"),
         "blueprint": blueprint.model_dump(mode="json"),
+        "renderSpec": (
+            render_spec.model_dump(mode="json")
+            if render_spec is not None
+            else None
+        ),
         "characterName": character_name,
         "character": (
             character_profile.model_dump(mode="json")
@@ -146,6 +153,7 @@ import {{ GLTFLoader }} from 'three/addons/loaders/GLTFLoader.js';
 const DATA = {data_json};
 const profile = DATA.profile;
 const bp = DATA.blueprint;
+const renderSpec = DATA.renderSpec || null;
 const character = DATA.character || {{}};
 const characterRuntime = DATA.characterRuntime || {{}};
 const visualAnchor = bp.visual_anchor || {{}};
