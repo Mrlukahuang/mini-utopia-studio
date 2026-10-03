@@ -392,6 +392,167 @@ function addSemanticLabel(text, x, y, z) {{
   world.add(sprite);
 }}
 
+const compiledMaterialCache = new Map();
+
+function renderSide(name) {{
+  if (name === 'double') return THREE.DoubleSide;
+  if (name === 'back') return THREE.BackSide;
+  return THREE.FrontSide;
+}}
+
+function compiledMaterial(spec) {{
+  if (!spec) return mat('#FFF4D7');
+  if (compiledMaterialCache.has(spec.material_id)) {{
+    return compiledMaterialCache.get(spec.material_id);
+  }}
+  const params = {{
+    color: new THREE.Color(spec.color_hex || '#FFF4D7'),
+    roughness: spec.roughness ?? .72,
+    metalness: spec.metalness ?? 0,
+    emissive: new THREE.Color(spec.emissive_hex || '#000000'),
+    emissiveIntensity: spec.emissive_intensity ?? 0,
+    opacity: spec.opacity ?? 1,
+    transparent: Boolean(spec.transparent),
+    alphaTest: spec.alpha_test ?? 0,
+    side: renderSide(spec.side),
+    vertexColors: Boolean(spec.vertex_colors),
+  }};
+  const material = spec.model === 'toon'
+    ? new THREE.MeshToonMaterial({{
+        color: params.color,
+        opacity: params.opacity,
+        transparent: params.transparent,
+        alphaTest: params.alphaTest,
+        side: params.side,
+        vertexColors: params.vertexColors,
+      }})
+    : new THREE.MeshStandardMaterial(params);
+  compiledMaterialCache.set(spec.material_id, material);
+  return material;
+}}
+
+function bufferGeometryFromSpec(buffer) {{
+  const geometry = new THREE.BufferGeometry();
+  if (buffer?.positions?.length) {{
+    geometry.setAttribute(
+      'position',
+      new THREE.Float32BufferAttribute(buffer.positions, 3)
+    );
+  }}
+  if (buffer?.indices?.length) geometry.setIndex(buffer.indices);
+  if (buffer?.normals?.length) {{
+    geometry.setAttribute(
+      'normal',
+      new THREE.Float32BufferAttribute(buffer.normals, 3)
+    );
+  }} else if (buffer?.positions?.length) {{
+    geometry.computeVertexNormals();
+  }}
+  if (buffer?.uvs?.length) {{
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(buffer.uvs, 2));
+  }}
+  if (buffer?.colors?.length) {{
+    geometry.setAttribute(
+      'color',
+      new THREE.Float32BufferAttribute(buffer.colors, 3)
+    );
+  }}
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return geometry;
+}}
+
+function primitiveGeometry(spec) {{
+  const size = spec.primitive_size || {{x:1,y:1,z:1}};
+  const primitive = spec.primitive || 'box';
+  let geometry;
+  const baseScale = new THREE.Vector3(1,1,1);
+
+  if (spec.source_type === 'buffer' && spec.buffer?.positions?.length) {{
+    return {{geometry: bufferGeometryFromSpec(spec.buffer), baseScale}};
+  }}
+
+  if (primitive === 'sphere' || primitive === 'ellipsoid') {{
+    geometry = new THREE.SphereGeometry(.5, 24, 16);
+    baseScale.set(size.x || 1, size.y || 1, size.z || 1);
+  }} else if (primitive === 'cylinder') {{
+    geometry = new THREE.CylinderGeometry(.5,.5,1,24);
+    baseScale.set(size.x || 1, size.y || 1, size.z || 1);
+  }} else if (primitive === 'cone') {{
+    geometry = new THREE.ConeGeometry(.5,1,20);
+    baseScale.set(size.x || 1, size.y || 1, size.z || 1);
+  }} else if (primitive === 'torus') {{
+    geometry = new THREE.TorusGeometry(.34,.12,12,32);
+    baseScale.set(size.x || 1, size.y || 1, size.z || 1);
+  }} else if (primitive === 'plane') {{
+    geometry = new THREE.PlaneGeometry(1,1);
+    geometry.rotateX(-Math.PI/2);
+    baseScale.set(size.x || 1, size.z || 1, size.y || .08);
+  }} else if (primitive === 'arch') {{
+    geometry = new THREE.TorusGeometry(.36,.11,12,32,Math.PI);
+    geometry.rotateZ(Math.PI);
+    baseScale.set(size.x || 1, size.y || 1, size.z || 1);
+  }} else {{
+    // box, rounded_box and voxel_cluster share the stable block fallback.
+    geometry = new THREE.BoxGeometry(1,1,1);
+    baseScale.set(size.x || 1, size.y || 1, size.z || 1);
+  }}
+  return {{geometry, baseScale}};
+}}
+
+function addCompiledRenderObject(spec) {{
+  if (!spec || spec.kind === 'portal') return false;
+  const objectGroup = new THREE.Group();
+  const nodeGroups = new Map();
+  const materialById = new Map(
+    (renderSpec?.materials || []).map(item => [item.material_id, item])
+  );
+
+  (spec.nodes || []).forEach(node => {{
+    const built = primitiveGeometry(node.geometry || {{}});
+    const material = compiledMaterial(materialById.get(node.material_id));
+    const mesh = new THREE.Mesh(built.geometry, material);
+    mesh.scale.copy(built.baseScale);
+    mesh.castShadow = node.cast_shadow !== false;
+    mesh.receiveShadow = node.receive_shadow !== false;
+    mesh.visible = node.visible !== false;
+    mesh.renderOrder = node.render_order || 0;
+    mesh.frustumCulled = spec.frustum_culled !== false;
+
+    const group = new THREE.Group();
+    const p = node.local_position || {{}};
+    const q = node.local_quaternion || {{}};
+    const s = node.local_scale || {{}};
+    group.position.set(p.x || 0, p.y || 0, p.z || 0);
+    group.quaternion.set(q.x || 0, q.y || 0, q.z || 0, q.w ?? 1);
+    group.scale.set(s.x ?? 1, s.y ?? 1, s.z ?? 1);
+    group.add(mesh);
+    nodeGroups.set(node.node_id, {{group, parent: node.parent_node_id || ''}});
+  }});
+
+  nodeGroups.forEach(entry => {{
+    const parent = entry.parent ? nodeGroups.get(entry.parent) : null;
+    if (parent) parent.group.add(entry.group);
+    else objectGroup.add(entry.group);
+  }});
+
+  const transform = spec.transform || {{}};
+  const p = transform.position || {{}};
+  const q = transform.quaternion || {{}};
+  const s = transform.scale || {{}};
+  objectGroup.position.set(p.x || 0, p.y || 0, p.z || 0);
+  objectGroup.quaternion.set(q.x || 0, q.y || 0, q.z || 0, q.w ?? 1);
+  objectGroup.scale.set(s.x ?? 1, s.y ?? 1, s.z ?? 1);
+  objectGroup.visible = spec.visible !== false;
+  objectGroup.renderOrder = spec.render_order || 0;
+  objectGroup.layers.set(spec.layer || 0);
+  objectGroup.userData.elementId = spec.element_id;
+  objectGroup.userData.semanticKey = spec.semantic_key || '';
+  objectGroup.userData.traversability = spec.traversability || 'scenic';
+  world.add(objectGroup);
+  return true;
+}}
+
 function addSemanticElement(element, index) {{
   if (!element || element.kind === 'portal') return;
 
@@ -557,7 +718,15 @@ function addSemanticElement(element, index) {{
   }}
 }}
 
-(bp.layout_elements || []).forEach(addSemanticElement);
+const compiledElementIds = new Set();
+if (renderSpec?.objects?.length) {{
+  (renderSpec.objects || []).forEach(spec => {{
+    if (addCompiledRenderObject(spec)) compiledElementIds.add(spec.element_id);
+  }});
+}}
+(bp.layout_elements || []).forEach((element,index) => {{
+  if (!compiledElementIds.has(element.element_id)) addSemanticElement(element,index);
+}});
 
 (bp.paths || []).forEach((path, pathIndex) => {{
   const points = path.points || [];
