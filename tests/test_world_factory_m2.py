@@ -453,3 +453,57 @@ def test_blueprint_preview_rejects_stale_profile_or_scene_plan(tmp_path):
             location_asset_id=world.asset_id,
             style_asset_id=style.asset_id,
         )
+
+
+def test_new_world_starts_unpublished_until_finish(tmp_path):
+    repo = SQLiteStudioRepository(tmp_path / "studio.db")
+    assets = AssetService(repo)
+    world = assets.create_world(
+        name="Draft Garden",
+        description="unfinished world",
+        profile=_profile(),
+    )
+
+    saved = repo.get_asset(world.asset_id)
+    assert saved is not None
+    assert saved.metadata["world_creation_complete"] is False
+    assert assets.is_world_library_visible(saved) is False
+
+    completed = assets.complete_world(world.asset_id)
+    assert completed.metadata["world_creation_complete"] is True
+    assert assets.is_world_library_visible(completed) is True
+
+
+def test_legacy_world_without_completion_metadata_remains_visible(tmp_path):
+    repo = SQLiteStudioRepository(tmp_path / "studio.db")
+    world = AssetService(repo).create_world(
+        name="Legacy Garden",
+        description="legacy world",
+        profile=_profile(),
+    )
+    world.metadata.pop("world_creation_complete", None)
+    repo.save_asset(world)
+
+    saved = repo.get_asset(world.asset_id)
+    assert saved is not None
+    assert AssetService.is_world_library_visible(saved) is True
+
+
+def test_archive_world_hides_library_card_but_preserves_record(tmp_path):
+    repo = SQLiteStudioRepository(tmp_path / "studio.db")
+    assets = AssetService(repo)
+    world = assets.create_world(
+        name="Finished Garden",
+        description="finished world",
+        profile=_profile(),
+    )
+    assets.complete_world(world.asset_id)
+
+    archived = assets.archive_world(world.asset_id)
+
+    assert archived.status == ReviewStatus.ARCHIVED
+    assert assets.is_world_library_visible(archived) is False
+    saved = repo.get_asset(world.asset_id)
+    assert saved is not None
+    assert saved.status == ReviewStatus.ARCHIVED
+    assert saved.metadata["world_profile"]["world_name"] == "Candy Cloud Valley"
