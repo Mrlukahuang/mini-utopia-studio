@@ -70,12 +70,6 @@ def archive_character(asset_id: str) -> None:
     st.session_state.pop(f"confirm_delete_{asset_id}", None)
 
 
-def archive_world(asset_id: str) -> None:
-    """Soft-delete a World while preserving references and creative history."""
-    ctx.assets.archive_world(asset_id)
-    st.session_state.pop(f"confirm_delete_world_{asset_id}", None)
-
-
 def explore_world(asset_id: str) -> None:
     """Open an approved Blueprint in the browser 3D runtime."""
     st.session_state.selected_world_id = asset_id
@@ -782,32 +776,6 @@ elif page == "🗺️ My Worlds":
                     args=(asset,),
                     use_container_width=True,
                 )
-                confirm_world_key = f"confirm_delete_world_{asset.asset_id}"
-                if not st.session_state.get(confirm_world_key):
-                    if st.button(
-                        "🗑️ Delete",
-                        key=f"delete_world_{asset.asset_id}",
-                        use_container_width=True,
-                    ):
-                        st.session_state[confirm_world_key] = True
-                        st.rerun()
-                else:
-                    st.warning("确定删除这个世界？")
-                    if st.button(
-                        "✅ Confirm",
-                        key=f"confirm_delete_world_button_{asset.asset_id}",
-                        type="primary",
-                        use_container_width=True,
-                    ):
-                        archive_world(asset.asset_id)
-                        st.rerun()
-                    if st.button(
-                        "↩ Cancel",
-                        key=f"cancel_delete_world_{asset.asset_id}",
-                        use_container_width=True,
-                    ):
-                        st.session_state[confirm_world_key] = False
-                        st.rerun()
                 st.caption(f"v{asset.version}")
 
             if (
