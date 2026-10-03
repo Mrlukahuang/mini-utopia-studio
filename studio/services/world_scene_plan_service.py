@@ -461,6 +461,8 @@ Return a complete WorldScenePlan."""
     @staticmethod
     def _infer_kind(name: str, default: str = "landmark") -> str:
         lowered = name.lower()
+        if any(token in lowered for token in ("plaza", "square", "广场")):
+            return "structure"
         mapping = (
             ("portal", ("portal", "gate", "arch", "传送门", "拱门")),
             ("water", ("lake", "river", "water", "waterfall", "ocean", "湖", "河", "水", "瀑布", "海")),
