@@ -51,6 +51,14 @@ class WorldConceptService:
         world.metadata["world_blueprint"] = blueprint.model_dump(mode="json")
         world.metadata["world_pipeline"] = "blueprint_first_v1"
         world.metadata["world_blueprint_source"] = "creator_profile"
+        # A rebuilt Blueprint invalidates any older beauty render. Keep the file
+        # as archive history, but require the next preview to be rendered from
+        # the new authoritative layout.
+        for file_ref in world.files:
+            if file_ref.role == "world_concept_approved":
+                file_ref.role = "world_concept_archive"
+        world.metadata.pop("world_concept_path", None)
+        world.metadata.pop("world_preview_source", None)
         world.metadata.pop("world_concept_match_reviewed", None)
         world.metadata.pop("world_concept_match_reviewed_at", None)
         world.metadata["world_concept_match_history"] = []
