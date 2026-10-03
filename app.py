@@ -153,24 +153,62 @@ render_brandbar(studio=(mode == "🛠 Studio"))
 
 # ---------------------------------------------------------------------------
 # Page navigation
-# Only appears after Studio is authenticated, or immediately in Creator Mode.
+# Collapsible hierarchy keeps Creator navigation compact and scalable.
 # ---------------------------------------------------------------------------
 
-page = st.sidebar.radio(
-    "Create",
-    [
-        "🏠 Home",
-        "🎭 My Characters",
-        "✨ Character Factory",
-        "🗺️ My Worlds",
-        "🌍 World Factory",
-        "🎮 Explore World",
-        "🌎 Mini Utopia",
-        "🧪 Playground",
-        "📖 Stories",
-    ],
-    key="app_page",
+NAV_GROUPS = [
+    (
+        "🎭 Characters / 角色",
+        ["🎭 My Characters", "✨ Character Factory"],
+    ),
+    (
+        "🗺️ Worlds / 世界",
+        ["🗺️ My Worlds", "🌍 World Factory", "🎮 Explore World"],
+    ),
+    (
+        "🌎 Universe / 宇宙",
+        ["🌎 Mini Utopia", "📖 Stories"],
+    ),
+    (
+        "🧪 Sandbox / 实验",
+        ["🧪 Playground"],
+    ),
+]
+
+if "app_page" not in st.session_state:
+    st.session_state.app_page = "🏠 Home"
+
+
+def _go_sidebar_page(target_page: str) -> None:
+    st.session_state.app_page = target_page
+
+
+current_page = st.session_state.app_page
+
+st.sidebar.markdown("### Navigate / 导航")
+st.sidebar.button(
+    "🏠 Home",
+    key="nav_home",
+    type="primary" if current_page == "🏠 Home" else "secondary",
+    on_click=_go_sidebar_page,
+    args=("🏠 Home",),
+    use_container_width=True,
 )
+
+for group_label, group_pages in NAV_GROUPS:
+    active_group = current_page in group_pages
+    with st.sidebar.expander(group_label, expanded=active_group):
+        for target_page in group_pages:
+            st.button(
+                target_page,
+                key=f"nav_{target_page}",
+                type="primary" if current_page == target_page else "secondary",
+                on_click=_go_sidebar_page,
+                args=(target_page,),
+                use_container_width=True,
+            )
+
+page = st.session_state.app_page
 
 
 creator_protected_pages = {
