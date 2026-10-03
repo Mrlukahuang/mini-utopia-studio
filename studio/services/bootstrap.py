@@ -20,6 +20,8 @@ from studio.services.world_blueprint_service import WorldBlueprintService
 from studio.services.world_concept_match_service import WorldConceptMatchService
 from studio.services.world_visual_anchor_service import WorldVisualAnchorService
 from studio.services.world_scene_plan_service import WorldScenePlanService
+from studio.services.world_appearance_service import WorldAppearanceService
+from studio.services.world_geometry_compiler_service import WorldGeometryCompilerService
 from studio.providers.openai_image import OpenAIImageProvider
 from studio.providers.openai_vision import OpenAIVisionProvider
 from studio.providers.openai_text import OpenAIStructuredTextProvider
@@ -47,6 +49,8 @@ class StudioContext:
     world_blueprints: WorldBlueprintService
     world_concepts: WorldConceptService
     world_scene_plans: WorldScenePlanService
+    world_appearances: WorldAppearanceService
+    world_geometry_compiler: WorldGeometryCompilerService
     world_concept_match: WorldConceptMatchService
 
 
@@ -128,6 +132,11 @@ def build_context(settings: Settings) -> StudioContext:
     world_blueprints = WorldBlueprintService(
         visual_anchor_service=world_visual_anchors
     )
+    world_appearances = WorldAppearanceService(
+        structured_provider=text_provider,
+        image_analysis_provider=vision_provider,
+    )
+    world_geometry_compiler = WorldGeometryCompilerService()
 
     return StudioContext(
         settings=settings,
@@ -156,9 +165,13 @@ def build_context(settings: Settings) -> StudioContext:
             world_concept_prompts,
             world_blueprints,
             image_provider=image_provider,
+            appearance_service=world_appearances,
+            geometry_compiler=world_geometry_compiler,
         ),
         world_scene_plans=WorldScenePlanService(
             structured_provider=text_provider,
         ),
+        world_appearances=world_appearances,
+        world_geometry_compiler=world_geometry_compiler,
         world_concept_match=WorldConceptMatchService(repository),
     )

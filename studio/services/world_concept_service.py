@@ -6,11 +6,14 @@ from uuid import uuid4
 
 from studio.core.enums import AssetType, ReviewStatus
 from studio.models.asset import AssetFile, now_utc
+from studio.models.render import WorldAppearancePlan, WorldRenderSpec
 from studio.models.world import WorldBlueprint, WorldProfile, WorldScenePlan
 from studio.providers.base import ImageGenerationProvider
 from studio.repositories.base import StudioRepository
 from studio.services.world_concept_prompt_service import WorldConceptPromptService
 from studio.services.world_blueprint_service import WorldBlueprintService
+from studio.services.world_appearance_service import WorldAppearanceService
+from studio.services.world_geometry_compiler_service import WorldGeometryCompilerService
 from studio.storage.base import ObjectStorage
 
 
@@ -22,12 +25,16 @@ class WorldConceptService:
         prompt_service: WorldConceptPromptService,
         blueprint_service: WorldBlueprintService,
         image_provider: ImageGenerationProvider | None = None,
+        appearance_service: WorldAppearanceService | None = None,
+        geometry_compiler: WorldGeometryCompilerService | None = None,
     ):
         self.repository = repository
         self.storage = storage
         self.prompt_service = prompt_service
         self.blueprint_service = blueprint_service
         self.image_provider = image_provider
+        self.appearance_service = appearance_service
+        self.geometry_compiler = geometry_compiler
 
     @property
     def is_available(self) -> bool:
@@ -78,6 +85,12 @@ class WorldConceptService:
             world.metadata["world_blueprint_source"] = "legacy_creator_profile"
 
         world.metadata["world_blueprint"] = blueprint.model_dump(mode="json")
+        self._refresh_render_pipeline(
+            world=world,
+            profile=profile,
+            blueprint=blueprint,
+            style_asset_id=style_asset_id,
+        )
         world.metadata["world_pipeline"] = "blueprint_first_v1"
         # A rebuilt Blueprint invalidates any older beauty render. Keep the file
         # as archive history, but require the next preview to be rendered from
@@ -157,10 +170,23 @@ class WorldConceptService:
                 "World Preview requires a current Blueprint with layout elements."
             )
         blueprint_snapshot = blueprint.model_dump(mode="json")
+        self._refresh_render_pipeline(
+            world=world,
+            profile=profile,
+            blueprint=blueprint,
+            style_asset_id=style_asset_id,
+        )
+        raw_appearance = world.metadata.get("world_appearance_plan")
+        appearance_plan = (
+            WorldAppearancePlan.model_validate(raw_appearance)
+            if raw_appearance
+            else None
+        )
         prompt = self.prompt_service.compose_from_blueprint(
             profile=profile,
             blueprint=blueprint,
             style_profile=style.metadata.get("style_profile", {}),
+            appearance_plan=appearance_plan,
         )
         image_bytes = self.image_provider.generate(
             prompt=prompt,
@@ -185,6 +211,14 @@ class WorldConceptService:
         world.metadata["world_preview_path"] = path
         world.metadata["world_preview_source"] = "blueprint"
         world.metadata["world_preview_last_prompt"] = prompt
+        self._refresh_render_pipeline(
+            world=world,
+            profile=profile,
+            blueprint=blueprint,
+            style_asset_id=style_asset_id,
+            preview_image_bytes=image_bytes,
+            preview_mime_type="image/png",
+        )
         world.metadata["world_pipeline"] = "blueprint_first_v1"
         world.status = ReviewStatus.APPROVED
         world.updated_at = now_utc()
@@ -200,6 +234,86 @@ class WorldConceptService:
         if persisted.metadata.get("world_blueprint") != blueprint_snapshot:
             raise RuntimeError("World Blueprint changed while rendering Preview.")
         return file_ref
+
+    def _refresh_render_pipeline(
+        self,
+        *,
+        world,
+        profile: WorldProfile,
+        blueprint: WorldBlueprint,
+        style_asset_id: str | None,
+        preview_image_bytes: bytes | None = None,
+        preview_mime_type: str = "image/png",
+    ) -> None:
+        """Refresh appearance/render data without changing Blueprint world logic."""
+        if self.appearance_service is None or self.geometry_compiler is None:
+            return
+
+        style_profile: dict = {}
+        if style_asset_id:
+            style = self.repository.get_asset(style_asset_id)
+            if style is not None:
+                style_profile = style.metadata.get("style_profile", {}) or {}
+
+        blueprint_fingerprint = self._fingerprint(blueprint.model_dump_json())
+        raw_plan = world.metadata.get("world_appearance_plan")
+        can_reuse_plan = bool(
+            raw_plan
+            and world.metadata.get("world_render_blueprint_fingerprint")
+            == blueprint_fingerprint
+        )
+        if can_reuse_plan:
+            try:
+                appearance = WorldAppearancePlan.model_validate(raw_plan)
+            except Exception:
+                appearance = self.appearance_service.plan_from_blueprint(
+                    profile=profile,
+                    blueprint=blueprint,
+                    style_profile=style_profile,
+                )
+        else:
+            appearance = self.appearance_service.plan_from_blueprint(
+                profile=profile,
+                blueprint=blueprint,
+                style_profile=style_profile,
+            )
+
+        if preview_image_bytes:
+            appearance = self.appearance_service.refine_from_preview(
+                profile=profile,
+                blueprint=blueprint,
+                style_profile=style_profile,
+                base_plan=appearance,
+                image_bytes=preview_image_bytes,
+                mime_type=preview_mime_type,
+            )
+            world.metadata["world_appearance_source"] = "blueprint+preview_vision"
+        else:
+            world.metadata["world_appearance_source"] = "blueprint+creator_prompt"
+
+        render_spec = self.geometry_compiler.compile(
+            profile=profile,
+            blueprint=blueprint,
+            appearance=appearance,
+            style_profile=style_profile,
+        )
+        world.metadata["world_appearance_plan"] = appearance.model_dump(mode="json")
+        world.metadata["world_appearance_schema_version"] = appearance.schema_version
+        world.metadata["world_render_spec"] = render_spec.model_dump(mode="json")
+        world.metadata["world_render_schema_version"] = render_spec.schema_version
+        world.metadata["world_render_blueprint_fingerprint"] = blueprint_fingerprint
+
+    def current_render_spec(self, location_asset_id: str) -> WorldRenderSpec | None:
+        world = self.repository.get_asset(location_asset_id)
+        if world is None:
+            return None
+        raw = world.metadata.get("world_render_spec")
+        if not raw:
+            return None
+        try:
+            return WorldRenderSpec.model_validate(raw)
+        except Exception:
+            return None
 
     @staticmethod
     def _fingerprint(value: str) -> str:

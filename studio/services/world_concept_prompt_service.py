@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from studio.models.render import WorldAppearancePlan
 from studio.models.world import WorldBlueprint, WorldProfile
 
 
@@ -101,6 +102,7 @@ NEGATIVE RULES
         profile: WorldProfile,
         blueprint: WorldBlueprint,
         style_profile: dict,
+        appearance_plan: WorldAppearancePlan | None = None,
     ) -> str:
         """Render one beauty preview from an already authoritative Blueprint."""
         base = self.compose(
@@ -127,6 +129,23 @@ NEGATIVE RULES
                 f"geometry_role={element.geometry_role}; "
                 f"traversability={element.traversability}"
             )
+        appearance_lines = []
+        if appearance_plan is not None:
+            for item in appearance_plan.objects:
+                parts = ", ".join(
+                    f"{part.role}:{part.primitive}/"
+                    f"{part.palette_role}/{part.material_role}"
+                    for part in [item.main_body, *item.parts[:8]]
+                )
+                appearance_lines.append(
+                    f"- {item.element_id} {item.name}: "
+                    f"silhouette={item.silhouette_family}; "
+                    f"strategy={item.geometry_strategy}; "
+                    f"edge={item.edge_profile}; "
+                    f"parts=[{parts}]; "
+                    f"notes={item.silhouette_notes}"
+                )
+
         path_lines = []
         for path in blueprint.paths[:2]:
             coords = " -> ".join(
@@ -144,10 +163,18 @@ NEGATIVE RULES
             + ("\n".join(layout_lines) or "- No explicit layout elements")
             + "\n\nDISCOVERY PATH\n"
             + ("\n".join(path_lines) or "- No explicit path")
+            + "\n\nOBJECT APPEARANCE DIRECTION\n"
+            + (
+                "\n".join(appearance_lines)
+                if appearance_lines
+                else "- No separate AppearancePlan; infer appearance from Blueprint semantics."
+            )
             + "\n\nVISUALIZATION RULES\n"
             + "- Interpret x/y/z coordinates as spatial composition, not visible labels; y is real elevation.\n"
             + "- Preserve spatial_mode, orientation and geometry_role. Floating/aerial/suspended/inverted elements must remain that way.\n"
             + "- Preserve relative positions, vertical hierarchy and major scale hierarchy from the Blueprint.\n"
+            + "- Treat OBJECT APPEARANCE DIRECTION as the shared visual construction plan for silhouette and parts.\n"
+            + "- Keep every object inside one coherent Mini Utopia geometry/material language; do not introduce a competing style.\n"
             + "- You may enrich small decoration, foliage, lighting, atmospheric depth and surface detail.\n"
             + "- Do not draw a top-down map, grid, coordinate labels, measurements or blueprint UI.\n"
             + "- Produce one cinematic wide World Preview that looks like the finished playable world."
