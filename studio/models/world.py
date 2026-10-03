@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from studio.models.location import LocationProfile
 
@@ -126,6 +126,8 @@ class WorldVisualAnchor(BaseModel):
 
 class WorldVisualAnalysis(BaseModel):
     """Visible evidence extracted from an approved World Concept image."""
+
+    model_config = ConfigDict(extra="forbid")
 
     concept_summary: str
     must_preserve: list[str]
