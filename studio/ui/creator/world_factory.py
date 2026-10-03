@@ -619,7 +619,10 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
             ]
             for item in required_items:
                 hint = f" · {item.placement_hint}" if item.placement_hint else ""
-                st.write(f"• **{item.name}** · {item.kind}{hint}")
+                st.write(
+                    f"• **{item.name}** · {item.kind} · "
+                    f"{item.spatial_mode}/{item.geometry_role}{hint}"
+                )
         with enrich_col:
             st.markdown("**✨ Mini Utopia Enrichment**")
             enrichment = [
@@ -629,7 +632,10 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
             ]
             if enrichment:
                 for item in enrichment:
-                    st.write(f"• **{item.name}** · {item.kind}")
+                    st.write(
+                        f"• **{item.name}** · {item.kind} · "
+                        f"{item.spatial_mode}/{item.geometry_role}"
+                    )
             else:
                 st.caption("No extra enrichment / 没有额外补充")
 
@@ -669,7 +675,9 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
             for element in blueprint.layout_elements[:10]:
                 st.write(
                     f"**{element.name}** · {element.kind} · "
-                    f"x={element.position.x:.1f}, z={element.position.z:.1f}"
+                    f"{element.spatial_mode}/{element.geometry_role} · "
+                    f"x={element.position.x:.1f}, y={element.position.y:.1f}, "
+                    f"z={element.position.z:.1f}"
                 )
             st.caption(
                 "这里的结构才是 3D Runtime 的 source of truth。"
