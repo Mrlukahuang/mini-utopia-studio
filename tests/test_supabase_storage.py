@@ -7,9 +7,16 @@ from studio.storage.supabase import SupabaseObjectStorage
 
 
 class FakeResponse:
-    def __init__(self, status_code=200, content=b""):
+    def __init__(self, status_code=200, content=b"", json_data=None):
         self.status_code = status_code
         self.content = content
+        self.text = content.decode("utf-8", errors="ignore") if isinstance(content, bytes) else str(content)
+        self._json_data = json_data
+
+    def json(self):
+        if self._json_data is None:
+            raise ValueError("no json")
+        return self._json_data
 
     def raise_for_status(self):
         if self.status_code >= 400:
@@ -75,3 +82,32 @@ def test_exists_returns_false_on_404(monkeypatch):
 def test_resolve_is_not_available_for_remote_storage():
     with pytest.raises(RuntimeError, match="no local filesystem path"):
         _storage().resolve("assets/anything.glb")
+
+
+def test_exists_returns_false_on_supabase_400_object_not_found(monkeypatch):
+    monkeypatch.setattr(
+        requests,
+        "get",
+        lambda *args, **kwargs: FakeResponse(
+            400,
+            b'{"statusCode":"404","error":"not_found","message":"Object not found"}',
+            {"statusCode": "404", "error": "not_found", "message": "Object not found"},
+        ),
+    )
+
+    assert _storage().exists("settings/reference_characters.json") is False
+
+
+def test_exists_still_raises_on_unrelated_400(monkeypatch):
+    monkeypatch.setattr(
+        requests,
+        "get",
+        lambda *args, **kwargs: FakeResponse(
+            400,
+            b'{"message":"Invalid request"}',
+            {"message": "Invalid request"},
+        ),
+    )
+
+    with pytest.raises(requests.HTTPError):
+        _storage().exists("settings/reference_characters.json")
