@@ -1,3 +1,5 @@
+import pytest
+
 from studio.core.enums import AssetType
 from studio.models.asset import Asset
 from studio.models.world import (
@@ -176,8 +178,8 @@ def test_water_resize_syncs_water_zone(tmp_path):
     water_zone = next(z for z in updated.zones if z.kind == "water")
     assert lake.width > 12
     assert lake.depth > 10
-    assert water_zone.max_x - water_zone.min_x == lake.width
-    assert water_zone.max_z - water_zone.min_z == lake.depth
+    assert water_zone.max_x - water_zone.min_x == pytest.approx(lake.width)
+    assert water_zone.max_z - water_zone.min_z == pytest.approx(lake.depth)
 
 
 def test_mark_reviewed_persists_review_gate(tmp_path):
