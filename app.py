@@ -670,11 +670,18 @@ elif page == "🗺️ My Worlds":
                     )
 
                 blueprint = asset.metadata.get("world_blueprint")
-                if blueprint:
+                approved_concept = asset.metadata.get("world_concept_path")
+                has_candidate = any(
+                    file_ref.role == "world_concept_candidate"
+                    for file_ref in asset.files
+                )
+                if blueprint and approved_concept:
                     st.success("🎮 Ready to Explore / 可以进入世界")
                     st.caption("50×50 Mini World · Portal + Landmarks + Director Tour ready")
+                elif has_candidate:
+                    st.warning("💖 Concept generated · please choose one in World Factory")
                 else:
-                    st.caption("✨ Concept ready · waiting to become playable")
+                    st.caption("✨ Concept not approved yet")
 
             with action_col:
                 blueprint = asset.metadata.get("world_blueprint")
