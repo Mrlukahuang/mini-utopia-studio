@@ -569,6 +569,14 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
                             candidate_path=candidate["path"],
                             style_asset_id=style_asset_id,
                         )
+                        saved_world = ctx.repository.get_asset(asset_id)
+                        if saved_world is None:
+                            raise RuntimeError("Approved World could not be reloaded.")
+                        if not saved_world.metadata.get("world_concept_path"):
+                            raise RuntimeError("Approved Concept path is missing after save.")
+                        if not saved_world.metadata.get("world_blueprint"):
+                            raise RuntimeError("Blueprint is missing after save.")
+
                         st.session_state.world_concept_candidates = []
                         st.session_state.editing_world_id = None
                         st.session_state.pending_app_page = "🗺️ My Worlds"
