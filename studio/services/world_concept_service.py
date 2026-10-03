@@ -112,12 +112,15 @@ class WorldConceptService:
 
         profile = WorldProfile.model_validate(world.metadata.get("world_profile", {}))
         concept_direction = selected.path.rsplit("/", 1)[-1].split("_", 1)[0]
+        concept_image_bytes = self.storage.get_bytes(selected.path)
         blueprint = self.blueprint_service.build(
             location_asset_id=world.asset_id,
             style_asset_id=style_asset_id,
             profile=profile,
             concept_path=selected.path,
             concept_direction=concept_direction,
+            concept_image_bytes=concept_image_bytes,
+            concept_mime_type=selected.mime_type or "image/png",
         )
         world.metadata["world_blueprint"] = blueprint.model_dump(mode="json")
         world.updated_at = now_utc()
