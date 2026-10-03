@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+
 from uuid import uuid4
 
 from studio.core.enums import AssetType, ReviewStatus
@@ -56,8 +58,13 @@ class WorldConceptService:
                 profile=profile,
                 scene_plan=scene_plan,
             )
+            scene_fingerprint = self._fingerprint(scene_plan.model_dump_json())
+            profile_fingerprint = self._fingerprint(profile.model_dump_json())
             world.metadata["world_scene_plan"] = scene_plan.model_dump(mode="json")
             world.metadata["world_scene_plan_version"] = scene_plan.schema_version
+            world.metadata["world_scene_plan_fingerprint"] = scene_fingerprint
+            world.metadata["world_blueprint_scene_plan_fingerprint"] = scene_fingerprint
+            world.metadata["world_blueprint_profile_fingerprint"] = profile_fingerprint
             world.metadata["world_blueprint_source"] = (
                 f"scene_plan:{scene_plan.source_mode}"
             )
@@ -128,9 +135,22 @@ class WorldConceptService:
             raise ValueError(
                 "World Preview requires a Blueprint-first plan. Rebuild the Blueprint first."
             )
-        if not world.metadata.get("world_scene_plan"):
+        raw_scene_plan = world.metadata.get("world_scene_plan")
+        if not raw_scene_plan:
             raise ValueError(
                 "World Preview requires a Scene Plan. Rebuild this World with the current planner."
+            )
+        current_scene = WorldScenePlan.model_validate(raw_scene_plan)
+        current_scene_fingerprint = self._fingerprint(current_scene.model_dump_json())
+        current_profile_fingerprint = self._fingerprint(profile.model_dump_json())
+        if (
+            world.metadata.get("world_blueprint_scene_plan_fingerprint")
+            != current_scene_fingerprint
+            or world.metadata.get("world_blueprint_profile_fingerprint")
+            != current_profile_fingerprint
+        ):
+            raise ValueError(
+                "World Preview requires a Blueprint rebuilt from the current Scene Plan and Profile."
             )
         if not blueprint.layout_elements:
             raise ValueError(
@@ -180,6 +200,10 @@ class WorldConceptService:
         if persisted.metadata.get("world_blueprint") != blueprint_snapshot:
             raise RuntimeError("World Blueprint changed while rendering Preview.")
         return file_ref
+
+    @staticmethod
+    def _fingerprint(value: str) -> str:
+        return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
     def current_preview(self, location_asset_id: str) -> AssetFile | None:
         """Return the current Blueprint-first beauty preview, if one exists."""
