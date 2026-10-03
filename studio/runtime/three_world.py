@@ -176,20 +176,61 @@ const palette = (visualAnchor.palette_hexes && visualAnchor.palette_hexes.length
   : (profile.theme_color_hexes && profile.theme_color_hexes.length)
     ? profile.theme_color_hexes
     : ['#F7B7D2','#B9E7D0','#D7C2F3','#BDE3F7','#FFF4D7'];
-scene.background = new THREE.Color(palette[3] || '#BDE3F7');
-scene.fog = new THREE.Fog(scene.background, 55, 95);
+const renderEnv = renderSpec?.environment || {{}};
+scene.background = new THREE.Color(renderEnv.background_hex || palette[3] || '#BDE3F7');
+scene.fog = new THREE.Fog(
+  new THREE.Color(renderEnv.fog_hex || renderEnv.background_hex || palette[3] || '#BDE3F7'),
+  renderEnv.fog_near || 55,
+  renderEnv.fog_far || 95
+);
 
 const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 180);
 
-const hemi = new THREE.HemisphereLight(0xffffff, 0xcfc7e8, 2.3);
-scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xfff4df, 3.2);
-sun.position.set(24, 34, 18);
-sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
-sun.shadow.camera.left = -55; sun.shadow.camera.right = 55;
-sun.shadow.camera.top = 55; sun.shadow.camera.bottom = -55;
-scene.add(sun);
+function addRenderLight(spec) {{
+  const intensityScale = renderEnv.environment_intensity ?? 1;
+  let light = null;
+  if (spec.kind === 'ambient') {{
+    light = new THREE.AmbientLight(spec.color_hex || '#FFFFFF', (spec.intensity || 1) * intensityScale);
+  }} else if (spec.kind === 'point') {{
+    light = new THREE.PointLight(spec.color_hex || '#FFFFFF', (spec.intensity || 1) * intensityScale, 0);
+  }} else if (spec.kind === 'directional') {{
+    light = new THREE.DirectionalLight(spec.color_hex || '#FFFFFF', (spec.intensity || 1) * intensityScale);
+    const target = new THREE.Object3D();
+    target.position.set(spec.target?.x || 0, spec.target?.y || 0, spec.target?.z || 0);
+    scene.add(target);
+    light.target = target;
+  }} else {{
+    light = new THREE.HemisphereLight(
+      spec.color_hex || '#FFFFFF',
+      '#CFC7E8',
+      (spec.intensity || 1) * intensityScale
+    );
+  }}
+  light.position.set(spec.position?.x || 0, spec.position?.y || 20, spec.position?.z || 0);
+  light.castShadow = Boolean(spec.cast_shadow);
+  if (light.shadow) {{
+    light.shadow.mapSize.set(2048,2048);
+    if (light.shadow.camera) {{
+      light.shadow.camera.left = -55; light.shadow.camera.right = 55;
+      light.shadow.camera.top = 55; light.shadow.camera.bottom = -55;
+    }}
+  }}
+  scene.add(light);
+}}
+
+if (renderSpec?.environment?.lights?.length) {{
+  renderSpec.environment.lights.forEach(addRenderLight);
+}} else {{
+  const hemi = new THREE.HemisphereLight(0xffffff, 0xcfc7e8, 2.3);
+  scene.add(hemi);
+  const sun = new THREE.DirectionalLight(0xfff4df, 3.2);
+  sun.position.set(24, 34, 18);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.left = -55; sun.shadow.camera.right = 55;
+  sun.shadow.camera.top = 55; sun.shadow.camera.bottom = -55;
+  scene.add(sun);
+}}
 
 const world = new THREE.Group();
 scene.add(world);
