@@ -226,7 +226,7 @@ class WorldSceneElement(BaseModel):
 class WorldScenePlan(BaseModel):
     """Shared semantic contract between Prompt/Custom creation and Blueprint."""
 
-    schema_version: str = SCENE_PLAN_SCHEMA_VERSION
+    schema_version: Literal["0.1"] = SCENE_PLAN_SCHEMA_VERSION
     source_mode: Literal["prompt", "custom"]
     summary: str
     route_intent: str
