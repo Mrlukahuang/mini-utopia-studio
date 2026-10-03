@@ -164,3 +164,17 @@ def test_runtime_html_has_idle_walk_run_and_glb_loader_path():
     assert "ShiftLeft" in html
     assert "setAnimationState" in html
     assert "updateProceduralAnimation" in html
+
+
+def test_runtime_html_has_import_map_and_error_overlay():
+    html = build_world_runtime_html(
+        world_name="Candy Cloud Valley",
+        profile=WorldProfile(theme_color_hexes=["#F7B7D2"]),
+        blueprint=_blueprint(),
+    )
+
+    assert '<script type="importmap">' in html
+    assert '"three": "https://cdn.jsdelivr.net/npm/three@' in html
+    assert "three/addons/loaders/GLTFLoader.js" in html
+    assert 'id="runtimeError"' in html
+    assert "3D Runtime error:" in html
