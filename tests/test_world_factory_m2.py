@@ -224,8 +224,11 @@ def test_blueprint_preview_render_never_mutates_blueprint(tmp_path):
     assert saved.metadata["world_blueprint"] == before
     assert saved.metadata["world_pipeline"] == "blueprint_first_v1"
     assert saved.metadata["world_preview_source"] == "blueprint"
-    assert saved.metadata["world_concept_path"] == preview.path
-    assert preview.role == "world_concept_approved"
+    assert saved.metadata["world_preview_path"] == preview.path
+    assert "world_concept_path" not in saved.metadata
+    assert preview.role == "world_preview"
+    assert service.current_preview(world.asset_id).path == preview.path
+    assert service.current_concept(world.asset_id) is None
     assert len(provider.calls) == 1
     assert provider.calls[0]["size"] == "1536x1024"
     assert provider.calls[0]["quality"] == "medium"
@@ -336,3 +339,48 @@ def test_blueprint_preview_rejects_missing_layout_elements(tmp_path):
             location_asset_id=world.asset_id,
             style_asset_id=style.asset_id,
         )
+
+
+def test_replanning_archives_old_preview_and_clears_preview_metadata(tmp_path):
+    repo = SQLiteStudioRepository(tmp_path / "studio.db")
+    storage = LocalObjectStorage(tmp_path / "storage")
+    assets = AssetService(repo)
+    style = StyleService(repo).ensure_mini_utopia_base()
+    world = assets.create_world(
+        name="Preview Garden",
+        description="dream world",
+        profile=_profile(),
+    )
+    service = WorldConceptService(
+        repo,
+        storage,
+        WorldConceptPromptService(),
+        WorldBlueprintService(),
+        FakeWorldImageProvider(),
+    )
+
+    service.plan_blueprint(
+        location_asset_id=world.asset_id,
+        style_asset_id=style.asset_id,
+    )
+    preview = service.render_blueprint_preview(
+        location_asset_id=world.asset_id,
+        style_asset_id=style.asset_id,
+    )
+    assert service.current_preview(world.asset_id) is not None
+
+    service.plan_blueprint(
+        location_asset_id=world.asset_id,
+        style_asset_id=style.asset_id,
+    )
+
+    saved = repo.get_asset(world.asset_id)
+    assert saved is not None
+    assert "world_preview_path" not in saved.metadata
+    assert "world_preview_source" not in saved.metadata
+    assert "world_preview_last_prompt" not in saved.metadata
+    assert service.current_preview(world.asset_id) is None
+    assert any(
+        file_ref.path == preview.path and file_ref.role == "world_preview_archive"
+        for file_ref in saved.files
+    )
