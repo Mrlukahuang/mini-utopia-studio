@@ -246,3 +246,39 @@ def test_archive_world_soft_deletes_without_removing_record(tmp_path):
     saved = repo.get_asset(world.asset_id)
     assert saved is not None
     assert saved.status == ReviewStatus.ARCHIVED
+
+
+def test_blueprint_first_uses_prompt_spatial_relation(tmp_path):
+    repo = SQLiteStudioRepository(tmp_path / "studio.db")
+    storage = LocalObjectStorage(tmp_path / "storage")
+    assets = AssetService(repo)
+    style = StyleService(repo).ensure_mini_utopia_base()
+    profile = _profile().model_copy(
+        update={
+            "source_description": "A Star Arch behind Lake.",
+            "portal_form": "Star Arch / 星星拱门",
+            "water_features": ["Lake / 湖泊"],
+            "landmark_ideas": [],
+        }
+    )
+    world = assets.create_world(
+        name="Spatial Garden",
+        description=profile.source_description,
+        profile=profile,
+    )
+    service = WorldConceptService(
+        repo,
+        storage,
+        WorldConceptPromptService(),
+        WorldBlueprintService(),
+        image_provider=None,
+    )
+
+    blueprint = service.plan_blueprint(
+        location_asset_id=world.asset_id,
+        style_asset_id=style.asset_id,
+    )
+
+    portal = next(e for e in blueprint.layout_elements if e.kind == "portal")
+    lake = next(e for e in blueprint.layout_elements if e.kind == "water")
+    assert portal.position.z < lake.position.z
