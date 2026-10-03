@@ -31,6 +31,8 @@ class WorldBlueprintService:
         profile: WorldProfile,
         concept_path: str,
         concept_direction: str = "",
+        concept_image_bytes: bytes | None = None,
+        concept_mime_type: str = "image/png",
     ) -> WorldBlueprint:
         chunks = [
             ChunkSpec(
@@ -191,6 +193,8 @@ class WorldBlueprintService:
                 profile=profile,
                 concept_direction=concept_direction,
                 concept_path=concept_path,
+                image_bytes=concept_image_bytes,
+                mime_type=concept_mime_type,
             ),
             camera_points=camera_points,
             director_tours=[director_tour],
