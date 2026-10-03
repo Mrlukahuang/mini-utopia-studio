@@ -263,3 +263,41 @@ def test_runtime_renders_compiled_layout_water_and_concept_palette():
     assert "(bp.layout_elements || []).forEach" in html
     assert "element.kind === 'water'" in html
     assert "CylinderGeometry" in html
+
+
+def test_runtime_html_has_zoom_wheel_and_blueprint_aware_overview_camera():
+    blueprint = _blueprint()
+    blueprint.layout_elements = [
+        WorldLayoutElement(
+            element_id="SCENE_AERIAL",
+            name="Aerial Landmark",
+            kind="landmark",
+            spatial_mode="aerial",
+            elevation="high",
+            geometry_role="organic",
+            position=WorldPoint(x=40, y=22, z=40),
+            width=10,
+            depth=7,
+            height=8,
+        )
+    ]
+
+    html = build_world_runtime_html(
+        world_name="Vertical World",
+        profile=WorldProfile(world_name="Vertical World"),
+        blueprint=blueprint,
+    )
+
+    assert 'id="zoomOut"' in html
+    assert 'id="zoomIn"' in html
+    assert 'id="overview"' in html
+    assert 'id="zoomState"' in html
+    assert "renderer.domElement.addEventListener('wheel'" in html
+    assert "const layoutTopY = Math.max" in html
+    assert "const worldTopY = Math.max" in html
+    assert "const overviewTarget = new THREE.Vector3" in html
+    assert "function showOverview()" in html
+    assert "overviewMode = false" in html
+    assert "baseFollowOffset" in html
+    assert "multiplyScalar(followZoom)" in html
+    assert "Mouse Wheel / 滚轮缩放" in html
