@@ -3,7 +3,7 @@ from __future__ import annotations
 from uuid import uuid4
 
 from studio.core.enums import AssetType, ReviewStatus
-from studio.models.asset import AssetFile
+from studio.models.asset import AssetFile, now_utc
 from studio.models.world import WorldProfile
 from studio.providers.base import ImageGenerationProvider
 from studio.repositories.base import StudioRepository
@@ -77,6 +77,7 @@ class WorldConceptService:
         world.status = ReviewStatus.NEEDS_REVIEW
         world.metadata["world_concept_last_prompt"] = prompt
         world.metadata["world_concept_last_direction"] = direction
+        world.updated_at = now_utc()
         self.repository.save_asset(world)
         return file_ref
 
@@ -119,7 +120,17 @@ class WorldConceptService:
             concept_direction=concept_direction,
         )
         world.metadata["world_blueprint"] = blueprint.model_dump(mode="json")
+        world.updated_at = now_utc()
         self.repository.save_asset(world)
+
+        persisted = self.repository.get_asset(world.asset_id)
+        if persisted is None:
+            raise RuntimeError("Approved World disappeared after persistence write.")
+        if persisted.metadata.get("world_concept_path") != selected.path:
+            raise RuntimeError("Approved World Concept was not durably persisted.")
+        if not persisted.metadata.get("world_blueprint"):
+            raise RuntimeError("World Blueprint was not durably persisted.")
+
         return selected
 
     def current_concept(self, location_asset_id: str) -> AssetFile | None:
