@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import streamlit as st
+import streamlit.components.v1 as components
 
-from studio.models.world import WorldProfile
+from studio.models.world import WorldBlueprint, WorldProfile
 from studio.ui.creator.world_presets import (
     ARCHITECTURE_OPTIONS,
     LANDMARK_OPTIONS,
@@ -21,6 +22,7 @@ from studio.ui.creator.world_presets import (
     WEATHER_OPTIONS,
     WORLD_TYPE_OPTIONS,
 )
+from studio.ui.creator.concept_match_review import _layout_svg
 from studio.ui.theme import render_game_hero, render_quest
 
 
@@ -136,8 +138,8 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
 
     render_game_hero(
         "Build a Mini World 🌍",
-        "先想象，再选择，再把它变成可以进入的世界。和 Character Factory 一样，两种方式开始，同一套结构完成。",
-        kicker="WORLD FACTORY · DREAM TO PLAYABLE",
+        "先想象，再搭 Blueprint，再把同一个世界渲染出来。Prompt 和 Custom 最终走同一条可玩世界管线。",
+        kicker="WORLD FACTORY · BLUEPRINT FIRST",
     )
 
     draft: WorldProfile | None = st.session_state.get("world_draft")
@@ -444,7 +446,7 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
     final_profile = draft
     name = st.session_state.get("world_name", final_profile.world_name).strip()
 
-    st.markdown("### ✨ Create / 把世界先画出来")
+    st.markdown("### 🧩 Create / 先搭世界，再渲染")
     info, palette = st.columns([1.5, 1])
     with info:
         st.markdown(f"#### {name or 'New Mini World'}")
@@ -470,124 +472,180 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
     if not name:
         st.warning("请返回 Identity 给这个世界取一个名字。")
 
-    concept_count = st.radio(
-        "How many directions? / 生成几个方向？",
-        options=[1, 2, 3],
-        index=2,
-        horizontal=True,
-        help="1 = Playable, 2 = Playable + Dream, 3 = Playable + Dream + Story",
+    editing_id = st.session_state.get("editing_world_id")
+    saved_world = ctx.repository.get_asset(editing_id) if editing_id else None
+    raw_blueprint = (
+        saved_world.metadata.get("world_blueprint")
+        if saved_world is not None
+        else None
     )
-    directions = ["playable", "dream", "story"][: int(concept_count)]
+    blueprint = (
+        WorldBlueprint.model_validate(raw_blueprint)
+        if raw_blueprint
+        else None
+    )
+    desired_profile = final_profile.model_copy(update={"world_name": name})
+    saved_profile = (
+        WorldProfile.model_validate(saved_world.metadata.get("world_profile", {}))
+        if saved_world is not None
+        else None
+    )
+    profile_changed = bool(
+        saved_profile is not None
+        and desired_profile.model_dump(mode="json")
+        != saved_profile.model_dump(mode="json")
+    )
+    blueprint_first_current = bool(
+        saved_world is not None
+        and blueprint is not None
+        and saved_world.metadata.get("world_pipeline") == "blueprint_first_v1"
+        and blueprint.layout_elements
+        and not profile_changed
+    )
 
-    count = int(st.session_state.get("creator_generation_count", 0))
-    remaining = max(0, MAX_GENERATIONS_PER_SESSION - count)
-    st.caption(f"🎟️ 本次会话剩余生成次数：{remaining}/{MAX_GENERATIONS_PER_SESSION}")
+    st.markdown("#### 1 · Blueprint / 先确定世界结构")
+    st.caption(
+        "Blueprint 决定这个世界里有什么、在哪里、怎么走。"
+        " World Preview 只负责把这个已经确定的世界画漂亮。"
+    )
 
-    back, generate = st.columns([1, 2])
+    back, plan_col = st.columns([1, 2])
     with back:
         if st.button("← Back to Edit", use_container_width=True):
             go(3)
-    with generate:
+    with plan_col:
+        plan_label = (
+            "🔄 Rebuild Playable Blueprint / 重建可玩蓝图"
+            if blueprint is not None
+            else "🧩 Build Playable Blueprint / 生成可玩蓝图"
+        )
         if st.button(
-            "✨ Generate World Concepts / 生成世界概念图",
+            plan_label,
             type="primary",
-            disabled=(
-                not name
-                or not ctx.world_concepts.is_available
-                or remaining < len(directions)
-            ),
+            disabled=not bool(name and style_asset_id),
             use_container_width=True,
         ):
-            if not style_asset_id:
-                st.error("Mini Utopia Global Style Canon 尚未连接。")
-            else:
-                try:
-                    editing_id = st.session_state.get("editing_world_id")
-                    final_profile = final_profile.model_copy(update={"world_name": name})
-                    st.session_state.world_draft = final_profile
-                    if editing_id:
-                        asset = ctx.assets.update_world(
-                            asset_id=editing_id,
-                            name=name,
-                            description=final_profile.source_description,
-                            profile=final_profile,
-                        )
-                    else:
-                        asset = ctx.assets.create_world(
-                            name=name,
-                            description=final_profile.source_description,
-                            profile=final_profile,
-                        )
-                        st.session_state.editing_world_id = asset.asset_id
-
-                    generated = []
-                    with st.spinner("🌈 正在把你的世界想象画出来…"):
-                        for direction in directions:
-                            candidate = ctx.world_concepts.generate_candidate(
-                                location_asset_id=asset.asset_id,
-                                style_asset_id=style_asset_id,
-                                direction=direction,
-                            )
-                            generated.append({"direction": direction, "path": candidate.path})
-
-                    st.session_state.world_concept_candidates = generated
-                    st.session_state.creator_generation_count = count + len(generated)
-                    st.rerun()
-                except Exception as exc:
-                    st.error(f"World concept generation failed / 生成失败: {exc}")
-
-    if not ctx.world_concepts.is_available:
-        st.info("Image API 尚未连接；目前可以保存 World Profile，但不能生成 Concept Art。")
-
-    candidates = st.session_state.get("world_concept_candidates", [])
-    if candidates:
-        st.markdown("### 🌟 Choose / 哪一个最像你脑海里的世界？")
-        cols = st.columns(len(candidates))
-        for col, candidate in zip(cols, candidates):
-            with col:
-                direction = candidate["direction"]
-                try:
-                    st.image(
-                        ctx.storage.get_bytes(candidate["path"]),
-                        caption=DIRECTION_LABELS.get(direction, direction),
-                        use_container_width=True,
+            try:
+                st.session_state.world_draft = desired_profile
+                if editing_id:
+                    asset = ctx.assets.update_world(
+                        asset_id=editing_id,
+                        name=name,
+                        description=desired_profile.source_description,
+                        profile=desired_profile,
                     )
-                except Exception:
-                    st.warning("Concept image 暂时无法读取。")
+                else:
+                    asset = ctx.assets.create_world(
+                        name=name,
+                        description=desired_profile.source_description,
+                        profile=desired_profile,
+                    )
+                    st.session_state.editing_world_id = asset.asset_id
 
-                if st.button(
-                    "💖 Choose This World / 就要这个",
-                    key=f"choose_world_{direction}_{candidate['path']}",
+                ctx.world_concepts.plan_blueprint(
+                    location_asset_id=asset.asset_id,
+                    style_asset_id=style_asset_id,
+                )
+                st.success("Playable Blueprint ready / 可玩蓝图已生成。")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Blueprint planning failed / 蓝图生成失败: {exc}")
+
+    if blueprint is not None:
+        if profile_changed:
+            st.warning(
+                "⚠️ World Profile 已修改，但当前 Blueprint 还是旧版本。"
+                " 请先 Rebuild Blueprint，避免丢失这次修改。"
+            )
+        elif not blueprint_first_current:
+            st.warning(
+                "🧩 这是旧版 Blueprint。进入新的 Blueprint-first 流程前，"
+                "请先 Rebuild Blueprint。"
+            )
+
+        st.markdown("#### 🗺️ Playable Blueprint / 可玩蓝图")
+        map_col, detail_col = st.columns([1.2, 1])
+        with map_col:
+            components.html(_layout_svg(blueprint), height=430, scrolling=False)
+        with detail_col:
+            st.caption(
+                f"50×50 · {len(blueprint.layout_elements)} layout elements · "
+                f"{len(blueprint.landmarks)} landmarks"
+            )
+            for element in blueprint.layout_elements[:10]:
+                st.write(
+                    f"**{element.name}** · {element.kind} · "
+                    f"x={element.position.x:.1f}, z={element.position.z:.1f}"
+                )
+            st.caption(
+                "这里的结构才是 3D Runtime 的 source of truth。"
+                " 以后即使 Preview 图片有小偏差，也不会改写 Blueprint。"
+            )
+
+        st.markdown("#### 2 · World Preview / 根据 Blueprint 渲染一张世界图")
+        current_preview = (
+            ctx.world_concepts.current_preview(saved_world.asset_id)
+            if blueprint_first_current
+            else None
+        )
+        if current_preview:
+            try:
+                st.image(
+                    ctx.storage.get_bytes(current_preview.path),
+                    caption="✨ Blueprint World Preview",
                     use_container_width=True,
-                ):
-                    try:
-                        asset_id = st.session_state.get("editing_world_id")
-                        if not asset_id or not style_asset_id:
-                            raise RuntimeError("World or Style asset is missing.")
-                        ctx.world_concepts.approve_candidate(
-                            location_asset_id=asset_id,
-                            candidate_path=candidate["path"],
+                )
+            except Exception:
+                st.caption("World Preview 暂时无法读取。")
+
+        count = int(st.session_state.get("creator_generation_count", 0))
+        remaining = max(0, MAX_GENERATIONS_PER_SESSION - count)
+        st.caption(f"🎟️ 本次会话剩余图片渲染次数：{remaining}/{MAX_GENERATIONS_PER_SESSION}")
+
+        render_col, finish_col = st.columns([2, 1])
+        with render_col:
+            if st.button(
+                "🎨 Render World Preview / 渲染世界预览",
+                type="primary",
+                disabled=(
+                    not blueprint_first_current
+                    or not ctx.world_concepts.is_available
+                    or not style_asset_id
+                    or remaining < 1
+                ),
+                use_container_width=True,
+            ):
+                try:
+                    with st.spinner("🌈 正在按照 Blueprint 渲染这个世界…"):
+                        ctx.world_concepts.render_blueprint_preview(
+                            location_asset_id=saved_world.asset_id,
                             style_asset_id=style_asset_id,
                         )
-                        saved_world = ctx.repository.get_asset(asset_id)
-                        if saved_world is None:
-                            raise RuntimeError("Approved World could not be reloaded.")
-                        if not saved_world.metadata.get("world_concept_path"):
-                            raise RuntimeError("Approved Concept path is missing after save.")
-                        if not saved_world.metadata.get("world_blueprint"):
-                            raise RuntimeError("Blueprint is missing after save.")
+                    st.session_state.creator_generation_count = count + 1
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"World Preview render failed / 渲染失败: {exc}")
 
-                        st.session_state.world_concept_candidates = []
-                        st.session_state.editing_world_id = None
-                        st.session_state.pending_app_page = "🗺️ My Worlds"
-                        st.success("世界概念已锁定，并已经生成第一版结构 Blueprint。")
-                        st.balloons()
-                        st.rerun()
-                    except Exception as exc:
-                        st.error(f"World approval failed / 保存失败: {exc}")
+        with finish_col:
+            if st.button(
+                "✅ Finish / 完成",
+                disabled=profile_changed,
+                use_container_width=True,
+            ):
+                st.session_state.world_concept_candidates = []
+                st.session_state.editing_world_id = None
+                st.session_state.pending_app_page = "🗺️ My Worlds"
+                st.rerun()
 
-        st.caption(
-            "Concept Art 是视觉锚点；Blueprint 才是以后 3D Runtime 要读取的世界数据。"
+        if not ctx.world_concepts.is_available:
+            st.info(
+                "Image API 尚未连接；Blueprint 已经可以直接 Explore，"
+                "World Preview 可以以后再渲染。"
+            )
+    else:
+        st.info(
+            "先生成 Blueprint。生成后这个世界已经可以进入 3D；"
+            "World Preview 是随后的一张视觉表达，不再决定结构。"
         )
 
     st.divider()

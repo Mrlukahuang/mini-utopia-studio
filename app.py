@@ -584,7 +584,7 @@ elif page == "✨ Character Factory":
 elif page == "🗺️ My Worlds":
     render_game_hero(
         "My Mini Worlds 🗺️",
-        "这些是你已经想象并选定视觉方向的世界。下一步会把它们真正搭成可以走进去的地方。",
+        "这些世界先由 Blueprint 确定结构，再用同一份 Blueprint 渲染视觉预览并进入 3D。",
         kicker="WORLD LIBRARY",
     )
 
@@ -602,29 +602,44 @@ elif page == "🗺️ My Worlds":
         profile = WorldProfile.model_validate(
             asset.metadata.get("world_profile", {})
         )
-        concept = ctx.world_concepts.current_concept(asset.asset_id)
+        pipeline = asset.metadata.get("world_pipeline", "legacy")
+        world_visual = (
+            ctx.world_concepts.current_preview(asset.asset_id)
+            if pipeline == "blueprint_first_v1"
+            else ctx.world_concepts.current_concept(asset.asset_id)
+        )
 
         with st.container(border=True):
             art_col, info_col, action_col = st.columns([1.45, 2.15, 0.7])
 
             with art_col:
-                if concept:
+                if world_visual:
                     try:
                         st.image(
-                            ctx.storage.get_bytes(concept.path),
-                            caption="✨ Approved World Concept",
+                            ctx.storage.get_bytes(world_visual.path),
+                            caption=(
+                                "✨ Blueprint World Preview"
+                                if pipeline == "blueprint_first_v1"
+                                else "✨ Approved World Concept"
+                            ),
                             use_container_width=True,
                         )
                     except Exception:
                         st.markdown(
                             '<div class="mu-character-master-placeholder">🌍<br>'
-                            '<span>Concept image unavailable</span></div>',
+                            '<span>World preview unavailable</span></div>',
                             unsafe_allow_html=True,
                         )
+                elif asset.metadata.get("world_blueprint"):
+                    st.markdown(
+                        '<div class="mu-character-master-placeholder">🧩<br>'
+                        '<span>Blueprint ready · preview not rendered yet</span></div>',
+                        unsafe_allow_html=True,
+                    )
                 else:
                     st.markdown(
                         '<div class="mu-character-master-placeholder">🏝️<br>'
-                        '<span>No approved concept yet</span></div>',
+                        '<span>World not built yet</span></div>',
                         unsafe_allow_html=True,
                     )
 
@@ -677,13 +692,19 @@ elif page == "🗺️ My Worlds":
                     for file_ref in asset.files
                 )
                 legacy_blueprint = bool(
-                    blueprint
+                    pipeline != "blueprint_first_v1"
+                    and blueprint
                     and approved_concept
                     and not (blueprint.get("layout_elements") or [])
                 )
-                if blueprint and approved_concept:
+                if blueprint:
                     st.success("🎮 Ready to Explore / 可以进入世界")
-                    st.caption("50×50 Mini World · Portal + Landmarks + Director Tour ready")
+                    st.caption("50×50 Mini World · Blueprint + Portal + Landmarks + Director Tour ready")
+                    if (
+                        pipeline == "blueprint_first_v1"
+                        and not asset.metadata.get("world_preview_path")
+                    ):
+                        st.caption("🎨 World Preview 尚未渲染；不影响进入 3D 世界。")
                     if legacy_blueprint:
                         st.warning(
                             "🧩 Legacy Blueprint detected / 旧版 Blueprint："
@@ -741,9 +762,9 @@ elif page == "🗺️ My Worlds":
                                 f"Direction · {anchor.get('concept_direction', '—')}"
                             )
                 elif has_candidate:
-                    st.warning("💖 Concept generated · please choose one in World Factory")
+                    st.warning("💖 Legacy Concept generated · please finish it in World Factory")
                 else:
-                    st.caption("✨ Concept not approved yet")
+                    st.caption("🧩 Blueprint not built yet")
 
             with action_col:
                 blueprint = asset.metadata.get("world_blueprint")
@@ -764,7 +785,12 @@ elif page == "🗺️ My Worlds":
                 )
                 st.caption(f"v{asset.version}")
 
-            if blueprint and approved_concept and not legacy_blueprint:
+            if (
+                pipeline != "blueprint_first_v1"
+                and blueprint
+                and approved_concept
+                and not legacy_blueprint
+            ):
                 render_concept_match_review(
                     ctx,
                     asset=asset,
@@ -819,16 +845,21 @@ elif page == "🎮 Explore World":
             profile = WorldProfile.model_validate(
                 selected.metadata.get("world_profile", {})
             )
-            concept = ctx.world_concepts.current_concept(selected.asset_id)
-            if concept:
+            selected_pipeline = selected.metadata.get("world_pipeline", "legacy")
+            world_visual = (
+                ctx.world_concepts.current_preview(selected.asset_id)
+                if selected_pipeline == "blueprint_first_v1"
+                else ctx.world_concepts.current_concept(selected.asset_id)
+            )
+            if world_visual:
                 try:
                     st.image(
-                        ctx.storage.get_bytes(concept.path),
+                        ctx.storage.get_bytes(world_visual.path),
                         caption=f"✨ {selected.display_name}",
                         use_container_width=True,
                     )
                 except Exception:
-                    st.caption("World concept preview 暂时无法读取。")
+                    st.caption("World preview 暂时无法读取。")
 
         playable_characters = [
             asset

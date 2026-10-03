@@ -20,7 +20,11 @@ from studio.services.world_layout_service import WorldLayoutService
 
 
 class WorldBlueprintService:
-    """Build a deterministic structural Blueprint from an approved World concept."""
+    """Build deterministic executable World Blueprints.
+
+    Blueprint-first planning is the primary World Factory path. Image-driven
+    builds remain available for the optional legacy / Image-to-World path.
+    """
 
     def __init__(
         self,
@@ -29,6 +33,23 @@ class WorldBlueprintService:
     ):
         self.visual_anchor_service = visual_anchor_service or WorldVisualAnchorService()
         self.layout_service = layout_service or WorldLayoutService()
+
+    def plan(
+        self,
+        *,
+        location_asset_id: str,
+        style_asset_id: str | None,
+        profile: WorldProfile,
+    ) -> WorldBlueprint:
+        """Plan the playable world directly from creator intent, before imagery."""
+        return self.build(
+            location_asset_id=location_asset_id,
+            style_asset_id=style_asset_id,
+            profile=profile,
+            concept_path="",
+            concept_direction="blueprint_first",
+            concept_image_bytes=None,
+        )
 
     def build(
         self,

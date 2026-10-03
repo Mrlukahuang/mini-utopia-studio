@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from studio.core.enums import AssetType, ReviewStatus
 from studio.models.asset import AssetFile, now_utc
-from studio.models.world import WorldProfile
+from studio.models.world import WorldBlueprint, WorldProfile
 from studio.providers.base import ImageGenerationProvider
 from studio.repositories.base import StudioRepository
 from studio.services.world_concept_prompt_service import WorldConceptPromptService
@@ -30,6 +30,148 @@ class WorldConceptService:
     @property
     def is_available(self) -> bool:
         return self.image_provider is not None
+
+    def plan_blueprint(
+        self,
+        *,
+        location_asset_id: str,
+        style_asset_id: str | None,
+    ) -> WorldBlueprint:
+        """Create the executable world before any beauty render exists."""
+        world = self.repository.get_asset(location_asset_id)
+        if world is None or world.asset_type != AssetType.LOCATION:
+            raise ValueError(f"World not found: {location_asset_id}")
+
+        profile = WorldProfile.model_validate(world.metadata.get("world_profile", {}))
+        blueprint = self.blueprint_service.plan(
+            location_asset_id=world.asset_id,
+            style_asset_id=style_asset_id,
+            profile=profile,
+        )
+        world.metadata["world_blueprint"] = blueprint.model_dump(mode="json")
+        world.metadata["world_pipeline"] = "blueprint_first_v1"
+        world.metadata["world_blueprint_source"] = "creator_profile"
+        # A rebuilt Blueprint invalidates any older beauty render. Keep the file
+        # as archive history, but require the next preview to be rendered from
+        # the new authoritative layout.
+        for file_ref in world.files:
+            if file_ref.role == "world_concept_approved":
+                file_ref.role = "world_concept_archive"
+            elif file_ref.role == "world_preview":
+                file_ref.role = "world_preview_archive"
+        world.metadata.pop("world_concept_path", None)
+        world.metadata.pop("world_preview_path", None)
+        world.metadata.pop("world_preview_source", None)
+        world.metadata.pop("world_preview_last_prompt", None)
+        world.metadata.pop("world_concept_match_reviewed", None)
+        world.metadata.pop("world_concept_match_reviewed_at", None)
+        world.metadata["world_concept_match_history"] = []
+        world.status = ReviewStatus.APPROVED
+        world.updated_at = now_utc()
+        self.repository.save_asset(world)
+
+        persisted = self.repository.get_asset(world.asset_id)
+        if persisted is None:
+            raise RuntimeError("World disappeared after Blueprint planning.")
+        persisted_blueprint = persisted.metadata.get("world_blueprint") or {}
+        if not persisted_blueprint.get("layout_elements"):
+            raise RuntimeError("Blueprint planning did not persist layout elements.")
+        return blueprint
+
+    def render_blueprint_preview(
+        self,
+        *,
+        location_asset_id: str,
+        style_asset_id: str,
+        size: str = "1536x1024",
+        quality: str = "medium",
+    ) -> AssetFile:
+        """Render one visual preview from Blueprint without changing Blueprint data."""
+        if self.image_provider is None:
+            raise RuntimeError("World image generation is not configured.")
+
+        world = self.repository.get_asset(location_asset_id)
+        if world is None or world.asset_type != AssetType.LOCATION:
+            raise ValueError(f"World not found: {location_asset_id}")
+        raw_blueprint = world.metadata.get("world_blueprint")
+        if not raw_blueprint:
+            raise ValueError("World does not have a Blueprint to render.")
+
+        style = self.repository.get_asset(style_asset_id)
+        if style is None or style.asset_type != AssetType.STYLE:
+            raise ValueError(f"Style not found: {style_asset_id}")
+
+        profile = WorldProfile.model_validate(world.metadata.get("world_profile", {}))
+        blueprint = WorldBlueprint.model_validate(raw_blueprint)
+        if world.metadata.get("world_pipeline") != "blueprint_first_v1":
+            raise ValueError(
+                "World Preview requires a Blueprint-first plan. Rebuild the Blueprint first."
+            )
+        if not blueprint.layout_elements:
+            raise ValueError(
+                "World Preview requires a current Blueprint with layout elements."
+            )
+        blueprint_snapshot = blueprint.model_dump(mode="json")
+        prompt = self.prompt_service.compose_from_blueprint(
+            profile=profile,
+            blueprint=blueprint,
+            style_profile=style.metadata.get("style_profile", {}),
+        )
+        image_bytes = self.image_provider.generate(
+            prompt=prompt,
+            size=size,
+            quality=quality,
+        )
+
+        preview_id = uuid4().hex[:12]
+        path = self.storage.put_bytes(
+            f"assets/{location_asset_id}/preview/blueprint_{preview_id}.png",
+            image_bytes,
+        )
+        for file_ref in world.files:
+            if file_ref.role == "world_preview":
+                file_ref.role = "world_preview_archive"
+        file_ref = AssetFile(
+            role="world_preview",
+            path=path,
+            mime_type="image/png",
+        )
+        world.files.append(file_ref)
+        world.metadata["world_preview_path"] = path
+        world.metadata["world_preview_source"] = "blueprint"
+        world.metadata["world_preview_last_prompt"] = prompt
+        world.metadata["world_pipeline"] = "blueprint_first_v1"
+        world.status = ReviewStatus.APPROVED
+        world.updated_at = now_utc()
+
+        # Preview generation is intentionally not allowed to mutate the source of truth.
+        if world.metadata.get("world_blueprint") != blueprint_snapshot:
+            raise RuntimeError("World Preview render attempted to mutate the Blueprint.")
+        self.repository.save_asset(world)
+
+        persisted = self.repository.get_asset(world.asset_id)
+        if persisted is None:
+            raise RuntimeError("World disappeared after Preview render.")
+        if persisted.metadata.get("world_blueprint") != blueprint_snapshot:
+            raise RuntimeError("World Blueprint changed while rendering Preview.")
+        return file_ref
+
+    def current_preview(self, location_asset_id: str) -> AssetFile | None:
+        """Return the current Blueprint-first beauty preview, if one exists."""
+        world = self.repository.get_asset(location_asset_id)
+        if world is None:
+            return None
+        for file_ref in reversed(world.files):
+            if file_ref.role == "world_preview":
+                return file_ref
+        metadata_path = world.metadata.get("world_preview_path")
+        if metadata_path:
+            return AssetFile(
+                role="world_preview",
+                path=metadata_path,
+                mime_type="image/png",
+            )
+        return None
 
     def generate_candidate(
         self,
