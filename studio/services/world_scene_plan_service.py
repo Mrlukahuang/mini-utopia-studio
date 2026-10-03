@@ -93,6 +93,15 @@ SCENE_CASTLE, SCENE_PORTAL. There should be one clear main Portal. If the creato
 did not mention a Portal, add one as source=system_required so the world remains
 connected to Mini Utopia.
 
+COLOR RULES:
+- If the creator explicitly names colors, preserve those as the world identity.
+- Harmonize them with Mini Utopia's high-lightness, low-to-medium-saturation
+  macaron constitution rather than replacing them.
+- If the creator gives no colors, choose 3-5 coherent theme HEX colors from the
+  Mini Utopia palette families supplied below.
+- Enrichment colors support the creator's palette; they must not create a second
+  competing palette.
+
 Keep the result original, warm, approachable and child-friendly. Never copy a
 branded game/world. Do not invent a second competing theme."""
 
@@ -103,6 +112,7 @@ branded game/world. Do not invent a second competing theme."""
             "environment_scale_language": style_profile.get("environment_scale_language", ""),
             "color_harmony_rule": style_profile.get("color_harmony_rule", ""),
             "palette_notes": style_profile.get("palette_notes", ""),
+            "macaron_palette": style_profile.get("macaron_palette", {}),
             "portal_language": style_profile.get("portal_language", ""),
             "positive_rules": style_profile.get("positive_rules", []),
             "locked_rules": style_profile.get("locked_rules", []),
