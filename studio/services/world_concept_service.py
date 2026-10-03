@@ -57,8 +57,12 @@ class WorldConceptService:
         for file_ref in world.files:
             if file_ref.role == "world_concept_approved":
                 file_ref.role = "world_concept_archive"
+            elif file_ref.role == "world_preview":
+                file_ref.role = "world_preview_archive"
         world.metadata.pop("world_concept_path", None)
+        world.metadata.pop("world_preview_path", None)
         world.metadata.pop("world_preview_source", None)
+        world.metadata.pop("world_preview_last_prompt", None)
         world.metadata.pop("world_concept_match_reviewed", None)
         world.metadata.pop("world_concept_match_reviewed_at", None)
         world.metadata["world_concept_match_history"] = []
@@ -125,15 +129,15 @@ class WorldConceptService:
             image_bytes,
         )
         for file_ref in world.files:
-            if file_ref.role == "world_concept_approved":
-                file_ref.role = "world_concept_archive"
+            if file_ref.role == "world_preview":
+                file_ref.role = "world_preview_archive"
         file_ref = AssetFile(
-            role="world_concept_approved",
+            role="world_preview",
             path=path,
             mime_type="image/png",
         )
         world.files.append(file_ref)
-        world.metadata["world_concept_path"] = path
+        world.metadata["world_preview_path"] = path
         world.metadata["world_preview_source"] = "blueprint"
         world.metadata["world_preview_last_prompt"] = prompt
         world.metadata["world_pipeline"] = "blueprint_first_v1"
@@ -151,6 +155,23 @@ class WorldConceptService:
         if persisted.metadata.get("world_blueprint") != blueprint_snapshot:
             raise RuntimeError("World Blueprint changed while rendering Preview.")
         return file_ref
+
+    def current_preview(self, location_asset_id: str) -> AssetFile | None:
+        """Return the current Blueprint-first beauty preview, if one exists."""
+        world = self.repository.get_asset(location_asset_id)
+        if world is None:
+            return None
+        for file_ref in reversed(world.files):
+            if file_ref.role == "world_preview":
+                return file_ref
+        metadata_path = world.metadata.get("world_preview_path")
+        if metadata_path:
+            return AssetFile(
+                role="world_preview",
+                path=metadata_path,
+                mime_type="image/png",
+            )
+        return None
 
     def generate_candidate(
         self,
