@@ -27,13 +27,6 @@ from studio.ui.theme import render_game_hero, render_quest
 
 
 MAX_GENERATIONS_PER_SESSION = 20
-DIRECTION_LABELS = {
-    "playable": "🧭 Playable / 清晰可探索",
-    "dream": "✨ Dream / 最梦幻",
-    "story": "📖 Story / 最有故事感",
-}
-
-
 def _default_profile() -> WorldProfile:
     return WorldProfile(
         world_type=WORLD_TYPE_OPTIONS[0],
@@ -64,58 +57,6 @@ def _safe_index(options: list[str], value: str, default: int = 0) -> int:
         return options.index(value)
     except ValueError:
         return default
-
-
-def _draft_from_prompt(description: str) -> WorldProfile:
-    """Seed the structured builder from a child's description.
-
-    M2.1 keeps this deterministic and transparent. The original description is
-    always preserved and drives Concept Art. Later a structured-text provider
-    can improve the seeding without changing the UI or WorldProfile contract.
-    """
-    draft = _default_profile()
-    text = description.lower()
-
-    def choose(current: str, mapping: list[tuple[tuple[str, ...], str]]) -> str:
-        for keywords, option in mapping:
-            if any(keyword in text for keyword in keywords):
-                return option
-        return current
-
-    world_type = choose(
-        draft.world_type,
-        [
-            (("cloud", "云"), "Cloud Village / 云端小镇"),
-            (("candy", "糖果"), "Candy Forest / 糖果森林"),
-            (("star", "星"), "Star Harbor / 星光港湾"),
-            (("mushroom", "蘑菇"), "Mushroom Valley / 蘑菇秘境"),
-            (("underwater", "海底"), "Underwater Utopia / 海底乌托邦"),
-            (("future", "未来"), "Future City / 未来城市"),
-            (("floating", "漂浮"), "Floating Islands / 漂浮岛"),
-        ],
-    )
-    time_of_day = choose(
-        draft.time_of_day,
-        [
-            (("night", "夜"), "Night / 夜晚"),
-            (("sunset", "日落"), "Sunset / 日落"),
-            (("morning", "清晨"), "Morning / 清晨"),
-        ],
-    )
-    mood = list(draft.mood)
-    if any(k in text for k in ("mystery", "mysterious", "神秘")):
-        mood = ["Mysterious / 神秘"]
-    elif any(k in text for k in ("happy", "joy", "快乐")):
-        mood = ["Joyful / 快乐"]
-
-    return draft.model_copy(
-        update={
-            "source_description": description,
-            "world_type": world_type,
-            "time_of_day": time_of_day,
-            "mood": mood,
-        }
-    )
 
 
 def _reset_world() -> None:
@@ -577,9 +518,9 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
         and not profile_changed
     )
 
-    st.markdown("#### 1 · Blueprint / 先确定世界结构")
+    st.markdown("#### 1 · Scene Plan → Blueprint / 先理解，再搭世界")
     st.caption(
-        "Blueprint 决定这个世界里有什么、在哪里、怎么走。"
+        "Scene Plan 先确认世界里有什么、彼此关系和探索顺序；Blueprint 再把它变成精确可玩的 50×50 结构。"
         " World Preview 只负责把这个已经确定的世界画漂亮。"
     )
 
