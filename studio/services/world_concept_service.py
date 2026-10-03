@@ -170,10 +170,23 @@ class WorldConceptService:
                 "World Preview requires a current Blueprint with layout elements."
             )
         blueprint_snapshot = blueprint.model_dump(mode="json")
+        self._refresh_render_pipeline(
+            world=world,
+            profile=profile,
+            blueprint=blueprint,
+            style_asset_id=style_asset_id,
+        )
+        raw_appearance = world.metadata.get("world_appearance_plan")
+        appearance_plan = (
+            WorldAppearancePlan.model_validate(raw_appearance)
+            if raw_appearance
+            else None
+        )
         prompt = self.prompt_service.compose_from_blueprint(
             profile=profile,
             blueprint=blueprint,
             style_profile=style.metadata.get("style_profile", {}),
+            appearance_plan=appearance_plan,
         )
         image_bytes = self.image_provider.generate(
             prompt=prompt,
