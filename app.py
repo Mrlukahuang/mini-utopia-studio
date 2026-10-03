@@ -689,6 +689,16 @@ elif page == "🗺️ My Worlds":
                                 "**Flexible Details** · "
                                 + (" · ".join(anchor.get("flexible_details", [])) or "—")
                             )
+                            if anchor.get("composition_notes"):
+                                st.write(
+                                    "**Composition** · "
+                                    + " · ".join(anchor.get("composition_notes", []))
+                                )
+                            if anchor.get("spatial_relations"):
+                                st.write(
+                                    "**Spatial Relations** · "
+                                    + " · ".join(anchor.get("spatial_relations", []))
+                                )
                             st.caption(
                                 f"Extraction · {anchor.get('extraction_method', 'legacy')} · "
                                 f"Direction · {anchor.get('concept_direction', '—')}"
