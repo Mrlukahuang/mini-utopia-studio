@@ -201,12 +201,19 @@ class ThreeObjectTransformSpec(BaseModel):
 class ThreeObjectSpec(BaseModel):
     element_id: str
     name: str
+    kind: str = ""
+    semantic_key: str = ""
+    spatial_mode: str = "grounded"
+    traversability: str = "scenic"
     transform: ThreeObjectTransformSpec
     nodes: list[ThreeMeshNodeSpec] = Field(default_factory=list, max_length=32)
     visible: bool = True
     cast_shadow: bool = True
     receive_shadow: bool = True
     render_order: int = 0
+    frustum_culled: bool = True
+    layer: int = Field(default=0, ge=0, le=31)
+    animation_clip_names: list[str] = Field(default_factory=list, max_length=16)
     source: Literal["appearance_spec", "deterministic_fallback"] = "appearance_spec"
 
 
