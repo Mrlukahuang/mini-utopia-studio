@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from studio.models.render import WorldAppearancePlan
 from studio.models.world import WorldVisualAnalysis
 from studio.providers.openai_vision import ImageAnalysisError, OpenAIVisionProvider
 
@@ -77,3 +78,24 @@ def test_openai_vision_provider_raises_clean_error(monkeypatch):
             prompt="analyze",
             schema=WorldVisualAnalysis,
         )
+
+
+def test_openai_vision_strict_schema_supports_nested_appearance_contract():
+    schema = OpenAIVisionProvider._strict_schema(
+        WorldAppearancePlan.model_json_schema()
+    )
+
+    assert set(schema["required"]) == set(schema["properties"])
+    assert schema["additionalProperties"] is False
+
+    object_ref = schema["properties"]["objects"]["items"]["$ref"]
+    object_name = object_ref.rsplit("/", 1)[-1]
+    object_schema = schema["$defs"][object_name]
+    assert set(object_schema["required"]) == set(object_schema["properties"])
+    assert object_schema["additionalProperties"] is False
+
+    part_ref = object_schema["properties"]["main_body"]["$ref"]
+    part_name = part_ref.rsplit("/", 1)[-1]
+    part_schema = schema["$defs"][part_name]
+    assert set(part_schema["required"]) == set(part_schema["properties"])
+    assert part_schema["additionalProperties"] is False
