@@ -395,3 +395,61 @@ def test_replanning_archives_old_preview_and_clears_preview_metadata(tmp_path):
         file_ref.path == preview.path and file_ref.role == "world_preview_archive"
         for file_ref in saved.files
     )
+
+
+def test_blueprint_preview_rejects_stale_profile_or_scene_plan(tmp_path):
+    repo = SQLiteStudioRepository(tmp_path / "studio.db")
+    storage = LocalObjectStorage(tmp_path / "storage")
+    assets = AssetService(repo)
+    style = StyleService(repo).ensure_mini_utopia_base()
+    profile = _profile()
+    world = assets.create_world(
+        name="Fingerprint Garden",
+        description=profile.source_description,
+        profile=profile,
+    )
+    service = WorldConceptService(
+        repo,
+        storage,
+        WorldConceptPromptService(),
+        WorldBlueprintService(),
+        FakeWorldImageProvider(),
+    )
+    scene_plan = WorldScenePlanService().plan_from_profile(profile=profile)
+    service.plan_blueprint(
+        location_asset_id=world.asset_id,
+        style_asset_id=style.asset_id,
+        scene_plan=scene_plan,
+    )
+
+    stale_profile = repo.get_asset(world.asset_id)
+    assert stale_profile is not None
+    stale_profile.metadata["world_profile"]["mood"] = ["Mysterious / 神秘"]
+    repo.save_asset(stale_profile)
+    with pytest.raises(ValueError, match="current Scene Plan and Profile"):
+        service.render_blueprint_preview(
+            location_asset_id=world.asset_id,
+            style_asset_id=style.asset_id,
+        )
+
+    # Restore by rebuilding, then prove Scene Plan drift is guarded too.
+    assets.update_world(
+        asset_id=world.asset_id,
+        name=profile.world_name,
+        description=profile.source_description,
+        profile=profile,
+    )
+    service.plan_blueprint(
+        location_asset_id=world.asset_id,
+        style_asset_id=style.asset_id,
+        scene_plan=scene_plan,
+    )
+    stale_scene = repo.get_asset(world.asset_id)
+    assert stale_scene is not None
+    stale_scene.metadata["world_scene_plan"]["summary"] = "Changed without rebuild"
+    repo.save_asset(stale_scene)
+    with pytest.raises(ValueError, match="current Scene Plan and Profile"):
+        service.render_blueprint_preview(
+            location_asset_id=world.asset_id,
+            style_asset_id=style.asset_id,
+        )
