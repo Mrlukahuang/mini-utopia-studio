@@ -354,3 +354,38 @@ def test_custom_extra_details_fall_back_to_deterministic_plan_on_ai_failure():
     assert any("Castle" in item.name for item in plan.elements)
     assert any(item.kind == "portal" for item in plan.elements)
     assert plan.source_mode == "custom"
+
+
+def test_prompt_keeps_only_one_executable_main_portal():
+    payload = _prompt_payload()
+    payload["scene_plan"]["elements"].insert(
+        2,
+        {
+            "scene_id": "SCENE_SECOND_GATE",
+            "name": "Moon Gate",
+            "kind": "portal",
+            "source": "utopia_enrichment",
+            "required": False,
+            "placement_hint": "left side",
+            "relation_hints": [],
+            "photo_opportunity": True,
+            "notes": "",
+        },
+    )
+    provider = FakeStructuredProvider(payload)
+    service = WorldScenePlanService(structured_provider=provider)
+
+    result = service.plan_from_prompt(
+        description="A Lake with my Star Arch behind it.",
+        style_profile={},
+    )
+
+    portals = [
+        item for item in result.scene_plan.elements if item.kind == "portal"
+    ]
+    assert len(portals) == 1
+    assert "Star Arch" in portals[0].name
+    moon_gate = next(
+        item for item in result.scene_plan.elements if item.name == "Moon Gate"
+    )
+    assert moon_gate.kind == "landmark"
