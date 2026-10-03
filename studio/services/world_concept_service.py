@@ -314,6 +314,10 @@ class WorldConceptService:
             concept_mime_type=selected.mime_type or "image/png",
         )
         world.metadata["world_blueprint"] = blueprint.model_dump(mode="json")
+        world.metadata["world_pipeline"] = "legacy_concept_v1"
+        world.metadata["world_blueprint_source"] = "approved_concept"
+        world.metadata.pop("world_blueprint_scene_plan_fingerprint", None)
+        world.metadata.pop("world_blueprint_profile_fingerprint", None)
         world.updated_at = now_utc()
         self.repository.save_asset(world)
 
@@ -364,6 +368,10 @@ class WorldConceptService:
         )
 
         world.metadata["world_blueprint"] = blueprint.model_dump(mode="json")
+        world.metadata["world_pipeline"] = "legacy_concept_v1"
+        world.metadata["world_blueprint_source"] = "legacy_approved_concept"
+        world.metadata.pop("world_blueprint_scene_plan_fingerprint", None)
+        world.metadata.pop("world_blueprint_profile_fingerprint", None)
         world.metadata["world_concept_match_reviewed"] = False
         world.metadata.pop("world_concept_match_reviewed_at", None)
         world.metadata["world_concept_match_history"] = []
