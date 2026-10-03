@@ -164,7 +164,12 @@ branded game/world. Do not invent a second competing theme."""
             self._normalize_plan(
                 base,
                 source_mode="custom",
-                fallback_portal=profile.portal_form or _DEFAULT_PORTAL,
+                fallback_portal=(
+                    profile.portal_form
+                    if profile.portal_form
+                    and not profile.portal_form.lower().startswith("custom /")
+                    else _DEFAULT_PORTAL
+                ),
             )
         )
 
@@ -179,7 +184,11 @@ branded game/world. Do not invent a second competing theme."""
             photo: bool = False,
         ) -> None:
             clean = (name or "").strip()
-            if not clean or clean.lower().startswith("none /"):
+            if (
+                not clean
+                or clean.lower().startswith("none /")
+                or clean.lower().startswith("custom /")
+            ):
                 return
             if any(self._equivalent(item.name, clean) for item in elements):
                 return
@@ -206,8 +215,14 @@ branded game/world. Do not invent a second competing theme."""
         for surprise in profile.surprise_elements:
             add(surprise, self._infer_kind(surprise, default="decoration"), photo=True)
 
+        portal_name = (
+            profile.portal_form
+            if profile.portal_form
+            and not profile.portal_form.lower().startswith("custom /")
+            else _DEFAULT_PORTAL
+        )
         add(
-            profile.portal_form or _DEFAULT_PORTAL,
+            portal_name,
             "portal",
             placement_hint=profile.portal_placement_idea or "final reveal area",
             photo=True,
@@ -383,6 +398,8 @@ Return a complete WorldScenePlan."""
         for keywords, canonical, kind in _OBVIOUS_OBJECTS:
             if not any(keyword in text for keyword in keywords):
                 continue
+            if kind == "portal" and any(item.kind == "portal" for item in elements):
+                continue
             if any(
                 self._equivalent(item.name, canonical)
                 or any(keyword in item.name.lower() for keyword in keywords)
@@ -397,7 +414,7 @@ Return a complete WorldScenePlan."""
                     source="creator_required",
                     required=True,
                     placement_hint="",
-                    relation_hints=[description],
+                    relation_hints=[],
                     photo_opportunity=kind in {"portal", "water", "structure", "landmark"},
                     notes="Deterministic safeguard for an explicit creator object.",
                 )
