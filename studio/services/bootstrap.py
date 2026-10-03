@@ -17,7 +17,9 @@ from studio.services.character_runtime_service import CharacterRuntimeService
 from studio.services.world_concept_prompt_service import WorldConceptPromptService
 from studio.services.world_concept_service import WorldConceptService
 from studio.services.world_blueprint_service import WorldBlueprintService
+from studio.services.world_visual_anchor_service import WorldVisualAnchorService
 from studio.providers.openai_image import OpenAIImageProvider
+from studio.providers.openai_vision import OpenAIVisionProvider
 from studio.storage.base import ObjectStorage
 from studio.storage.local import LocalObjectStorage
 from studio.storage.supabase import SupabaseObjectStorage
@@ -91,7 +93,6 @@ def build_context(settings: Settings) -> StudioContext:
 
     character_master_prompts = CharacterMasterPromptService()
     world_concept_prompts = WorldConceptPromptService()
-    world_blueprints = WorldBlueprintService()
     image_provider = (
         OpenAIImageProvider(
             settings.openai_api_key,
@@ -99,6 +100,20 @@ def build_context(settings: Settings) -> StudioContext:
         )
         if settings.openai_api_key
         else None
+    )
+    vision_provider = (
+        OpenAIVisionProvider(
+            settings.openai_api_key,
+            model=settings.openai_vision_model,
+        )
+        if settings.openai_api_key
+        else None
+    )
+    world_visual_anchors = WorldVisualAnchorService(
+        image_analysis_provider=vision_provider
+    )
+    world_blueprints = WorldBlueprintService(
+        visual_anchor_service=world_visual_anchors
     )
 
     return StudioContext(
