@@ -120,6 +120,19 @@ class WorldVisualAnchor(BaseModel):
     must_preserve: list[str] = Field(default_factory=list)
     flexible_details: list[str] = Field(default_factory=list)
     palette_hexes: list[str] = Field(default_factory=list)
+    composition_notes: list[str] = Field(default_factory=list)
+    spatial_relations: list[str] = Field(default_factory=list)
+
+
+class WorldVisualAnalysis(BaseModel):
+    """Visible evidence extracted from an approved World Concept image."""
+
+    concept_summary: str
+    must_preserve: list[str]
+    flexible_details: list[str]
+    palette_hexes: list[str]
+    composition_notes: list[str]
+    spatial_relations: list[str]
 
 
 class WorldProfile(LocationProfile):
