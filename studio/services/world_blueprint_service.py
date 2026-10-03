@@ -177,6 +177,10 @@ class WorldBlueprintService:
                 name=element.name,
                 position=element.position.model_copy(deep=True),
                 kind=element.kind,
+                geometry_role=element.geometry_role,
+                orientation=element.orientation,
+                spatial_mode=element.spatial_mode,
+                traversability=element.traversability,
                 required_for_concept_match=True,
             )
             for index, element in enumerate(landmark_elements)
@@ -204,10 +208,13 @@ class WorldBlueprintService:
         if scene_plan is not None:
             for scene_id in scene_plan.exploration_order:
                 element = by_id.get(scene_id)
-                if (
-                    element is None
-                    or element.kind in {"portal", "terrain", "decoration"}
-                ):
+                if element is None or element.kind == "portal":
+                    continue
+                if element.traversability in {"blocked", "decorative"}:
+                    # Blocked features can still receive a scenic edge viewpoint
+                    # when they are meaningful water/landmarks.
+                    if element.kind in {"water", "landmark", "structure"}:
+                        route_points.append(self._safe_route_point(element, grid))
                     continue
                 route_points.append(self._safe_route_point(element, grid))
         else:
@@ -257,7 +264,12 @@ class WorldBlueprintService:
         ]
         water_zone_ids: list[str] = []
         for index, element in enumerate(
-            item for item in layout_plan.elements if item.kind == "water"
+            item
+            for item in layout_plan.elements
+            if item.kind == "water"
+            and item.traversability == "blocked"
+            and item.geometry_role == "surface"
+            and item.spatial_mode in {"grounded", "elevated"}
         ):
             zone_id = f"ZONE_WATER_{index+1:02d}"
             water_zone_ids.append(zone_id)
@@ -273,22 +285,35 @@ class WorldBlueprintService:
                 )
             )
 
+        max_scene_y = max(
+            (
+                element.position.y + element.height
+                for element in layout_plan.elements
+            ),
+            default=6.0,
+        )
+        establishing_y = max(11.0, min(28.0, max_scene_y + 5.0))
+        follow_target = (
+            route_points[1]
+            if len(route_points) > 1
+            else WorldPoint(x=18, y=2, z=25)
+        )
         camera_points = [
             CameraPoint(
                 camera_id="CAM_ESTABLISHING",
-                position=WorldPoint(x=4, y=11, z=10),
-                look_at=WorldPoint(x=24, y=2, z=25),
+                position=WorldPoint(x=4, y=establishing_y, z=10),
+                look_at=WorldPoint(x=24, y=max(2.0, max_scene_y * .4), z=25),
                 lens_mm=28,
                 role="establishing",
             ),
             CameraPoint(
                 camera_id="CAM_FOLLOW",
-                position=WorldPoint(x=10, y=4, z=25),
-                look_at=(
-                    route_points[1]
-                    if len(route_points) > 1
-                    else WorldPoint(x=18, y=2, z=25)
+                position=WorldPoint(
+                    x=10,
+                    y=max(4.0, follow_target.y + 4.0),
+                    z=25,
                 ),
+                look_at=follow_target,
                 lens_mm=35,
                 role="follow",
             ),
@@ -316,10 +341,14 @@ class WorldBlueprintService:
                     camera_id=f"CAM_PHOTO_{index+1:02d}",
                     position=WorldPoint(
                         x=max(2, min(grid.width - 2, target.x - 7)),
-                        y=6,
+                        y=max(6.0, target.y + element.height * .65 + 3.0),
                         z=max(2, min(grid.depth - 2, target.z - 7)),
                     ),
-                    look_at=target,
+                    look_at=WorldPoint(
+                        x=target.x,
+                        y=target.y + element.height * .45,
+                        z=target.z,
+                    ),
                     lens_mm=35,
                     role="landmark",
                 )
@@ -331,17 +360,29 @@ class WorldBlueprintService:
                     camera_id="CAM_PORTAL",
                     position=WorldPoint(
                         x=max(2, portal_position.x - 6),
-                        y=5,
+                        y=max(5.0, portal_position.y + 5.0),
                         z=portal_position.z,
                     ),
-                    look_at=portal_position,
+                    look_at=WorldPoint(
+                        x=portal_position.x,
+                        y=portal_position.y + 3.0,
+                        z=portal_position.z,
+                    ),
                     lens_mm=40,
                     role="portal_reveal",
                 ),
                 CameraPoint(
                     camera_id="CAM_ENDING",
-                    position=WorldPoint(x=48, y=12, z=42),
-                    look_at=WorldPoint(x=28, y=1, z=25),
+                    position=WorldPoint(
+                        x=48,
+                        y=max(12.0, min(28.0, max_scene_y + 3.0)),
+                        z=42,
+                    ),
+                    look_at=WorldPoint(
+                        x=28,
+                        y=max(1.0, max_scene_y * .35),
+                        z=25,
+                    ),
                     lens_mm=32,
                     role="ending",
                 ),
@@ -395,8 +436,13 @@ class WorldBlueprintService:
 
     @staticmethod
     def _safe_route_point(element, grid: GridSpec) -> WorldPoint:
-        """Use a scenic edge for blocked water instead of routing through its center."""
-        if element.kind == "water":
+        """Return a walkable/scenic approach point while preserving elevation."""
+        if element.traversability == "blocked" or element.kind == "water":
+            route_y = element.position.y
+            if element.geometry_role == "vertical_flow":
+                # Visit the receiving/base level of a vertical flow instead of
+                # trying to walk through its volume.
+                route_y = max(0.0, element.position.y)
             return WorldPoint(
                 x=max(
                     5,
@@ -405,7 +451,7 @@ class WorldBlueprintService:
                         element.position.x - element.width / 2 - 2,
                     ),
                 ),
-                y=0,
+                y=route_y,
                 z=max(5, min(grid.depth - 5, element.position.z)),
             )
         return element.position.model_copy(deep=True)
