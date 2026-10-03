@@ -20,6 +20,7 @@ from studio.ui.auth import (
 from studio.ui.brand import render_primary_brand, render_sidebar_brand
 from studio.ui.creator.character_factory import render_character_factory, reset_character_creation_state
 from studio.ui.creator.world_factory import render_world_factory
+from studio.ui.creator.concept_match_review import render_concept_match_review
 from studio.ui.theme import apply_mini_utopia_theme, render_brandbar, render_game_hero, render_quest
 
 
@@ -736,6 +737,13 @@ elif page == "🗺️ My Worlds":
                     use_container_width=True,
                 )
                 st.caption(f"v{asset.version}")
+
+            if blueprint and approved_concept:
+                render_concept_match_review(
+                    ctx,
+                    asset=asset,
+                    studio_mode=bool(mode == "🛠 Studio" and studio_unlocked),
+                )
 
 
 elif page == "🎮 Explore World":
