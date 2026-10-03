@@ -8,7 +8,7 @@ from studio.models.location import LocationProfile
 
 
 WORLD_SCHEMA_VERSION = "0.1"
-BLUEPRINT_SCHEMA_VERSION = "0.3"
+BLUEPRINT_SCHEMA_VERSION = "0.4"
 
 
 class GridSpec(BaseModel):
@@ -106,6 +106,27 @@ class ExpansionEdge(BaseModel):
     continuation_hint: str = ""
 
 
+class WorldLayoutElement(BaseModel):
+    """Executable semantic placement compiled from visual concept evidence."""
+
+    element_id: str
+    name: str
+    kind: Literal[
+        "portal",
+        "landmark",
+        "structure",
+        "water",
+        "terrain",
+        "bridge",
+        "decoration",
+    ] = "landmark"
+    position: WorldPoint
+    width: float = Field(default=6.0, gt=0)
+    depth: float = Field(default=6.0, gt=0)
+    height: float = Field(default=4.0, gt=0)
+    source_evidence: list[str] = Field(default_factory=list)
+
+
 class WorldVisualAnchor(BaseModel):
     """Creator-approved concept direction.
 
@@ -193,6 +214,7 @@ class WorldBlueprint(BaseModel):
     blocked_zone_ids: list[str] = Field(default_factory=list)
 
     visual_anchor: WorldVisualAnchor = Field(default_factory=WorldVisualAnchor)
+    layout_elements: list[WorldLayoutElement] = Field(default_factory=list)
     camera_points: list[CameraPoint] = Field(default_factory=list)
     director_tours: list[TourRoute] = Field(default_factory=list)
     expansion_edges: list[ExpansionEdge] = Field(

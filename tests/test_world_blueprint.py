@@ -37,7 +37,7 @@ def test_world_profile_is_playable_and_keeps_theme_colors_separate_from_style_ca
 
 
 def test_blueprint_schema_version_is_explicit():
-    assert BLUEPRINT_SCHEMA_VERSION == "0.3"
+    assert BLUEPRINT_SCHEMA_VERSION == "0.4"
 
 
 def test_structural_blueprint_contains_paths_zones_and_director_tour():
@@ -101,3 +101,56 @@ def test_blueprint_visual_anchor_preserves_world_identity():
     assert "Pink Forest / 粉色树林" in anchor.must_preserve
     assert "Rainbow Waterfall / 彩虹瀑布" in anchor.flexible_details
     assert anchor.palette_hexes == ["#F7B7D2", "#B9E7D0", "#D7C2F3"]
+
+
+def test_blueprint_uses_visual_layout_for_portal_landmark_and_water():
+    from studio.models.world import WorldVisualAnchor
+    from studio.services.world_blueprint_service import WorldBlueprintService
+
+    class StubAnchorService:
+        def extract(self, **kwargs):
+            return WorldVisualAnchor(
+                extraction_method="test",
+                must_preserve=[
+                    "Star Arch / 星星拱门",
+                    "Moon Castle / 月亮城堡",
+                    "Central Lake / 中央湖",
+                ],
+                composition_notes=["Star Arch centered in midground"],
+                spatial_relations=[
+                    "Star Arch in front of lake",
+                    "castle behind portal",
+                ],
+            )
+
+    profile = WorldProfile(
+        world_name="Pastel Star Garden",
+        portal_form="Star Arch / 星星拱门",
+    )
+    blueprint = WorldBlueprintService(
+        visual_anchor_service=StubAnchorService()
+    ).build(
+        location_asset_id="LOC_TEST",
+        style_asset_id="STYLE_TEST",
+        profile=profile,
+        concept_path="assets/LOC_TEST/concept.png",
+        concept_direction="playable",
+    )
+
+    assert blueprint.layout_elements
+    portal_element = next(
+        element for element in blueprint.layout_elements if element.kind == "portal"
+    )
+    lake_element = next(
+        element for element in blueprint.layout_elements if element.kind == "water"
+    )
+    castle = next(
+        landmark for landmark in blueprint.landmarks if "Castle" in landmark.name
+    )
+
+    assert blueprint.portal is not None
+    assert blueprint.portal.position == portal_element.position
+    assert portal_element.position.z > lake_element.position.z
+    assert castle.position.z < portal_element.position.z
+    assert any(zone.kind == "water" for zone in blueprint.zones)
+    assert blueprint.blocked_zone_ids

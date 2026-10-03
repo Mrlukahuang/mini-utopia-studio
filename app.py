@@ -699,6 +699,16 @@ elif page == "🗺️ My Worlds":
                                     "**Spatial Relations** · "
                                     + " · ".join(anchor.get("spatial_relations", []))
                                 )
+                            layout_elements = blueprint.get("layout_elements", []) or []
+                            if layout_elements:
+                                st.write("**Compiled Layout / 已编译布局**")
+                                for element in layout_elements:
+                                    position = element.get("position", {}) or {}
+                                    st.caption(
+                                        f"{element.get('kind', 'landmark')} · "
+                                        f"{element.get('name', 'Unnamed')} · "
+                                        f"x={position.get('x', '—')}, z={position.get('z', '—')}"
+                                    )
                             st.caption(
                                 f"Extraction · {anchor.get('extraction_method', 'legacy')} · "
                                 f"Direction · {anchor.get('concept_direction', '—')}"

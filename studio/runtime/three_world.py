@@ -159,9 +159,11 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 host.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-const palette = (profile.theme_color_hexes && profile.theme_color_hexes.length)
-  ? profile.theme_color_hexes
-  : ['#F7B7D2','#B9E7D0','#D7C2F3','#BDE3F7','#FFF4D7'];
+const palette = (visualAnchor.palette_hexes && visualAnchor.palette_hexes.length)
+  ? visualAnchor.palette_hexes
+  : (profile.theme_color_hexes && profile.theme_color_hexes.length)
+    ? profile.theme_color_hexes
+    : ['#F7B7D2','#B9E7D0','#D7C2F3','#BDE3F7','#FFF4D7'];
 scene.background = new THREE.Color(palette[3] || '#BDE3F7');
 scene.fog = new THREE.Fog(scene.background, 55, 95);
 
@@ -331,6 +333,32 @@ if (floatingWorld) {{
   addCloud(14, 16, 36, .7);
 }}
 
+(bp.layout_elements || []).forEach((element, index) => {{
+  if (element.kind === 'water') {{
+    const water = new THREE.Mesh(
+      new THREE.CylinderGeometry(
+        Math.max(element.width || 10, element.depth || 8) * .5,
+        Math.max(element.width || 10, element.depth || 8) * .5,
+        .16,
+        36
+      ),
+      new THREE.MeshStandardMaterial({{
+        color:new THREE.Color(palette[(index+3) % palette.length] || '#BDE3F7'),
+        transparent:true,
+        opacity:.72,
+        roughness:.28,
+        metalness:.04,
+        emissive:new THREE.Color(palette[(index+3) % palette.length] || '#BDE3F7'),
+        emissiveIntensity:.12
+      }})
+    );
+    water.scale.z = Math.max(.35, (element.depth || 8) / Math.max(element.width || 10, element.depth || 8));
+    water.position.set(element.position.x, .05, element.position.z);
+    water.receiveShadow = true;
+    world.add(water);
+  }}
+}});
+
 (bp.paths || []).forEach((path, pathIndex) => {{
   const points = path.points || [];
   for (let i=0; i<points.length-1; i++) {{
@@ -353,13 +381,24 @@ function addLandmark(spec, index) {{
   const g = new THREE.Group();
   const c1 = palette[(index + 1) % palette.length];
   const c2 = palette[(index + 3) % palette.length];
-  const base = new THREE.Mesh(new THREE.BoxGeometry(4.4, 1.2, 4.4), mat(c1));
-  base.position.y = .6; base.castShadow = true; base.receiveShadow = true;
-  g.add(base);
-  const tower = new THREE.Mesh(new THREE.BoxGeometry(2.6, 5.2, 2.6), mat(c2));
-  tower.position.y = 3.2; tower.castShadow = true; g.add(tower);
-  const cap = new THREE.Mesh(new THREE.SphereGeometry(1.8, 16, 10), mat(c1));
-  cap.scale.y = .7; cap.position.y = 6.0; cap.castShadow = true; g.add(cap);
+
+  if ((spec.kind || '').toLowerCase() === 'bridge') {{
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(8.5,.55,2.4), mat(c1));
+    deck.position.y=.85; deck.castShadow=true; deck.receiveShadow=true; g.add(deck);
+    [-3.5,3.5].forEach(x => {{
+      const post = new THREE.Mesh(new THREE.BoxGeometry(.35,1.7,.35), mat(c2));
+      post.position.set(x,1.55,0); post.castShadow=true; g.add(post);
+    }});
+  }} else {{
+    const base = new THREE.Mesh(new THREE.BoxGeometry(4.4, 1.2, 4.4), mat(c1));
+    base.position.y = .6; base.castShadow = true; base.receiveShadow = true;
+    g.add(base);
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(2.6, 5.2, 2.6), mat(c2));
+    tower.position.y = 3.2; tower.castShadow = true; g.add(tower);
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(1.8, 16, 10), mat(c1));
+    cap.scale.y = .7; cap.position.y = 6.0; cap.castShadow = true; g.add(cap);
+  }}
+
   g.position.set(spec.position.x, spec.position.y || 0, spec.position.z);
   g.userData.label = spec.name;
   world.add(g);
