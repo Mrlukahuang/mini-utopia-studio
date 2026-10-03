@@ -361,7 +361,8 @@ def test_runtime_semantic_proxy_uses_layout_and_hides_ground_quilt_for_floating_
     assert "role === 'organic'" in html
     assert "element.kind === 'landmark'" in html
     assert "['floating','aerial','suspended'].includes(spatialMode)" in html
-    assert "(bp.layout_elements || []).forEach(addSemanticElement)" in html
+    assert "compiledElementIds" in html
+    assert "if (!compiledElementIds.has(element.element_id)) addSemanticElement" in html
     assert "if (!(bp.layout_elements || []).length)" in html
     assert "Gentle Sky Carrier" in html
     assert "Back Garden Station" in html
