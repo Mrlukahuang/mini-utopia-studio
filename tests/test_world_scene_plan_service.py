@@ -288,3 +288,37 @@ def test_scene_plan_drives_spatial_layout_route_and_photo_cameras():
     assert len(
         [camera for camera in blueprint.camera_points if camera.role == "landmark"]
     ) >= 2
+
+
+def test_prompt_normalizes_portal_plaza_away_from_main_portal():
+    payload = _prompt_payload()
+    payload["scene_plan"]["elements"].insert(
+        1,
+        {
+            "scene_id": "SCENE_PLAZA",
+            "name": "Portal Plaza / 传送门广场",
+            "kind": "portal",
+            "source": "creator_required",
+            "required": True,
+            "placement_hint": "near the lake",
+            "relation_hints": [],
+            "photo_opportunity": True,
+            "notes": "",
+        },
+    )
+    provider = FakeStructuredProvider(payload)
+    service = WorldScenePlanService(structured_provider=provider)
+
+    result = service.plan_from_prompt(
+        description="A Portal Plaza beside a Lake with a Star Arch behind the Lake.",
+        style_profile={},
+    )
+
+    plaza = next(
+        item for item in result.scene_plan.elements
+        if "Portal Plaza" in item.name
+    )
+    assert plaza.kind == "structure"
+    assert len(
+        [item for item in result.scene_plan.elements if item.kind == "portal"]
+    ) == 1
