@@ -71,13 +71,45 @@ class SupabaseObjectStorage(ObjectStorage):
         response.raise_for_status()
         return cleaned
 
+    @staticmethod
+    def _looks_like_missing_object(response) -> bool:
+        if response.status_code == 404:
+            return True
+        if response.status_code != 400:
+            return False
+
+        parts: list[str] = []
+        text_value = getattr(response, "text", None)
+        if isinstance(text_value, str):
+            parts.append(text_value)
+        content_value = getattr(response, "content", b"")
+        if isinstance(content_value, bytes):
+            parts.append(content_value.decode("utf-8", errors="ignore"))
+
+        try:
+            payload = response.json()
+        except Exception:
+            payload = None
+        if isinstance(payload, dict):
+            parts.extend(
+                str(payload.get(key, ""))
+                for key in ("message", "error", "code", "statusCode")
+            )
+
+        body = " ".join(parts).lower()
+        return (
+            "object not found" in body
+            or "not found" in body
+            or "no such object" in body
+        )
+
     def exists(self, relative_path: str) -> bool:
         response = requests.get(
             self._object_url(relative_path, authenticated=True),
             headers=self._headers(),
             timeout=self.timeout_seconds,
         )
-        if response.status_code == 404:
+        if self._looks_like_missing_object(response):
             return False
         response.raise_for_status()
         return True
