@@ -546,6 +546,16 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
         if raw_blueprint
         else None
     )
+    raw_scene_plan = (
+        saved_world.metadata.get("world_scene_plan")
+        if saved_world is not None
+        else None
+    )
+    scene_plan = (
+        WorldScenePlan.model_validate(raw_scene_plan)
+        if raw_scene_plan
+        else None
+    )
     desired_profile = final_profile.model_copy(update={"world_name": name})
     saved_profile = (
         WorldProfile.model_validate(saved_world.metadata.get("world_profile", {}))
@@ -561,6 +571,7 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
         saved_world is not None
         and blueprint is not None
         and saved_world.metadata.get("world_pipeline") == "blueprint_first_v1"
+        and scene_plan is not None
         and blueprint.layout_elements
         and not profile_changed
     )
@@ -571,47 +582,106 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
         " World Preview 只负责把这个已经确定的世界画漂亮。"
     )
 
-    back, plan_col = st.columns([1, 2])
-    with back:
-        if st.button("← Back to Edit", use_container_width=True):
-            go(3)
-    with plan_col:
-        plan_label = (
-            "🔄 Rebuild Playable Blueprint / 重建可玩蓝图"
-            if blueprint is not None
-            else "🧩 Build Playable Blueprint / 生成可玩蓝图"
-        )
+    if mode == "prompt":
         if st.button(
-            plan_label,
-            type="primary",
-            disabled=not bool(name and style_asset_id),
+            "← Modify Prompt / 修改描述并重新规划",
             use_container_width=True,
         ):
-            try:
-                st.session_state.world_draft = desired_profile
-                if editing_id:
-                    asset = ctx.assets.update_world(
-                        asset_id=editing_id,
-                        name=name,
-                        description=desired_profile.source_description,
+            st.session_state.world_draft = None
+            st.session_state.world_stage = 4
+            st.rerun()
+    else:
+        back, plan_col = st.columns([1, 2])
+        with back:
+            if st.button("← Back to Edit", use_container_width=True):
+                go(3)
+        with plan_col:
+            plan_label = (
+                "🔄 Rebuild Playable Blueprint / 重建可玩蓝图"
+                if blueprint is not None
+                else "🧩 Build Playable Blueprint / 生成可玩蓝图"
+            )
+            if st.button(
+                plan_label,
+                type="primary",
+                disabled=not bool(name and style_asset_id),
+                use_container_width=True,
+            ):
+                try:
+                    st.session_state.world_draft = desired_profile
+                    style = ctx.repository.get_asset(style_asset_id)
+                    if style is None:
+                        raise RuntimeError("Mini Utopia Global Style Canon is missing.")
+                    scene_plan_for_build = ctx.world_scene_plans.plan_from_profile(
                         profile=desired_profile,
+                        style_profile=style.metadata.get("style_profile", {}),
                     )
-                else:
-                    asset = ctx.assets.create_world(
-                        name=name,
-                        description=desired_profile.source_description,
-                        profile=desired_profile,
-                    )
-                    st.session_state.editing_world_id = asset.asset_id
+                    if editing_id:
+                        asset = ctx.assets.update_world(
+                            asset_id=editing_id,
+                            name=name,
+                            description=desired_profile.source_description,
+                            profile=desired_profile,
+                        )
+                    else:
+                        asset = ctx.assets.create_world(
+                            name=name,
+                            description=desired_profile.source_description,
+                            profile=desired_profile,
+                        )
+                        st.session_state.editing_world_id = asset.asset_id
 
-                ctx.world_concepts.plan_blueprint(
-                    location_asset_id=asset.asset_id,
-                    style_asset_id=style_asset_id,
-                )
-                st.success("Playable Blueprint ready / 可玩蓝图已生成。")
-                st.rerun()
-            except Exception as exc:
-                st.error(f"Blueprint planning failed / 蓝图生成失败: {exc}")
+                    ctx.world_concepts.plan_blueprint(
+                        location_asset_id=asset.asset_id,
+                        style_asset_id=style_asset_id,
+                        scene_plan=scene_plan_for_build,
+                    )
+                    st.success("Scene Plan + Playable Blueprint ready / 世界规划与可玩蓝图已生成。")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Blueprint planning failed / 蓝图生成失败: {exc}")
+
+    if scene_plan is not None:
+        st.markdown("#### 🧠 Scene Plan / 世界清单")
+        st.caption(
+            "Creator Required 是你明确要求、必须保留的内容；Utopia Enrichment 是系统为品牌感、"
+            "探索感和拍照体验加入的少量可调整细节。"
+        )
+        required_col, enrich_col = st.columns(2)
+        with required_col:
+            st.markdown("**🔒 Creator / Required**")
+            required_items = [
+                item
+                for item in scene_plan.elements
+                if item.source != "utopia_enrichment"
+            ]
+            for item in required_items:
+                hint = f" · {item.placement_hint}" if item.placement_hint else ""
+                st.write(f"• **{item.name}** · {item.kind}{hint}")
+        with enrich_col:
+            st.markdown("**✨ Mini Utopia Enrichment**")
+            enrichment = [
+                item
+                for item in scene_plan.elements
+                if item.source == "utopia_enrichment"
+            ]
+            if enrichment:
+                for item in enrichment:
+                    st.write(f"• **{item.name}** · {item.kind}")
+            else:
+                st.caption("No extra enrichment / 没有额外补充")
+
+        by_scene_id = {item.scene_id: item for item in scene_plan.elements}
+        route_names = [
+            by_scene_id[scene_id].name
+            for scene_id in scene_plan.exploration_order
+            if scene_id in by_scene_id
+        ]
+        if route_names:
+            st.write("**🚶 Exploration Route / 探索路线**")
+            st.caption(" → ".join(["Spawn / 出生点", *route_names]))
+        if scene_plan.route_intent:
+            st.caption("🎬 " + scene_plan.route_intent)
 
     if blueprint is not None:
         if profile_changed:
