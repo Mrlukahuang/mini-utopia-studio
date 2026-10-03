@@ -584,7 +584,7 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
 
         st.markdown("#### 2 · World Preview / 根据 Blueprint 渲染一张世界图")
         current_preview = (
-            ctx.world_concepts.current_concept(saved_world.asset_id)
+            ctx.world_concepts.current_preview(saved_world.asset_id)
             if blueprint_first_current
             else None
         )
