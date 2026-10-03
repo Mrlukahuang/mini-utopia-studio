@@ -154,8 +154,31 @@ class ThreeGeometrySpec(BaseModel):
     primitive_size: RenderVec3 = Field(
         default_factory=lambda: RenderVec3(x=1.0, y=1.0, z=1.0)
     )
+    # Small generated meshes may be inline. Large voxel/custom geometry should
+    # be stored as an external binary/GLB asset and referenced here.
     buffer: ThreeBufferGeometrySpec = Field(default_factory=ThreeBufferGeometrySpec)
-    glb_path: str = ""
+    asset_path: str = ""
+    asset_mime_type: str = ""
+    asset_sha256: str = ""
+
+
+class ThreeTextureSpec(BaseModel):
+    texture_id: str
+    usage: Literal[
+        "map",
+        "normal",
+        "roughness",
+        "metalness",
+        "emissive",
+        "alpha",
+        "environment",
+    ]
+    asset_path: str
+    mime_type: str = "image/png"
+    color_space: Literal["srgb", "none"] = "srgb"
+    wrap: Literal["clamp", "repeat", "mirror"] = "clamp"
+    repeat_x: float = Field(default=1.0, gt=0)
+    repeat_y: float = Field(default=1.0, gt=0)
 
 
 class ThreeMaterialSpec(BaseModel):
@@ -172,6 +195,12 @@ class ThreeMaterialSpec(BaseModel):
     alpha_test: float = Field(default=0.0, ge=0.0, le=1.0)
     side: Literal["front", "back", "double"] = "front"
     vertex_colors: bool = False
+    map_texture_id: str = ""
+    normal_texture_id: str = ""
+    roughness_texture_id: str = ""
+    metalness_texture_id: str = ""
+    emissive_texture_id: str = ""
+    alpha_texture_id: str = ""
 
 
 class ThreeMeshNodeSpec(BaseModel):
@@ -217,6 +246,23 @@ class ThreeObjectSpec(BaseModel):
     source: Literal["appearance_spec", "deterministic_fallback"] = "appearance_spec"
 
 
+class RenderCameraSpec(BaseModel):
+    fov_degrees: float = Field(default=48.0, gt=1.0, lt=179.0)
+    near: float = Field(default=0.1, gt=0.0)
+    far: float = Field(default=300.0, gt=1.0)
+    zoom: float = Field(default=1.0, gt=0.0)
+    film_gauge_mm: float = Field(default=35.0, gt=0.0)
+
+
+class RenderRendererSpec(BaseModel):
+    antialias: bool = True
+    pixel_ratio_cap: float = Field(default=2.0, gt=0.0, le=4.0)
+    shadows_enabled: bool = True
+    shadow_map_size: int = Field(default=2048, ge=256, le=8192)
+    tone_mapping: Literal["aces", "linear", "none"] = "aces"
+    exposure: float = Field(default=1.0, gt=0.0, le=4.0)
+
+
 class RenderLightSpec(BaseModel):
     light_id: str
     kind: Literal["ambient", "hemisphere", "directional", "point"]
@@ -243,6 +289,9 @@ class WorldRenderSpec(BaseModel):
     location_asset_id: str | None = None
     blueprint_schema_version: str = ""
     appearance_schema_version: str = RENDER_SPEC_SCHEMA_VERSION
-    materials: list[ThreeMaterialSpec] = Field(default_factory=list, max_length=32)
+    textures: list[ThreeTextureSpec] = Field(default_factory=list, max_length=64)
+    materials: list[ThreeMaterialSpec] = Field(default_factory=list, max_length=64)
     objects: list[ThreeObjectSpec] = Field(default_factory=list, max_length=32)
+    camera: RenderCameraSpec = Field(default_factory=RenderCameraSpec)
+    renderer: RenderRendererSpec = Field(default_factory=RenderRendererSpec)
     environment: RenderEnvironmentSpec = Field(default_factory=RenderEnvironmentSpec)
