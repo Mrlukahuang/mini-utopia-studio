@@ -81,9 +81,11 @@ class WorldLayoutService:
         for scene in plan.elements:
             for relation in scene.relation_hints:
                 for clause in self._relation_clauses(relation):
+                    self._apply_composition_note(elements, clause, grid)
                     self._apply_relation(elements, clause, grid)
         for relation in plan.spatial_relations:
             for clause in self._relation_clauses(relation):
+                self._apply_composition_note(elements, clause, grid)
                 self._apply_relation(elements, clause, grid)
 
         for element in elements:
@@ -302,7 +304,7 @@ class WorldLayoutService:
         grid: GridSpec,
     ) -> bool:
         marker = None
-        for candidate in (" connects ", " between ", "连接", "位于"):
+        for candidate in (" connects ", " connecting ", " between ", "连接", "位于"):
             if candidate in lowered:
                 marker = candidate
                 break
