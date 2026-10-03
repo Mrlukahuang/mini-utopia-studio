@@ -3,8 +3,10 @@ from studio.models.world import (
     WorldProfile,
     WorldSceneElement,
     WorldScenePlan,
+    WorldSceneRelation,
 )
 from studio.providers.base import StructuredTextProvider
+from studio.runtime.three_world import build_world_runtime_html
 from studio.services.world_blueprint_service import WorldBlueprintService
 from studio.services.world_scene_plan_service import WorldScenePlanService
 
@@ -512,3 +514,455 @@ def test_utopia_path_enrichment_is_not_an_executable_structure():
         if item.name == "湖畔漫步小径"
     )
     assert path.kind == "decoration"
+
+
+def test_scene_plan_v01_remains_backward_compatible():
+    plan = WorldScenePlan.model_validate(
+        {
+            "schema_version": "0.1",
+            "source_mode": "prompt",
+            "summary": "Legacy scene",
+            "route_intent": "Walk to the portal",
+            "elements": [
+                {
+                    "scene_id": "OLD_PORTAL",
+                    "name": "Star Arch",
+                    "kind": "portal",
+                    "source": "creator_required",
+                }
+            ],
+        }
+    )
+
+    assert plan.schema_version == "0.1"
+    assert plan.elements[0].spatial_mode == "grounded"
+    assert plan.elements[0].elevation == "ground"
+    assert plan.elements[0].orientation == "normal"
+    assert plan.elements[0].relations == []
+
+
+def test_typed_relation_ids_are_remapped_during_scene_normalization():
+    payload = _prompt_payload()
+    payload["scene_plan"]["elements"] = [
+        {
+            "scene_id": "SCENE_WHALE",
+            "name": "Sky Whale",
+            "semantic_key": "sky_whale",
+            "kind": "landmark",
+            "source": "creator_required",
+            "required": True,
+            "spatial_mode": "aerial",
+            "elevation": "high",
+            "orientation": "normal",
+            "geometry_role": "organic",
+            "traversability": "scenic",
+            "placement_hint": "high in the sky",
+            "relation_hints": [],
+            "relations": [],
+            "photo_opportunity": True,
+            "notes": "",
+        },
+        {
+            "scene_id": "SCENE_GARDEN",
+            "name": "Whale Back Garden",
+            "semantic_key": "whale_back_garden",
+            "kind": "terrain",
+            "source": "creator_required",
+            "required": True,
+            "spatial_mode": "elevated",
+            "elevation": "high",
+            "orientation": "normal",
+            "geometry_role": "platform",
+            "traversability": "walkable",
+            "placement_hint": "",
+            "relation_hints": [],
+            "relations": [
+                {
+                    "relation": "on_top_of",
+                    "target_scene_ids": ["SCENE_WHALE"],
+                }
+            ],
+            "photo_opportunity": True,
+            "notes": "",
+        },
+        {
+            "scene_id": "SCENE_PORTAL",
+            "name": "Moon Portal",
+            "semantic_key": "moon_portal",
+            "kind": "portal",
+            "source": "creator_required",
+            "required": True,
+            "spatial_mode": "aerial",
+            "elevation": "high",
+            "orientation": "normal",
+            "geometry_role": "arch",
+            "traversability": "walkable",
+            "placement_hint": "",
+            "relation_hints": [],
+            "relations": [],
+            "photo_opportunity": True,
+            "notes": "",
+        },
+    ]
+    payload["scene_plan"]["exploration_order"] = [
+        "SCENE_GARDEN",
+        "SCENE_PORTAL",
+    ]
+    payload["scene_plan"]["photo_spot_ids"] = ["SCENE_WHALE", "SCENE_GARDEN"]
+
+    service = WorldScenePlanService(
+        structured_provider=FakeStructuredProvider(payload)
+    )
+    result = service.plan_from_prompt(
+        description="A sky whale carrying a walkable garden on its back.",
+        style_profile={},
+    )
+
+    whale = next(item for item in result.scene_plan.elements if item.semantic_key == "sky_whale")
+    garden = next(item for item in result.scene_plan.elements if item.semantic_key == "whale_back_garden")
+    assert garden.relations[0].target_scene_ids == [whale.scene_id]
+    assert result.scene_plan.schema_version == "0.2"
+
+
+def test_spatial_semantics_compile_floating_vertical_flow_without_object_specific_rule():
+    plan = WorldScenePlan(
+        source_mode="prompt",
+        summary="A high floating vertical flow reaches a lower island.",
+        route_intent="Approach a scenic viewpoint near the receiving island.",
+        elements=[
+            WorldSceneElement(
+                scene_id="SCENE_RECEIVER",
+                name="Lower Floating Island",
+                semantic_key="lower_floating_island",
+                kind="terrain",
+                source="creator_required",
+                spatial_mode="floating",
+                elevation="low",
+                geometry_role="terrain_mass",
+                traversability="walkable",
+            ),
+            WorldSceneElement(
+                scene_id="SCENE_FLOW",
+                name="Sky Flow",
+                semantic_key="sky_flow",
+                kind="water",
+                source="creator_required",
+                spatial_mode="aerial",
+                elevation="high",
+                orientation="vertical",
+                geometry_role="vertical_flow",
+                traversability="blocked",
+                relations=[
+                    WorldSceneRelation(
+                        relation="flows_to",
+                        target_scene_ids=["SCENE_RECEIVER"],
+                    )
+                ],
+                photo_opportunity=True,
+            ),
+            WorldSceneElement(
+                scene_id="SCENE_PORTAL",
+                name="Moon Portal",
+                semantic_key="moon_portal",
+                kind="portal",
+                source="creator_required",
+                spatial_mode="elevated",
+                elevation="medium",
+                geometry_role="arch",
+                traversability="walkable",
+            ),
+        ],
+        exploration_order=["SCENE_FLOW", "SCENE_PORTAL"],
+        photo_spot_ids=["SCENE_FLOW"],
+    )
+    profile = WorldProfile(
+        world_name="Sky Flow World",
+        terrain=["Floating Islands"],
+        portal_form="Moon Portal",
+    )
+
+    blueprint = WorldBlueprintService().plan_from_scene_plan(
+        location_asset_id="LOC_FLOW",
+        style_asset_id="STYLE_MINI",
+        profile=profile,
+        scene_plan=plan,
+    )
+    by_id = {item.element_id: item for item in blueprint.layout_elements}
+    receiver = by_id["SCENE_RECEIVER"]
+    flow = by_id["SCENE_FLOW"]
+
+    assert flow.spatial_mode == "aerial"
+    assert flow.geometry_role == "vertical_flow"
+    assert flow.orientation == "vertical"
+    assert flow.height >= 12
+    assert flow.position.x == receiver.position.x
+    assert flow.position.z == receiver.position.z
+    assert flow.position.y >= receiver.position.y
+    # A vertical aerial flow must not flatten into a ground-level water zone.
+    assert not any(zone.name == "Sky Flow" for zone in blueprint.zones)
+
+
+def test_spatial_semantics_compile_inverted_suspended_world_below_support():
+    plan = WorldScenePlan(
+        source_mode="prompt",
+        summary="An inverted garden hangs below a floating island.",
+        route_intent="Look up from a scenic path, then reveal the portal.",
+        elements=[
+            WorldSceneElement(
+                scene_id="SCENE_ISLAND",
+                name="Upper Floating Mass",
+                semantic_key="upper_floating_mass",
+                kind="terrain",
+                source="creator_required",
+                spatial_mode="floating",
+                elevation="high",
+                geometry_role="terrain_mass",
+                traversability="walkable",
+            ),
+            WorldSceneElement(
+                scene_id="SCENE_FOREST",
+                name="Inverted Hanging Garden",
+                semantic_key="inverted_hanging_garden",
+                kind="terrain",
+                source="creator_required",
+                spatial_mode="suspended",
+                elevation="high",
+                orientation="inverted",
+                geometry_role="terrain_mass",
+                traversability="scenic",
+                relations=[
+                    WorldSceneRelation(
+                        relation="suspended_from",
+                        target_scene_ids=["SCENE_ISLAND"],
+                    )
+                ],
+            ),
+            WorldSceneElement(
+                scene_id="SCENE_PORTAL",
+                name="Hidden Star Portal",
+                semantic_key="hidden_star_portal",
+                kind="portal",
+                source="creator_required",
+                geometry_role="arch",
+                traversability="walkable",
+            ),
+        ],
+        exploration_order=["SCENE_FOREST", "SCENE_PORTAL"],
+    )
+
+    blueprint = WorldBlueprintService().plan_from_scene_plan(
+        location_asset_id="LOC_INVERTED",
+        style_asset_id="STYLE_MINI",
+        profile=WorldProfile(world_name="Inverted Garden", portal_form="Hidden Star Portal"),
+        scene_plan=plan,
+    )
+    by_id = {item.element_id: item for item in blueprint.layout_elements}
+    island = by_id["SCENE_ISLAND"]
+    forest = by_id["SCENE_FOREST"]
+
+    assert forest.orientation == "inverted"
+    assert forest.spatial_mode == "suspended"
+    assert forest.position.x == island.position.x
+    assert forest.position.z == island.position.z
+    assert forest.position.y < island.position.y
+
+
+def test_spatial_semantics_compile_walkable_platform_on_aerial_organic_volume():
+    plan = WorldScenePlan(
+        source_mode="prompt",
+        summary="A station garden sits on an aerial organic landmark.",
+        route_intent="Climb toward the station and finish at the portal.",
+        elements=[
+            WorldSceneElement(
+                scene_id="SCENE_CARRIER",
+                name="Gentle Sky Carrier",
+                semantic_key="sky_carrier",
+                kind="landmark",
+                source="creator_required",
+                spatial_mode="aerial",
+                elevation="high",
+                geometry_role="organic",
+                traversability="scenic",
+            ),
+            WorldSceneElement(
+                scene_id="SCENE_STATION",
+                name="Back Garden Station",
+                semantic_key="back_garden_station",
+                kind="terrain",
+                source="creator_required",
+                spatial_mode="elevated",
+                elevation="high",
+                geometry_role="platform",
+                traversability="walkable",
+                relations=[
+                    WorldSceneRelation(
+                        relation="on_top_of",
+                        target_scene_ids=["SCENE_CARRIER"],
+                    )
+                ],
+                photo_opportunity=True,
+            ),
+            WorldSceneElement(
+                scene_id="SCENE_PORTAL",
+                name="Moon Star Portal",
+                semantic_key="moon_star_portal",
+                kind="portal",
+                source="creator_required",
+                spatial_mode="aerial",
+                elevation="high",
+                geometry_role="arch",
+                traversability="walkable",
+                relations=[
+                    WorldSceneRelation(
+                        relation="on_top_of",
+                        target_scene_ids=["SCENE_CARRIER"],
+                    )
+                ],
+            ),
+        ],
+        exploration_order=["SCENE_STATION", "SCENE_PORTAL"],
+        photo_spot_ids=["SCENE_STATION"],
+    )
+    profile = WorldProfile(world_name="Sky Station", portal_form="Moon Star Portal")
+
+    blueprint = WorldBlueprintService().plan_from_scene_plan(
+        location_asset_id="LOC_SKY_STATION",
+        style_asset_id="STYLE_MINI",
+        profile=profile,
+        scene_plan=plan,
+    )
+    by_id = {item.element_id: item for item in blueprint.layout_elements}
+    carrier = by_id["SCENE_CARRIER"]
+    station = by_id["SCENE_STATION"]
+
+    assert carrier.geometry_role == "organic"
+    assert carrier.position.y >= 16
+    assert station.position.y > carrier.position.y
+    assert any(point.y > 0 for point in blueprint.paths[0].points)
+    assert max(camera.position.y for camera in blueprint.camera_points) > 12
+
+    html = build_world_runtime_html(
+        world_name="Sky Station",
+        profile=profile,
+        blueprint=blueprint,
+    )
+    assert '"spatial_mode": "aerial"' in html
+    assert '"geometry_role": "organic"' in html
+    assert "function pathHeightAt" in html
+    assert "role === 'organic'" in html
+
+
+def test_prompt_negation_does_not_add_a_negated_lake_safety_object():
+    payload = _prompt_payload()
+    payload["scene_plan"]["elements"] = [
+        item
+        for item in payload["scene_plan"]["elements"]
+        if item["scene_id"] != "SCENE_LAKE"
+    ]
+    provider = FakeStructuredProvider(payload)
+    service = WorldScenePlanService(structured_provider=provider)
+
+    result = service.plan_from_prompt(
+        description=(
+            "This world is not a lake and 不是湖泊. "
+            "Its main feature is a waterfall floating in the sky."
+        ),
+        style_profile={},
+    )
+
+    keys = [item.semantic_key for item in result.scene_plan.elements]
+    names = [item.name.lower() for item in result.scene_plan.elements]
+    assert "lake" not in keys
+    assert not any(name == "lake / 湖泊" for name in names)
+    assert any(
+        item.kind == "water" and item.semantic_key == "waterfall"
+        for item in result.scene_plan.elements
+    )
+
+
+def test_semantic_key_prevents_duplicate_floating_island_safety_element():
+    payload = _prompt_payload()
+    payload["scene_plan"]["elements"].insert(
+        0,
+        {
+            "scene_id": "SCENE_FLOATING_MASS",
+            "name": "高低错落的漂浮岛群",
+            "semantic_key": "floating_islands",
+            "kind": "terrain",
+            "source": "creator_required",
+            "required": True,
+            "spatial_mode": "floating",
+            "elevation": "medium",
+            "orientation": "normal",
+            "geometry_role": "terrain_mass",
+            "traversability": "walkable",
+            "placement_hint": "",
+            "relation_hints": [],
+            "relations": [],
+            "photo_opportunity": True,
+            "notes": "",
+        },
+    )
+    provider = FakeStructuredProvider(payload)
+    service = WorldScenePlanService(structured_provider=provider)
+
+    result = service.plan_from_prompt(
+        description="A world made from floating islands / 漂浮岛.",
+        style_profile={},
+    )
+
+    floating = [
+        item
+        for item in result.scene_plan.elements
+        if item.semantic_key == "floating_islands"
+    ]
+    assert len(floating) == 1
+
+
+def test_grounded_scene_regression_stays_grounded():
+    plan = WorldScenePlan(
+        source_mode="prompt",
+        summary="Ordinary ground scene",
+        route_intent="Walk from lake to castle to portal.",
+        elements=[
+            WorldSceneElement(
+                scene_id="SCENE_LAKE",
+                name="Lake",
+                semantic_key="lake",
+                kind="water",
+                source="creator_required",
+                geometry_role="surface",
+                traversability="blocked",
+                placement_hint="center",
+            ),
+            WorldSceneElement(
+                scene_id="SCENE_CASTLE",
+                name="Castle",
+                semantic_key="castle",
+                kind="structure",
+                source="creator_required",
+                geometry_role="volume",
+                traversability="scenic",
+                placement_hint="right of Lake",
+            ),
+            WorldSceneElement(
+                scene_id="SCENE_PORTAL",
+                name="Star Portal",
+                semantic_key="star_portal",
+                kind="portal",
+                source="creator_required",
+                geometry_role="arch",
+                traversability="walkable",
+                placement_hint="behind Lake",
+            ),
+        ],
+        exploration_order=["SCENE_LAKE", "SCENE_CASTLE", "SCENE_PORTAL"],
+    )
+    blueprint = WorldBlueprintService().plan_from_scene_plan(
+        location_asset_id="LOC_GROUND",
+        style_asset_id="STYLE_MINI",
+        profile=WorldProfile(world_name="Ground Garden", portal_form="Star Portal"),
+        scene_plan=plan,
+    )
+
+    assert all(element.position.y == 0 for element in blueprint.layout_elements)
