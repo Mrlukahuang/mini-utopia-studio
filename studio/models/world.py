@@ -9,6 +9,7 @@ from studio.models.location import LocationProfile
 
 WORLD_SCHEMA_VERSION = "0.1"
 BLUEPRINT_SCHEMA_VERSION = "0.4"
+SCENE_PLAN_SCHEMA_VERSION = "0.1"
 
 
 class GridSpec(BaseModel):
@@ -107,7 +108,7 @@ class ExpansionEdge(BaseModel):
 
 
 class WorldLayoutElement(BaseModel):
-    """Executable semantic placement compiled from visual concept evidence."""
+    """Executable semantic placement compiled from Scene Plan or legacy visual evidence."""
 
     element_id: str
     name: str
@@ -193,6 +194,107 @@ class WorldProfile(LocationProfile):
     theme_color_hexes: list[str] = Field(default_factory=list)
 
     playable: bool = True
+
+
+class WorldSceneElement(BaseModel):
+    """Semantic object in a creator world before runtime coordinates are assigned."""
+
+    scene_id: str
+    name: str
+    kind: Literal[
+        "portal",
+        "landmark",
+        "structure",
+        "water",
+        "terrain",
+        "bridge",
+        "decoration",
+    ]
+    source: Literal[
+        "creator_required",
+        "utopia_enrichment",
+        "custom_selection",
+        "system_required",
+    ]
+    required: bool = True
+    placement_hint: str = ""
+    relation_hints: list[str] = Field(default_factory=list)
+    photo_opportunity: bool = False
+    notes: str = ""
+
+
+class WorldScenePlan(BaseModel):
+    """Shared semantic contract between Prompt/Custom creation and Blueprint."""
+
+    schema_version: str = SCENE_PLAN_SCHEMA_VERSION
+    source_mode: Literal["prompt", "custom"]
+    summary: str
+    route_intent: str
+    elements: list[WorldSceneElement] = Field(min_length=1, max_length=16)
+    spatial_relations: list[str] = Field(default_factory=list, max_length=20)
+    exploration_order: list[str] = Field(default_factory=list, max_length=16)
+    photo_spot_ids: list[str] = Field(default_factory=list, max_length=8)
+    enrichment_notes: list[str] = Field(default_factory=list, max_length=6)
+
+
+class WorldPromptInterpretation(BaseModel):
+    """GPT interpretation of one creator Prompt, including controlled Utopia enrichment."""
+
+    world_name: str
+    world_type: str
+    reality_mode: str
+    story_function: str
+    terrain: list[str]
+    season: str
+    weather: str
+    time_of_day: str
+    architecture: str
+    mood: list[str]
+    portal_form: str
+    theme_color_hexes: list[str]
+    scene_plan: WorldScenePlan
+
+    def to_profile(self, *, source_description: str) -> WorldProfile:
+        scene = self.scene_plan
+        waters = [item.name for item in scene.elements if item.kind == "water"]
+        landmarks = [
+            item.name
+            for item in scene.elements
+            if item.kind in {"landmark", "structure", "bridge"}
+            and item.source != "utopia_enrichment"
+        ]
+        landscape = [
+            item.name
+            for item in scene.elements
+            if item.kind in {"terrain", "decoration"}
+        ]
+        surprises = [
+            item.name
+            for item in scene.elements
+            if item.source == "utopia_enrichment"
+        ]
+        return WorldProfile(
+            source_description=source_description,
+            world_name=self.world_name,
+            world_type=self.world_type,
+            reality_mode=self.reality_mode,
+            story_function=self.story_function,
+            terrain=list(self.terrain),
+            season=self.season,
+            weather=self.weather,
+            time_of_day=self.time_of_day,
+            architecture=self.architecture,
+            water_features=waters,
+            landscape_elements=landscape,
+            mood=list(self.mood),
+            landmark_ideas=landmarks,
+            portal_form=self.portal_form,
+            portal_placement_idea="Follow the Scene Plan spatial relations.",
+            traversability_notes=scene.route_intent,
+            surprise_elements=surprises,
+            theme_color_hexes=list(self.theme_color_hexes),
+            playable=True,
+        )
 
 
 class WorldBlueprint(BaseModel):
