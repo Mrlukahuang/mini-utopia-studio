@@ -305,30 +305,29 @@ function decorateChunk(chunk, i, centerX, centerZ) {{
   }}
 }}
 
-const floatingWorld = (profile.world_type || '').toLowerCase().includes('floating') || anchorText.includes('floating');
-(bp.chunks || []).forEach((chunk, i) => {{
-  const color = palette[i % palette.length];
-  const geo = new THREE.BoxGeometry(cw - .18, .8, cd - .18);
-  const mesh = new THREE.Mesh(geo, mat(color));
-  mesh.position.set(chunk.chunk_x * cw + cw/2, -.4, chunk.chunk_z * cd + cd/2);
-  mesh.receiveShadow = true;
-  world.add(mesh);
+const semanticElevatedTerrain = (bp.layout_elements || []).some(element =>
+  element.kind === 'terrain' &&
+  ['floating','aerial','suspended'].includes(element.spatial_mode || '')
+);
+const floatingWorld =
+  semanticElevatedTerrain ||
+  (profile.world_type || '').toLowerCase().includes('floating') ||
+  anchorText.includes('floating');
 
-  if (floatingWorld) {{
-    const depth = 2.4 + (i % 4) * .45;
-    const underside = new THREE.Mesh(
-      new THREE.CylinderGeometry(Math.min(cw,cd)*.28, Math.min(cw,cd)*.10, depth, 6),
-      mat(i % 2 ? '#E8D3D8' : '#D9CBE8')
-    );
-    underside.position.set(mesh.position.x, -1.15-depth/2, mesh.position.z);
-    underside.rotation.y = (i % 6) * .18;
-    underside.castShadow = true;
-    underside.receiveShadow = true;
-    world.add(underside);
-  }}
-
-  decorateChunk(chunk, i, mesh.position.x, mesh.position.z);
-}});
+// Grounded worlds keep the classic chunk quilt. Semantic floating/aerial worlds
+// are built from Scene elements instead, so a 25-tile ground plane does not
+// overwrite the creator's vertical composition.
+if (!semanticElevatedTerrain) {{
+  (bp.chunks || []).forEach((chunk, i) => {{
+    const color = palette[i % palette.length];
+    const geo = new THREE.BoxGeometry(cw - .18, .8, cd - .18);
+    const mesh = new THREE.Mesh(geo, mat(color));
+    mesh.position.set(chunk.chunk_x * cw + cw/2, -.4, chunk.chunk_z * cd + cd/2);
+    mesh.receiveShadow = true;
+    world.add(mesh);
+    decorateChunk(chunk, i, mesh.position.x, mesh.position.z);
+  }});
+}}
 
 if (floatingWorld) {{
   addCloud(7, 11, 9, 1.1);
@@ -356,85 +355,201 @@ function semanticMaterial(index, transparent=false) {{
   }});
 }}
 
-(bp.layout_elements || []).forEach((element, index) => {{
-  const role = element.geometry_role || '';
-  const y = element.position.y || 0;
+function addSemanticLabel(text, x, y, z) {{
+  if (!text) return;
+  const canvas = document.createElement('canvas');
+  canvas.width = 512; canvas.height = 96;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = 'rgba(255,255,255,.92)';
+  ctx.strokeStyle = 'rgba(75,67,105,.18)';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.roundRect(8,10,496,76,22);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#34334c';
+  ctx.font = '700 28px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const clean = String(text).slice(0,30);
+  ctx.fillText(clean, 256, 49);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({{map:texture, transparent:true, depthTest:false}})
+  );
+  sprite.scale.set(7.2,1.35,1);
+  sprite.position.set(x,y,z);
+  sprite.renderOrder = 30;
+  world.add(sprite);
+}}
+
+function addSemanticElement(element, index) {{
+  if (!element || element.kind === 'portal') return;
+
+  const role = element.geometry_role || 'volume';
+  const spatialMode = element.spatial_mode || 'grounded';
+  const y = element.position?.y || 0;
+  const width = Math.max(1.2, element.width || 5);
+  const depth = Math.max(1.2, element.depth || 5);
+  const height = Math.max(.6, element.height || 4);
+  const g = new THREE.Group();
+  let labelHeight = height + 2.0;
 
   if (element.kind === 'water') {{
     if (role === 'vertical_flow') {{
       const flow = new THREE.Mesh(
-        new THREE.BoxGeometry(
-          Math.max(1.5, element.width || 4),
-          Math.max(4, element.height || 12),
-          Math.max(1.2, element.depth || 3)
-        ),
-        semanticMaterial(index, true)
+        new THREE.BoxGeometry(width, Math.max(4,height), Math.max(1.2,depth)),
+        semanticMaterial(index,true)
       );
-      flow.position.set(
-        element.position.x,
-        y + Math.max(4, element.height || 12) / 2,
-        element.position.z
-      );
+      flow.position.y = Math.max(4,height) / 2;
       flow.castShadow = true;
-      world.add(flow);
+      g.add(flow);
+      labelHeight = Math.max(4,height) + 2;
     }} else {{
       const water = new THREE.Mesh(
         new THREE.CylinderGeometry(
-          Math.max(element.width || 10, element.depth || 8) * .5,
-          Math.max(element.width || 10, element.depth || 8) * .5,
+          Math.max(width,depth) * .5,
+          Math.max(width,depth) * .5,
           .16,
           36
         ),
-        semanticMaterial(index, true)
+        semanticMaterial(index,true)
       );
-      water.scale.z = Math.max(.35, (element.depth || 8) / Math.max(element.width || 10, element.depth || 8));
-      water.position.set(element.position.x, y + .05, element.position.z);
+      water.scale.z = Math.max(.35, depth / Math.max(width,depth));
+      water.position.y = .05;
       water.receiveShadow = true;
-      world.add(water);
+      g.add(water);
+      labelHeight = 1.6;
     }}
+  }} else if (role === 'terrain_mass' || element.kind === 'terrain') {{
+    const mass = new THREE.Mesh(
+      new THREE.BoxGeometry(width, height, depth),
+      semanticMaterial(index,false)
+    );
+    mass.position.y = height / 2;
+    mass.castShadow = true; mass.receiveShadow = true; g.add(mass);
+    if (['floating','aerial','suspended'].includes(spatialMode)) {{
+      const underside = new THREE.Mesh(
+        new THREE.CylinderGeometry(
+          Math.max(1.1,width*.31),
+          Math.max(.5,width*.10),
+          Math.max(2.4,height*.75),
+          6
+        ),
+        mat('#D9CBE8')
+      );
+      underside.position.y = -Math.max(1.3,height*.34);
+      underside.castShadow = true; g.add(underside);
+    }}
+  }} else if (
+    role === 'organic' ||
+    (
+      role === 'volume' &&
+      element.kind === 'landmark' &&
+      ['floating','aerial','suspended'].includes(spatialMode)
+    )
+  ) {{
+    // Generic soft-body proxy for organic subjects and legacy aerial volume
+    // landmarks. This is semantic fallback, not an object-name special case.
+    const body = new THREE.Mesh(
+      new THREE.SphereGeometry(1,24,16),
+      semanticMaterial(index,false)
+    );
+    body.scale.set(width*.52, height*.42, depth*.52);
+    body.position.y = height*.5;
+    body.castShadow = true; body.receiveShadow = true; g.add(body);
+
+    const secondary = new THREE.Mesh(
+      new THREE.SphereGeometry(1,18,12),
+      semanticMaterial(index+1,false)
+    );
+    secondary.scale.set(width*.22,height*.22,depth*.30);
+    secondary.position.set(width*.42,height*.55,0);
+    secondary.castShadow = true; g.add(secondary);
+
+    const appendage = new THREE.Mesh(
+      new THREE.ConeGeometry(Math.max(.6,depth*.20), Math.max(1.5,width*.34), 5),
+      semanticMaterial(index+2,false)
+    );
+    appendage.rotation.z = Math.PI/2;
+    appendage.position.set(-width*.48,height*.48,0);
+    appendage.castShadow = true; g.add(appendage);
+  }} else if (role === 'platform') {{
+    const deck = new THREE.Mesh(
+      new THREE.BoxGeometry(width, Math.max(.5,height*.18), depth),
+      semanticMaterial(index,false)
+    );
+    deck.position.y = Math.max(.25,height*.09);
+    deck.castShadow=true; deck.receiveShadow=true; g.add(deck);
+    const rail = new THREE.Mesh(
+      new THREE.BoxGeometry(Math.max(1,width*.88),.3,.3),
+      semanticMaterial(index+1,false)
+    );
+    rail.position.set(0,1.05,-depth*.42);
+    rail.castShadow=true; g.add(rail);
+    labelHeight = 2.6;
+  }} else if (role === 'bridge' || element.kind === 'bridge') {{
+    const deck = new THREE.Mesh(
+      new THREE.BoxGeometry(width, Math.max(.35,height*.25), depth),
+      semanticMaterial(index,false)
+    );
+    deck.position.y = Math.max(.3,height*.14);
+    deck.castShadow=true; deck.receiveShadow=true; g.add(deck);
+    [-.42,.42].forEach(k => {{
+      const rail = new THREE.Mesh(
+        new THREE.BoxGeometry(width,.35,.24),
+        semanticMaterial(index+1,false)
+      );
+      rail.position.set(0,1.0,depth*k);
+      rail.castShadow=true; g.add(rail);
+    }});
+    labelHeight = 2.5;
+  }} else if (role === 'path') {{
+    const path = new THREE.Mesh(
+      new THREE.BoxGeometry(width,.22,depth),
+      semanticMaterial(index,false)
+    );
+    path.position.y=.11; path.receiveShadow=true; g.add(path);
+    labelHeight = 1.4;
+  }} else if (role === 'decorative' || element.kind === 'decoration') {{
+    const deco = new THREE.Mesh(
+      new THREE.OctahedronGeometry(Math.max(.65,width*.28),0),
+      semanticMaterial(index,false)
+    );
+    deco.position.y = Math.max(.8,height*.5);
+    deco.castShadow=true; g.add(deco);
+    labelHeight = Math.max(1.8,height+1);
+  }} else {{
+    // Generic built/artificial volume uses its actual Blueprint dimensions.
+    const base = new THREE.Mesh(
+      new THREE.BoxGeometry(width,height,depth),
+      semanticMaterial(index,false)
+    );
+    base.position.y = height/2;
+    base.castShadow=true; base.receiveShadow=true; g.add(base);
   }}
 
-  if (element.kind === 'terrain' || element.kind === 'decoration') {{
-    const g = new THREE.Group();
-    if (element.kind === 'terrain') {{
-      const platform = new THREE.Mesh(
-        new THREE.BoxGeometry(
-          Math.max(3, element.width || 8),
-          Math.max(.8, element.height || 3),
-          Math.max(3, element.depth || 8)
-        ),
-        semanticMaterial(index, false)
-      );
-      platform.position.y = Math.max(.8, element.height || 3) / 2;
-      platform.castShadow = true; platform.receiveShadow = true; g.add(platform);
-      if (['floating','aerial','suspended'].includes(element.spatial_mode || '')) {{
-        const underside = new THREE.Mesh(
-          new THREE.CylinderGeometry(
-            Math.max(1.4, (element.width || 8) * .3),
-            .8,
-            3.2,
-            6
-          ),
-          mat('#D9CBE8')
-        );
-        underside.position.y = -2.0;
-        underside.castShadow = true;
-        g.add(underside);
-      }}
-    }} else {{
-      const deco = new THREE.Mesh(
-        new THREE.OctahedronGeometry(Math.max(.65, (element.width || 2) * .3), 0),
-        semanticMaterial(index, false)
-      );
-      deco.position.y = Math.max(1.0, element.height || 2) * .5;
-      deco.castShadow = true; g.add(deco);
-    }}
-    applySemanticOrientation(g, element.orientation || 'normal');
-    g.position.set(element.position.x, y, element.position.z);
-    g.userData.label = element.name;
-    world.add(g);
+  applySemanticOrientation(g, element.orientation || 'normal');
+  g.position.set(element.position.x,y,element.position.z);
+  g.userData.label = element.name;
+  world.add(g);
+
+  if (
+    element.kind !== 'decoration' &&
+    role !== 'decorative' &&
+    role !== 'path'
+  ) {{
+    addSemanticLabel(
+      element.name,
+      element.position.x,
+      y + labelHeight,
+      element.position.z
+    );
   }}
-}});
+}}
+
+(bp.layout_elements || []).forEach(addSemanticElement);
 
 (bp.paths || []).forEach((path, pathIndex) => {{
   const points = path.points || [];
@@ -499,7 +614,10 @@ function addLandmark(spec, index) {{
   g.userData.label = spec.name;
   world.add(g);
 }}
-(bp.landmarks || []).forEach(addLandmark);
+// Legacy Blueprints without layout_elements still use LandmarkSpec proxies.
+if (!(bp.layout_elements || []).length) {{
+  (bp.landmarks || []).forEach(addLandmark);
+}}
 
 if (bp.portal) {{
   const portal = new THREE.Group();
@@ -542,6 +660,12 @@ if (bp.portal) {{
   glow.position.y = 3.0; portal.add(glow);
   portal.position.set(bp.portal.position.x, bp.portal.position.y || 0, bp.portal.position.z);
   world.add(portal);
+  addSemanticLabel(
+    bp.portal.form || profile.portal_form || 'Portal',
+    bp.portal.position.x,
+    (bp.portal.position.y || 0) + 7.2,
+    bp.portal.position.z
+  );
 }}
 
 function makeAvatar() {{

@@ -301,3 +301,83 @@ def test_runtime_html_has_zoom_wheel_and_blueprint_aware_overview_camera():
     assert "baseFollowOffset" in html
     assert "multiplyScalar(followZoom)" in html
     assert "Mouse Wheel / 滚轮缩放" in html
+
+
+def test_runtime_semantic_proxy_uses_layout_and_hides_ground_quilt_for_floating_terrain():
+    blueprint = _blueprint()
+    blueprint.layout_elements = [
+        WorldLayoutElement(
+            element_id="SCENE_ISLAND",
+            name="Cloud Island",
+            kind="terrain",
+            spatial_mode="floating",
+            elevation="medium",
+            geometry_role="terrain_mass",
+            traversability="walkable",
+            position=WorldPoint(x=25, y=8, z=25),
+            width=12,
+            depth=10,
+            height=4,
+        ),
+        WorldLayoutElement(
+            element_id="SCENE_CARRIER",
+            name="Gentle Sky Carrier",
+            kind="landmark",
+            spatial_mode="aerial",
+            elevation="high",
+            geometry_role="volume",
+            traversability="scenic",
+            position=WorldPoint(x=40, y=16, z=40),
+            width=12,
+            depth=7,
+            height=7,
+        ),
+        WorldLayoutElement(
+            element_id="SCENE_PLATFORM",
+            name="Back Garden Station",
+            kind="structure",
+            spatial_mode="elevated",
+            elevation="high",
+            geometry_role="platform",
+            traversability="walkable",
+            position=WorldPoint(x=40, y=22, z=40),
+            width=9,
+            depth=7,
+            height=2,
+        ),
+    ]
+
+    html = build_world_runtime_html(
+        world_name="Semantic Sky World",
+        profile=WorldProfile(world_name="Semantic Sky World"),
+        blueprint=blueprint,
+    )
+
+    assert "const semanticElevatedTerrain" in html
+    assert "if (!semanticElevatedTerrain)" in html
+    assert "function addSemanticElement" in html
+    assert "function addSemanticLabel" in html
+    assert "Generic soft-body proxy for organic subjects and legacy aerial volume" in html
+    assert "role === 'organic'" in html
+    assert "element.kind === 'landmark'" in html
+    assert "['floating','aerial','suspended'].includes(spatialMode)" in html
+    assert "(bp.layout_elements || []).forEach(addSemanticElement)" in html
+    assert "if (!(bp.layout_elements || []).length)" in html
+    assert "Gentle Sky Carrier" in html
+    assert "Back Garden Station" in html
+
+
+def test_runtime_semantic_proxy_labels_main_portal():
+    blueprint = _blueprint()
+    blueprint.portal = PortalSpec(
+        position=WorldPoint(x=25, y=14, z=25),
+        form="Moon Star Portal",
+    )
+    html = build_world_runtime_html(
+        world_name="Portal Label World",
+        profile=WorldProfile(world_name="Portal Label World"),
+        blueprint=blueprint,
+    )
+
+    assert "addSemanticLabel(" in html
+    assert "bp.portal.form || profile.portal_form || 'Portal'" in html
