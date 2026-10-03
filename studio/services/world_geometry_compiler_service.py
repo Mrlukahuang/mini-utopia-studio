@@ -110,11 +110,9 @@ class WorldGeometryCompilerService:
                         else ""
                     ),
                     geometry=ThreeGeometrySpec(
-                        source_type=(
-                            "glb"
-                            if appearance.geometry_strategy == "glb"
-                            else "primitive"
-                        ),
+                        # Strategy is planning intent. Until an actual GLB/buffer
+                        # artifact exists, the compiled runtime source stays primitive.
+                        source_type="primitive",
                         primitive=part.primitive,
                         primitive_size=RenderVec3(
                             x=max(.08, element.width * abs(part.relative_scale.x)),
