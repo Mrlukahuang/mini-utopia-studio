@@ -139,3 +139,93 @@ def test_world_concept_generation_uses_wide_medium_image(tmp_path):
 
     assert provider.calls[0]["size"] == "1536x1024"
     assert provider.calls[0]["quality"] == "medium"
+
+
+def test_blueprint_first_plan_is_playable_before_any_preview(tmp_path):
+    repo = SQLiteStudioRepository(tmp_path / "studio.db")
+    storage = LocalObjectStorage(tmp_path / "storage")
+    assets = AssetService(repo)
+    style = StyleService(repo).ensure_mini_utopia_base()
+    profile = _profile().model_copy(
+        update={
+            "landmark_ideas": ["Portal Plaza / 传送门广场"],
+            "portal_form": "Star Arch / 星星拱门",
+            "water_features": ["Lake / 湖泊"],
+        }
+    )
+    world = assets.create_world(
+        name="Candy Cloud Valley",
+        description=profile.source_description,
+        profile=profile,
+    )
+    service = WorldConceptService(
+        repo,
+        storage,
+        WorldConceptPromptService(),
+        WorldBlueprintService(),
+        image_provider=None,
+    )
+
+    blueprint = service.plan_blueprint(
+        location_asset_id=world.asset_id,
+        style_asset_id=style.asset_id,
+    )
+
+    saved = repo.get_asset(world.asset_id)
+    assert saved is not None
+    assert saved.status == ReviewStatus.APPROVED
+    assert saved.metadata["world_pipeline"] == "blueprint_first_v1"
+    assert saved.metadata["world_blueprint_source"] == "creator_profile"
+    assert "world_concept_path" not in saved.metadata
+    assert blueprint.layout_elements
+    assert blueprint.portal is not None
+    assert len([e for e in blueprint.layout_elements if e.kind == "portal"]) == 1
+
+    plaza = next(e for e in blueprint.layout_elements if "Portal Plaza" in e.name)
+    assert plaza.kind == "structure"
+
+
+def test_blueprint_preview_render_never_mutates_blueprint(tmp_path):
+    repo = SQLiteStudioRepository(tmp_path / "studio.db")
+    storage = LocalObjectStorage(tmp_path / "storage")
+    assets = AssetService(repo)
+    style = StyleService(repo).ensure_mini_utopia_base()
+    world = assets.create_world(
+        name="Candy Cloud Valley",
+        description="dream world",
+        profile=_profile(),
+    )
+    provider = FakeWorldImageProvider()
+    service = WorldConceptService(
+        repo,
+        storage,
+        WorldConceptPromptService(),
+        WorldBlueprintService(),
+        provider,
+    )
+
+    service.plan_blueprint(
+        location_asset_id=world.asset_id,
+        style_asset_id=style.asset_id,
+    )
+    planned = repo.get_asset(world.asset_id)
+    assert planned is not None
+    before = planned.metadata["world_blueprint"]
+
+    preview = service.render_blueprint_preview(
+        location_asset_id=world.asset_id,
+        style_asset_id=style.asset_id,
+    )
+
+    saved = repo.get_asset(world.asset_id)
+    assert saved is not None
+    assert saved.metadata["world_blueprint"] == before
+    assert saved.metadata["world_pipeline"] == "blueprint_first_v1"
+    assert saved.metadata["world_preview_source"] == "blueprint"
+    assert saved.metadata["world_concept_path"] == preview.path
+    assert preview.role == "world_concept_approved"
+    assert len(provider.calls) == 1
+    assert provider.calls[0]["size"] == "1536x1024"
+    assert provider.calls[0]["quality"] == "medium"
+    assert "BLUEPRINT IS AUTHORITATIVE" in provider.calls[0]["prompt"]
+    assert "50x50 PLAYABLE LAYOUT" in provider.calls[0]["prompt"]
