@@ -165,11 +165,16 @@ branded game/world. Do not invent a second competing theme."""
             profile.creator_extra_details.strip()
             and self.structured_provider is not None
         ):
-            base = self._supplement_custom_extra(
-                profile=profile,
-                base=base,
-                style_profile=style_profile or {},
-            )
+            try:
+                base = self._supplement_custom_extra(
+                    profile=profile,
+                    base=base,
+                    style_profile=style_profile or {},
+                )
+            except Exception:
+                # Custom Build must remain deterministic and usable even if the
+                # optional free-text supplement provider is temporarily unavailable.
+                pass
         return self.route_planner.normalize(
             self._normalize_plan(
                 base,
