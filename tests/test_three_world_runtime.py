@@ -9,6 +9,7 @@ from studio.models.world import (
     WorldBlueprint,
     WorldPoint,
     WorldProfile,
+    WorldVisualAnchor,
 )
 from studio.runtime.three_world import THREE_VERSION, build_world_runtime_html, runtime_summary
 
@@ -207,3 +208,30 @@ def test_runtime_html_has_floating_garden_world_identity_kit():
     assert "ExtrudeGeometry" in html
     assert "portalForm.includes('star')" in html
     assert "(bp.paths || []).forEach" in html
+
+
+def test_runtime_consumes_visual_anchor_hints():
+    blueprint = _blueprint()
+    blueprint.visual_anchor = WorldVisualAnchor(
+        must_preserve=[
+            "Floating Islands / 漂浮岛",
+            "Star Arch / 星星拱门",
+            "Pink Garden / 粉色花园",
+        ],
+        concept_summary="floating pastel garden with star portal",
+    )
+    blueprint.portal = PortalSpec(
+        position=WorldPoint(x=25, y=0, z=25),
+        form="",
+    )
+
+    html = build_world_runtime_html(
+        world_name="Anchor Driven World",
+        profile=WorldProfile(world_name="Anchor Driven World"),
+        blueprint=blueprint,
+    )
+
+    assert "anchorText" in html
+    assert "anchorText.includes('floating')" in html
+    assert "anchorText.includes('garden')" in html
+    assert "visualAnchor.must_preserve" in html
