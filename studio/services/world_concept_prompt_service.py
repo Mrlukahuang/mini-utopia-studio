@@ -133,7 +133,8 @@ NEGATIVE RULES
         if appearance_plan is not None:
             for item in appearance_plan.objects:
                 parts = ", ".join(
-                    f"{part.role}:{part.primitive}"
+                    f"{part.role}:{part.primitive}/"
+                    f"{part.palette_role}/{part.material_role}"
                     for part in [item.main_body, *item.parts[:8]]
                 )
                 appearance_lines.append(
