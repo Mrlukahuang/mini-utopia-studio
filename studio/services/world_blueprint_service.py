@@ -13,17 +13,19 @@ from studio.models.world import (
     WorldBlueprint,
     WorldPoint,
     WorldProfile,
+    WorldScenePlan,
+    WorldVisualAnchor,
     ZoneSpec,
 )
 from studio.services.world_visual_anchor_service import WorldVisualAnchorService
-from studio.services.world_layout_service import WorldLayoutService
+from studio.services.world_layout_service import WorldLayoutPlan, WorldLayoutService
 
 
 class WorldBlueprintService:
     """Build deterministic executable World Blueprints.
 
-    Blueprint-first planning is the primary World Factory path. Image-driven
-    builds remain available for the optional legacy / Image-to-World path.
+    The primary pipeline compiles a semantic Scene Plan. Legacy/image-to-world
+    builds remain supported through the visual-anchor path.
     """
 
     def __init__(
@@ -41,7 +43,7 @@ class WorldBlueprintService:
         style_asset_id: str | None,
         profile: WorldProfile,
     ) -> WorldBlueprint:
-        """Plan the playable world directly from creator intent, before imagery."""
+        """Legacy deterministic profile planning kept for backward compatibility."""
         return self.build(
             location_asset_id=location_asset_id,
             style_asset_id=style_asset_id,
@@ -49,6 +51,49 @@ class WorldBlueprintService:
             concept_path="",
             concept_direction="blueprint_first",
             concept_image_bytes=None,
+        )
+
+    def plan_from_scene_plan(
+        self,
+        *,
+        location_asset_id: str,
+        style_asset_id: str | None,
+        profile: WorldProfile,
+        scene_plan: WorldScenePlan,
+    ) -> WorldBlueprint:
+        """Compile the shared Prompt/Custom Scene Plan into runtime truth."""
+        grid, chunks = self._grid_and_chunks(profile)
+        visual_anchor = WorldVisualAnchor(
+            concept_image_roles=[],
+            concept_path="",
+            concept_direction=f"scene_plan:{scene_plan.source_mode}",
+            extraction_method="scene_plan_v1",
+            concept_summary=scene_plan.summary,
+            must_preserve=[
+                item.name for item in scene_plan.elements if item.required
+            ],
+            flexible_details=[
+                item.name
+                for item in scene_plan.elements
+                if item.source == "utopia_enrichment"
+            ],
+            palette_hexes=list(profile.theme_color_hexes),
+            composition_notes=[scene_plan.route_intent],
+            spatial_relations=list(scene_plan.spatial_relations),
+        )
+        layout_plan = self.layout_service.compile_scene_plan(
+            plan=scene_plan,
+            grid=grid,
+        )
+        return self._assemble(
+            location_asset_id=location_asset_id,
+            style_asset_id=style_asset_id,
+            profile=profile,
+            grid=grid,
+            chunks=chunks,
+            visual_anchor=visual_anchor,
+            layout_plan=layout_plan,
+            scene_plan=scene_plan,
         )
 
     def build(
@@ -62,19 +107,8 @@ class WorldBlueprintService:
         concept_image_bytes: bytes | None = None,
         concept_mime_type: str = "image/png",
     ) -> WorldBlueprint:
-        grid = GridSpec()
-        chunks = [
-            ChunkSpec(
-                chunk_x=x,
-                chunk_z=z,
-                generated=True,
-                biome=(profile.terrain[(x + z) % len(profile.terrain)] if profile.terrain else "meadow"),
-                theme_hint=profile.world_type,
-            )
-            for z in range(5)
-            for x in range(5)
-        ]
-
+        """Legacy visual/profile compiler used by Image-to-World compatibility."""
+        grid, chunks = self._grid_and_chunks(profile)
         visual_anchor = self.visual_anchor_service.extract(
             profile=profile,
             concept_direction=concept_direction,
@@ -87,14 +121,56 @@ class WorldBlueprintService:
             anchor=visual_anchor,
             grid=grid,
         )
+        return self._assemble(
+            location_asset_id=location_asset_id,
+            style_asset_id=style_asset_id,
+            profile=profile,
+            grid=grid,
+            chunks=chunks,
+            visual_anchor=visual_anchor,
+            layout_plan=layout_plan,
+            scene_plan=None,
+        )
 
+    @staticmethod
+    def _grid_and_chunks(profile: WorldProfile) -> tuple[GridSpec, list[ChunkSpec]]:
+        grid = GridSpec()
+        chunks = [
+            ChunkSpec(
+                chunk_x=x,
+                chunk_z=z,
+                generated=True,
+                biome=(
+                    profile.terrain[(x + z) % len(profile.terrain)]
+                    if profile.terrain
+                    else "meadow"
+                ),
+                theme_hint=profile.world_type,
+            )
+            for z in range(5)
+            for x in range(5)
+        ]
+        return grid, chunks
+
+    def _assemble(
+        self,
+        *,
+        location_asset_id: str,
+        style_asset_id: str | None,
+        profile: WorldProfile,
+        grid: GridSpec,
+        chunks: list[ChunkSpec],
+        visual_anchor: WorldVisualAnchor,
+        layout_plan: WorldLayoutPlan,
+        scene_plan: WorldScenePlan | None,
+    ) -> WorldBlueprint:
         spawn = SpawnPoint(x=6, y=0, z=25, facing_degrees=90)
 
         landmark_elements = [
             element
             for element in layout_plan.elements
             if element.kind in {"structure", "landmark", "bridge"}
-        ][:6]
+        ][:8]
         landmarks = [
             LandmarkSpec(
                 landmark_id=f"LANDMARK_{index+1:02d}",
@@ -115,15 +191,32 @@ class WorldBlueprintService:
         portal = PortalSpec(
             position=portal_position,
             facing_degrees=270,
-            form=profile.portal_form or (
-                portal_element.name if portal_element is not None else "Portal"
+            form=(
+                portal_element.name
+                if portal_element is not None
+                else profile.portal_form or "Portal"
             ),
             destination_hint="Next Mini World",
         )
 
+        by_id = {element.element_id: element for element in layout_plan.elements}
         route_points = [WorldPoint(x=spawn.x, y=0, z=spawn.z)]
-        route_points.extend(lm.position for lm in landmarks)
-        route_points.append(portal_position)
+        if scene_plan is not None:
+            for scene_id in scene_plan.exploration_order:
+                element = by_id.get(scene_id)
+                if (
+                    element is None
+                    or element.kind in {"portal", "terrain", "decoration"}
+                ):
+                    continue
+                route_points.append(self._safe_route_point(element, grid))
+        else:
+            route_points.extend(
+                landmark.position.model_copy(deep=True)
+                for landmark in landmarks
+            )
+        route_points.append(portal_position.model_copy(deep=True))
+        route_points = self._dedupe_points(route_points)
 
         main_path = PathSpec(
             path_id="PATH_MAIN",
@@ -191,25 +284,47 @@ class WorldBlueprintService:
             CameraPoint(
                 camera_id="CAM_FOLLOW",
                 position=WorldPoint(x=10, y=4, z=25),
-                look_at=WorldPoint(x=18, y=2, z=25),
+                look_at=(
+                    route_points[1]
+                    if len(route_points) > 1
+                    else WorldPoint(x=18, y=2, z=25)
+                ),
                 lens_mm=35,
                 role="follow",
             ),
         ]
-        for index, landmark in enumerate(landmarks[:2]):
+
+        photo_elements = []
+        if scene_plan is not None:
+            for scene_id in scene_plan.photo_spot_ids:
+                element = by_id.get(scene_id)
+                if (
+                    element is not None
+                    and element.kind != "portal"
+                    and element not in photo_elements
+                ):
+                    photo_elements.append(element)
+                if len(photo_elements) >= 4:
+                    break
+        else:
+            photo_elements = landmark_elements[:2]
+
+        for index, element in enumerate(photo_elements):
+            target = element.position.model_copy(deep=True)
             camera_points.append(
                 CameraPoint(
-                    camera_id=f"CAM_LANDMARK_{index+1:02d}",
+                    camera_id=f"CAM_PHOTO_{index+1:02d}",
                     position=WorldPoint(
-                        x=max(0, landmark.position.x - 7),
+                        x=max(2, min(grid.width - 2, target.x - 7)),
                         y=6,
-                        z=max(0, landmark.position.z - 7),
+                        z=max(2, min(grid.depth - 2, target.z - 7)),
                     ),
-                    look_at=landmark.position,
+                    look_at=target,
                     lens_mm=35,
                     role="landmark",
                 )
             )
+
         camera_points.extend(
             [
                 CameraPoint(
@@ -236,15 +351,28 @@ class WorldBlueprintService:
         director_tour = TourRoute(
             name="First World Tour",
             steps=[
-                TourStep(camera_id=point.camera_id, duration_seconds=4.0, movement=(
-                    "fly" if point.role == "establishing"
-                    else "follow" if point.role == "follow"
-                    else "orbit" if point.role == "landmark"
-                    else "dolly" if point.role == "portal_reveal"
-                    else "cut"
-                ))
+                TourStep(
+                    camera_id=point.camera_id,
+                    duration_seconds=4.0,
+                    movement=(
+                        "fly"
+                        if point.role == "establishing"
+                        else "follow"
+                        if point.role == "follow"
+                        else "orbit"
+                        if point.role == "landmark"
+                        else "dolly"
+                        if point.role == "portal_reveal"
+                        else "cut"
+                    ),
+                )
                 for point in camera_points
             ],
+            character_route_point_ids=(
+                list(scene_plan.exploration_order)
+                if scene_plan is not None
+                else []
+            ),
         )
 
         return WorldBlueprint(
@@ -264,3 +392,32 @@ class WorldBlueprintService:
             camera_points=camera_points,
             director_tours=[director_tour],
         )
+
+    @staticmethod
+    def _safe_route_point(element, grid: GridSpec) -> WorldPoint:
+        """Use a scenic edge for blocked water instead of routing through its center."""
+        if element.kind == "water":
+            return WorldPoint(
+                x=max(
+                    5,
+                    min(
+                        grid.width - 5,
+                        element.position.x - element.width / 2 - 2,
+                    ),
+                ),
+                y=0,
+                z=max(5, min(grid.depth - 5, element.position.z)),
+            )
+        return element.position.model_copy(deep=True)
+
+    @staticmethod
+    def _dedupe_points(points: list[WorldPoint]) -> list[WorldPoint]:
+        result: list[WorldPoint] = []
+        for point in points:
+            if result and (
+                abs(result[-1].x - point.x) < .01
+                and abs(result[-1].z - point.z) < .01
+            ):
+                continue
+            result.append(point)
+        return result
