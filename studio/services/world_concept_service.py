@@ -242,8 +242,14 @@ class WorldConceptService:
             if style is not None:
                 style_profile = style.metadata.get("style_profile", {}) or {}
 
+        blueprint_fingerprint = self._fingerprint(blueprint.model_dump_json())
         raw_plan = world.metadata.get("world_appearance_plan")
-        if raw_plan:
+        can_reuse_plan = bool(
+            raw_plan
+            and world.metadata.get("world_render_blueprint_fingerprint")
+            == blueprint_fingerprint
+        )
+        if can_reuse_plan:
             try:
                 appearance = WorldAppearancePlan.model_validate(raw_plan)
             except Exception:
@@ -282,9 +288,7 @@ class WorldConceptService:
         world.metadata["world_appearance_schema_version"] = appearance.schema_version
         world.metadata["world_render_spec"] = render_spec.model_dump(mode="json")
         world.metadata["world_render_schema_version"] = render_spec.schema_version
-        world.metadata["world_render_blueprint_fingerprint"] = self._fingerprint(
-            blueprint.model_dump_json()
-        )
+        world.metadata["world_render_blueprint_fingerprint"] = blueprint_fingerprint
 
     def current_render_spec(self, location_asset_id: str) -> WorldRenderSpec | None:
         world = self.repository.get_asset(location_asset_id)
