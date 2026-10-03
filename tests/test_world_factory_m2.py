@@ -229,3 +229,20 @@ def test_blueprint_preview_render_never_mutates_blueprint(tmp_path):
     assert provider.calls[0]["quality"] == "medium"
     assert "BLUEPRINT IS AUTHORITATIVE" in provider.calls[0]["prompt"]
     assert "50x50 PLAYABLE LAYOUT" in provider.calls[0]["prompt"]
+
+
+def test_archive_world_soft_deletes_without_removing_record(tmp_path):
+    repo = SQLiteStudioRepository(tmp_path / "studio.db")
+    assets = AssetService(repo)
+    world = assets.create_world(
+        name="Candy Cloud Valley",
+        description="dream world",
+        profile=_profile(),
+    )
+
+    archived = assets.archive_world(world.asset_id)
+
+    assert archived.status == ReviewStatus.ARCHIVED
+    saved = repo.get_asset(world.asset_id)
+    assert saved is not None
+    assert saved.status == ReviewStatus.ARCHIVED
