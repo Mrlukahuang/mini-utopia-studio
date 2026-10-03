@@ -57,7 +57,10 @@ class AssetService:
             display_name=name,
             slug=slugify(name),
             description=description,
-            metadata={"world_profile": profile.model_dump(mode="json")},
+            metadata={
+                "world_profile": profile.model_dump(mode="json"),
+                "world_creation_complete": False,
+            },
         )
         self.repository.save_asset(asset)
         return asset
@@ -79,6 +82,34 @@ class AssetService:
         asset.metadata["world_profile"] = profile.model_dump(mode="json")
         self.repository.save_asset(asset)
         return asset
+
+    def complete_world(self, asset_id: str) -> Asset:
+        """Publish a World to the Library after the creator explicitly finishes it."""
+        asset = self.repository.get_asset(asset_id)
+        if asset is None or asset.asset_type != AssetType.LOCATION:
+            raise ValueError(f"World not found: {asset_id}")
+        asset.metadata["world_creation_complete"] = True
+        self.repository.save_asset(asset)
+        return asset
+
+    def archive_world(self, asset_id: str) -> Asset:
+        """Soft-delete a World while preserving Story/Asset references."""
+        asset = self.repository.get_asset(asset_id)
+        if asset is None or asset.asset_type != AssetType.LOCATION:
+            raise ValueError(f"World not found: {asset_id}")
+        asset.status = ReviewStatus.ARCHIVED
+        self.repository.save_asset(asset)
+        return asset
+
+    @staticmethod
+    def is_world_library_visible(asset: Asset) -> bool:
+        """Hide unfinished new drafts while keeping pre-metadata legacy Worlds visible."""
+        return bool(
+            asset.asset_type == AssetType.LOCATION
+            and asset.status != ReviewStatus.ARCHIVED
+            and "world_profile" in asset.metadata
+            and asset.metadata.get("world_creation_complete", True)
+        )
 
     def ensure_default_character_wearables(self) -> dict[str, Asset]:
         defaults = {
