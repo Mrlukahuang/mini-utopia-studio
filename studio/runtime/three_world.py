@@ -106,12 +106,16 @@ def build_world_runtime_html(
     <span class="pill" id="animState">Idle</span>
     <span class="pill">🌀 Portal</span>
     <span class="pill">🎬 Director Camera</span>
+    <span class="pill" id="zoomState">🔎 100%</span>
   </div>
   <div class="controls">
+    <button id="zoomOut" title="Zoom out / 拉远">−</button>
+    <button id="zoomIn" title="Zoom in / 拉近">＋</button>
+    <button id="overview" title="Show the whole World / 查看全景">🌐 Overview</button>
     <button id="reset">↺ Reset</button>
     <button id="tour" class="primary">🎬 Start Director Tour</button>
   </div>
-  <div class="tip">WASD / 方向键移动 · Hold Shift to Run / 按住 Shift 奔跑</div>
+  <div class="tip">WASD / 方向键移动 · Shift 奔跑 · Mouse Wheel / 滚轮缩放 · 🌐 Overview 看全景</div>
   <div id="runtimeError" style="
     display:none; position:absolute; inset:120px 24px auto 24px; z-index:20;
     padding:16px 18px; border-radius:18px; background:rgba(255,235,238,.96);
@@ -650,6 +654,13 @@ window.addEventListener('keydown', e => {{
     'KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight'
   ].includes(e.code)) {{
     if (e.code.startsWith('Arrow')) e.preventDefault();
+    if (
+      overviewMode &&
+      ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','KeyW','KeyA','KeyS','KeyD'].includes(e.code)
+    ) {{
+      overviewMode = false;
+      updateZoomLabel();
+    }}
     keys.add(e.code);
   }}
 }});
@@ -658,6 +669,93 @@ window.addEventListener('keyup', e => keys.delete(e.code));
 const velocity = new THREE.Vector3();
 const cameraTarget = new THREE.Vector3();
 const clock = new THREE.Clock();
+
+const baseFollowOffset = new THREE.Vector3(-7, 7, 9);
+const scaledFollowOffset = new THREE.Vector3();
+const ZOOM_MIN = .60;
+const ZOOM_MAX = 3.80;
+let followZoom = 1.0;
+let overviewMode = false;
+
+const layoutTopY = Math.max(
+  0,
+  ...(bp.layout_elements || []).map(element =>
+    (element.position?.y || 0) + (element.height || 0)
+  ),
+);
+const cameraTopY = Math.max(
+  0,
+  ...(bp.camera_points || []).flatMap(point => [
+    point.position?.y || 0,
+    point.look_at?.y || 0,
+  ]),
+);
+const worldTopY = Math.max(8, layoutTopY, cameraTopY);
+const worldSpan = Math.max(
+  bp.grid.width * cell,
+  bp.grid.depth * cell,
+  worldTopY * 1.6,
+);
+camera.far = Math.max(camera.far, worldSpan * 4);
+camera.updateProjectionMatrix();
+if (scene.fog) {{
+  scene.fog.near = Math.max(55, worldSpan * .9);
+  scene.fog.far = Math.max(95, worldSpan * 2.8);
+}}
+const overviewTarget = new THREE.Vector3(
+  bp.grid.width * cell * .5,
+  Math.max(2, worldTopY * .34),
+  bp.grid.depth * cell * .5,
+);
+
+function updateZoomLabel() {{
+  const label = document.getElementById('zoomState');
+  if (!label) return;
+  if (overviewMode) {{
+    label.textContent = '🌐 Overview';
+    return;
+  }}
+  label.textContent = '🔎 ' + Math.round(100 / followZoom) + '%';
+}}
+
+function setFollowZoom(value) {{
+  followZoom = THREE.MathUtils.clamp(value, ZOOM_MIN, ZOOM_MAX);
+  overviewMode = false;
+  updateZoomLabel();
+}}
+
+function zoomCamera(direction) {{
+  if (overviewMode) {{
+    const delta = camera.position.clone().sub(cameraTarget);
+    const currentDistance = Math.max(.001, delta.length());
+    const factor = direction > 0 ? 1.16 : .86;
+    const nextDistance = THREE.MathUtils.clamp(
+      currentDistance * factor,
+      worldSpan * .35,
+      worldSpan * 2.2,
+    );
+    delta.setLength(nextDistance);
+    camera.position.copy(cameraTarget).add(delta);
+    camera.lookAt(cameraTarget);
+    return;
+  }}
+  setFollowZoom(followZoom * (direction > 0 ? 1.16 : .86));
+}}
+
+function showOverview() {{
+  stopTour();
+  overviewMode = true;
+  keys.clear();
+  const horizontal = Math.max(bp.grid.width * cell, bp.grid.depth * cell);
+  cameraTarget.copy(overviewTarget);
+  camera.position.set(
+    overviewTarget.x - horizontal * .78,
+    Math.max(worldTopY + horizontal * .58, 30),
+    overviewTarget.z + horizontal * .88,
+  );
+  camera.lookAt(cameraTarget);
+  updateZoomLabel();
+}}
 
 function setAnimationState(next) {{
   if (animationState === next) return;
@@ -738,10 +836,10 @@ function updatePlayer(dt) {{
   player.position.y += ((routeY + .02) - player.position.y) * Math.min(1, dt * 9);
 }}
 
-const followOffset = new THREE.Vector3(-7, 7, 9);
 function updateFollowCamera(dt) {{
-  if (!manualMode) return;
-  const desired = player.position.clone().add(followOffset);
+  if (!manualMode || overviewMode) return;
+  scaledFollowOffset.copy(baseFollowOffset).multiplyScalar(followZoom);
+  const desired = player.position.clone().add(scaledFollowOffset);
   const blend = 1 - Math.pow(.001, dt);
   camera.position.lerp(desired, blend);
   cameraTarget.lerp(player.position.clone().add(new THREE.Vector3(0,1.8,0)), blend);
@@ -755,6 +853,8 @@ function cameraPointById(id) {{
 function startTour() {{
   const tour = (bp.director_tours || [])[0];
   if (!tour || !(tour.steps || []).length) return;
+  overviewMode = false;
+  updateZoomLabel();
   manualMode = false;
   keys.clear();
   tourState = {{ tour, index:0, elapsed:0, fromPos:camera.position.clone(), fromLook:cameraTarget.clone() }};
@@ -795,9 +895,21 @@ function updateTour(dt) {{
 document.getElementById('tour').addEventListener('click', () => {{
   if (manualMode) startTour(); else stopTour();
 }});
+document.getElementById('zoomOut').addEventListener('click', () => zoomCamera(1));
+document.getElementById('zoomIn').addEventListener('click', () => zoomCamera(-1));
+document.getElementById('overview').addEventListener('click', showOverview);
 document.getElementById('reset').addEventListener('click', () => {{
-  stopTour(); resetPlayer();
+  stopTour();
+  overviewMode = false;
+  followZoom = 1.0;
+  resetPlayer();
+  updateZoomLabel();
 }});
+renderer.domElement.addEventListener('wheel', event => {{
+  event.preventDefault();
+  if (!manualMode) return;
+  zoomCamera(Math.sign(event.deltaY || 1));
+}}, {{ passive:false }});
 
 function resize() {{
   const w = host.clientWidth || 900;
@@ -808,9 +920,14 @@ function resize() {{
 }}
 window.addEventListener('resize', resize);
 resize();
-camera.position.set(spawn.x-7, 7, spawn.z+9);
+camera.position.set(
+  spawn.x + baseFollowOffset.x,
+  (spawn.y || 0) + baseFollowOffset.y,
+  spawn.z + baseFollowOffset.z,
+);
 cameraTarget.copy(player.position).add(new THREE.Vector3(0,1.8,0));
 camera.lookAt(cameraTarget);
+updateZoomLabel();
 
 function animate() {{
   requestAnimationFrame(animate);
