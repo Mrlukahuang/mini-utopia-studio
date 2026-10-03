@@ -346,21 +346,44 @@ Return a complete WorldScenePlan."""
         enrichment_count = 0
         elements: list[WorldSceneElement] = []
         old_to_new: dict[str, str] = {}
-        needs_system_portal = not any(
-            item.kind == "portal" for item in plan.elements
+
+        portal_candidates = [
+            (index, item)
+            for index, item in enumerate(plan.elements)
+            if item.kind == "portal"
+            and not any(
+                token in item.name.lower()
+                for token in ("plaza", "square", "广场")
+            )
+        ]
+        main_portal_index = next(
+            (
+                index
+                for index, item in portal_candidates
+                if item.source == "creator_required"
+            ),
+            portal_candidates[0][0] if portal_candidates else None,
         )
+        needs_system_portal = main_portal_index is None
         max_before_portal = 15 if needs_system_portal else 16
 
-        for item in plan.elements:
+        for index, item in enumerate(plan.elements):
             name = item.name.strip()
             if not name:
                 continue
             source = item.source
             kind = item.kind
+            notes = item.notes
             if kind == "portal" and any(
                 token in name.lower() for token in ("plaza", "square", "广场")
             ):
                 kind = "structure"
+            elif kind == "portal" and index != main_portal_index:
+                kind = "landmark"
+                notes = (
+                    (notes + " ").strip()
+                    + "Secondary portal-like feature; not the executable main Portal."
+                ).strip()
             if source == "utopia_enrichment":
                 if enrichment_count >= 3:
                     continue
@@ -379,6 +402,7 @@ Return a complete WorldScenePlan."""
                         "scene_id": new_id,
                         "name": name,
                         "kind": kind,
+                        "notes": notes,
                         "required": source != "utopia_enrichment",
                     }
                 )
