@@ -14,6 +14,10 @@ from studio.models.world import WorldBlueprint, WorldLayoutElement, WorldProfile
 from studio.providers.base import ImageAnalysisProvider, StructuredTextProvider
 
 
+class WorldAppearancePlanningError(RuntimeError):
+    pass
+
+
 class WorldAppearanceService:
     """Plan object appearance without changing authoritative Blueprint logic."""
 
@@ -32,6 +36,8 @@ class WorldAppearanceService:
         profile: WorldProfile,
         blueprint: WorldBlueprint,
         style_profile: dict,
+        strict_provider: bool = False,
+        repair_weak_heroes: bool = False,
     ) -> WorldAppearancePlan:
         fallback = self._fallback_plan(profile=profile, blueprint=blueprint)
         if self.structured_provider is None:
@@ -48,13 +54,27 @@ class WorldAppearanceService:
                 ),
                 schema=WorldAppearancePlan,
             )
-        except Exception:
+        except Exception as exc:
+            if strict_provider:
+                raise WorldAppearancePlanningError(
+                    f"GPT AppearancePlan generation failed: {exc}"
+                ) from exc
             return fallback
-        return self._normalize(
+
+        normalized = self._normalize(
             proposed=proposed,
             blueprint=blueprint,
             fallback=fallback,
         )
+        if repair_weak_heroes:
+            normalized = self._repair_weak_heroes_from_text(
+                profile=profile,
+                blueprint=blueprint,
+                style_profile=style_profile,
+                plan=normalized,
+                strict_provider=strict_provider,
+            )
+        return normalized
 
     def refine_from_preview(
         self,
@@ -65,6 +85,8 @@ class WorldAppearanceService:
         base_plan: WorldAppearancePlan,
         image_bytes: bytes,
         mime_type: str = "image/png",
+        strict_provider: bool = False,
+        repair_weak_heroes: bool = False,
     ) -> WorldAppearancePlan:
         if self.image_analysis_provider is None or not image_bytes:
             return base_plan
@@ -94,13 +116,29 @@ class WorldAppearanceService:
                 prompt=prompt,
                 schema=WorldAppearancePlan,
             )
-        except Exception:
+        except Exception as exc:
+            if strict_provider:
+                raise WorldAppearancePlanningError(
+                    f"Preview Vision appearance refinement failed: {exc}"
+                ) from exc
             return base_plan
-        return self._normalize(
+
+        normalized = self._normalize(
             proposed=proposed,
             blueprint=blueprint,
             fallback=base_plan,
         )
+        if repair_weak_heroes:
+            normalized = self._repair_weak_heroes_from_vision(
+                profile=profile,
+                blueprint=blueprint,
+                style_profile=style_profile,
+                plan=normalized,
+                image_bytes=image_bytes,
+                mime_type=mime_type,
+                strict_provider=strict_provider,
+            )
+        return normalized
 
     def _system_prompt(self, style_profile: dict) -> str:
         palette = style_profile.get("macaron_palette", {}) or {}
@@ -230,6 +268,219 @@ STYLE SAFETY
                 or fallback.world_style_summary
             ),
             objects=objects,
+        )
+
+    def summarize_plan(
+        self,
+        *,
+        blueprint: WorldBlueprint,
+        plan: WorldAppearancePlan,
+    ) -> dict:
+        by_id = {item.element_id: item for item in plan.objects}
+        objects = []
+        for element in blueprint.layout_elements:
+            item = by_id.get(element.element_id)
+            if item is None:
+                continue
+            objects.append(
+                {
+                    "element_id": element.element_id,
+                    "name": element.name,
+                    "kind": element.kind,
+                    "geometry_role": element.geometry_role,
+                    "silhouette_family": item.silhouette_family,
+                    "geometry_strategy": item.geometry_strategy,
+                    "main_primitive": item.main_body.primitive,
+                    "part_count": len(item.parts),
+                    "part_roles": [part.role for part in item.parts],
+                    "weak_hero": self._is_weak_hero(element=element, item=item),
+                }
+            )
+        return {
+            "object_count": len(objects),
+            "weak_hero_count": sum(1 for item in objects if item["weak_hero"]),
+            "objects": objects,
+        }
+
+    @staticmethod
+    def _is_weak_hero(
+        *,
+        element: WorldLayoutElement,
+        item: ObjectAppearanceSpec,
+    ) -> bool:
+        organic = (
+            element.geometry_role == "organic"
+            or item.silhouette_family == "organic_creature"
+        )
+        hero_scale = max(element.width, element.depth, element.height) >= 6.0
+        hero_kind = element.kind in {"landmark", "structure"}
+        return bool(organic and hero_scale and hero_kind and len(item.parts) < 2)
+
+    def _repair_weak_heroes_from_text(
+        self,
+        *,
+        profile: WorldProfile,
+        blueprint: WorldBlueprint,
+        style_profile: dict,
+        plan: WorldAppearancePlan,
+        strict_provider: bool,
+    ) -> WorldAppearancePlan:
+        if self.structured_provider is None:
+            return plan
+
+        by_id = {item.element_id: item for item in plan.objects}
+        changed = False
+        for element in blueprint.layout_elements:
+            current = by_id.get(element.element_id)
+            if current is None or not self._is_weak_hero(
+                element=element,
+                item=current,
+            ):
+                continue
+            try:
+                repaired = self.structured_provider.generate_structured(
+                    system=self._system_prompt(style_profile),
+                    user=self._focused_hero_prompt(
+                        profile=profile,
+                        element=element,
+                        current=current,
+                        preview_mode=False,
+                    ),
+                    schema=ObjectAppearanceSpec,
+                )
+            except Exception as exc:
+                if strict_provider:
+                    raise WorldAppearancePlanningError(
+                        f"Focused Hero appearance repair failed for "
+                        f"{element.element_id} ({element.name}): {exc}"
+                    ) from exc
+                continue
+            by_id[element.element_id] = repaired.model_copy(
+                update={
+                    "element_id": element.element_id,
+                    "name": element.name,
+                }
+            )
+            changed = True
+
+        if not changed:
+            return plan
+        return plan.model_copy(
+            update={
+                "objects": [
+                    by_id.get(element.element_id)
+                    for element in blueprint.layout_elements
+                    if by_id.get(element.element_id) is not None
+                ]
+            }
+        )
+
+    def _repair_weak_heroes_from_vision(
+        self,
+        *,
+        profile: WorldProfile,
+        blueprint: WorldBlueprint,
+        style_profile: dict,
+        plan: WorldAppearancePlan,
+        image_bytes: bytes,
+        mime_type: str,
+        strict_provider: bool,
+    ) -> WorldAppearancePlan:
+        if self.image_analysis_provider is None:
+            return plan
+
+        by_id = {item.element_id: item for item in plan.objects}
+        changed = False
+        for element in blueprint.layout_elements:
+            current = by_id.get(element.element_id)
+            if current is None or not self._is_weak_hero(
+                element=element,
+                item=current,
+            ):
+                continue
+            prompt = (
+                self._system_prompt(style_profile)
+                + "\n\nFOCUSED HERO RECONSTRUCTION\n"
+                + self._focused_hero_prompt(
+                    profile=profile,
+                    element=element,
+                    current=current,
+                    preview_mode=True,
+                )
+                + "\nUse the provided Preview image as visual evidence. "
+                  "Return only this one ObjectAppearanceSpec."
+            )
+            try:
+                repaired = self.image_analysis_provider.analyze_structured(
+                    image_bytes=image_bytes,
+                    mime_type=mime_type,
+                    prompt=prompt,
+                    schema=ObjectAppearanceSpec,
+                )
+            except Exception as exc:
+                if strict_provider:
+                    raise WorldAppearancePlanningError(
+                        f"Focused Hero Vision repair failed for "
+                        f"{element.element_id} ({element.name}): {exc}"
+                    ) from exc
+                continue
+            by_id[element.element_id] = repaired.model_copy(
+                update={
+                    "element_id": element.element_id,
+                    "name": element.name,
+                }
+            )
+            changed = True
+
+        if not changed:
+            return plan
+        return plan.model_copy(
+            update={
+                "objects": [
+                    by_id.get(element.element_id)
+                    for element in blueprint.layout_elements
+                    if by_id.get(element.element_id) is not None
+                ]
+            }
+        )
+
+    def _focused_hero_prompt(
+        self,
+        *,
+        profile: WorldProfile,
+        element: WorldLayoutElement,
+        current: ObjectAppearanceSpec,
+        preview_mode: bool,
+    ) -> str:
+        evidence = list(element.source_evidence)
+        return (
+            "FOCUSED OBJECT\n"
+            f"element_id: {element.element_id}\n"
+            f"name: {element.name}\n"
+            f"kind: {element.kind}\n"
+            f"semantic_key: {element.semantic_key}\n"
+            f"geometry_role: {element.geometry_role}\n"
+            f"spatial_mode: {element.spatial_mode}\n"
+            f"size: width={element.width}, depth={element.depth}, "
+            f"height={element.height}\n"
+            f"creator_description: {profile.source_description}\n"
+            f"source_evidence: {json.dumps(evidence, ensure_ascii=False)}\n"
+            "CURRENT WEAK SPEC\n"
+            + json.dumps(current.model_dump(mode="json"), ensure_ascii=False, indent=2)
+            + "\n\nQUALITY REQUIREMENT\n"
+            + "This is a major organic Hero object. A body-only primitive is not "
+              "recognizable enough. Keep one clear main body and add 2-8 "
+              "silhouette-defining local parts appropriate to the creator's named "
+              "subject: e.g. head/muzzle, rear appendage/tail, paired side "
+              "appendages, wings/fins/limbs/tentacles when appropriate. Do not "
+              "invent traits that contradict the creator. Strong readable silhouette "
+              "matters more than micro-detail. Keep Mini Utopia toy/soft-voxel style.\n"
+            + (
+                "Use the Preview as the primary appearance evidence while preserving "
+                "the Blueprint identity."
+                if preview_mode
+                else "Use creator wording and Blueprint semantics as appearance evidence."
+            )
         )
 
     def _fallback_plan(
