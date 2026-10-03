@@ -119,6 +119,9 @@ For EVERY Scene element also describe its generic spatial semantics:
 - orientation: normal, inverted, vertical, horizontal or tilted.
 - geometry_role: surface, volume, platform, bridge, vertical_flow, path, organic,
   arch, terrain_mass or decorative.
+  Use organic for living creatures, biological carriers, soft creature bodies,
+  giant animals, plant-like living bodies, or other non-built organic subjects.
+  Use volume for built/artificial solid masses or generic architectural objects.
 - traversability: walkable, scenic, blocked, decorative or rideable.
 - relations: typed relationships to other scene_id values, using left_of,
   right_of, behind, in_front_of, near, above, below, on_top_of, under, inside,
