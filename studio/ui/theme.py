@@ -491,6 +491,43 @@ h1, h2, h3 {
     margin-top:10px;
 }
 
+.mu-play-launch-card {
+    min-height: 132px;
+    padding: 18px 20px;
+    border-radius: 24px;
+    background: linear-gradient(145deg, rgba(255,255,255,.90), rgba(246,239,255,.84));
+    border: 1px solid rgba(113,100,176,.10);
+    box-shadow: 0 10px 26px rgba(71,61,121,.065);
+    margin: 4px 0 10px;
+}
+.mu-play-launch-card .mu-play-icon {
+    font-size: 1.7rem;
+    margin-bottom: 5px;
+}
+.mu-play-launch-card strong {
+    display:block;
+    color:#3B3857;
+    font-size:1.02rem;
+    margin-bottom:4px;
+}
+.mu-play-launch-card span {
+    color:#76738D;
+    font-size:.86rem;
+    line-height:1.35;
+}
+.mu-ready-banner {
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:15px 18px;
+    border-radius:22px;
+    background:linear-gradient(90deg, rgba(220,246,232,.88), rgba(229,242,255,.88), rgba(244,232,255,.86));
+    border:1px solid rgba(83,159,122,.12);
+    color:#4A5E59;
+    font-weight:800;
+    margin:10px 0 14px;
+}
+
 [data-testid="stSidebar"] .stButton > button {
     min-height: 2.7rem;
     border-radius: 16px;

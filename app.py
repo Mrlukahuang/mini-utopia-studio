@@ -633,9 +633,10 @@ elif page == "🗺️ My Worlds":
 
                 blueprint = asset.metadata.get("world_blueprint")
                 if blueprint:
-                    st.success("🧩 Blueprint seed ready · 50×50 expandable world")
+                    st.success("🎮 Ready to Explore / 可以进入世界")
+                    st.caption("50×50 Mini World · Portal + Landmarks + Director Tour ready")
                 else:
-                    st.caption("Concept stage · waiting for Blueprint")
+                    st.caption("✨ Concept ready · waiting to become playable")
 
             with action_col:
                 blueprint = asset.metadata.get("world_blueprint")
@@ -659,9 +660,9 @@ elif page == "🗺️ My Worlds":
 
 elif page == "🎮 Explore World":
     render_game_hero(
-        "Explore Mini World 🎮",
-        "这是第一版可玩的 3D Runtime：Blueprint 决定世界结构，Three.js 负责把它画出来。",
-        kicker="M4 · PLAYABLE RUNTIME v0.1",
+        "Choose Your Adventure 🎮",
+        "选一个 Mini World，再带一个角色进去。准备好以后，直接开始探索。",
+        kicker="ENTER MINI UTOPIA",
     )
 
     playable_worlds = [
@@ -673,7 +674,7 @@ elif page == "🎮 Explore World":
     ]
 
     if not playable_worlds:
-        st.info("还没有可探索的 World Blueprint。先在 World Factory 选择并保存一个 Concept。")
+        st.info("还没有可以进入的 Mini World。先去 World Factory 创造并选择一个世界吧！")
     else:
         selected_id = st.session_state.get("selected_world_id")
         selected_index = next(
@@ -684,20 +685,36 @@ elif page == "🎮 Explore World":
             ),
             0,
         )
-        selected = st.selectbox(
-            "World / 选择世界",
-            playable_worlds,
-            index=selected_index,
-            format_func=lambda asset: asset.display_name,
-        )
-        st.session_state.selected_world_id = selected.asset_id
 
-        profile = WorldProfile.model_validate(
-            selected.metadata.get("world_profile", {})
-        )
-        blueprint = WorldBlueprint.model_validate(
-            selected.metadata.get("world_blueprint", {})
-        )
+        world_col, traveler_col = st.columns(2, gap="large")
+        with world_col:
+            st.markdown(
+                '<div class="mu-play-launch-card"><div class="mu-play-icon">🌍</div>'
+                '<strong>Choose a World / 选择世界</strong>'
+                '<span>从已经搭好的 Mini World 里选一个今天要去的地方。</span></div>',
+                unsafe_allow_html=True,
+            )
+            selected = st.selectbox(
+                "World",
+                playable_worlds,
+                index=selected_index,
+                format_func=lambda asset: asset.display_name,
+                label_visibility="collapsed",
+            )
+            st.session_state.selected_world_id = selected.asset_id
+            profile = WorldProfile.model_validate(
+                selected.metadata.get("world_profile", {})
+            )
+            concept = ctx.world_concepts.current_concept(selected.asset_id)
+            if concept:
+                try:
+                    st.image(
+                        ctx.storage.get_bytes(concept.path),
+                        caption=f"✨ {selected.display_name}",
+                        use_container_width=True,
+                    )
+                except Exception:
+                    st.caption("World concept preview 暂时无法读取。")
 
         playable_characters = [
             asset
@@ -708,42 +725,65 @@ elif page == "🎮 Explore World":
         selected_character = None
         character_profile = None
         character_runtime = ctx.character_runtime.resolve(None)
-        if playable_characters:
-            selected_character = st.selectbox(
-                "Traveler / 选择进入世界的角色",
-                playable_characters,
-                format_func=lambda asset: asset.display_name,
-                key="runtime_character_asset",
-            )
-            character_profile = CharacterProfile.model_validate(
-                selected_character.metadata.get("character_profile", {})
-            )
-            character_runtime = ctx.character_runtime.resolve(selected_character)
-        else:
-            st.caption("还没有 Approved Character，Runtime 会使用 Mini Traveler placeholder。")
 
+        with traveler_col:
+            st.markdown(
+                '<div class="mu-play-launch-card"><div class="mu-play-icon">🧸</div>'
+                '<strong>Choose a Traveler / 选择角色</strong>'
+                '<span>带一个已经确认过造型的角色进入这个世界。</span></div>',
+                unsafe_allow_html=True,
+            )
+            if playable_characters:
+                selected_character = st.selectbox(
+                    "Traveler",
+                    playable_characters,
+                    format_func=lambda asset: asset.display_name,
+                    key="runtime_character_asset",
+                    label_visibility="collapsed",
+                )
+                character_profile = CharacterProfile.model_validate(
+                    selected_character.metadata.get("character_profile", {})
+                )
+                character_runtime = ctx.character_runtime.resolve(selected_character)
+                master_ref = ctx.character_masters.current_master(
+                    selected_character.asset_id
+                )
+                if master_ref:
+                    try:
+                        st.image(
+                            ctx.storage.get_bytes(master_ref.path),
+                            caption=f"🧸 {selected_character.display_name}",
+                            use_container_width=True,
+                        )
+                    except Exception:
+                        st.caption("Character Master preview 暂时无法读取。")
+            else:
+                st.info("还没有 Approved Character，会使用 Mini Traveler placeholder。")
+
+        blueprint = WorldBlueprint.model_validate(
+            selected.metadata.get("world_blueprint", {})
+        )
         summary = runtime_summary(
             profile=profile,
             blueprint=blueprint,
             character_profile=character_profile,
         )
 
+        st.markdown(
+            '<div class="mu-ready-banner">🚪 Adventure Ready / 准备完成 · '
+            '进入世界后用 WASD 或方向键移动，按住 Shift 奔跑。</div>',
+            unsafe_allow_html=True,
+        )
+
         a, b, c3, d = st.columns(4)
-        a.metric("Grid", summary["grid"])
-        b.metric("Chunks", summary["chunks"])
-        c3.metric("Landmarks", summary["landmarks"])
-        d.metric("Director Shots", summary["camera_points"])
+        a.metric("🗺️ World", summary["grid"])
+        b.metric("🧩 Chunks", summary["chunks"])
+        c3.metric("🏰 Landmarks", summary["landmarks"])
+        d.metric("🎬 Tour Shots", summary["camera_points"])
 
         st.caption(
-            "Controls: WASD / Arrow Keys · Hold Shift to Run · 第三人称跟随相机 · "
-            "右上角可启动 Director Tour。"
-        )
-        st.caption(
-            f"Character Runtime · {character_runtime.mode.upper()} · "
-            f"Idle / Walk / Run clips: "
-            f"{character_runtime.animation_clips.idle} / "
-            f"{character_runtime.animation_clips.walk} / "
-            f"{character_runtime.animation_clips.run}"
+            f"Today: {selected_character.display_name if selected_character else 'Mini Traveler'} "
+            f"→ {selected.display_name} · Portal and Director Tour are ready."
         )
 
         components.html(
@@ -763,8 +803,21 @@ elif page == "🎮 Explore World":
             scrolling=False,
         )
 
-        with st.expander("🧩 Runtime Blueprint Inspector", expanded=False):
-            st.json(blueprint.model_dump(mode="json"))
+        st.caption(
+            "🎮 Controls · WASD / Arrow Keys 移动 · Shift 奔跑 · "
+            "右上角 Start Director Tour 自动参观世界。"
+        )
+
+        if mode == "🛠 Studio" and studio_unlocked:
+            st.caption(
+                f"Runtime · {character_runtime.mode.upper()} · "
+                f"Idle / Walk / Run = "
+                f"{character_runtime.animation_clips.idle} / "
+                f"{character_runtime.animation_clips.walk} / "
+                f"{character_runtime.animation_clips.run}"
+            )
+            with st.expander("🧩 Runtime Blueprint Inspector", expanded=False):
+                st.json(blueprint.model_dump(mode="json"))
 
 
 elif page == "🌍 World Factory":
