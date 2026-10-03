@@ -290,6 +290,10 @@ def test_geometry_compiler_preserves_blueprint_transform_and_resolves_style_mate
     assert body.geometry.primitive == "ellipsoid"
     assert body.geometry.primitive_size.x == 18
     assert body.geometry.primitive_size.y == 8 * .72
+    # Blueprint y is a support/base elevation; Three.js primitives are centered.
+    assert body.local_position.y == 4.0
+    tail = next(node for node in whale.nodes if node.node_id.endswith(":tail"))
+    assert tail.local_position.y == 4.0
     assert any(material.color_hex == "#BDE3F7" for material in render.materials)
     assert all(material.metalness == 0 for material in render.materials)
 
