@@ -60,9 +60,19 @@ class WorldLayoutService:
         for index, scene in enumerate(plan.elements):
             pos = self._default_position(kind=scene.kind, index=index, grid=grid)
             pos.y = self._semantic_y(scene.spatial_mode, scene.elevation)
+            geometry_role = (
+                scene.geometry_role
+                if "geometry_role" in scene.model_fields_set
+                else self._default_geometry_role(scene.kind)
+            )
+            traversability = (
+                scene.traversability
+                if "traversability" in scene.model_fields_set
+                else self._default_traversability(scene.kind)
+            )
             width, depth, height = self._semantic_footprint(
                 kind=scene.kind,
-                geometry_role=scene.geometry_role,
+                geometry_role=geometry_role,
             )
             element = WorldLayoutElement(
                 element_id=scene.scene_id,
@@ -72,8 +82,8 @@ class WorldLayoutService:
                 spatial_mode=scene.spatial_mode,
                 elevation=scene.elevation,
                 orientation=scene.orientation,
-                geometry_role=scene.geometry_role,
-                traversability=scene.traversability,
+                geometry_role=geometry_role,
+                traversability=traversability,
                 position=pos,
                 width=width,
                 depth=depth,
@@ -83,8 +93,8 @@ class WorldLayoutService:
                     f"spatial_mode:{scene.spatial_mode}",
                     f"elevation:{scene.elevation}",
                     f"orientation:{scene.orientation}",
-                    f"geometry_role:{scene.geometry_role}",
-                    f"traversability:{scene.traversability}",
+                    f"geometry_role:{geometry_role}",
+                    f"traversability:{traversability}",
                     *scene.relation_hints,
                 ],
             )
@@ -176,6 +186,12 @@ class WorldLayoutService:
                     element_id=f"LAYOUT_{index+1:02d}",
                     name=name,
                     kind=kind,
+                    semantic_key="",
+                    spatial_mode="grounded",
+                    elevation="ground",
+                    orientation="normal",
+                    geometry_role=self._default_geometry_role(kind),
+                    traversability=self._default_traversability(kind),
                     position=pos,
                     width=width,
                     depth=depth,
@@ -190,6 +206,12 @@ class WorldLayoutService:
                     element_id=f"LAYOUT_{len(elements)+1:02d}",
                     name=profile.portal_form or "Portal",
                     kind="portal",
+                    semantic_key="",
+                    spatial_mode="grounded",
+                    elevation="ground",
+                    orientation="normal",
+                    geometry_role="arch",
+                    traversability="walkable",
                     position=WorldPoint(x=grid.width * .78, y=0, z=grid.depth * .5),
                     width=5.5,
                     depth=3.0,
@@ -592,6 +614,30 @@ class WorldLayoutService:
             for part in re.split(r"[.;,，。；]+", value or "")
             if part.strip()
         ]
+
+    @staticmethod
+    def _default_geometry_role(kind: str) -> str:
+        return {
+            "water": "surface",
+            "bridge": "bridge",
+            "terrain": "terrain_mass",
+            "portal": "arch",
+            "decoration": "decorative",
+            "structure": "volume",
+            "landmark": "volume",
+        }.get(kind, "volume")
+
+    @staticmethod
+    def _default_traversability(kind: str) -> str:
+        return {
+            "water": "blocked",
+            "bridge": "walkable",
+            "terrain": "walkable",
+            "portal": "walkable",
+            "decoration": "decorative",
+            "structure": "scenic",
+            "landmark": "scenic",
+        }.get(kind, "scenic")
 
     @staticmethod
     def _semantic_y(spatial_mode: str, elevation: str) -> float:
