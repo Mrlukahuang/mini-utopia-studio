@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from studio.core.enums import AssetType, ReviewStatus
 from studio.models.asset import AssetFile, now_utc
-from studio.models.world import WorldBlueprint, WorldProfile
+from studio.models.world import WorldBlueprint, WorldProfile, WorldScenePlan
 from studio.providers.base import ImageGenerationProvider
 from studio.repositories.base import StudioRepository
 from studio.services.world_concept_prompt_service import WorldConceptPromptService
@@ -36,21 +36,42 @@ class WorldConceptService:
         *,
         location_asset_id: str,
         style_asset_id: str | None,
+        scene_plan: WorldScenePlan | None = None,
     ) -> WorldBlueprint:
-        """Create the executable world before any beauty render exists."""
+        """Create executable runtime truth from the shared semantic Scene Plan."""
         world = self.repository.get_asset(location_asset_id)
         if world is None or world.asset_type != AssetType.LOCATION:
             raise ValueError(f"World not found: {location_asset_id}")
 
         profile = WorldProfile.model_validate(world.metadata.get("world_profile", {}))
-        blueprint = self.blueprint_service.plan(
-            location_asset_id=world.asset_id,
-            style_asset_id=style_asset_id,
-            profile=profile,
-        )
+        if scene_plan is None:
+            stored_plan = world.metadata.get("world_scene_plan")
+            if stored_plan:
+                scene_plan = WorldScenePlan.model_validate(stored_plan)
+
+        if scene_plan is not None:
+            blueprint = self.blueprint_service.plan_from_scene_plan(
+                location_asset_id=world.asset_id,
+                style_asset_id=style_asset_id,
+                profile=profile,
+                scene_plan=scene_plan,
+            )
+            world.metadata["world_scene_plan"] = scene_plan.model_dump(mode="json")
+            world.metadata["world_scene_plan_version"] = scene_plan.schema_version
+            world.metadata["world_blueprint_source"] = (
+                f"scene_plan:{scene_plan.source_mode}"
+            )
+        else:
+            # Compatibility fallback for Worlds created before Scene Plan v0.1.
+            blueprint = self.blueprint_service.plan(
+                location_asset_id=world.asset_id,
+                style_asset_id=style_asset_id,
+                profile=profile,
+            )
+            world.metadata["world_blueprint_source"] = "legacy_creator_profile"
+
         world.metadata["world_blueprint"] = blueprint.model_dump(mode="json")
         world.metadata["world_pipeline"] = "blueprint_first_v1"
-        world.metadata["world_blueprint_source"] = "creator_profile"
         # A rebuilt Blueprint invalidates any older beauty render. Keep the file
         # as archive history, but require the next preview to be rendered from
         # the new authoritative layout.
@@ -106,6 +127,10 @@ class WorldConceptService:
         if world.metadata.get("world_pipeline") != "blueprint_first_v1":
             raise ValueError(
                 "World Preview requires a Blueprint-first plan. Rebuild the Blueprint first."
+            )
+        if not world.metadata.get("world_scene_plan"):
+            raise ValueError(
+                "World Preview requires a Scene Plan. Rebuild this World with the current planner."
             )
         if not blueprint.layout_elements:
             raise ValueError(
