@@ -19,7 +19,7 @@ from studio.models.world import (
     WorldSceneElement,
     WorldScenePlan,
 )
-from studio.providers.base import ImageAnalysisProvider, StructuredTextProvider
+from studio.providers.base import ImageAnalysisProvider, ImageGenerationProvider, StructuredTextProvider
 from studio.repositories.sqlite import SQLiteStudioRepository
 from studio.runtime.three_world import build_world_runtime_html
 from studio.services.asset_service import AssetService
@@ -30,7 +30,19 @@ from studio.services.world_concept_prompt_service import WorldConceptPromptServi
 from studio.services.world_concept_service import WorldConceptService
 from studio.services.world_geometry_compiler_service import WorldGeometryCompilerService
 from studio.storage.local import LocalObjectStorage
-from tests.test_world_factory_m2 import FakeWorldImageProvider
+class FakeWorldImageProvider(ImageGenerationProvider):
+    def __init__(self):
+        self.calls = []
+
+    def generate(
+        self,
+        *,
+        prompt: str,
+        size: str = "1536x1024",
+        quality: str = "medium",
+    ) -> bytes:
+        self.calls.append({"prompt": prompt, "size": size, "quality": quality})
+        return b"fake-world-image"
 
 
 class FakeStructuredAppearanceProvider(StructuredTextProvider):
