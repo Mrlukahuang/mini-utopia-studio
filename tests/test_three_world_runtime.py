@@ -7,6 +7,7 @@ from studio.models.world import (
     TourStep,
     PortalSpec,
     WorldBlueprint,
+    WorldLayoutElement,
     WorldPoint,
     WorldProfile,
     WorldVisualAnchor,
@@ -235,3 +236,30 @@ def test_runtime_consumes_visual_anchor_hints():
     assert "anchorText.includes('floating')" in html
     assert "anchorText.includes('garden')" in html
     assert "visualAnchor.must_preserve" in html
+
+
+def test_runtime_renders_compiled_layout_water_and_concept_palette():
+    blueprint = _blueprint()
+    blueprint.visual_anchor.palette_hexes = ["#AABBCC", "#DDEEFF"]
+    blueprint.layout_elements = [
+        WorldLayoutElement(
+            element_id="LAYOUT_01",
+            name="Central Lake",
+            kind="water",
+            position=WorldPoint(x=25, y=0, z=25),
+            width=12,
+            depth=8,
+            height=.3,
+        )
+    ]
+
+    html = build_world_runtime_html(
+        world_name="Layout World",
+        profile=WorldProfile(theme_color_hexes=["#111111"]),
+        blueprint=blueprint,
+    )
+
+    assert "#AABBCC" in html
+    assert "(bp.layout_elements || []).forEach" in html
+    assert "element.kind === 'water'" in html
+    assert "CylinderGeometry" in html
