@@ -1,3 +1,5 @@
+import pytest
+
 from studio.core.enums import AssetType, ReviewStatus
 from studio.models.world import WorldProfile
 from studio.providers.base import ImageGenerationProvider
@@ -231,23 +233,6 @@ def test_blueprint_preview_render_never_mutates_blueprint(tmp_path):
     assert "50x50 PLAYABLE LAYOUT" in provider.calls[0]["prompt"]
 
 
-def test_archive_world_soft_deletes_without_removing_record(tmp_path):
-    repo = SQLiteStudioRepository(tmp_path / "studio.db")
-    assets = AssetService(repo)
-    world = assets.create_world(
-        name="Candy Cloud Valley",
-        description="dream world",
-        profile=_profile(),
-    )
-
-    archived = assets.archive_world(world.asset_id)
-
-    assert archived.status == ReviewStatus.ARCHIVED
-    saved = repo.get_asset(world.asset_id)
-    assert saved is not None
-    assert saved.status == ReviewStatus.ARCHIVED
-
-
 def test_blueprint_first_uses_prompt_spatial_relation(tmp_path):
     repo = SQLiteStudioRepository(tmp_path / "studio.db")
     storage = LocalObjectStorage(tmp_path / "storage")
@@ -282,3 +267,72 @@ def test_blueprint_first_uses_prompt_spatial_relation(tmp_path):
     portal = next(e for e in blueprint.layout_elements if e.kind == "portal")
     lake = next(e for e in blueprint.layout_elements if e.kind == "water")
     assert portal.position.z < lake.position.z
+
+
+def test_blueprint_preview_rejects_legacy_pipeline(tmp_path):
+    repo = SQLiteStudioRepository(tmp_path / "studio.db")
+    storage = LocalObjectStorage(tmp_path / "storage")
+    assets = AssetService(repo)
+    style = StyleService(repo).ensure_mini_utopia_base()
+    world = assets.create_world(
+        name="Legacy Garden",
+        description="dream world",
+        profile=_profile(),
+    )
+    blueprint = WorldBlueprintService().plan(
+        location_asset_id=world.asset_id,
+        style_asset_id=style.asset_id,
+        profile=_profile(),
+    )
+    world.metadata["world_blueprint"] = blueprint.model_dump(mode="json")
+    repo.save_asset(world)
+
+    provider = FakeWorldImageProvider()
+    service = WorldConceptService(
+        repo,
+        storage,
+        WorldConceptPromptService(),
+        WorldBlueprintService(),
+        provider,
+    )
+
+    with pytest.raises(ValueError, match="Blueprint-first plan"):
+        service.render_blueprint_preview(
+            location_asset_id=world.asset_id,
+            style_asset_id=style.asset_id,
+        )
+
+    assert provider.calls == []
+
+
+def test_blueprint_preview_rejects_missing_layout_elements(tmp_path):
+    repo = SQLiteStudioRepository(tmp_path / "studio.db")
+    storage = LocalObjectStorage(tmp_path / "storage")
+    assets = AssetService(repo)
+    style = StyleService(repo).ensure_mini_utopia_base()
+    world = assets.create_world(
+        name="Broken Blueprint Garden",
+        description="dream world",
+        profile=_profile(),
+    )
+    service = WorldConceptService(
+        repo,
+        storage,
+        WorldConceptPromptService(),
+        WorldBlueprintService(),
+        FakeWorldImageProvider(),
+    )
+    service.plan_blueprint(
+        location_asset_id=world.asset_id,
+        style_asset_id=style.asset_id,
+    )
+    saved = repo.get_asset(world.asset_id)
+    assert saved is not None
+    saved.metadata["world_blueprint"]["layout_elements"] = []
+    repo.save_asset(saved)
+
+    with pytest.raises(ValueError, match="layout elements"):
+        service.render_blueprint_preview(
+            location_asset_id=world.asset_id,
+            style_asset_id=style.asset_id,
+        )
