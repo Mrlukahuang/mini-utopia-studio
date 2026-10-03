@@ -678,6 +678,21 @@ elif page == "🗺️ My Worlds":
                 if blueprint and approved_concept:
                     st.success("🎮 Ready to Explore / 可以进入世界")
                     st.caption("50×50 Mini World · Portal + Landmarks + Director Tour ready")
+                    if mode == "🛠 Studio" and studio_unlocked:
+                        anchor = blueprint.get("visual_anchor", {}) or {}
+                        with st.expander("🎯 Concept Visual Anchor", expanded=False):
+                            st.write(
+                                "**Must Preserve** · "
+                                + (" · ".join(anchor.get("must_preserve", [])) or "—")
+                            )
+                            st.write(
+                                "**Flexible Details** · "
+                                + (" · ".join(anchor.get("flexible_details", [])) or "—")
+                            )
+                            st.caption(
+                                f"Extraction · {anchor.get('extraction_method', 'legacy')} · "
+                                f"Direction · {anchor.get('concept_direction', '—')}"
+                            )
                 elif has_candidate:
                     st.warning("💖 Concept generated · please choose one in World Factory")
                 else:

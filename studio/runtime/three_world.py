@@ -144,6 +144,11 @@ const profile = DATA.profile;
 const bp = DATA.blueprint;
 const character = DATA.character || {{}};
 const characterRuntime = DATA.characterRuntime || {{}};
+const visualAnchor = bp.visual_anchor || {{}};
+const anchorText = [
+  ...(visualAnchor.must_preserve || []),
+  visualAnchor.concept_summary || ''
+].join(' ').toLowerCase();
 const host = document.getElementById('canvas');
 
 const renderer = new THREE.WebGLRenderer({{ antialias:true, alpha:false }});
@@ -279,7 +284,7 @@ function decorateChunk(chunk, i, centerX, centerZ) {{
   const biome = (chunk.biome || '').toLowerCase();
   const worldType = (profile.world_type || '').toLowerCase();
   const worldName = (profile.world_name || DATA.worldName || '').toLowerCase();
-  const gardenLike = biome.includes('forest') || worldType.includes('forest') || worldType.includes('garden') || worldName.includes('garden');
+  const gardenLike = biome.includes('forest') || worldType.includes('forest') || worldType.includes('garden') || worldName.includes('garden') || anchorText.includes('garden') || anchorText.includes('forest');
   if (gardenLike) {{
     addToyTree(centerX-2.6, centerZ+2.2, i);
     addToyTree(centerX+2.3, centerZ-1.8, i+1);
@@ -294,7 +299,7 @@ function decorateChunk(chunk, i, centerX, centerZ) {{
   }}
 }}
 
-const floatingWorld = (profile.world_type || '').toLowerCase().includes('floating');
+const floatingWorld = (profile.world_type || '').toLowerCase().includes('floating') || anchorText.includes('floating');
 (bp.chunks || []).forEach((chunk, i) => {{
   const color = palette[i % palette.length];
   const geo = new THREE.BoxGeometry(cw - .18, .8, cd - .18);
@@ -370,7 +375,9 @@ if (bp.portal) {{
     emissiveIntensity:1.4,
     roughness:.35
   }});
-  const portalForm = (bp.portal.form || profile.portal_form || '').toLowerCase();
+  const portalForm = (
+    bp.portal.form || profile.portal_form || visualAnchor.must_preserve?.join(' ') || ''
+  ).toLowerCase();
 
   if (portalForm.includes('star')) {{
     const shape = new THREE.Shape();

@@ -37,7 +37,7 @@ def test_world_profile_is_playable_and_keeps_theme_colors_separate_from_style_ca
 
 
 def test_blueprint_schema_version_is_explicit():
-    assert BLUEPRINT_SCHEMA_VERSION == "0.2"
+    assert BLUEPRINT_SCHEMA_VERSION == "0.3"
 
 
 def test_structural_blueprint_contains_paths_zones_and_director_tour():
@@ -65,3 +65,39 @@ def test_structural_blueprint_contains_paths_zones_and_director_tour():
     assert "ZONE_CORE" in blueprint.walkable_zone_ids
     assert blueprint.camera_points
     assert blueprint.director_tours
+
+
+def test_blueprint_visual_anchor_preserves_world_identity():
+    from studio.services.world_blueprint_service import WorldBlueprintService
+
+    profile = WorldProfile(
+        world_name="Pastel Star Garden",
+        world_type="Floating Islands / 漂浮岛",
+        portal_form="Star Arch / 星星拱门",
+        landmark_ideas=["Moon Castle / 月亮城堡"],
+        water_features=["Central Lake / 中央湖"],
+        landscape_elements=["Pink Forest / 粉色树林"],
+        surprise_elements=["Rainbow Waterfall / 彩虹瀑布"],
+        mood=["Dreamy / 梦幻"],
+        theme_color_hexes=["#F7B7D2", "#B9E7D0", "#D7C2F3"],
+    )
+
+    blueprint = WorldBlueprintService().build(
+        location_asset_id="LOC_TEST",
+        style_asset_id="STYLE_TEST",
+        profile=profile,
+        concept_path="assets/LOC_TEST/concept/playable.png",
+        concept_direction="playable",
+    )
+
+    anchor = blueprint.visual_anchor
+    assert anchor.extraction_method == "deterministic_profile_v1"
+    assert anchor.concept_direction == "playable"
+    assert anchor.concept_path.endswith("playable.png")
+    assert "Floating Islands / 漂浮岛" in anchor.must_preserve
+    assert "Star Arch / 星星拱门" in anchor.must_preserve
+    assert "Moon Castle / 月亮城堡" in anchor.must_preserve
+    assert "Central Lake / 中央湖" in anchor.must_preserve
+    assert "Pink Forest / 粉色树林" in anchor.must_preserve
+    assert "Rainbow Waterfall / 彩虹瀑布" in anchor.flexible_details
+    assert anchor.palette_hexes == ["#F7B7D2", "#B9E7D0", "#D7C2F3"]

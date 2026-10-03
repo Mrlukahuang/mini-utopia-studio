@@ -12,17 +12,16 @@ from studio.models.world import (
     WorldBlueprint,
     WorldPoint,
     WorldProfile,
-    WorldVisualAnchor,
     ZoneSpec,
 )
+from studio.services.world_visual_anchor_service import WorldVisualAnchorService
 
 
 class WorldBlueprintService:
-    """Build a deterministic structural Blueprint from an approved World concept.
+    """Build a deterministic structural Blueprint from an approved World concept."""
 
-    M3 deliberately creates stable data first. Later versions may use vision/LLM
-    analysis to refine the same schema without changing the runtime contract.
-    """
+    def __init__(self, visual_anchor_service: WorldVisualAnchorService | None = None):
+        self.visual_anchor_service = visual_anchor_service or WorldVisualAnchorService()
 
     def build(
         self,
@@ -188,14 +187,10 @@ class WorldBlueprintService:
             zones=zones,
             walkable_zone_ids=["ZONE_SPAWN", "ZONE_CORE", "ZONE_PORTAL"],
             blocked_zone_ids=[],
-            visual_anchor=WorldVisualAnchor(
-                concept_image_roles=["world_concept_approved"],
-                concept_summary=(
-                    f"{profile.world_name} · {concept_direction or 'approved concept'} · "
-                    f"{profile.source_description}"
-                ).strip(" ·"),
-                must_preserve=list(profile.landmark_ideas),
-                flexible_details=list(profile.surprise_elements),
+            visual_anchor=self.visual_anchor_service.extract(
+                profile=profile,
+                concept_direction=concept_direction,
+                concept_path=concept_path,
             ),
             camera_points=camera_points,
             director_tours=[director_tour],
