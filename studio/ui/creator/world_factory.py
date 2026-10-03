@@ -717,15 +717,55 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
                 ),
                 use_container_width=True,
             ):
+                build_status = st.status(
+                    "✨ Mini Utopia 正在开始建造这个世界…",
+                    expanded=True,
+                )
+                build_progress = st.progress(
+                    0,
+                    text="🗺️ 正在读取 Blueprint…",
+                )
+                seen_stages: set[str] = set()
+
+                def on_world_build_progress(
+                    stage: str,
+                    message: str,
+                    progress: float,
+                ) -> None:
+                    percent = int(round(max(0.0, min(1.0, progress)) * 100))
+                    build_progress.progress(percent, text=message)
+                    build_status.update(
+                        label=message,
+                        state="running",
+                        expanded=True,
+                    )
+                    if stage not in seen_stages:
+                        build_status.write(message)
+                        seen_stages.add(stage)
+
                 try:
-                    with st.spinner("🌈 正在按照 Blueprint 渲染这个世界…"):
-                        ctx.world_concepts.render_blueprint_preview(
-                            location_asset_id=saved_world.asset_id,
-                            style_asset_id=style_asset_id,
-                        )
+                    ctx.world_concepts.render_blueprint_preview(
+                        location_asset_id=saved_world.asset_id,
+                        style_asset_id=style_asset_id,
+                        progress_callback=on_world_build_progress,
+                    )
+                    build_progress.progress(
+                        100,
+                        text="🌟 世界准备好了！可以进入 Preview 和 3D 世界。",
+                    )
+                    build_status.update(
+                        label="🌟 World Ready / 世界建造完成",
+                        state="complete",
+                        expanded=False,
+                    )
                     st.session_state.creator_generation_count = count + 1
                     st.rerun()
                 except Exception as exc:
+                    build_status.update(
+                        label="🛠️ Build paused / 世界建造中断",
+                        state="error",
+                        expanded=True,
+                    )
                     st.error(f"World Preview render failed / 渲染失败: {exc}")
 
         with finish_col:

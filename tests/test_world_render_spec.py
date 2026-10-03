@@ -382,9 +382,13 @@ def test_world_pipeline_persists_initial_render_spec_and_preview_refinement(tmp_
     assert planned.metadata["world_render_spec"]["objects"]
     assert planned.metadata["world_appearance_source"] == "blueprint+creator_prompt"
 
+    progress_events: list[tuple[str, str, float]] = []
     service.render_blueprint_preview(
         location_asset_id=world.asset_id,
         style_asset_id=style.asset_id,
+        progress_callback=lambda stage, message, progress: progress_events.append(
+            (stage, message, progress)
+        ),
     )
     rendered = repo.get_asset(world.asset_id)
     assert rendered is not None
@@ -393,3 +397,23 @@ def test_world_pipeline_persists_initial_render_spec_and_preview_refinement(tmp_
     assert "OBJECT APPEARANCE DIRECTION" in rendered.metadata["world_preview_last_prompt"]
     assert "SCENE_WHALE" in rendered.metadata["world_preview_last_prompt"]
     assert vision.calls
+
+    stages = [stage for stage, _, _ in progress_events]
+    assert stages == [
+        "blueprint",
+        "appearance",
+        "appearance_ready",
+        "art_direction",
+        "preview",
+        "preview_ready",
+        "appearance",
+        "vision",
+        "geometry",
+        "persist",
+        "ready",
+    ]
+    progress_values = [progress for _, _, progress in progress_events]
+    assert progress_values == sorted(progress_values)
+    assert progress_values[-1] == 1.0
+    assert "Gentle Sky Whale" in progress_events[0][1]
+    assert any("Three.js RenderSpec" in message for _, message, _ in progress_events)

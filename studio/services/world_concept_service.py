@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 
+from collections.abc import Callable
 from uuid import uuid4
 
 from studio.core.enums import AssetType, ReviewStatus
@@ -15,6 +16,9 @@ from studio.services.world_blueprint_service import WorldBlueprintService
 from studio.services.world_appearance_service import WorldAppearanceService
 from studio.services.world_geometry_compiler_service import WorldGeometryCompilerService
 from studio.storage.base import ObjectStorage
+
+
+WorldBuildProgressCallback = Callable[[str, str, float], None]
 
 
 class WorldConceptService:
@@ -126,6 +130,7 @@ class WorldConceptService:
         style_asset_id: str,
         size: str = "1536x1024",
         quality: str = "medium",
+        progress_callback: WorldBuildProgressCallback | None = None,
     ) -> AssetFile:
         """Render one visual preview from Blueprint without changing Blueprint data."""
         if self.image_provider is None:
@@ -170,11 +175,24 @@ class WorldConceptService:
                 "World Preview requires a current Blueprint with layout elements."
             )
         blueprint_snapshot = blueprint.model_dump(mode="json")
+        featured_names = "、".join(
+            element.name for element in blueprint.layout_elements[:3]
+        )
+        self._report_progress(
+            progress_callback,
+            "blueprint",
+            (
+                f"🗺️ Blueprint 已锁定 · {len(blueprint.layout_elements)} 个世界元素"
+                + (f" · {featured_names}" if featured_names else "")
+            ),
+            0.06,
+        )
         self._refresh_render_pipeline(
             world=world,
             profile=profile,
             blueprint=blueprint,
             style_asset_id=style_asset_id,
+            progress_callback=progress_callback,
         )
         raw_appearance = world.metadata.get("world_appearance_plan")
         appearance_plan = (
@@ -182,16 +200,35 @@ class WorldConceptService:
             if raw_appearance
             else None
         )
+        self._report_progress(
+            progress_callback,
+            "art_direction",
+            "🎨 正在把 Blueprint + 外观设计整理成统一的 Mini Utopia 美术指导…",
+            0.32,
+        )
         prompt = self.prompt_service.compose_from_blueprint(
             profile=profile,
             blueprint=blueprint,
             style_profile=style.metadata.get("style_profile", {}),
             appearance_plan=appearance_plan,
         )
+        self._report_progress(
+            progress_callback,
+            "preview",
+            "🖼️ 正在生成 World Preview · 把这个世界先画出来…",
+            0.42,
+        )
         image_bytes = self.image_provider.generate(
             prompt=prompt,
             size=size,
             quality=quality,
+        )
+
+        self._report_progress(
+            progress_callback,
+            "preview_ready",
+            "✨ World Preview 已完成 · 现在开始让 Vision 对照画面校正 3D 外观…",
+            0.66,
         )
 
         preview_id = uuid4().hex[:12]
@@ -218,6 +255,13 @@ class WorldConceptService:
             style_asset_id=style_asset_id,
             preview_image_bytes=image_bytes,
             preview_mime_type="image/png",
+            progress_callback=progress_callback,
+        )
+        self._report_progress(
+            progress_callback,
+            "persist",
+            "💾 正在保存最终 AppearancePlan + RenderSpec…",
+            0.95,
         )
         world.metadata["world_pipeline"] = "blueprint_first_v1"
         world.status = ReviewStatus.APPROVED
@@ -233,6 +277,12 @@ class WorldConceptService:
             raise RuntimeError("World disappeared after Preview render.")
         if persisted.metadata.get("world_blueprint") != blueprint_snapshot:
             raise RuntimeError("World Blueprint changed while rendering Preview.")
+        self._report_progress(
+            progress_callback,
+            "ready",
+            "🌟 世界准备好了 · Preview 与 Three.js RenderSpec 已同步完成！",
+            1.0,
+        )
         return file_ref
 
     def _refresh_render_pipeline(
@@ -244,6 +294,7 @@ class WorldConceptService:
         style_asset_id: str | None,
         preview_image_bytes: bytes | None = None,
         preview_mime_type: str = "image/png",
+        progress_callback: WorldBuildProgressCallback | None = None,
     ) -> None:
         """Refresh appearance/render data without changing Blueprint world logic."""
         if self.appearance_service is None or self.geometry_compiler is None:
@@ -263,22 +314,54 @@ class WorldConceptService:
             == blueprint_fingerprint
         )
         if can_reuse_plan:
+            self._report_progress(
+                progress_callback,
+                "appearance",
+                "🧠 正在检查已经设计好的世界物件外观…",
+                0.14 if not preview_image_bytes else 0.69,
+            )
             try:
                 appearance = WorldAppearancePlan.model_validate(raw_plan)
             except Exception:
+                self._report_progress(
+                    progress_callback,
+                    "appearance",
+                    "✨ 外观设计需要更新 · 正在重新设计各个世界物件…",
+                    0.18 if not preview_image_bytes else 0.71,
+                )
                 appearance = self.appearance_service.plan_from_blueprint(
                     profile=profile,
                     blueprint=blueprint,
                     style_profile=style_profile,
                 )
         else:
+            self._report_progress(
+                progress_callback,
+                "appearance",
+                "✨ 正在根据 Blueprint 设计每个世界物件的形状、部件与材质…",
+                0.16,
+            )
             appearance = self.appearance_service.plan_from_blueprint(
                 profile=profile,
                 blueprint=blueprint,
                 style_profile=style_profile,
             )
 
+        if not preview_image_bytes:
+            self._report_progress(
+                progress_callback,
+                "appearance_ready",
+                f"🧩 Object AppearancePlan 已完成 · {len(appearance.objects)} 个物件准备就绪",
+                0.27,
+            )
+
         if preview_image_bytes:
+            self._report_progress(
+                progress_callback,
+                "vision",
+                "👁️ 正在让 Vision 对照 Preview 校正轮廓、部件、颜色角色和材质…",
+                0.74,
+            )
             appearance = self.appearance_service.refine_from_preview(
                 profile=profile,
                 blueprint=blueprint,
@@ -291,6 +374,13 @@ class WorldConceptService:
         else:
             world.metadata["world_appearance_source"] = "blueprint+creator_prompt"
 
+        if preview_image_bytes:
+            self._report_progress(
+                progress_callback,
+                "geometry",
+                "🧱 正在把最终外观说明编译成 Three.js RenderSpec…",
+                0.88,
+            )
         render_spec = self.geometry_compiler.compile(
             profile=profile,
             blueprint=blueprint,
@@ -302,6 +392,17 @@ class WorldConceptService:
         world.metadata["world_render_spec"] = render_spec.model_dump(mode="json")
         world.metadata["world_render_schema_version"] = render_spec.schema_version
         world.metadata["world_render_blueprint_fingerprint"] = blueprint_fingerprint
+
+    @staticmethod
+    def _report_progress(
+        callback: WorldBuildProgressCallback | None,
+        stage: str,
+        message: str,
+        progress: float,
+    ) -> None:
+        if callback is None:
+            return
+        callback(stage, message, max(0.0, min(1.0, progress)))
 
     def current_render_spec(self, location_asset_id: str) -> WorldRenderSpec | None:
         world = self.repository.get_asset(location_asset_id)
