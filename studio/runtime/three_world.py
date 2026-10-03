@@ -696,6 +696,12 @@ const worldSpan = Math.max(
   bp.grid.depth * cell,
   worldTopY * 1.6,
 );
+camera.far = Math.max(camera.far, worldSpan * 4);
+camera.updateProjectionMatrix();
+if (scene.fog) {{
+  scene.fog.near = Math.max(55, worldSpan * .9);
+  scene.fog.far = Math.max(95, worldSpan * 2.8);
+}}
 const overviewTarget = new THREE.Vector3(
   bp.grid.width * cell * .5,
   Math.max(2, worldTopY * .34),
