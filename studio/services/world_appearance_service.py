@@ -76,6 +76,15 @@ class WorldAppearanceService:
             )
         return normalized
 
+    def fallback_from_blueprint(
+        self,
+        *,
+        profile: WorldProfile,
+        blueprint: WorldBlueprint,
+    ) -> WorldAppearancePlan:
+        """Return the deterministic Blueprint-safe appearance fallback."""
+        return self._fallback_plan(profile=profile, blueprint=blueprint)
+
     def refine_from_preview(
         self,
         *,
