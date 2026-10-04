@@ -724,6 +724,17 @@ def render_world_factory(
                 source = saved_world.metadata.get("world_appearance_source", "—")
                 weak_count = appearance_diagnostics.get("weak_hero_count", 0)
                 st.write(f"**Appearance Source** · {source}")
+                planning_status = saved_world.metadata.get(
+                    "world_appearance_generation_status", ""
+                )
+                if planning_status == "fallback":
+                    fallback_source = saved_world.metadata.get(
+                        "world_appearance_generation_fallback", "safe_fallback"
+                    )
+                    st.warning(
+                        "GPT AppearancePlan fallback · "
+                        f"{fallback_source} · build continued safely"
+                    )
                 st.write(f"**Weak Hero Objects** · {weak_count}")
                 render_by_id = {
                     item.get("element_id"): item
