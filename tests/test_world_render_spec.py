@@ -518,7 +518,7 @@ def test_weak_organic_hero_gets_focused_shape_repair():
     assert [part.role for part in whale.parts] == ["rear_tail", "side_fin"]
     assert len(provider.calls) == 2
     assert provider.calls[1]["schema"] is ObjectAppearanceSpec
-    assert "major organic Hero object" in provider.calls[1]["user"]
+    assert "major Hero object" in provider.calls[1]["user"]
 
 
 def test_strict_hero_repair_rejects_body_only_result():
