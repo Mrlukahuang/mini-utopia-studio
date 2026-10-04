@@ -169,6 +169,25 @@ def test_runtime_html_has_idle_walk_run_and_glb_loader_path():
     assert "updateProceduralAnimation" in html
 
 
+def test_runtime_html_normalizes_hero_glb_axis_pivot_and_uniform_scale():
+    html = build_world_runtime_html(
+        world_name="Hero Spatial World",
+        profile=WorldProfile(theme_color_hexes=["#BDE3F7"]),
+        blueprint=_blueprint(),
+    )
+
+    assert "function dominantHorizontalAxis" in html
+    assert "function fitHeroGLBToEnvelope" in html
+    assert "nativeAxis !== targetAxis" in html
+    assert "model.rotation.y += Math.PI / 2" in html
+    assert "Math.min(sx, sy, sz) * .96" in html
+    assert "model.position.x -= center.x" in html
+    assert "model.position.z -= center.z" in html
+    assert "model.position.y -= bounds.min.y" in html
+    assert "pivot: 'bottom_center'" in html
+    assert "heroSpatialNormalization" in html
+
+
 def test_runtime_html_has_import_map_and_error_overlay():
     html = build_world_runtime_html(
         world_name="Candy Cloud Valley",
