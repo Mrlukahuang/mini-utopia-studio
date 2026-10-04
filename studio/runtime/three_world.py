@@ -26,6 +26,7 @@ def build_world_runtime_html(
     character_profile: CharacterProfile | None = None,
     character_runtime: CharacterRuntimeSpec | None = None,
     render_spec: WorldRenderSpec | None = None,
+    render_asset_payloads: dict[str, str] | None = None,
 ) -> str:
     """Build a self-contained Three.js playground for a saved WorldBlueprint.
 
@@ -42,6 +43,7 @@ def build_world_runtime_html(
             if render_spec is not None
             else None
         ),
+        "renderAssets": render_asset_payloads or {},
         "characterName": character_name,
         "character": (
             character_profile.model_dump(mode="json")
@@ -155,6 +157,11 @@ const DATA = {data_json};
 const profile = DATA.profile;
 const bp = DATA.blueprint;
 const renderSpec = DATA.renderSpec || null;
+const renderAssets = DATA.renderAssets || {{}};
+const layoutById = new Map(
+  (bp.layout_elements || []).map(element => [element.element_id, element])
+);
+const gltfLoader = new GLTFLoader();
 const character = DATA.character || {{}};
 const characterRuntime = DATA.characterRuntime || {{}};
 const visualAnchor = bp.visual_anchor || {{}};
@@ -615,15 +622,98 @@ function primitiveGeometry(spec) {{
   return {{geometry, baseScale}};
 }}
 
+function applyNodeTransform(group, node) {{
+  const p = node.local_position || {{}};
+  const q = node.local_quaternion || {{}};
+  const s = node.local_scale || {{}};
+  group.position.set(p.x || 0, p.y || 0, p.z || 0);
+  group.quaternion.set(q.x || 0, q.y || 0, q.z || 0, q.w ?? 1);
+  group.scale.set(s.x ?? 1, s.y ?? 1, s.z ?? 1);
+}}
+
+function fitHeroGLBToEnvelope(model, element) {{
+  if (!model || !element) return;
+  model.updateMatrixWorld(true);
+  let bounds = new THREE.Box3().setFromObject(model);
+  const size = bounds.getSize(new THREE.Vector3());
+  const target = new THREE.Vector3(
+    Math.max(.1, element.width || 1),
+    Math.max(.1, element.height || 1),
+    Math.max(.1, element.depth || 1)
+  );
+  const sx = target.x / Math.max(.001, size.x);
+  const sy = target.y / Math.max(.001, size.y);
+  const sz = target.z / Math.max(.001, size.z);
+  const fitScale = Math.min(sx, sy, sz) * .94;
+  model.scale.multiplyScalar(fitScale);
+  model.updateMatrixWorld(true);
+
+  bounds = new THREE.Box3().setFromObject(model);
+  const center = bounds.getCenter(new THREE.Vector3());
+  model.position.x -= center.x;
+  model.position.z -= center.z;
+  model.position.y -= bounds.min.y;
+  model.updateMatrixWorld(true);
+}}
+
+function loadHeroGLBNode({{node, spec, objectGroup, fallbackGroups}}) {{
+  const geometry = node.geometry || {{}};
+  const assetPath = geometry.asset_path || '';
+  const assetUrl = renderAssets[assetPath];
+  if (!assetPath || !assetUrl) return false;
+
+  const holder = new THREE.Group();
+  applyNodeTransform(holder, node);
+  holder.visible = node.visible !== false;
+  objectGroup.add(holder);
+
+  gltfLoader.load(
+    assetUrl,
+    gltf => {{
+      const model = gltf.scene;
+      model.traverse(child => {{
+        if (!child.isMesh) return;
+        child.castShadow = node.cast_shadow !== false;
+        child.receiveShadow = node.receive_shadow !== false;
+        child.frustumCulled = spec.frustum_culled !== false;
+      }});
+      fitHeroGLBToEnvelope(model, layoutById.get(spec.element_id));
+      holder.add(model);
+      fallbackGroups.forEach(group => {{ group.visible = false; }});
+      objectGroup.userData.heroAssetLoaded = true;
+      objectGroup.userData.heroAssetPath = assetPath;
+    }},
+    undefined,
+    error => {{
+      console.warn(
+        'Hero GLB failed; keeping procedural fallback',
+        spec.element_id,
+        assetPath,
+        error
+      );
+      holder.removeFromParent();
+      objectGroup.userData.heroAssetLoaded = false;
+    }}
+  );
+  return true;
+}}
+
 function addCompiledRenderObject(spec) {{
   if (!spec || spec.kind === 'portal') return false;
   const objectGroup = new THREE.Group();
   const nodeGroups = new Map();
+  const fallbackGroups = [];
+  const glbNodes = [];
   const materialById = new Map(
     (renderSpec?.materials || []).map(item => [item.material_id, item])
   );
 
   (spec.nodes || []).forEach(node => {{
+    if (node.geometry?.source_type === 'glb') {{
+      glbNodes.push(node);
+      return;
+    }}
+
     const built = primitiveGeometry(node.geometry || {{}});
     const material = compiledMaterial(materialById.get(node.material_id));
     const mesh = new THREE.Mesh(built.geometry, material);
@@ -635,19 +725,13 @@ function addCompiledRenderObject(spec) {{
     mesh.frustumCulled = spec.frustum_culled !== false;
 
     const group = new THREE.Group();
-    const p = node.local_position || {{}};
-    const q = node.local_quaternion || {{}};
-    const s = node.local_scale || {{}};
-    group.position.set(p.x || 0, p.y || 0, p.z || 0);
-    group.quaternion.set(q.x || 0, q.y || 0, q.z || 0, q.w ?? 1);
-    group.scale.set(s.x ?? 1, s.y ?? 1, s.z ?? 1);
+    applyNodeTransform(group, node);
     group.add(mesh);
+    fallbackGroups.push(group);
     nodeGroups.set(node.node_id, {{group, parent: node.parent_node_id || ''}});
   }});
 
   // RenderSpec v0.2 mesh-node transforms are all object-local.
-  // attachment_parent_part_id remains semantic metadata; no nested transform
-  // accumulation is applied here.
   nodeGroups.forEach(entry => objectGroup.add(entry.group));
 
   const transform = spec.transform || {{}};
@@ -664,6 +748,14 @@ function addCompiledRenderObject(spec) {{
   objectGroup.userData.semanticKey = spec.semantic_key || '';
   objectGroup.userData.traversability = spec.traversability || 'scenic';
   world.add(objectGroup);
+
+  glbNodes.forEach(node => loadHeroGLBNode({{
+    node,
+    spec,
+    objectGroup,
+    fallbackGroups,
+  }}));
+
   return true;
 }}
 
