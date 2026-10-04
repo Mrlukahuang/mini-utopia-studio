@@ -97,6 +97,7 @@ class ReusableGLBSpec(BaseModel):
     sha256: str
     byte_size: int = Field(ge=0)
     source: ReusableAssetSourceSpec
+    source_fingerprint: str = ""
     style_status: ReusableAssetStyleStatus = "raw"
     normalization: ReusableAssetNormalizationSpec = Field(
         default_factory=ReusableAssetNormalizationSpec
