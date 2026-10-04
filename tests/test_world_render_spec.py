@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from typing import Type
 
+import io
+
 import pytest
+from PIL import Image
 
 from pydantic import BaseModel
 
@@ -22,6 +25,7 @@ from studio.models.world import (
     WorldScenePlan,
 )
 from studio.providers.base import ImageAnalysisProvider, ImageGenerationProvider, StructuredTextProvider
+from studio.providers.hero_asset import HeroAssetProvider, HeroAssetResult
 from studio.repositories.sqlite import SQLiteStudioRepository
 from studio.runtime.three_world import build_world_runtime_html
 from studio.services.asset_service import AssetService
@@ -34,6 +38,7 @@ from studio.services.world_blueprint_service import WorldBlueprintService
 from studio.services.world_concept_prompt_service import WorldConceptPromptService
 from studio.services.world_concept_service import WorldConceptService
 from studio.services.world_geometry_compiler_service import WorldGeometryCompilerService
+from studio.services.world_hero_asset_service import WorldHeroAssetService
 from studio.storage.local import LocalObjectStorage
 class FakeWorldImageProvider(ImageGenerationProvider):
     def __init__(self):
@@ -628,3 +633,325 @@ def test_runtime_supports_richer_procedural_shape_vocabulary():
     assert "primitive === 'disc'" in html
     assert "primitive === 'torus' || primitive === 'ring'" in html
     assert "nodeGroups.forEach(entry => objectGroup.add(entry.group))" in html
+
+
+class FakeHeroAssetProvider(HeroAssetProvider):
+    def __init__(self, *, fail: bool = False, model: str = "pixal3d"):
+        self.fail = fail
+        self.model = model
+        self.calls = []
+
+    def generate(
+        self,
+        *,
+        image_bytes: bytes,
+        mime_type: str,
+        element_id: str,
+        appearance: ObjectAppearanceSpec,
+    ) -> HeroAssetResult:
+        self.calls.append(
+            {
+                "image_bytes": image_bytes,
+                "mime_type": mime_type,
+                "element_id": element_id,
+                "appearance": appearance,
+            }
+        )
+        if self.fail:
+            raise RuntimeError("GPU worker unavailable")
+        return HeroAssetResult(
+            payload=b"glTF-fake-hero-binary",
+            mime_type="model/gltf-binary",
+            model=self.model,
+            provider="fake",
+            metadata={"quality": "spike"},
+        )
+
+
+def _preview_png() -> bytes:
+    image = Image.new("RGBA", (320, 200), (220, 238, 255, 255))
+    output = io.BytesIO()
+    image.save(output, format="PNG")
+    return output.getvalue()
+
+
+def _normalized_appearance() -> WorldAppearancePlan:
+    appearance = WorldAppearancePlan.model_validate(_appearance_payload())
+    return WorldAppearanceService()._normalize(
+        proposed=appearance,
+        blueprint=_blueprint(),
+        fallback=WorldAppearanceService().plan_from_blueprint(
+            profile=_profile(),
+            blueprint=_blueprint(),
+            style_profile={},
+        ),
+    )
+
+
+def test_hero_asset_service_generates_stores_and_attaches_real_glb(tmp_path):
+    storage = LocalObjectStorage(tmp_path / "storage")
+    provider = FakeHeroAssetProvider()
+    appearance = _normalized_appearance()
+    render = WorldGeometryCompilerService().compile(
+        profile=_profile(),
+        blueprint=_blueprint(),
+        appearance=appearance,
+        style_profile={},
+    )
+    original_whale = next(
+        item for item in render.objects if item.element_id == "SCENE_WHALE"
+    )
+    original_node_count = len(original_whale.nodes)
+
+    service = WorldHeroAssetService(
+        storage=storage,
+        provider=provider,
+        max_assets_per_world=1,
+    )
+    enriched, builds, cache = service.enrich_render_spec(
+        location_asset_id="LOC_RENDER",
+        blueprint=_blueprint(),
+        appearance=appearance,
+        render_spec=render,
+        preview_image_bytes=_preview_png(),
+        preview_mime_type="image/png",
+    )
+
+    assert len(provider.calls) == 1
+    assert provider.calls[0]["element_id"] == "SCENE_WHALE"
+    assert builds[0].status == "generated"
+    assert builds[0].model == "pixal3d"
+    assert builds[0].asset_path.endswith(".glb")
+    assert storage.get_bytes(builds[0].asset_path) == b"glTF-fake-hero-binary"
+
+    whale = next(
+        item for item in enriched.objects if item.element_id == "SCENE_WHALE"
+    )
+    assert len(whale.nodes) == original_node_count + 1
+    hero_node = next(
+        node for node in whale.nodes if node.geometry.source_type == "glb"
+    )
+    assert hero_node.node_id == "SCENE_WHALE:hero_glb"
+    assert hero_node.geometry.asset_path == builds[0].asset_path
+    assert hero_node.geometry.asset_mime_type == "model/gltf-binary"
+    assert cache["SCENE_WHALE"]["model"] == "pixal3d"
+
+
+def test_hero_asset_service_reuses_cached_glb_without_second_gpu_call(tmp_path):
+    storage = LocalObjectStorage(tmp_path / "storage")
+    provider = FakeHeroAssetProvider()
+    appearance = _normalized_appearance()
+    compiler = WorldGeometryCompilerService()
+    service = WorldHeroAssetService(
+        storage=storage,
+        provider=provider,
+        max_assets_per_world=1,
+    )
+
+    first_render = compiler.compile(
+        profile=_profile(),
+        blueprint=_blueprint(),
+        appearance=appearance,
+        style_profile={},
+    )
+    _, first_builds, cache = service.enrich_render_spec(
+        location_asset_id="LOC_RENDER",
+        blueprint=_blueprint(),
+        appearance=appearance,
+        render_spec=first_render,
+        preview_image_bytes=_preview_png(),
+        preview_mime_type="image/png",
+    )
+
+    second_render = compiler.compile(
+        profile=_profile(),
+        blueprint=_blueprint(),
+        appearance=appearance,
+        style_profile={},
+    )
+    enriched, second_builds, _ = service.enrich_render_spec(
+        location_asset_id="LOC_RENDER",
+        blueprint=_blueprint(),
+        appearance=appearance,
+        render_spec=second_render,
+        preview_image_bytes=_preview_png(),
+        preview_mime_type="image/png",
+        existing_assets=cache,
+    )
+
+    assert first_builds[0].status == "generated"
+    assert second_builds[0].status == "cached"
+    assert len(provider.calls) == 1
+    whale = next(
+        item for item in enriched.objects if item.element_id == "SCENE_WHALE"
+    )
+    assert any(node.geometry.source_type == "glb" for node in whale.nodes)
+
+
+def test_hero_asset_worker_failure_keeps_procedural_fallback(tmp_path):
+    storage = LocalObjectStorage(tmp_path / "storage")
+    provider = FakeHeroAssetProvider(fail=True)
+    appearance = _normalized_appearance()
+    render = WorldGeometryCompilerService().compile(
+        profile=_profile(),
+        blueprint=_blueprint(),
+        appearance=appearance,
+        style_profile={},
+    )
+    service = WorldHeroAssetService(
+        storage=storage,
+        provider=provider,
+        max_assets_per_world=1,
+    )
+
+    enriched, builds, cache = service.enrich_render_spec(
+        location_asset_id="LOC_RENDER",
+        blueprint=_blueprint(),
+        appearance=appearance,
+        render_spec=render,
+        preview_image_bytes=_preview_png(),
+        preview_mime_type="image/png",
+    )
+
+    assert builds[0].status == "fallback"
+    assert "GPU worker unavailable" in builds[0].message
+    assert cache == {}
+    whale = next(
+        item for item in enriched.objects if item.element_id == "SCENE_WHALE"
+    )
+    assert not any(node.geometry.source_type == "glb" for node in whale.nodes)
+
+
+def test_three_runtime_loads_hero_glb_and_hides_fallback_only_after_success(tmp_path):
+    storage = LocalObjectStorage(tmp_path / "storage")
+    provider = FakeHeroAssetProvider()
+    appearance = _normalized_appearance()
+    render = WorldGeometryCompilerService().compile(
+        profile=_profile(),
+        blueprint=_blueprint(),
+        appearance=appearance,
+        style_profile={},
+    )
+    service = WorldHeroAssetService(
+        storage=storage,
+        provider=provider,
+        max_assets_per_world=1,
+    )
+    enriched, builds, _ = service.enrich_render_spec(
+        location_asset_id="LOC_RENDER",
+        blueprint=_blueprint(),
+        appearance=appearance,
+        render_spec=render,
+        preview_image_bytes=_preview_png(),
+        preview_mime_type="image/png",
+    )
+    asset_path = builds[0].asset_path
+
+    html = build_world_runtime_html(
+        world_name="Hero GLB World",
+        profile=_profile(),
+        blueprint=_blueprint(),
+        render_spec=enriched,
+        render_asset_payloads={
+            asset_path: "data:model/gltf-binary;base64,ZmFrZQ=="
+        },
+    )
+
+    assert '"renderAssets": {' in html
+    assert asset_path in html
+    assert "function fitHeroGLBToEnvelope" in html
+    assert "gltfLoader.load(" in html
+    assert "fallbackGroups.forEach(group => { group.visible = false; });" in html
+    assert "Hero GLB failed; keeping procedural fallback" in html
+    assert "objectGroup.userData.heroAssetLoaded = true" in html
+
+
+def test_manual_hero_glb_attach_works_without_gpu_provider(tmp_path):
+    storage = LocalObjectStorage(tmp_path / "storage")
+    service = WorldHeroAssetService(
+        storage=storage,
+        provider=None,
+        max_assets_per_world=0,
+    )
+    appearance = _normalized_appearance()
+    render = WorldGeometryCompilerService().compile(
+        profile=_profile(),
+        blueprint=_blueprint(),
+        appearance=appearance,
+        style_profile={},
+    )
+
+    enriched, build, record = service.attach_existing_glb(
+        location_asset_id="LOC_RENDER",
+        blueprint=_blueprint(),
+        render_spec=render,
+        element_id="SCENE_WHALE",
+        payload=b"glTF-manual-test",
+    )
+
+    assert build.status == "generated"
+    assert build.model == "manual_glb"
+    assert record["provider"] == "manual"
+    assert storage.get_bytes(build.asset_path) == b"glTF-manual-test"
+    whale = next(
+        item for item in enriched.objects if item.element_id == "SCENE_WHALE"
+    )
+    hero_nodes = [
+        node for node in whale.nodes if node.geometry.source_type == "glb"
+    ]
+    assert len(hero_nodes) == 1
+    assert hero_nodes[0].geometry.asset_path == build.asset_path
+
+
+def test_hero_cache_changes_when_3d_model_changes(tmp_path):
+    storage = LocalObjectStorage(tmp_path / "storage")
+    appearance = _normalized_appearance()
+    compiler = WorldGeometryCompilerService()
+
+    pixal = FakeHeroAssetProvider(model="pixal3d")
+    pixal_service = WorldHeroAssetService(
+        storage=storage,
+        provider=pixal,
+        max_assets_per_world=1,
+    )
+    first_render = compiler.compile(
+        profile=_profile(),
+        blueprint=_blueprint(),
+        appearance=appearance,
+        style_profile={},
+    )
+    _, _, cache = pixal_service.enrich_render_spec(
+        location_asset_id="LOC_RENDER",
+        blueprint=_blueprint(),
+        appearance=appearance,
+        render_spec=first_render,
+        preview_image_bytes=_preview_png(),
+        preview_mime_type="image/png",
+    )
+
+    triposr = FakeHeroAssetProvider(model="triposr")
+    triposr_service = WorldHeroAssetService(
+        storage=storage,
+        provider=triposr,
+        max_assets_per_world=1,
+    )
+    second_render = compiler.compile(
+        profile=_profile(),
+        blueprint=_blueprint(),
+        appearance=appearance,
+        style_profile={},
+    )
+    _, builds, updated_cache = triposr_service.enrich_render_spec(
+        location_asset_id="LOC_RENDER",
+        blueprint=_blueprint(),
+        appearance=appearance,
+        render_spec=second_render,
+        preview_image_bytes=_preview_png(),
+        preview_mime_type="image/png",
+        existing_assets=cache,
+    )
+
+    assert builds[0].status == "generated"
+    assert builds[0].model == "triposr"
+    assert len(triposr.calls) == 1
+    assert updated_cache["SCENE_WHALE"]["model"] == "triposr"

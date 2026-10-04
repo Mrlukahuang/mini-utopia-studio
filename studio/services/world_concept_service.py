@@ -15,6 +15,7 @@ from studio.services.world_concept_prompt_service import WorldConceptPromptServi
 from studio.services.world_blueprint_service import WorldBlueprintService
 from studio.services.world_appearance_service import WorldAppearanceService
 from studio.services.world_geometry_compiler_service import WorldGeometryCompilerService
+from studio.services.world_hero_asset_service import WorldHeroAssetService
 from studio.storage.base import ObjectStorage
 
 
@@ -31,6 +32,7 @@ class WorldConceptService:
         image_provider: ImageGenerationProvider | None = None,
         appearance_service: WorldAppearanceService | None = None,
         geometry_compiler: WorldGeometryCompilerService | None = None,
+        hero_asset_service: WorldHeroAssetService | None = None,
     ):
         self.repository = repository
         self.storage = storage
@@ -39,6 +41,7 @@ class WorldConceptService:
         self.image_provider = image_provider
         self.appearance_service = appearance_service
         self.geometry_compiler = geometry_compiler
+        self.hero_asset_service = hero_asset_service
 
     @property
     def is_available(self) -> bool:
@@ -426,6 +429,43 @@ class WorldConceptService:
             appearance=appearance,
             style_profile=style_profile,
         )
+
+        if (
+            preview_image_bytes
+            and self.hero_asset_service is not None
+            and self.hero_asset_service.is_available
+        ):
+            self._report_progress(
+                progress_callback,
+                "hero_asset",
+                "🐋 正在把主要 Hero 从 Preview 转成真正的 3D GLB…",
+                0.91,
+            )
+            render_spec, hero_builds, hero_cache = (
+                self.hero_asset_service.enrich_render_spec(
+                    location_asset_id=world.asset_id,
+                    blueprint=blueprint,
+                    appearance=appearance,
+                    render_spec=render_spec,
+                    preview_image_bytes=preview_image_bytes,
+                    preview_mime_type=preview_mime_type,
+                    existing_assets=world.metadata.get("world_hero_assets", {}),
+                )
+            )
+            world.metadata["world_hero_assets"] = hero_cache
+            world.metadata["world_hero_asset_diagnostics"] = [
+                {
+                    "element_id": item.element_id,
+                    "name": item.name,
+                    "status": item.status,
+                    "asset_path": item.asset_path,
+                    "model": item.model,
+                    "bytes": item.bytes,
+                    "message": item.message,
+                }
+                for item in hero_builds
+            ]
+
         world.metadata["world_appearance_plan"] = appearance.model_dump(mode="json")
         world.metadata["world_appearance_schema_version"] = appearance.schema_version
         world.metadata["world_render_spec"] = render_spec.model_dump(mode="json")
@@ -454,6 +494,76 @@ class WorldConceptService:
         if callback is None:
             return
         callback(stage, message, max(0.0, min(1.0, progress)))
+
+    def attach_manual_hero_glb(
+        self,
+        *,
+        location_asset_id: str,
+        element_id: str,
+        payload: bytes,
+    ):
+        if self.hero_asset_service is None:
+            raise RuntimeError("Hero Asset service is not configured.")
+
+        world = self.repository.get_asset(location_asset_id)
+        if world is None or world.asset_type != AssetType.LOCATION:
+            raise ValueError(f"World not found: {location_asset_id}")
+
+        raw_blueprint = world.metadata.get("world_blueprint")
+        raw_render_spec = world.metadata.get("world_render_spec")
+        if not raw_blueprint or not raw_render_spec:
+            raise ValueError(
+                "Manual Hero GLB requires an existing Blueprint and RenderSpec."
+            )
+
+        blueprint = WorldBlueprint.model_validate(raw_blueprint)
+        render_spec = WorldRenderSpec.model_validate(raw_render_spec)
+        updated, build, record = self.hero_asset_service.attach_existing_glb(
+            location_asset_id=location_asset_id,
+            blueprint=blueprint,
+            render_spec=render_spec,
+            element_id=element_id,
+            payload=payload,
+        )
+
+        world.metadata["world_render_spec"] = updated.model_dump(mode="json")
+        cache = dict(world.metadata.get("world_hero_assets", {}) or {})
+        cache[element_id] = record
+        world.metadata["world_hero_assets"] = cache
+        diagnostics = [
+            item
+            for item in (
+                world.metadata.get("world_hero_asset_diagnostics", []) or []
+            )
+            if item.get("element_id") != element_id
+        ]
+        diagnostics.append(
+            {
+                "element_id": build.element_id,
+                "name": build.name,
+                "status": build.status,
+                "asset_path": build.asset_path,
+                "model": build.model,
+                "bytes": build.bytes,
+                "message": build.message,
+            }
+        )
+        world.metadata["world_hero_asset_diagnostics"] = diagnostics
+        world.metadata["world_render_diagnostics"] = {
+            "object_count": len(updated.objects),
+            "objects": [
+                {
+                    "element_id": item.element_id,
+                    "name": item.name,
+                    "node_count": len(item.nodes),
+                    "node_ids": [node.node_id for node in item.nodes],
+                }
+                for item in updated.objects
+            ],
+        }
+        world.updated_at = now_utc()
+        self.repository.save_asset(world)
+        return build
 
     def current_render_spec(self, location_asset_id: str) -> WorldRenderSpec | None:
         world = self.repository.get_asset(location_asset_id)

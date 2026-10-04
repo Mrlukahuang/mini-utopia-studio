@@ -22,9 +22,11 @@ from studio.services.world_visual_anchor_service import WorldVisualAnchorService
 from studio.services.world_scene_plan_service import WorldScenePlanService
 from studio.services.world_appearance_service import WorldAppearanceService
 from studio.services.world_geometry_compiler_service import WorldGeometryCompilerService
+from studio.services.world_hero_asset_service import WorldHeroAssetService
 from studio.providers.openai_image import OpenAIImageProvider
 from studio.providers.openai_vision import OpenAIVisionProvider
 from studio.providers.openai_text import OpenAIStructuredTextProvider
+from studio.providers.hero_asset import HttpHeroAssetProvider
 from studio.storage.base import ObjectStorage
 from studio.storage.local import LocalObjectStorage
 from studio.storage.supabase import SupabaseObjectStorage
@@ -51,6 +53,7 @@ class StudioContext:
     world_scene_plans: WorldScenePlanService
     world_appearances: WorldAppearanceService
     world_geometry_compiler: WorldGeometryCompilerService
+    world_hero_assets: WorldHeroAssetService
     world_concept_match: WorldConceptMatchService
 
 
@@ -137,6 +140,21 @@ def build_context(settings: Settings) -> StudioContext:
         image_analysis_provider=vision_provider,
     )
     world_geometry_compiler = WorldGeometryCompilerService()
+    hero_asset_provider = (
+        HttpHeroAssetProvider(
+            base_url=settings.hero_asset_worker_url,
+            model=settings.hero_asset_model,
+            token=settings.hero_asset_worker_token,
+            timeout_seconds=settings.hero_asset_timeout_seconds,
+        )
+        if settings.hero_asset_worker_url
+        else None
+    )
+    world_hero_assets = WorldHeroAssetService(
+        storage=storage,
+        provider=hero_asset_provider,
+        max_assets_per_world=settings.hero_asset_max_per_world,
+    )
 
     return StudioContext(
         settings=settings,
@@ -167,11 +185,13 @@ def build_context(settings: Settings) -> StudioContext:
             image_provider=image_provider,
             appearance_service=world_appearances,
             geometry_compiler=world_geometry_compiler,
+            hero_asset_service=world_hero_assets,
         ),
         world_scene_plans=WorldScenePlanService(
             structured_provider=text_provider,
         ),
         world_appearances=world_appearances,
         world_geometry_compiler=world_geometry_compiler,
+        world_hero_assets=world_hero_assets,
         world_concept_match=WorldConceptMatchService(repository),
     )

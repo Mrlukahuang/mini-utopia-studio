@@ -176,11 +176,37 @@ Voxel Compiler may take ObjectAppearanceSpec and emit chunked voxel
 occupancy/palette data, greedy-meshed BufferGeometry, or instanced blocks. The
 result still enters Three.js through ThreeGeometrySpec.
 
+### Open-source Hero GLB Worker
+
+M3.3 adds an optional GPU Worker for major organic Hero objects.
+
+Current adapters:
+
+- Pixal3D — quality benchmark
+- TripoSR — lightweight baseline
+
+The Worker receives a Preview crop + ObjectAppearanceSpec and returns GLB. The
+main Studio stores the GLB in ObjectStorage and appends a real
+ThreeGeometrySpec(source_type="glb") node while retaining procedural nodes as
+fallback.
+
+Three.js loads the GLB asynchronously, measures its bounding box, uniformly fits
+it inside the authoritative Blueprint width/height/depth envelope, centers x/z,
+and aligns the model bottom to Blueprint base y. Procedural fallback is hidden
+only after GLB load succeeds.
+
+For the first spike, private GLB bytes are embedded into Explore as data URIs.
+Production transport should move to short-lived signed URLs; RenderSpec does not
+need to change.
+
+The GPU runtime remains isolated from Streamlit so CUDA/PyTorch versions for
+Pixal3D, TripoSR, TRELLIS or future generators can change independently.
+
 ### AI / procedural GLB
 
-A Hero Object generator may emit GLB. The result is stored in Object Storage,
-style-normalized, then referenced by ThreeGeometrySpec.asset_path. No Blueprint
-changes are required.
+Additional Hero generators may emit GLB through the same provider/Worker
+contract. The result is stored in Object Storage, style-normalized, then
+referenced by ThreeGeometrySpec.asset_path. No Blueprint changes are required.
 
 ### Appearance correction loop
 

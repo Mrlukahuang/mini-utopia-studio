@@ -79,7 +79,12 @@ def _reset_world() -> None:
     st.rerun()
 
 
-def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
+def render_world_factory(
+    ctx,
+    *,
+    style_asset_id: str | None,
+    studio_mode: bool = False,
+) -> None:
     """Blueprint-first World Factory with independent Prompt and Custom entry paths."""
 
     render_game_hero(
@@ -739,6 +744,88 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
                         f"parts={item.get('part_count', 0)} [{roles}] · "
                         f"Three.js nodes={rendered.get('node_count', 0)}"
                     )
+
+                hero_diagnostics = saved_world.metadata.get(
+                    "world_hero_asset_diagnostics", []
+                )
+                if hero_diagnostics:
+                    st.divider()
+                    st.write("**🧊 Hero 3D Assets / Open-source GLB**")
+                    for hero in hero_diagnostics:
+                        status = hero.get("status", "—")
+                        model = hero.get("model") or "—"
+                        byte_count = int(hero.get("bytes", 0) or 0)
+                        size_mb = byte_count / (1024 * 1024)
+                        message = hero.get("message", "")
+                        st.write(
+                            f"**{hero.get('name', hero.get('element_id', 'Hero'))}** · "
+                            f"{status} · model={model} · {size_mb:.2f} MB"
+                        )
+                        if hero.get("asset_path"):
+                            st.caption(f"GLB · {hero.get('asset_path')}")
+                        if message:
+                            st.warning(message)
+
+                if studio_mode and saved_world is not None:
+                    hero_candidates = [
+                        element
+                        for element in blueprint.layout_elements
+                        if (
+                            element.geometry_role == "organic"
+                            and element.kind in {"landmark", "structure"}
+                        )
+                    ]
+                    if hero_candidates:
+                        st.divider()
+                        st.write("**🛠 Manual Hero GLB Test / 手动验证**")
+                        st.caption(
+                            "可以先在 Pixal3D / TripoSR 官方 Demo 生成 GLB，"
+                            "上传这里验证 GLB → RenderSpec → Three.js → Blueprint 回填。"
+                        )
+                        selected_hero = st.selectbox(
+                            "Hero Blueprint Object",
+                            hero_candidates,
+                            format_func=lambda item: (
+                                f"{item.name} · {item.element_id}"
+                            ),
+                            key=f"manual_hero_target_{saved_world.asset_id}",
+                        )
+                        manual_glb = st.file_uploader(
+                            "Hero GLB",
+                            type=["glb"],
+                            key=f"manual_hero_glb_{saved_world.asset_id}",
+                        )
+                        if st.button(
+                            "🧊 Attach Hero GLB / 接入 3D",
+                            key=f"attach_hero_glb_{saved_world.asset_id}",
+                            disabled=manual_glb is None,
+                            use_container_width=True,
+                        ):
+                            try:
+                                build = ctx.world_concepts.attach_manual_hero_glb(
+                                    location_asset_id=saved_world.asset_id,
+                                    element_id=selected_hero.element_id,
+                                    payload=manual_glb.getvalue(),
+                                )
+                                st.success(
+                                    f"Hero GLB attached · {build.name} · "
+                                    f"{build.bytes / (1024 * 1024):.2f} MB"
+                                )
+                                st.rerun()
+                            except Exception as exc:
+                                st.error(f"Hero GLB attach failed: {exc}")
+
+        if getattr(ctx, "world_hero_assets", None) is not None:
+            if ctx.world_hero_assets.is_available:
+                st.caption(
+                    "🧊 Hero GLB Worker 已连接 · Render Preview 时会把最大的 organic Hero "
+                    "送去开源 3D Worker。"
+                )
+            else:
+                st.caption(
+                    "🧩 Hero GLB Worker 未连接 · 当前 Explore 会继续使用 Procedural "
+                    "Shape Grammar fallback。"
+                )
 
         count = int(st.session_state.get("creator_generation_count", 0))
         remaining = max(0, MAX_GENERATIONS_PER_SESSION - count)
