@@ -420,7 +420,7 @@ def test_world_pipeline_persists_initial_render_spec_and_preview_refinement(tmp_
     rendered = repo.get_asset(world.asset_id)
     assert rendered is not None
     assert rendered.metadata["world_appearance_source"] == "blueprint+preview_vision"
-    assert rendered.metadata["world_render_schema_version"] == "0.1"
+    assert rendered.metadata["world_render_schema_version"] == "0.2"
     appearance_diag = rendered.metadata["world_appearance_diagnostics"]
     whale_diag = next(
         item
