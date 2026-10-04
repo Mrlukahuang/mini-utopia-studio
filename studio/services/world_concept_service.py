@@ -478,6 +478,8 @@ class WorldConceptService:
                     render_spec=render_spec,
                     preview_image_bytes=preview_image_bytes,
                     preview_mime_type=preview_mime_type,
+                    profile=profile,
+                    style_profile=style_profile,
                     existing_assets=world.metadata.get("world_hero_assets", {}),
                 )
             )
@@ -490,6 +492,7 @@ class WorldConceptService:
                     "asset_path": item.asset_path,
                     "model": item.model,
                     "bytes": item.bytes,
+                    "reference_mode": item.reference_mode,
                     "message": item.message,
                 }
                 for item in hero_builds
