@@ -115,14 +115,18 @@ def test_world_hero_service_reuses_exact_global_generated_asset(tmp_path):
         provider=provider,
         reusable_library=library,
     )
-    crop = probe._crop_preview(
+    element = blueprint.layout_elements[0]
+    reference_mode, fingerprint, _, _ = probe._prepare_reference(
         preview_image_bytes=_preview(),
         appearance=appearance.objects[0],
+        element=element,
+        style_profile={},
     )
     input_sha = probe._input_sha(
-        crop=crop,
+        crop=fingerprint,
         appearance=appearance.objects[0],
         provider_key=provider.cache_identity,
+        reference_mode=reference_mode,
     )
 
     library.import_glb(
