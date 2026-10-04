@@ -222,3 +222,31 @@ aerial whale carrying a garden/Portal while preserving Blueprint path and
 elevation.
 
 The benchmark is recognizable 3D identity, not photorealism.
+
+
+## M3.4 Reusable GLB Asset Library
+
+Full-3D Mini Utopia does not require every visible object to be generated from
+scratch. Common world pieces should be resolved from a persistent reusable GLB
+library before GPU generation is considered.
+
+Source priority:
+
+```text
+Approved reusable GLB
+→ procedural/simple geometry when appropriate
+→ generated Hero GLB only for creator-specific identity-bearing objects
+```
+
+Imported and generated GLBs share one Mini Utopia asset contract: stable asset
+identity, content hash, ObjectStorage path, provenance/license metadata,
+transform normalization expectations, style review state, and non-destructive
+variant policy. Color/material/scale variants may reference the same immutable
+GLB bytes instead of consuming another generation.
+
+This asset identity is part of World continuity: future Stories and Videos must
+reuse the same canonical World assets unless the creator explicitly changes the
+World.
+
+See `docs/M3_ASSET_LIBRARY_STRATEGY.md` for the durable sourcing and reuse
+policy.

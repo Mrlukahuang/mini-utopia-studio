@@ -23,6 +23,7 @@ from studio.services.world_scene_plan_service import WorldScenePlanService
 from studio.services.world_appearance_service import WorldAppearanceService
 from studio.services.world_geometry_compiler_service import WorldGeometryCompilerService
 from studio.services.world_hero_asset_service import WorldHeroAssetService
+from studio.services.reusable_asset_library_service import ReusableAssetLibraryService
 from studio.providers.openai_image import OpenAIImageProvider
 from studio.providers.openai_vision import OpenAIVisionProvider
 from studio.providers.openai_text import OpenAIStructuredTextProvider
@@ -54,6 +55,7 @@ class StudioContext:
     world_appearances: WorldAppearanceService
     world_geometry_compiler: WorldGeometryCompilerService
     world_hero_assets: WorldHeroAssetService
+    reusable_assets: ReusableAssetLibraryService
     world_concept_match: WorldConceptMatchService
 
 
@@ -193,5 +195,6 @@ def build_context(settings: Settings) -> StudioContext:
         world_appearances=world_appearances,
         world_geometry_compiler=world_geometry_compiler,
         world_hero_assets=world_hero_assets,
+        reusable_assets=ReusableAssetLibraryService(repository, storage),
         world_concept_match=WorldConceptMatchService(repository),
     )
