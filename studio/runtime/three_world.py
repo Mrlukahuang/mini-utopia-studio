@@ -633,29 +633,77 @@ function applyNodeTransform(group, node) {{
   group.scale.set(s.x ?? 1, s.y ?? 1, s.z ?? 1);
 }}
 
+function dominantHorizontalAxis(size) {{
+  const x = Math.max(.001, size.x || 0);
+  const z = Math.max(.001, size.z || 0);
+  const ratio = Math.min(x, z) / Math.max(x, z);
+  if (ratio > .88) return 'balanced';
+  return x >= z ? 'x' : 'z';
+}}
+
 function fitHeroGLBToEnvelope(model, element) {{
-  if (!model || !element) return;
+  if (!model || !element) return null;
+
+  // Provider GLBs can arrive with arbitrary world units, pivots and with the
+  // long horizontal axis on either X or Z. Normalize those before fitting the
+  // authoritative Blueprint envelope.
   model.updateMatrixWorld(true);
   let bounds = new THREE.Box3().setFromObject(model);
-  const size = bounds.getSize(new THREE.Vector3());
+  const nativeSize = bounds.getSize(new THREE.Vector3());
   const target = new THREE.Vector3(
     Math.max(.1, element.width || 1),
     Math.max(.1, element.height || 1),
     Math.max(.1, element.depth || 1)
   );
-  const sx = target.x / Math.max(.001, size.x);
-  const sy = target.y / Math.max(.001, size.y);
-  const sz = target.z / Math.max(.001, size.z);
-  const fitScale = Math.min(sx, sy, sz) * .94;
+
+  const nativeAxis = dominantHorizontalAxis(nativeSize);
+  const targetAxis = dominantHorizontalAxis(
+    new THREE.Vector3(target.x, 0, target.z)
+  );
+  let axisRotationDegrees = 0;
+
+  if (
+    nativeAxis !== 'balanced'
+    && targetAxis !== 'balanced'
+    && nativeAxis !== targetAxis
+  ) {{
+    model.rotation.y += Math.PI / 2;
+    axisRotationDegrees = 90;
+    model.updateMatrixWorld(true);
+    bounds = new THREE.Box3().setFromObject(model);
+  }}
+
+  const orientedSize = bounds.getSize(new THREE.Vector3());
+  const sx = target.x / Math.max(.001, orientedSize.x);
+  const sy = target.y / Math.max(.001, orientedSize.y);
+  const sz = target.z / Math.max(.001, orientedSize.z);
+  const fitScale = Math.min(sx, sy, sz) * .96;
   model.scale.multiplyScalar(fitScale);
   model.updateMatrixWorld(true);
 
+  // Canonical Hero pivot = horizontal center + bottom anchor. This makes the
+  // Blueprint element position a stable support/base elevation regardless of
+  // where Pixal3D placed its native origin.
   bounds = new THREE.Box3().setFromObject(model);
   const center = bounds.getCenter(new THREE.Vector3());
   model.position.x -= center.x;
   model.position.z -= center.z;
   model.position.y -= bounds.min.y;
   model.updateMatrixWorld(true);
+
+  const finalBounds = new THREE.Box3().setFromObject(model);
+  const finalSize = finalBounds.getSize(new THREE.Vector3());
+  return {{
+    native_axis: nativeAxis,
+    target_axis: targetAxis,
+    axis_rotation_degrees: axisRotationDegrees,
+    uniform_scale: fitScale,
+    native_size: {{x:nativeSize.x, y:nativeSize.y, z:nativeSize.z}},
+    oriented_size: {{x:orientedSize.x, y:orientedSize.y, z:orientedSize.z}},
+    target_size: {{x:target.x, y:target.y, z:target.z}},
+    final_size: {{x:finalSize.x, y:finalSize.y, z:finalSize.z}},
+    pivot: 'bottom_center',
+  }};
 }}
 
 function loadHeroGLBNode({{node, spec, objectGroup, fallbackGroups}}) {{
@@ -679,11 +727,15 @@ function loadHeroGLBNode({{node, spec, objectGroup, fallbackGroups}}) {{
         child.receiveShadow = node.receive_shadow !== false;
         child.frustumCulled = spec.frustum_culled !== false;
       }});
-      fitHeroGLBToEnvelope(model, layoutById.get(spec.element_id));
+      const normalization = fitHeroGLBToEnvelope(
+        model,
+        layoutById.get(spec.element_id)
+      );
       holder.add(model);
       fallbackGroups.forEach(group => {{ group.visible = false; }});
       objectGroup.userData.heroAssetLoaded = true;
       objectGroup.userData.heroAssetPath = assetPath;
+      objectGroup.userData.heroSpatialNormalization = normalization;
     }},
     undefined,
     error => {{
