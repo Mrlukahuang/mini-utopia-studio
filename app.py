@@ -1040,6 +1040,7 @@ elif page == "🌍 World Factory":
     render_world_factory(
         ctx,
         style_asset_id=universe.style_asset_id,
+        studio_mode=bool(mode == "🛠 Studio" and studio_unlocked),
     )
 
 
