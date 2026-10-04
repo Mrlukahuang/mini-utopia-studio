@@ -207,7 +207,7 @@ class WorldHeroAssetService:
                             dict.fromkeys(
                                 [
                                     element.semantic_key,
-                                    appearance.silhouette_family,
+                                    item.silhouette_family,
                                     "hero",
                                 ]
                             )
