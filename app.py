@@ -1,3 +1,4 @@
+import base64
 from pathlib import Path
 
 import streamlit as st
@@ -953,6 +954,26 @@ elif page == "🎮 Explore World":
             if raw_render_spec
             else None
         )
+        render_asset_payloads: dict[str, str] = {}
+        if render_spec is not None:
+            for render_object in render_spec.objects:
+                for node in render_object.nodes:
+                    geometry = node.geometry
+                    if (
+                        geometry.source_type != "glb"
+                        or not geometry.asset_path
+                        or geometry.asset_path in render_asset_payloads
+                    ):
+                        continue
+                    try:
+                        payload = ctx.storage.get_bytes(geometry.asset_path)
+                    except Exception:
+                        continue
+                    render_asset_payloads[geometry.asset_path] = (
+                        "data:model/gltf-binary;base64,"
+                        + base64.b64encode(payload).decode("ascii")
+                    )
+
         summary = runtime_summary(
             profile=profile,
             blueprint=blueprint,
@@ -989,6 +1010,7 @@ elif page == "🎮 Explore World":
                 character_profile=character_profile,
                 character_runtime=character_runtime,
                 render_spec=render_spec,
+                render_asset_payloads=render_asset_payloads,
             ),
             height=760,
             scrolling=False,
