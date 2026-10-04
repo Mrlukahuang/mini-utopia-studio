@@ -776,26 +776,38 @@ def render_world_factory(
                         st.caption(f"Reference · {reference_mode}")
                         usage = hero.get("usage") or {}
                         if usage.get("status") == "ok":
-                            gpu_seconds = float(usage.get("gpu_seconds", 0) or 0)
-                            wall_seconds = float(usage.get("wall_seconds", 0) or 0)
                             remaining = float(
                                 usage.get("remaining_seconds", 0) or 0
                             )
                             base = float(usage.get("base_seconds", 0) or 0)
-                            overquota = float(
-                                usage.get("overquota_gpu_seconds", 0) or 0
-                            )
-                            st.caption(
-                                "HF ZeroGPU · "
-                                f"本次 {gpu_seconds/60:.2f} GPU min · "
-                                f"墙钟 {wall_seconds/60:.2f} min · "
-                                f"剩余 {remaining/60:.1f}/{base/60:.1f} min"
-                                + (
-                                    f" · paid {overquota/60:.2f} min"
-                                    if overquota > 0
-                                    else ""
+                            if usage.get("kind") == "snapshot":
+                                used = float(usage.get("used_seconds", 0) or 0)
+                                st.caption(
+                                    "HF ZeroGPU · "
+                                    f"当前已用 {used/60:.1f}/{base/60:.1f} min · "
+                                    f"剩余 {remaining/60:.1f} min"
                                 )
-                            )
+                            else:
+                                gpu_seconds = float(
+                                    usage.get("gpu_seconds", 0) or 0
+                                )
+                                wall_seconds = float(
+                                    usage.get("wall_seconds", 0) or 0
+                                )
+                                overquota = float(
+                                    usage.get("overquota_gpu_seconds", 0) or 0
+                                )
+                                st.caption(
+                                    "HF ZeroGPU · "
+                                    f"本次 {gpu_seconds/60:.2f} GPU min · "
+                                    f"墙钟 {wall_seconds/60:.2f} min · "
+                                    f"剩余 {remaining/60:.1f}/{base/60:.1f} min"
+                                    + (
+                                        f" · paid {overquota/60:.2f} min"
+                                        if overquota > 0
+                                        else ""
+                                    )
+                                )
                         elif usage:
                             st.caption(
                                 "HF ZeroGPU usage · "
