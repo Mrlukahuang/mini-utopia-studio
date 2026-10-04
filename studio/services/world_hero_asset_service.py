@@ -98,7 +98,18 @@ class WorldHeroAssetService:
                 preview_image_bytes=preview_image_bytes,
                 appearance=item,
             )
-            input_sha = self._input_sha(crop=crop, appearance=item)
+            provider_key = str(
+                getattr(
+                    self.provider,
+                    "model",
+                    self.provider.__class__.__name__,
+                )
+            )
+            input_sha = self._input_sha(
+                crop=crop,
+                appearance=item,
+                provider_key=provider_key,
+            )
             cached = cache.get(element.element_id, {}) or {}
             cached_path = str(cached.get("asset_path", "") or "")
             if (
@@ -314,8 +325,15 @@ class WorldHeroAssetService:
         return output.getvalue()
 
     @staticmethod
-    def _input_sha(*, crop: bytes, appearance: ObjectAppearanceSpec) -> str:
+    def _input_sha(
+        *,
+        crop: bytes,
+        appearance: ObjectAppearanceSpec,
+        provider_key: str,
+    ) -> str:
         digest = hashlib.sha256()
+        digest.update(provider_key.encode("utf-8"))
+        digest.update(b"\0")
         digest.update(crop)
         digest.update(
             json.dumps(
