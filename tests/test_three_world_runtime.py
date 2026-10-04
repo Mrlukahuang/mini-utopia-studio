@@ -300,7 +300,7 @@ def test_runtime_html_has_zoom_wheel_and_blueprint_aware_overview_camera():
     assert "overviewMode = false" in html
     assert "baseFollowOffset" in html
     assert "baseFollowDistance * followZoom" in html
-    assert "Mouse Wheel / 滚轮缩放" in html
+    assert "Wheel / 滚轮缩放" in html
 
 
 def test_runtime_html_has_360_degree_pointer_orbit_camera():
@@ -310,7 +310,7 @@ def test_runtime_html_has_360_degree_pointer_orbit_camera():
         blueprint=_blueprint(),
     )
 
-    assert "Mouse Drag / 拖动旋转 360°" in html
+    assert "Mouse Drag / 拖动环绕视角" in html
     assert "ORBIT_PITCH_MIN" in html
     assert "ORBIT_PITCH_MAX" in html
     assert "orbitYaw" in html
@@ -322,6 +322,28 @@ def test_runtime_html_has_360_degree_pointer_orbit_camera():
     assert "setPointerCapture" in html
     assert "overviewDistance" in html
     assert "resetOrbitAngle()" in html
+
+
+def test_runtime_html_has_third_person_follow_and_camera_relative_movement():
+    html = build_world_runtime_html(
+        world_name="Third Person World",
+        profile=WorldProfile(world_name="Third Person World"),
+        blueprint=_blueprint(),
+    )
+
+    assert 'id="recenter"' in html
+    assert "Third-person Explore" in html
+    assert "recenterBehindPlayer" in html
+    assert "targetOrbitYaw" in html
+    assert "targetOrbitPitch" in html
+    assert "updateOrbitDamping" in html
+    assert "ORBIT_DAMPING" in html
+    assert "PLAYER_TURN_DAMPING" in html
+    assert "moveForward.set(-Math.sin(orbitYaw)" in html
+    assert "moveRight.set(-moveForward.z" in html
+    assert "player.position.addScaledVector(moveVector" in html
+    assert "desiredPlayerYaw" in html
+    assert "🎯 Behind" in html
 
 
 def test_runtime_semantic_proxy_uses_layout_and_hides_ground_quilt_for_floating_terrain():

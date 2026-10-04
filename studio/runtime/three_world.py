@@ -110,7 +110,7 @@ def build_world_runtime_html(
   <div id="canvas"></div>
   <div class="hud">
     <h2>🌍 {escape(world_name)}</h2>
-    <p><b>Explore Mode</b> · WASD / Arrow Keys · Drag to Orbit</p>
+    <p><b>Third-person Explore</b> · WASD / Arrow Keys · Drag to Look</p>
     <p>Blueprint v{escape(blueprint.schema_version)} · {blueprint.grid.width}×{blueprint.grid.depth} · {len(blueprint.chunks)} chunks</p>
     <span class="pill">🧸 {escape(character_name)}</span>
     <span class="pill" id="animState">Idle</span>
@@ -122,10 +122,11 @@ def build_world_runtime_html(
     <button id="zoomOut" title="Zoom out / 拉远">−</button>
     <button id="zoomIn" title="Zoom in / 拉近">＋</button>
     <button id="overview" title="Show the whole World / 查看全景">🌐 Overview</button>
+    <button id="recenter" title="Put camera behind character / 镜头回到角色背后">🎯 Behind</button>
     <button id="reset">↺ Reset</button>
     <button id="tour" class="primary">🎬 Start Director Tour</button>
   </div>
-  <div class="tip">WASD / 方向键移动 · Shift 奔跑 · Mouse Drag / 拖动旋转 360° · Mouse Wheel / 滚轮缩放 · 🌐 Overview 看全景</div>
+  <div class="tip">WASD / 方向键跟随镜头移动 · Shift 奔跑 · Mouse Drag / 拖动环绕视角 · Wheel / 滚轮缩放 · 🎯 Behind 回正</div>
   <div id="runtimeError" style="
     display:none; position:absolute; inset:120px 24px auto 24px; z-index:20;
     padding:16px 18px; border-radius:18px; background:rgba(255,235,238,.96);
@@ -1179,24 +1180,33 @@ const cameraTarget = new THREE.Vector3();
 const clock = new THREE.Clock();
 
 const FOLLOW_TARGET_HEIGHT = 1.8;
-const baseFollowOffset = new THREE.Vector3(-7, 7, 9);
-const defaultOrbitOffset = baseFollowOffset.clone().sub(
-  new THREE.Vector3(0, FOLLOW_TARGET_HEIGHT, 0)
-);
-const baseFollowDistance = defaultOrbitOffset.length();
-const scaledFollowOffset = new THREE.Vector3();
+const baseFollowDistance = 12.0;
 const ZOOM_MIN = .60;
 const ZOOM_MAX = 3.80;
-const ORBIT_PITCH_MIN = THREE.MathUtils.degToRad(-12);
-const ORBIT_PITCH_MAX = THREE.MathUtils.degToRad(82);
-const ORBIT_SENSITIVITY = .006;
-const DEFAULT_ORBIT_YAW = Math.atan2(defaultOrbitOffset.x, defaultOrbitOffset.z);
-const DEFAULT_ORBIT_PITCH = Math.asin(defaultOrbitOffset.y / baseFollowDistance);
+const ORBIT_PITCH_MIN = THREE.MathUtils.degToRad(-10);
+const ORBIT_PITCH_MAX = THREE.MathUtils.degToRad(72);
+const ORBIT_SENSITIVITY = .0052;
+const ORBIT_DAMPING = 14.0;
+const PLAYER_TURN_DAMPING = 16.0;
+const INITIAL_PLAYER_YAW = THREE.MathUtils.degToRad(-(spawn.facing_degrees || 0));
+const DEFAULT_ORBIT_YAW = INITIAL_PLAYER_YAW + Math.PI;
+const DEFAULT_ORBIT_PITCH = THREE.MathUtils.degToRad(24);
+const baseFollowOffset = new THREE.Vector3(
+  Math.sin(DEFAULT_ORBIT_YAW) * Math.cos(DEFAULT_ORBIT_PITCH) * baseFollowDistance,
+  Math.sin(DEFAULT_ORBIT_PITCH) * baseFollowDistance,
+  Math.cos(DEFAULT_ORBIT_YAW) * Math.cos(DEFAULT_ORBIT_PITCH) * baseFollowDistance,
+);
+const scaledFollowOffset = new THREE.Vector3();
+const moveForward = new THREE.Vector3();
+const moveRight = new THREE.Vector3();
+const moveVector = new THREE.Vector3();
 let followZoom = 1.0;
 let overviewMode = false;
 let overviewDistance = 1;
 let orbitYaw = DEFAULT_ORBIT_YAW;
 let orbitPitch = DEFAULT_ORBIT_PITCH;
+let targetOrbitYaw = DEFAULT_ORBIT_YAW;
+let targetOrbitPitch = DEFAULT_ORBIT_PITCH;
 let orbitDragging = false;
 let orbitPointerId = null;
 let orbitPointerX = 0;
@@ -1233,9 +1243,25 @@ const overviewTarget = new THREE.Vector3(
   bp.grid.depth * cell * .5,
 );
 
+function dampAngle(current, target, damping, dt) {{
+  const delta = Math.atan2(Math.sin(target-current), Math.cos(target-current));
+  return current + delta * (1 - Math.exp(-damping * dt));
+}}
+
 function resetOrbitAngle() {{
   orbitYaw = DEFAULT_ORBIT_YAW;
   orbitPitch = DEFAULT_ORBIT_PITCH;
+  targetOrbitYaw = DEFAULT_ORBIT_YAW;
+  targetOrbitPitch = DEFAULT_ORBIT_PITCH;
+}}
+
+function recenterBehindPlayer(immediate=false) {{
+  targetOrbitYaw = player.rotation.y + Math.PI;
+  targetOrbitPitch = DEFAULT_ORBIT_PITCH;
+  if (immediate) {{
+    orbitYaw = targetOrbitYaw;
+    orbitPitch = targetOrbitPitch;
+  }}
 }}
 
 function setOrbitFromOffset(offset) {{
@@ -1246,7 +1272,18 @@ function setOrbitFromOffset(offset) {{
     ORBIT_PITCH_MIN,
     ORBIT_PITCH_MAX,
   );
+  targetOrbitYaw = orbitYaw;
+  targetOrbitPitch = orbitPitch;
   return distance;
+}}
+
+function updateOrbitDamping(dt) {{
+  orbitYaw = dampAngle(orbitYaw, targetOrbitYaw, ORBIT_DAMPING, dt);
+  orbitPitch += (targetOrbitPitch - orbitPitch) * (1 - Math.exp(-ORBIT_DAMPING * dt));
+  orbitPitch = THREE.MathUtils.clamp(orbitPitch, ORBIT_PITCH_MIN, ORBIT_PITCH_MAX);
+  if (manualMode && overviewMode) {{
+    positionCameraOnOrbit(cameraTarget, overviewDistance);
+  }}
 }}
 
 function positionCameraOnOrbit(target, distance) {{
@@ -1365,23 +1402,42 @@ function updatePlayer(dt) {{
     setAnimationState('Idle');
     return;
   }}
-  let dx = 0, dz = 0;
-  if (keys.has('KeyW') || keys.has('ArrowUp')) dz -= 1;
-  if (keys.has('KeyS') || keys.has('ArrowDown')) dz += 1;
-  if (keys.has('KeyA') || keys.has('ArrowLeft')) dx -= 1;
-  if (keys.has('KeyD') || keys.has('ArrowRight')) dx += 1;
-  const len = Math.hypot(dx, dz);
+
+  let forwardInput = 0;
+  let sideInput = 0;
+  if (keys.has('KeyW') || keys.has('ArrowUp')) forwardInput += 1;
+  if (keys.has('KeyS') || keys.has('ArrowDown')) forwardInput -= 1;
+  if (keys.has('KeyA') || keys.has('ArrowLeft')) sideInput -= 1;
+  if (keys.has('KeyD') || keys.has('ArrowRight')) sideInput += 1;
+
+  const inputLength = Math.hypot(forwardInput, sideInput);
   const running = keys.has('ShiftLeft') || keys.has('ShiftRight');
-  if (len > 0) {{
-    dx /= len; dz /= len;
+
+  if (inputLength > 0) {{
+    // Camera-relative ground-plane movement: W always moves into the view,
+    // while A/D remain screen-relative left/right after any orbit.
+    moveForward.set(-Math.sin(orbitYaw), 0, -Math.cos(orbitYaw)).normalize();
+    moveRight.set(-moveForward.z, 0, moveForward.x).normalize();
+    moveVector
+      .copy(moveForward).multiplyScalar(forwardInput)
+      .addScaledVector(moveRight, sideInput)
+      .normalize();
+
     const speed = running ? 10.5 : 6.2;
     setAnimationState(running ? 'Run' : 'Walk');
-    player.position.x += dx * speed * dt;
-    player.position.z += dz * speed * dt;
-    player.rotation.y = Math.atan2(dx, dz);
+    player.position.addScaledVector(moveVector, speed * dt);
+
+    const desiredPlayerYaw = Math.atan2(moveVector.x, moveVector.z);
+    player.rotation.y = dampAngle(
+      player.rotation.y,
+      desiredPlayerYaw,
+      PLAYER_TURN_DAMPING,
+      dt,
+    );
   }} else {{
     setAnimationState('Idle');
   }}
+
   const margin = 1.5;
   player.position.x = THREE.MathUtils.clamp(player.position.x, margin, bp.grid.width*cell-margin);
   player.position.z = THREE.MathUtils.clamp(player.position.z, margin, bp.grid.depth*cell-margin);
@@ -1460,6 +1516,12 @@ document.getElementById('tour').addEventListener('click', () => {{
 document.getElementById('zoomOut').addEventListener('click', () => zoomCamera(1));
 document.getElementById('zoomIn').addEventListener('click', () => zoomCamera(-1));
 document.getElementById('overview').addEventListener('click', showOverview);
+document.getElementById('recenter').addEventListener('click', () => {{
+  stopTour();
+  overviewMode = false;
+  recenterBehindPlayer();
+  updateZoomLabel();
+}});
 document.getElementById('reset').addEventListener('click', () => {{
   stopTour();
   overviewMode = false;
@@ -1486,16 +1548,12 @@ renderer.domElement.addEventListener('pointermove', event => {{
   orbitPointerX = event.clientX;
   orbitPointerY = event.clientY;
 
-  orbitYaw -= dx * ORBIT_SENSITIVITY;
-  orbitPitch = THREE.MathUtils.clamp(
-    orbitPitch - dy * ORBIT_SENSITIVITY,
+  targetOrbitYaw -= dx * ORBIT_SENSITIVITY;
+  targetOrbitPitch = THREE.MathUtils.clamp(
+    targetOrbitPitch - dy * ORBIT_SENSITIVITY,
     ORBIT_PITCH_MIN,
     ORBIT_PITCH_MAX,
   );
-
-  if (overviewMode) {{
-    positionCameraOnOrbit(cameraTarget, overviewDistance);
-  }}
 }});
 
 function endOrbitDrag(event) {{
@@ -1524,18 +1582,15 @@ function resize() {{
 }}
 window.addEventListener('resize', resize);
 resize();
-camera.position.set(
-  spawn.x + baseFollowOffset.x,
-  (spawn.y || 0) + baseFollowOffset.y,
-  spawn.z + baseFollowOffset.z,
-);
 cameraTarget.copy(player.position).add(new THREE.Vector3(0,FOLLOW_TARGET_HEIGHT,0));
+camera.position.copy(cameraTarget).add(baseFollowOffset);
 camera.lookAt(cameraTarget);
 updateZoomLabel();
 
 function animate() {{
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), .05);
+  updateOrbitDamping(dt);
   updatePlayer(dt);
   updateProceduralAnimation(dt);
   if (gltfMixer) gltfMixer.update(dt);
