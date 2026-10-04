@@ -300,7 +300,7 @@ def test_runtime_html_has_zoom_wheel_and_blueprint_aware_overview_camera():
     assert "overviewMode = false" in html
     assert "baseFollowOffset" in html
     assert "baseFollowDistance * followZoom" in html
-    assert "Mouse Wheel / 滚轮缩放" in html
+    assert "Wheel / 滚轮缩放" in html
 
 
 def test_runtime_html_has_360_degree_pointer_orbit_camera():
