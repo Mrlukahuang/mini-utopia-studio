@@ -186,6 +186,80 @@ class WorldHeroAssetService:
 
         return updated, builds, cache
 
+    def attach_existing_glb(
+        self,
+        *,
+        location_asset_id: str,
+        blueprint: WorldBlueprint,
+        render_spec: WorldRenderSpec,
+        element_id: str,
+        payload: bytes,
+        model: str = "manual_glb",
+    ) -> tuple[WorldRenderSpec, HeroAssetBuild, dict]:
+        if not payload:
+            raise ValueError("Hero GLB payload is empty.")
+
+        element = next(
+            (
+                item
+                for item in blueprint.layout_elements
+                if item.element_id == element_id
+            ),
+            None,
+        )
+        if element is None:
+            raise ValueError(f"Blueprint element not found: {element_id}")
+
+        updated = render_spec.model_copy(deep=True)
+        render_object = next(
+            (
+                item
+                for item in updated.objects
+                if item.element_id == element_id
+            ),
+            None,
+        )
+        if render_object is None:
+            raise ValueError(f"RenderSpec object not found: {element_id}")
+
+        glb_sha = hashlib.sha256(payload).hexdigest()
+        asset_path = self.storage.put_bytes(
+            (
+                f"assets/{location_asset_id}/hero/"
+                f"{element_id}_{glb_sha[:12]}.glb"
+            ),
+            payload,
+        )
+        self._attach_glb_node(
+            render_object=render_object,
+            element=element,
+            asset_path=asset_path,
+            asset_sha256=glb_sha,
+            model=model,
+        )
+        record = {
+            "asset_path": asset_path,
+            "mime_type": "model/gltf-binary",
+            "model": model,
+            "provider": "manual",
+            "input_sha256": f"manual:{glb_sha}",
+            "glb_sha256": glb_sha,
+            "bytes": len(payload),
+            "metadata": {},
+        }
+        build = HeroAssetBuild(
+            element_id=element_id,
+            name=element.name,
+            status="generated",
+            asset_path=asset_path,
+            model=model,
+            input_sha256=record["input_sha256"],
+            glb_sha256=glb_sha,
+            bytes=len(payload),
+            message="Manual GLB attached for Hero pipeline validation.",
+        )
+        return updated, build, record
+
     @staticmethod
     def _is_hero_candidate(
         *,
