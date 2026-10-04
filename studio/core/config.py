@@ -24,6 +24,11 @@ class Settings:
     supabase_storage_bucket: str = "mini-utopia-assets"
     studio_repository_backend: str = "sqlite"
     supabase_metadata_table: str = "studio_records"
+    hero_asset_worker_url: str | None = None
+    hero_asset_worker_token: str | None = None
+    hero_asset_model: str = "pixal3d"
+    hero_asset_timeout_seconds: float = 900.0
+    hero_asset_max_per_world: int = 1
 
 
 def get_settings(root_dir: Path | None = None) -> Settings:
@@ -52,4 +57,13 @@ def get_settings(root_dir: Path | None = None) -> Settings:
         supabase_metadata_table=os.getenv(
             "SUPABASE_METADATA_TABLE", "studio_records"
         ).strip(),
+        hero_asset_worker_url=os.getenv("HERO_ASSET_WORKER_URL") or None,
+        hero_asset_worker_token=os.getenv("HERO_ASSET_WORKER_TOKEN") or None,
+        hero_asset_model=os.getenv("HERO_ASSET_MODEL", "pixal3d").strip().lower(),
+        hero_asset_timeout_seconds=float(
+            os.getenv("HERO_ASSET_TIMEOUT_SECONDS", "900")
+        ),
+        hero_asset_max_per_world=int(
+            os.getenv("HERO_ASSET_MAX_PER_WORLD", "1")
+        ),
     )
