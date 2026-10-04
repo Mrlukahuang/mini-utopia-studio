@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -101,6 +102,12 @@ class HttpHeroAssetProvider(HeroAssetProvider):
                 f"{content_type}"
             )
 
+        quota_after = self._zero_gpu_quota_snapshot()
+        zero_gpu_usage = self._zero_gpu_usage(quota_before, quota_after)
+        zero_gpu_usage["wall_seconds"] = max(
+            0.0, time.perf_counter() - started_at
+        )
+
         return HeroAssetResult(
             payload=payload,
             mime_type="model/gltf-binary",
@@ -133,6 +140,7 @@ class HuggingFacePixal3DProvider(HeroAssetProvider):
         seed: int = 42,
         client_factory=None,
         handle_file_fn=None,
+        quota_fetcher=None,
     ):
         if not token.strip():
             raise ValueError("HF_TOKEN is required for Hugging Face Pixal3D.")
@@ -154,6 +162,7 @@ class HuggingFacePixal3DProvider(HeroAssetProvider):
         self.model = "pixal3d"
         self._client_factory = client_factory
         self._handle_file_fn = handle_file_fn
+        self._quota_fetcher = quota_fetcher
 
     @property
     def cache_identity(self) -> str:
@@ -185,6 +194,82 @@ class HuggingFacePixal3DProvider(HeroAssetProvider):
             "Pixal3D returned an unsupported file result; "
             f"received {type(value).__name__}."
         )
+
+    def _zero_gpu_quota_snapshot(self) -> dict:
+        """Best-effort account quota snapshot; never block Hero generation."""
+        try:
+            if self._quota_fetcher is not None:
+                quota = self._quota_fetcher()
+            else:
+                from huggingface_hub import HfApi
+
+                quota = HfApi(token=self.token).get_zero_gpu_quota()
+
+            def read(name, default=None):
+                if isinstance(quota, dict):
+                    return quota.get(name, default)
+                return getattr(quota, name, default)
+
+            resets_at = read("resets_at")
+            if resets_at is not None and hasattr(resets_at, "isoformat"):
+                resets_at = resets_at.isoformat()
+
+            return {
+                "status": "ok",
+                "base_seconds": float(read("base", 0) or 0),
+                "remaining_seconds": float(read("remaining", 0) or 0),
+                "overquota_used_seconds": float(read("overquota_used", 0) or 0),
+                "resets_at": resets_at,
+            }
+        except Exception as exc:
+            return {
+                "status": "unavailable",
+                "error": str(exc)[:500],
+            }
+
+    @staticmethod
+    def _zero_gpu_usage(before: dict, after: dict) -> dict:
+        result = {
+            "status": "unavailable",
+            "before": before,
+            "after": after,
+        }
+        if before.get("status") != "ok" or after.get("status") != "ok":
+            return result
+
+        same_window = (
+            before.get("resets_at") == after.get("resets_at")
+            and before.get("base_seconds") == after.get("base_seconds")
+        )
+        if not same_window:
+            result["status"] = "reset_during_request"
+            return result
+
+        included = max(
+            0.0,
+            float(before.get("remaining_seconds", 0))
+            - float(after.get("remaining_seconds", 0)),
+        )
+        overquota = max(
+            0.0,
+            float(after.get("overquota_used_seconds", 0))
+            - float(before.get("overquota_used_seconds", 0)),
+        )
+        result.update(
+            {
+                "status": "ok",
+                "included_gpu_seconds": included,
+                "overquota_gpu_seconds": overquota,
+                "gpu_seconds": included + overquota,
+                "remaining_seconds": float(after.get("remaining_seconds", 0)),
+                "base_seconds": float(after.get("base_seconds", 0)),
+                "overquota_used_seconds": float(
+                    after.get("overquota_used_seconds", 0)
+                ),
+                "resets_at": after.get("resets_at"),
+            }
+        )
+        return result
 
     def _client_tools(self):
         if self._client_factory is not None and self._handle_file_fn is not None:
@@ -236,6 +321,8 @@ class HuggingFacePixal3DProvider(HeroAssetProvider):
             raise ValueError("Pixal3D input image is empty.")
 
         Client, handle_file = self._client_tools()
+        quota_before = self._zero_gpu_quota_snapshot()
+        started_at = time.perf_counter()
         session_id = f"mu-{uuid.uuid4().hex}"
         suffix = ".png" if "png" in mime_type.lower() else ".jpg"
 
@@ -318,5 +405,6 @@ class HuggingFacePixal3DProvider(HeroAssetProvider):
                 "seed": self.seed,
                 "element_id": element_id,
                 "appearance_element_id": appearance.element_id,
+                "zero_gpu_usage": zero_gpu_usage,
             },
         )
