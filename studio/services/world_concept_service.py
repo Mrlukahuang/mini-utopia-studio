@@ -495,6 +495,76 @@ class WorldConceptService:
             return
         callback(stage, message, max(0.0, min(1.0, progress)))
 
+    def attach_manual_hero_glb(
+        self,
+        *,
+        location_asset_id: str,
+        element_id: str,
+        payload: bytes,
+    ):
+        if self.hero_asset_service is None:
+            raise RuntimeError("Hero Asset service is not configured.")
+
+        world = self.repository.get_asset(location_asset_id)
+        if world is None or world.asset_type != AssetType.LOCATION:
+            raise ValueError(f"World not found: {location_asset_id}")
+
+        raw_blueprint = world.metadata.get("world_blueprint")
+        raw_render_spec = world.metadata.get("world_render_spec")
+        if not raw_blueprint or not raw_render_spec:
+            raise ValueError(
+                "Manual Hero GLB requires an existing Blueprint and RenderSpec."
+            )
+
+        blueprint = WorldBlueprint.model_validate(raw_blueprint)
+        render_spec = WorldRenderSpec.model_validate(raw_render_spec)
+        updated, build, record = self.hero_asset_service.attach_existing_glb(
+            location_asset_id=location_asset_id,
+            blueprint=blueprint,
+            render_spec=render_spec,
+            element_id=element_id,
+            payload=payload,
+        )
+
+        world.metadata["world_render_spec"] = updated.model_dump(mode="json")
+        cache = dict(world.metadata.get("world_hero_assets", {}) or {})
+        cache[element_id] = record
+        world.metadata["world_hero_assets"] = cache
+        diagnostics = [
+            item
+            for item in (
+                world.metadata.get("world_hero_asset_diagnostics", []) or []
+            )
+            if item.get("element_id") != element_id
+        ]
+        diagnostics.append(
+            {
+                "element_id": build.element_id,
+                "name": build.name,
+                "status": build.status,
+                "asset_path": build.asset_path,
+                "model": build.model,
+                "bytes": build.bytes,
+                "message": build.message,
+            }
+        )
+        world.metadata["world_hero_asset_diagnostics"] = diagnostics
+        world.metadata["world_render_diagnostics"] = {
+            "object_count": len(updated.objects),
+            "objects": [
+                {
+                    "element_id": item.element_id,
+                    "name": item.name,
+                    "node_count": len(item.nodes),
+                    "node_ids": [node.node_id for node in item.nodes],
+                }
+                for item in updated.objects
+            ],
+        }
+        world.updated_at = now_utc()
+        self.repository.save_asset(world)
+        return build
+
     def current_render_spec(self, location_asset_id: str) -> WorldRenderSpec | None:
         world = self.repository.get_asset(location_asset_id)
         if world is None:
