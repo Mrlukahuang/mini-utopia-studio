@@ -299,7 +299,7 @@ def test_runtime_html_has_zoom_wheel_and_blueprint_aware_overview_camera():
     assert "function showOverview()" in html
     assert "overviewMode = false" in html
     assert "baseFollowOffset" in html
-    assert "multiplyScalar(followZoom)" in html
+    assert "baseFollowDistance * followZoom" in html
     assert "Mouse Wheel / 滚轮缩放" in html
 
 
