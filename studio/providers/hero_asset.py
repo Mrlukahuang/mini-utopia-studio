@@ -30,6 +30,10 @@ class HeroAssetProvider(ABC):
         appearance: ObjectAppearanceSpec,
     ) -> HeroAssetResult: ...
 
+    def usage_snapshot(self) -> dict | None:
+        """Optional best-effort provider usage snapshot for diagnostics."""
+        return None
+
 
 class HttpHeroAssetProvider(HeroAssetProvider):
     """Thin client for a separately deployed GPU Hero Asset Worker."""
@@ -221,10 +225,23 @@ class HuggingFacePixal3DProvider(HeroAssetProvider):
                 "error": str(exc)[:500],
             }
 
+    def usage_snapshot(self) -> dict | None:
+        snapshot = self._zero_gpu_quota_snapshot()
+        if snapshot.get("status") != "ok":
+            return snapshot
+        base = float(snapshot.get("base_seconds", 0) or 0)
+        remaining = float(snapshot.get("remaining_seconds", 0) or 0)
+        return {
+            **snapshot,
+            "kind": "snapshot",
+            "used_seconds": max(0.0, base - remaining),
+        }
+
     @staticmethod
     def _zero_gpu_usage(before: dict, after: dict) -> dict:
         result = {
             "status": "unavailable",
+            "kind": "generation",
             "before": before,
             "after": after,
         }
@@ -252,6 +269,7 @@ class HuggingFacePixal3DProvider(HeroAssetProvider):
         result.update(
             {
                 "status": "ok",
+                "kind": "generation",
                 "included_gpu_seconds": included,
                 "overquota_gpu_seconds": overquota,
                 "gpu_seconds": included + overquota,
