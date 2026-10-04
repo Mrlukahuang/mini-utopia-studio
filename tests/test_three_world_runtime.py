@@ -303,6 +303,27 @@ def test_runtime_html_has_zoom_wheel_and_blueprint_aware_overview_camera():
     assert "Mouse Wheel / 滚轮缩放" in html
 
 
+def test_runtime_html_has_360_degree_pointer_orbit_camera():
+    html = build_world_runtime_html(
+        world_name="Orbit World",
+        profile=WorldProfile(world_name="Orbit World"),
+        blueprint=_blueprint(),
+    )
+
+    assert "Mouse Drag / 拖动旋转 360°" in html
+    assert "ORBIT_PITCH_MIN" in html
+    assert "ORBIT_PITCH_MAX" in html
+    assert "orbitYaw" in html
+    assert "orbitPitch" in html
+    assert "positionCameraOnOrbit" in html
+    assert "renderer.domElement.addEventListener('pointerdown'" in html
+    assert "renderer.domElement.addEventListener('pointermove'" in html
+    assert "renderer.domElement.addEventListener('pointerup'" in html
+    assert "setPointerCapture" in html
+    assert "overviewDistance" in html
+    assert "resetOrbitAngle()" in html
+
+
 def test_runtime_semantic_proxy_uses_layout_and_hides_ground_quilt_for_floating_terrain():
     blueprint = _blueprint()
     blueprint.layout_elements = [
