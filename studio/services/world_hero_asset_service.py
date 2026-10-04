@@ -423,9 +423,14 @@ class WorldHeroAssetService:
         digest.update(provider_key.encode("utf-8"))
         digest.update(b"\0")
         digest.update(crop)
+        appearance_payload = appearance.model_dump(mode="json")
+        # Blueprint IDs identify placement, not visual geometry. Excluding the
+        # element ID lets the same exact visual request be reused after a World
+        # is cloned or rebuilt with a different local Scene ID.
+        appearance_payload.pop("element_id", None)
         digest.update(
             json.dumps(
-                appearance.model_dump(mode="json"),
+                appearance_payload,
                 sort_keys=True,
                 ensure_ascii=False,
             ).encode("utf-8")
