@@ -863,3 +863,40 @@ def test_three_runtime_loads_hero_glb_and_hides_fallback_only_after_success(tmp_
     assert "fallbackGroups.forEach(group => { group.visible = false; });" in html
     assert "Hero GLB failed; keeping procedural fallback" in html
     assert "objectGroup.userData.heroAssetLoaded = true" in html
+
+
+def test_manual_hero_glb_attach_works_without_gpu_provider(tmp_path):
+    storage = LocalObjectStorage(tmp_path / "storage")
+    service = WorldHeroAssetService(
+        storage=storage,
+        provider=None,
+        max_assets_per_world=0,
+    )
+    appearance = _normalized_appearance()
+    render = WorldGeometryCompilerService().compile(
+        profile=_profile(),
+        blueprint=_blueprint(),
+        appearance=appearance,
+        style_profile={},
+    )
+
+    enriched, build, record = service.attach_existing_glb(
+        location_asset_id="LOC_RENDER",
+        blueprint=_blueprint(),
+        render_spec=render,
+        element_id="SCENE_WHALE",
+        payload=b"glTF-manual-test",
+    )
+
+    assert build.status == "generated"
+    assert build.model == "manual_glb"
+    assert record["provider"] == "manual"
+    assert storage.get_bytes(build.asset_path) == b"glTF-manual-test"
+    whale = next(
+        item for item in enriched.objects if item.element_id == "SCENE_WHALE"
+    )
+    hero_nodes = [
+        node for node in whale.nodes if node.geometry.source_type == "glb"
+    ]
+    assert len(hero_nodes) == 1
+    assert hero_nodes[0].geometry.asset_path == build.asset_path
