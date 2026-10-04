@@ -817,13 +817,20 @@ def render_world_factory(
 
         if getattr(ctx, "world_hero_assets", None) is not None:
             if ctx.world_hero_assets.is_available:
+                provider = ctx.world_hero_assets.provider
+                provider_name = (
+                    f"Hugging Face · {getattr(provider, 'space_id', '')}"
+                    if getattr(provider, "space_id", "")
+                    else provider.__class__.__name__
+                )
                 st.caption(
-                    "🧊 Hero GLB Worker 已连接 · Render Preview 时会把最大的 organic Hero "
-                    "送去开源 3D Worker。"
+                    "🧊 Hero GLB Provider 已连接 · "
+                    f"{provider_name} · Render Preview 时会把最大的 organic Hero "
+                    "送去 3D Asset Provider；已有精确缓存会直接复用。"
                 )
             else:
                 st.caption(
-                    "🧩 Hero GLB Worker 未连接 · 当前 Explore 会继续使用 Procedural "
+                    "🧩 Hero GLB Provider 未连接 · 当前 Explore 会继续使用 Procedural "
                     "Shape Grammar fallback。"
                 )
 
