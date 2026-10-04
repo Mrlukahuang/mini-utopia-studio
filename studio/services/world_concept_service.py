@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from studio.core.enums import AssetType, ReviewStatus
 from studio.models.asset import AssetFile, now_utc
+from studio.models.hero_composition import WorldHeroCompositionPlan
 from studio.models.render import WorldAppearancePlan, WorldRenderSpec
 from studio.models.world import WorldBlueprint, WorldProfile, WorldScenePlan
 from studio.providers.base import ImageGenerationProvider
@@ -19,6 +20,7 @@ from studio.services.world_appearance_service import (
 )
 from studio.services.world_geometry_compiler_service import WorldGeometryCompilerService
 from studio.services.world_hero_asset_service import WorldHeroAssetService
+from studio.services.world_hero_composition_service import WorldHeroCompositionService
 from studio.storage.base import ObjectStorage
 
 
@@ -36,6 +38,7 @@ class WorldConceptService:
         appearance_service: WorldAppearanceService | None = None,
         geometry_compiler: WorldGeometryCompilerService | None = None,
         hero_asset_service: WorldHeroAssetService | None = None,
+        hero_composition_service: WorldHeroCompositionService | None = None,
     ):
         self.repository = repository
         self.storage = storage
@@ -45,6 +48,7 @@ class WorldConceptService:
         self.appearance_service = appearance_service
         self.geometry_compiler = geometry_compiler
         self.hero_asset_service = hero_asset_service
+        self.hero_composition_service = hero_composition_service
 
     @property
     def is_available(self) -> bool:
@@ -95,6 +99,13 @@ class WorldConceptService:
             world.metadata["world_blueprint_source"] = "legacy_creator_profile"
 
         world.metadata["world_blueprint"] = blueprint.model_dump(mode="json")
+        if scene_plan is not None:
+            self._ensure_hero_composition_plan(
+                world=world,
+                profile=profile,
+                scene_plan=scene_plan,
+                blueprint=blueprint,
+            )
         self._refresh_render_pipeline(
             world=world,
             profile=profile,
@@ -181,6 +192,12 @@ class WorldConceptService:
                 "World Preview requires a current Blueprint with layout elements."
             )
         blueprint_snapshot = blueprint.model_dump(mode="json")
+        self._ensure_hero_composition_plan(
+            world=world,
+            profile=profile,
+            scene_plan=current_scene,
+            blueprint=blueprint,
+        )
         featured_names = "、".join(
             element.name for element in blueprint.layout_elements[:3]
         )
@@ -571,6 +588,50 @@ class WorldConceptService:
                 for item in render_spec.objects
             ],
         }
+
+    def _ensure_hero_composition_plan(
+        self,
+        *,
+        world,
+        profile: WorldProfile,
+        scene_plan: WorldScenePlan,
+        blueprint: WorldBlueprint,
+    ) -> WorldHeroCompositionPlan | None:
+        if self.hero_composition_service is None:
+            return None
+
+        fingerprint_source = "|".join(
+            [
+                profile.source_description,
+                scene_plan.model_dump_json(),
+                blueprint.visual_anchor.model_dump_json(),
+                ",".join(
+                    element.element_id for element in blueprint.layout_elements
+                ),
+            ]
+        )
+        fingerprint = self._fingerprint(fingerprint_source)
+        raw = world.metadata.get("world_hero_composition_plan")
+        if (
+            raw
+            and world.metadata.get("world_hero_composition_fingerprint")
+            == fingerprint
+        ):
+            try:
+                return WorldHeroCompositionPlan.model_validate(raw)
+            except Exception:
+                pass
+
+        plan = self.hero_composition_service.resolve(
+            profile=profile,
+            scene_plan=scene_plan,
+            blueprint=blueprint,
+        )
+        world.metadata["world_hero_composition_plan"] = plan.model_dump(mode="json")
+        world.metadata["world_hero_composition_version"] = plan.schema_version
+        world.metadata["world_hero_composition_source"] = plan.source
+        world.metadata["world_hero_composition_fingerprint"] = fingerprint
+        return plan
 
     @staticmethod
     def _report_progress(
