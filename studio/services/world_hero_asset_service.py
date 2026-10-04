@@ -17,6 +17,8 @@ from studio.models.render import (
 )
 from studio.models.world import WorldBlueprint, WorldLayoutElement
 from studio.providers.hero_asset import HeroAssetProvider
+from studio.models.reusable_asset import ReusableAssetSourceSpec
+from studio.services.reusable_asset_library_service import ReusableAssetLibraryService
 from studio.storage.base import ObjectStorage
 
 
@@ -42,10 +44,12 @@ class WorldHeroAssetService:
         storage: ObjectStorage,
         provider: HeroAssetProvider | None,
         max_assets_per_world: int = 1,
+        reusable_library: ReusableAssetLibraryService | None = None,
     ):
         self.storage = storage
         self.provider = provider
         self.max_assets_per_world = max(0, max_assets_per_world)
+        self.reusable_library = reusable_library
 
     @property
     def is_available(self) -> bool:
@@ -101,8 +105,12 @@ class WorldHeroAssetService:
             provider_key = str(
                 getattr(
                     self.provider,
-                    "model",
-                    self.provider.__class__.__name__,
+                    "cache_identity",
+                    getattr(
+                        self.provider,
+                        "model",
+                        self.provider.__class__.__name__,
+                    ),
                 )
             )
             input_sha = self._input_sha(
@@ -138,6 +146,49 @@ class WorldHeroAssetService:
                 )
                 continue
 
+            if self.reusable_library is not None:
+                reusable = self.reusable_library.find_by_source_fingerprint(input_sha)
+                if reusable is not None:
+                    reusable_spec = self.reusable_library.get_spec(reusable)
+                    if self.storage.exists(reusable_spec.storage_path):
+                        self._attach_glb_node(
+                            render_object=render_object,
+                            element=element,
+                            asset_path=reusable_spec.storage_path,
+                            asset_sha256=reusable_spec.sha256,
+                            model=reusable_spec.source.generator_model or "library",
+                        )
+                        cache[element.element_id] = {
+                            "asset_path": reusable_spec.storage_path,
+                            "mime_type": "model/gltf-binary",
+                            "model": reusable_spec.source.generator_model or "library",
+                            "provider": reusable_spec.source.source_name,
+                            "input_sha256": input_sha,
+                            "glb_sha256": reusable_spec.sha256,
+                            "bytes": reusable_spec.byte_size,
+                            "metadata": {
+                                "reusable_asset_id": reusable.asset_id,
+                                "reused_from_library": True,
+                            },
+                        }
+                        builds.append(
+                            HeroAssetBuild(
+                                element_id=element.element_id,
+                                name=element.name,
+                                status="cached",
+                                asset_path=reusable_spec.storage_path,
+                                model=reusable_spec.source.generator_model or "library",
+                                input_sha256=input_sha,
+                                glb_sha256=reusable_spec.sha256,
+                                bytes=reusable_spec.byte_size,
+                                message=(
+                                    "Reused exact generated Hero from the global "
+                                    "Mini Utopia Asset Library."
+                                ),
+                            )
+                        )
+                        continue
+
             try:
                 result = self.provider.generate(
                     image_bytes=crop,
@@ -146,13 +197,43 @@ class WorldHeroAssetService:
                     appearance=item,
                 )
                 glb_sha = hashlib.sha256(result.payload).hexdigest()
-                asset_path = self.storage.put_bytes(
-                    (
-                        f"assets/{location_asset_id}/hero/"
-                        f"{element.element_id}_{glb_sha[:12]}.glb"
-                    ),
-                    result.payload,
-                )
+                reusable_asset_id = ""
+                if self.reusable_library is not None:
+                    reusable = self.reusable_library.import_glb(
+                        payload=result.payload,
+                        display_name=f"{element.name} / Generated Hero",
+                        category="hero",
+                        semantic_keys=list(
+                            dict.fromkeys(
+                                [
+                                    element.semantic_key,
+                                    appearance.silhouette_family,
+                                    "hero",
+                                ]
+                            )
+                        ),
+                        source=ReusableAssetSourceSpec(
+                            origin_kind="generated",
+                            source_name=result.provider,
+                            source_url=str(result.metadata.get("space_id", "") or ""),
+                            license_id="GENERATED",
+                            attribution_required=False,
+                            generator_model=result.model,
+                        ),
+                        tags=["generated-hero", "mini-utopia"],
+                        source_fingerprint=input_sha,
+                    )
+                    reusable_spec = self.reusable_library.get_spec(reusable)
+                    asset_path = reusable_spec.storage_path
+                    reusable_asset_id = reusable.asset_id
+                else:
+                    asset_path = self.storage.put_bytes(
+                        (
+                            f"assets/{location_asset_id}/hero/"
+                            f"{element.element_id}_{glb_sha[:12]}.glb"
+                        ),
+                        result.payload,
+                    )
                 cache[element.element_id] = {
                     "asset_path": asset_path,
                     "mime_type": result.mime_type,
@@ -161,7 +242,14 @@ class WorldHeroAssetService:
                     "input_sha256": input_sha,
                     "glb_sha256": glb_sha,
                     "bytes": len(result.payload),
-                    "metadata": result.metadata,
+                    "metadata": {
+                        **result.metadata,
+                        **(
+                            {"reusable_asset_id": reusable_asset_id}
+                            if reusable_asset_id
+                            else {}
+                        ),
+                    },
                 }
                 self._attach_glb_node(
                     render_object=render_object,
