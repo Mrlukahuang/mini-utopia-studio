@@ -193,6 +193,9 @@ class WorldConceptService:
             blueprint=blueprint,
             style_asset_id=style_asset_id,
             progress_callback=progress_callback,
+            force_appearance_regeneration=True,
+            strict_appearance=True,
+            repair_weak_heroes=True,
         )
         raw_appearance = world.metadata.get("world_appearance_plan")
         appearance_plan = (
@@ -256,6 +259,8 @@ class WorldConceptService:
             preview_image_bytes=image_bytes,
             preview_mime_type="image/png",
             progress_callback=progress_callback,
+            strict_appearance=True,
+            repair_weak_heroes=True,
         )
         self._report_progress(
             progress_callback,
@@ -295,6 +300,9 @@ class WorldConceptService:
         preview_image_bytes: bytes | None = None,
         preview_mime_type: str = "image/png",
         progress_callback: WorldBuildProgressCallback | None = None,
+        force_appearance_regeneration: bool = False,
+        strict_appearance: bool = False,
+        repair_weak_heroes: bool = False,
     ) -> None:
         """Refresh appearance/render data without changing Blueprint world logic."""
         if self.appearance_service is None or self.geometry_compiler is None:
@@ -309,7 +317,8 @@ class WorldConceptService:
         blueprint_fingerprint = self._fingerprint(blueprint.model_dump_json())
         raw_plan = world.metadata.get("world_appearance_plan")
         can_reuse_plan = bool(
-            raw_plan
+            not force_appearance_regeneration
+            and raw_plan
             and world.metadata.get("world_render_blueprint_fingerprint")
             == blueprint_fingerprint
         )
@@ -333,6 +342,8 @@ class WorldConceptService:
                     profile=profile,
                     blueprint=blueprint,
                     style_profile=style_profile,
+                    strict_provider=strict_appearance,
+                    repair_weak_heroes=repair_weak_heroes,
                 )
         else:
             self._report_progress(
@@ -345,13 +356,29 @@ class WorldConceptService:
                 profile=profile,
                 blueprint=blueprint,
                 style_profile=style_profile,
+                strict_provider=strict_appearance,
+                repair_weak_heroes=repair_weak_heroes,
             )
 
         if not preview_image_bytes:
+            diagnostics = self.appearance_service.summarize_plan(
+                blueprint=blueprint,
+                plan=appearance,
+            )
+            world.metadata["world_appearance_diagnostics"] = diagnostics
+            hero_parts = [
+                f"{item['name']}:{item['part_count']} parts"
+                for item in diagnostics["objects"]
+                if item["geometry_role"] == "organic"
+            ]
+            detail = " · ".join(hero_parts[:3])
             self._report_progress(
                 progress_callback,
                 "appearance_ready",
-                f"🧩 Object AppearancePlan 已完成 · {len(appearance.objects)} 个物件准备就绪",
+                (
+                    f"🧩 Object AppearancePlan 已完成 · {len(appearance.objects)} 个物件"
+                    + (f" · {detail}" if detail else "")
+                ),
                 0.27,
             )
 
@@ -369,10 +396,22 @@ class WorldConceptService:
                 base_plan=appearance,
                 image_bytes=preview_image_bytes,
                 mime_type=preview_mime_type,
+                strict_provider=strict_appearance,
+                repair_weak_heroes=repair_weak_heroes,
             )
             world.metadata["world_appearance_source"] = "blueprint+preview_vision"
+            world.metadata["world_appearance_diagnostics"] = (
+                self.appearance_service.summarize_plan(
+                    blueprint=blueprint,
+                    plan=appearance,
+                )
+            )
         else:
-            world.metadata["world_appearance_source"] = "blueprint+creator_prompt"
+            world.metadata["world_appearance_source"] = (
+                "blueprint+gpt_fresh"
+                if force_appearance_regeneration
+                else "blueprint+creator_prompt"
+            )
 
         if preview_image_bytes:
             self._report_progress(
@@ -392,6 +431,18 @@ class WorldConceptService:
         world.metadata["world_render_spec"] = render_spec.model_dump(mode="json")
         world.metadata["world_render_schema_version"] = render_spec.schema_version
         world.metadata["world_render_blueprint_fingerprint"] = blueprint_fingerprint
+        world.metadata["world_render_diagnostics"] = {
+            "object_count": len(render_spec.objects),
+            "objects": [
+                {
+                    "element_id": item.element_id,
+                    "name": item.name,
+                    "node_count": len(item.nodes),
+                    "node_ids": [node.node_id for node in item.nodes],
+                }
+                for item in render_spec.objects
+            ],
+        }
 
     @staticmethod
     def _report_progress(

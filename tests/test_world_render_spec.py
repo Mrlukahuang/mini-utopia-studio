@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Type
 
+import pytest
+
 from pydantic import BaseModel
 
 from studio.models.render import (
@@ -24,7 +26,10 @@ from studio.repositories.sqlite import SQLiteStudioRepository
 from studio.runtime.three_world import build_world_runtime_html
 from studio.services.asset_service import AssetService
 from studio.services.style_service import StyleService
-from studio.services.world_appearance_service import WorldAppearanceService
+from studio.services.world_appearance_service import (
+    WorldAppearancePlanningError,
+    WorldAppearanceService,
+)
 from studio.services.world_blueprint_service import WorldBlueprintService
 from studio.services.world_concept_prompt_service import WorldConceptPromptService
 from studio.services.world_concept_service import WorldConceptService
@@ -46,18 +51,23 @@ class FakeWorldImageProvider(ImageGenerationProvider):
 
 
 class FakeStructuredAppearanceProvider(StructuredTextProvider):
-    def __init__(self, payload):
+    def __init__(self, payload, *, object_payload=None):
         self.payload = payload
+        self.object_payload = object_payload
         self.calls = []
 
     def generate_structured(self, *, system: str, user: str, schema: Type[BaseModel]):
         self.calls.append({"system": system, "user": user, "schema": schema})
-        return schema.model_validate(self.payload)
+        payload = self.payload
+        if schema is ObjectAppearanceSpec:
+            payload = self.object_payload or self.payload["objects"][0]
+        return schema.model_validate(payload)
 
 
 class FakeVisionAppearanceProvider(ImageAnalysisProvider):
-    def __init__(self, payload):
+    def __init__(self, payload, *, object_payload=None):
         self.payload = payload
+        self.object_payload = object_payload
         self.calls = []
 
     def analyze_structured(
@@ -76,7 +86,10 @@ class FakeVisionAppearanceProvider(ImageAnalysisProvider):
                 "schema": schema,
             }
         )
-        return schema.model_validate(self.payload)
+        payload = self.payload
+        if schema is ObjectAppearanceSpec:
+            payload = self.object_payload or self.payload["objects"][0]
+        return schema.model_validate(payload)
 
 
 def _profile() -> WorldProfile:
@@ -277,6 +290,10 @@ def test_geometry_compiler_preserves_blueprint_transform_and_resolves_style_mate
     assert body.geometry.primitive == "ellipsoid"
     assert body.geometry.primitive_size.x == 18
     assert body.geometry.primitive_size.y == 8 * .72
+    # Blueprint y is a support/base elevation; Three.js primitives are centered.
+    assert body.local_position.y == 4.0
+    tail = next(node for node in whale.nodes if node.node_id.endswith(":tail"))
+    assert tail.local_position.y == 4.0
     assert any(material.color_hex == "#BDE3F7" for material in render.materials)
     assert all(material.metalness == 0 for material in render.materials)
 
@@ -321,8 +338,12 @@ def test_world_pipeline_persists_initial_render_spec_and_preview_refinement(tmp_
         profile=profile,
     )
 
+    structured = FakeStructuredAppearanceProvider(_appearance_payload())
     vision = FakeVisionAppearanceProvider(_appearance_payload())
-    appearance_service = WorldAppearanceService(image_analysis_provider=vision)
+    appearance_service = WorldAppearanceService(
+        structured_provider=structured,
+        image_analysis_provider=vision,
+    )
     service = WorldConceptService(
         repo,
         storage,
@@ -394,6 +415,21 @@ def test_world_pipeline_persists_initial_render_spec_and_preview_refinement(tmp_
     assert rendered is not None
     assert rendered.metadata["world_appearance_source"] == "blueprint+preview_vision"
     assert rendered.metadata["world_render_schema_version"] == "0.1"
+    appearance_diag = rendered.metadata["world_appearance_diagnostics"]
+    whale_diag = next(
+        item
+        for item in appearance_diag["objects"]
+        if item["element_id"] == "SCENE_WHALE"
+    )
+    assert whale_diag["part_count"] >= 2
+    assert whale_diag["weak_hero"] is False
+    render_diag = rendered.metadata["world_render_diagnostics"]
+    whale_render = next(
+        item
+        for item in render_diag["objects"]
+        if item["element_id"] == "SCENE_WHALE"
+    )
+    assert whale_render["node_count"] >= 3
     assert "OBJECT APPEARANCE DIRECTION" in rendered.metadata["world_preview_last_prompt"]
     assert "SCENE_WHALE" in rendered.metadata["world_preview_last_prompt"]
     assert vision.calls
@@ -417,3 +453,82 @@ def test_world_pipeline_persists_initial_render_spec_and_preview_refinement(tmp_
     assert progress_values[-1] == 1.0
     assert "Gentle Sky Whale" in progress_events[0][1]
     assert any("Three.js RenderSpec" in message for _, message, _ in progress_events)
+
+
+class FailingStructuredAppearanceProvider(StructuredTextProvider):
+    def generate_structured(self, *, system: str, user: str, schema: Type[BaseModel]):
+        raise RuntimeError("provider exploded")
+
+
+def test_strict_appearance_does_not_silently_fall_back_on_provider_failure():
+    service = WorldAppearanceService(
+        structured_provider=FailingStructuredAppearanceProvider()
+    )
+
+    with pytest.raises(WorldAppearancePlanningError, match="AppearancePlan generation failed"):
+        service.plan_from_blueprint(
+            profile=_profile(),
+            blueprint=_blueprint(),
+            style_profile={},
+            strict_provider=True,
+        )
+
+
+def test_non_strict_appearance_still_keeps_backward_compatible_fallback():
+    service = WorldAppearanceService(
+        structured_provider=FailingStructuredAppearanceProvider()
+    )
+
+    plan = service.plan_from_blueprint(
+        profile=_profile(),
+        blueprint=_blueprint(),
+        style_profile={},
+    )
+
+    whale = next(item for item in plan.objects if item.element_id == "SCENE_WHALE")
+    assert whale.main_body.primitive == "ellipsoid"
+    assert whale.parts == []
+
+
+def test_weak_organic_hero_gets_focused_shape_repair():
+    weak = _appearance_payload()
+    weak["objects"][0]["parts"] = []
+    provider = FakeStructuredAppearanceProvider(
+        weak,
+        object_payload=_appearance_payload()["objects"][0],
+    )
+    service = WorldAppearanceService(structured_provider=provider)
+
+    plan = service.plan_from_blueprint(
+        profile=_profile(),
+        blueprint=_blueprint(),
+        style_profile={},
+        strict_provider=True,
+        repair_weak_heroes=True,
+    )
+
+    whale = next(item for item in plan.objects if item.element_id == "SCENE_WHALE")
+    assert len(whale.parts) == 2
+    assert [part.role for part in whale.parts] == ["rear_tail", "side_fin"]
+    assert len(provider.calls) == 2
+    assert provider.calls[1]["schema"] is ObjectAppearanceSpec
+    assert "major organic Hero object" in provider.calls[1]["user"]
+
+
+def test_strict_hero_repair_rejects_body_only_result():
+    weak = _appearance_payload()
+    weak["objects"][0]["parts"] = []
+    provider = FakeStructuredAppearanceProvider(
+        weak,
+        object_payload=weak["objects"][0],
+    )
+    service = WorldAppearanceService(structured_provider=provider)
+
+    with pytest.raises(WorldAppearancePlanningError, match="remained too weak"):
+        service.plan_from_blueprint(
+            profile=_profile(),
+            blueprint=_blueprint(),
+            style_profile={},
+            strict_provider=True,
+            repair_weak_heroes=True,
+        )

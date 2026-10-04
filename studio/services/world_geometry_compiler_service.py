@@ -145,11 +145,20 @@ class WorldGeometryCompilerService:
                         ),
                     ),
                     material_id=material_id,
+                    # Blueprint y is the object's base/support elevation.
+                    # Shape grammar local positions are center-relative, while
+                    # Three.js primitives are centered on their local origin.
+                    # Lift every compiled part by half the authoritative object
+                    # height so geometry occupies y .. y+height instead of
+                    # straddling the Blueprint base plane.
                     local_position=RenderVec3(
                         x=self._clamp(part.local_position.x, -1.5, 1.5)
                         * element.width,
-                        y=self._clamp(part.local_position.y, -1.5, 1.5)
-                        * element.height,
+                        y=(
+                            element.height * .5
+                            + self._clamp(part.local_position.y, -1.5, 1.5)
+                            * element.height
+                        ),
                         z=self._clamp(part.local_position.z, -1.5, 1.5)
                         * element.depth,
                     ),
