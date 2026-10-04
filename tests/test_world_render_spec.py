@@ -294,6 +294,12 @@ def test_geometry_compiler_preserves_blueprint_transform_and_resolves_style_mate
     assert body.local_position.y == 4.0
     tail = next(node for node in whale.nodes if node.node_id.endswith(":tail"))
     assert tail.local_position.y == 4.0
+    # local_position -1..1 maps across half-extents, so -0.58 on an
+    # 18-unit envelope becomes -5.22 rather than -10.44.
+    assert tail.local_position.x == pytest.approx(-5.22)
+    fin = next(node for node in whale.nodes if node.node_id.endswith(":left_fin"))
+    assert fin.local_position.z == pytest.approx(2.475)
+    assert all(node.parent_node_id == "" for node in whale.nodes)
     assert any(material.color_hex == "#BDE3F7" for material in render.materials)
     assert all(material.metalness == 0 for material in render.materials)
 
@@ -532,3 +538,93 @@ def test_strict_hero_repair_rejects_body_only_result():
             strict_provider=True,
             repair_weak_heroes=True,
         )
+
+
+def test_geometry_compiler_clamps_parts_inside_blueprint_envelope():
+    payload = _appearance_payload()
+    whale = payload["objects"][0]
+    whale["parts"][0]["relative_scale"] = {"x": 4.0, "y": 2.0, "z": 3.0}
+    whale["parts"][0]["local_position"] = {"x": -1.0, "y": 1.0, "z": 1.0}
+    appearance = WorldAppearancePlan.model_validate(payload)
+    appearance = WorldAppearanceService()._normalize(
+        proposed=appearance,
+        blueprint=_blueprint(),
+        fallback=WorldAppearanceService().plan_from_blueprint(
+            profile=_profile(),
+            blueprint=_blueprint(),
+            style_profile={},
+        ),
+    )
+
+    render = WorldGeometryCompilerService().compile(
+        profile=_profile(),
+        blueprint=_blueprint(),
+        appearance=appearance,
+        style_profile={},
+    )
+
+    compiled = next(item for item in render.objects if item.element_id == "SCENE_WHALE")
+    tail = next(node for node in compiled.nodes if node.node_id.endswith(":tail"))
+    assert tail.geometry.primitive_size.x == 18
+    assert tail.geometry.primitive_size.y == 8
+    assert tail.geometry.primitive_size.z == 9
+    # A full-envelope part can only be centered; it cannot escape the bounds.
+    assert tail.local_position.x == 0
+    assert tail.local_position.y == 4
+    assert tail.local_position.z == 0
+
+
+def test_parent_part_is_semantic_metadata_not_nested_three_transform():
+    payload = _appearance_payload()
+    payload["objects"][0]["parts"][1]["parent_part_id"] = "body"
+    appearance = WorldAppearancePlan.model_validate(payload)
+    appearance = WorldAppearanceService()._normalize(
+        proposed=appearance,
+        blueprint=_blueprint(),
+        fallback=WorldAppearanceService().plan_from_blueprint(
+            profile=_profile(),
+            blueprint=_blueprint(),
+            style_profile={},
+        ),
+    )
+
+    render = WorldGeometryCompilerService().compile(
+        profile=_profile(),
+        blueprint=_blueprint(),
+        appearance=appearance,
+        style_profile={},
+    )
+    compiled = next(item for item in render.objects if item.element_id == "SCENE_WHALE")
+    fin = next(node for node in compiled.nodes if node.node_id.endswith(":left_fin"))
+    assert fin.parent_node_id == ""
+    assert fin.attachment_parent_part_id == "body"
+
+
+def test_runtime_supports_richer_procedural_shape_vocabulary():
+    appearance = WorldAppearanceService().plan_from_blueprint(
+        profile=_profile(),
+        blueprint=_blueprint(),
+        style_profile={},
+    )
+    render = WorldGeometryCompilerService().compile(
+        profile=_profile(),
+        blueprint=_blueprint(),
+        appearance=appearance,
+        style_profile={},
+    )
+
+    html = build_world_runtime_html(
+        world_name="Shape Grammar World",
+        profile=_profile(),
+        blueprint=_blueprint(),
+        render_spec=render,
+    )
+
+    assert "RoundedBoxGeometry" in html
+    assert "THREE.CapsuleGeometry" in html
+    assert "primitive === 'hemisphere' || primitive === 'dome'" in html
+    assert "primitive === 'wedge'" in html
+    assert "primitive === 'tapered_box'" in html
+    assert "primitive === 'disc'" in html
+    assert "primitive === 'torus' || primitive === 'ring'" in html
+    assert "nodeGroups.forEach(entry => objectGroup.add(entry.group))" in html
