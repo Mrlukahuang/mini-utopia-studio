@@ -134,6 +134,81 @@ def test_hf_pixal3d_provider_calls_authenticated_three_stage_space_api(monkeypat
     assert result.metadata["space_id"] == "TencentARC/Pixal3D"
 
 
+def test_hf_pixal3d_provider_records_zero_gpu_quota_delta(monkeypatch):
+    FakeClient.instances.clear()
+
+    def fake_get(url, *, headers, timeout):
+        return FakeStaticResponse(_valid_glb())
+
+    snapshots = iter(
+        [
+            {
+                "base": 2400,
+                "remaining": 2100,
+                "overquota_used": 0,
+                "resets_at": "2026-10-05T10:00:00+00:00",
+            },
+            {
+                "base": 2400,
+                "remaining": 1920,
+                "overquota_used": 0,
+                "resets_at": "2026-10-05T10:00:00+00:00",
+            },
+        ]
+    )
+    monkeypatch.setattr("studio.providers.hero_asset.requests.get", fake_get)
+    provider = HuggingFacePixal3DProvider(
+        token="hf-test-secret",
+        client_factory=FakeClient,
+        handle_file_fn=fake_handle_file,
+        quota_fetcher=lambda: next(snapshots),
+    )
+
+    result = provider.generate(
+        image_bytes=b"input-png",
+        mime_type="image/png",
+        element_id="SCENE_HERO",
+        appearance=_appearance(),
+    )
+
+    usage = result.metadata["zero_gpu_usage"]
+    assert usage["status"] == "ok"
+    assert usage["gpu_seconds"] == 180
+    assert usage["included_gpu_seconds"] == 180
+    assert usage["overquota_gpu_seconds"] == 0
+    assert usage["remaining_seconds"] == 1920
+    assert usage["base_seconds"] == 2400
+    assert usage["wall_seconds"] >= 0
+
+
+def test_hf_pixal3d_quota_telemetry_failure_never_blocks_generation(monkeypatch):
+    FakeClient.instances.clear()
+
+    def fake_get(url, *, headers, timeout):
+        return FakeStaticResponse(_valid_glb())
+
+    monkeypatch.setattr("studio.providers.hero_asset.requests.get", fake_get)
+    provider = HuggingFacePixal3DProvider(
+        token="hf-test-secret",
+        client_factory=FakeClient,
+        handle_file_fn=fake_handle_file,
+        quota_fetcher=lambda: (_ for _ in ()).throw(RuntimeError("billing denied")),
+    )
+
+    result = provider.generate(
+        image_bytes=b"input-png",
+        mime_type="image/png",
+        element_id="SCENE_HERO",
+        appearance=_appearance(),
+    )
+
+    assert result.payload == _valid_glb()
+    usage = result.metadata["zero_gpu_usage"]
+    assert usage["status"] == "unavailable"
+    assert usage["before"]["status"] == "unavailable"
+    assert usage["after"]["status"] == "unavailable"
+
+
 def test_hf_pixal3d_cache_identity_changes_with_quality_profile():
     low = HuggingFacePixal3DProvider(
         token="hf-test",

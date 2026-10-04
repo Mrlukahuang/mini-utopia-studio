@@ -549,6 +549,7 @@ class WorldConceptService:
                     "model": item.model,
                     "bytes": item.bytes,
                     "reference_mode": item.reference_mode,
+                    "usage": item.usage,
                     "message": item.message,
                 }
                 for item in hero_builds

@@ -34,6 +34,7 @@ class HeroAssetBuild:
     glb_sha256: str = ""
     bytes: int = 0
     reference_mode: str = ""
+    usage: dict | None = None
     message: str = ""
 
 
@@ -158,6 +159,12 @@ class WorldHeroAssetService:
                                 "reference_mode", reference_mode
                             )
                         ),
+                        usage=(
+                            (cached.get("metadata", {}) or {}).get(
+                                "zero_gpu_usage"
+                            )
+                            or self.provider.usage_snapshot()
+                        ),
                     )
                 )
                 continue
@@ -199,6 +206,7 @@ class WorldHeroAssetService:
                                 glb_sha256=reusable_spec.sha256,
                                 bytes=reusable_spec.byte_size,
                                 reference_mode=reference_mode,
+                                usage=self.provider.usage_snapshot(),
                                 message=(
                                     "Reused exact generated Hero from the global "
                                     "Mini Utopia Asset Library."
@@ -300,6 +308,7 @@ class WorldHeroAssetService:
                         glb_sha256=glb_sha,
                         bytes=len(result.payload),
                         reference_mode=reference_mode,
+                        usage=result.metadata.get("zero_gpu_usage"),
                     )
                 )
             except Exception as exc:
@@ -312,6 +321,7 @@ class WorldHeroAssetService:
                         status="fallback",
                         input_sha256=input_sha,
                         reference_mode=reference_mode,
+                        usage=self.provider.usage_snapshot(),
                         message=str(exc),
                     )
                 )
