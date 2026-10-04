@@ -159,8 +159,11 @@ class WorldHeroAssetService:
                                 "reference_mode", reference_mode
                             )
                         ),
-                        usage=(cached.get("metadata", {}) or {}).get(
-                            "zero_gpu_usage"
+                        usage=(
+                            (cached.get("metadata", {}) or {}).get(
+                                "zero_gpu_usage"
+                            )
+                            or self.provider.usage_snapshot()
                         ),
                     )
                 )
@@ -203,6 +206,7 @@ class WorldHeroAssetService:
                                 glb_sha256=reusable_spec.sha256,
                                 bytes=reusable_spec.byte_size,
                                 reference_mode=reference_mode,
+                                usage=self.provider.usage_snapshot(),
                                 message=(
                                     "Reused exact generated Hero from the global "
                                     "Mini Utopia Asset Library."
@@ -317,6 +321,7 @@ class WorldHeroAssetService:
                         status="fallback",
                         input_sha256=input_sha,
                         reference_mode=reference_mode,
+                        usage=self.provider.usage_snapshot(),
                         message=str(exc),
                     )
                 )
