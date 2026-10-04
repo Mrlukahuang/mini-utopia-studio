@@ -757,10 +757,12 @@ def render_world_factory(
                         byte_count = int(hero.get("bytes", 0) or 0)
                         size_mb = byte_count / (1024 * 1024)
                         message = hero.get("message", "")
+                        reference_mode = hero.get("reference_mode") or "—"
                         st.write(
                             f"**{hero.get('name', hero.get('element_id', 'Hero'))}** · "
                             f"{status} · model={model} · {size_mb:.2f} MB"
                         )
+                        st.caption(f"Reference · {reference_mode}")
                         if hero.get("asset_path"):
                             st.caption(f"GLB · {hero.get('asset_path')}")
                         if message:
