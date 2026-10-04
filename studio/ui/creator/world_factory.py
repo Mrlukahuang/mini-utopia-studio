@@ -740,6 +740,27 @@ def render_world_factory(ctx, *, style_asset_id: str | None) -> None:
                         f"Three.js nodes={rendered.get('node_count', 0)}"
                     )
 
+                hero_diagnostics = saved_world.metadata.get(
+                    "world_hero_asset_diagnostics", []
+                )
+                if hero_diagnostics:
+                    st.divider()
+                    st.write("**🧊 Hero 3D Assets / Open-source GLB**")
+                    for hero in hero_diagnostics:
+                        status = hero.get("status", "—")
+                        model = hero.get("model") or "—"
+                        byte_count = int(hero.get("bytes", 0) or 0)
+                        size_mb = byte_count / (1024 * 1024)
+                        message = hero.get("message", "")
+                        st.write(
+                            f"**{hero.get('name', hero.get('element_id', 'Hero'))}** · "
+                            f"{status} · model={model} · {size_mb:.2f} MB"
+                        )
+                        if hero.get("asset_path"):
+                            st.caption(f"GLB · {hero.get('asset_path')}")
+                        if message:
+                            st.warning(message)
+
         count = int(st.session_state.get("creator_generation_count", 0))
         remaining = max(0, MAX_GENERATIONS_PER_SESSION - count)
         st.caption(f"🎟️ 本次会话剩余图片渲染次数：{remaining}/{MAX_GENERATIONS_PER_SESSION}")
