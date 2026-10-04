@@ -108,3 +108,38 @@ class ReusableGLBSpec(BaseModel):
     variant_overrides: ReusableAssetVariantOverrides = Field(
         default_factory=ReusableAssetVariantOverrides
     )
+
+
+class ReusableAssetPackEntry(BaseModel):
+    """One normalized GLB entry inside a portable Mini Utopia asset pack."""
+
+    asset_key: str
+    display_name: str
+    category: ReusableAssetCategory
+    semantic_keys: list[str] = Field(default_factory=list, max_length=32)
+    source_pack: str = ""
+    source_entry: str = ""
+    source_name: str
+    source_url: str = ""
+    license_id: str = "UNKNOWN"
+    attribution_required: bool = False
+    glb_path: str
+    sha256: str
+    byte_size: int = Field(ge=0)
+    style_status: ReusableAssetStyleStatus = "raw"
+    normalization: ReusableAssetNormalizationSpec = Field(
+        default_factory=ReusableAssetNormalizationSpec
+    )
+    variant_policy: ReusableAssetVariantPolicy = Field(
+        default_factory=ReusableAssetVariantPolicy
+    )
+    tags: list[str] = Field(default_factory=list, max_length=32)
+
+
+class ReusableAssetPackManifest(BaseModel):
+    """Manifest for an offline-normalized reusable GLB pack."""
+
+    schema_version: str = "1.0"
+    name: str
+    style_target: str = "Mini Utopia Visual DNA v1"
+    assets: list[ReusableAssetPackEntry] = Field(default_factory=list, max_length=500)

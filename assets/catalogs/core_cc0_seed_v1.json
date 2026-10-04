@@ -1,0 +1,669 @@
+{
+  "schema_version": "1.0",
+  "name": "Mini Utopia Core CC0 Seed v1",
+  "packs": {
+    "kaykit_forest": {
+      "source_name": "KayKit",
+      "source_url": "https://kaylousberg.itch.io/kaykit-forest",
+      "license_id": "CC0-1.0",
+      "license_entry": "KayKit_Forest_Nature_Pack_1.0_FREE/License.txt",
+      "prefix": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/",
+      "source_format": "gltf",
+      "texture_max_size": 512
+    },
+    "kenney_town": {
+      "source_name": "Kenney",
+      "source_url": "https://kenney.nl/assets/fantasy-town-kit",
+      "license_id": "CC0-1.0",
+      "license_entry": "License.txt",
+      "prefix": "Models/GLB format/",
+      "source_format": "glb",
+      "texture_max_size": null
+    },
+    "quaternius_nature": {
+      "source_name": "Quaternius",
+      "source_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+      "license_id": "CC0-1.0",
+      "license_entry": "License_Standard.txt",
+      "prefix": "glTF/",
+      "source_format": "gltf",
+      "texture_max_size": 512
+    },
+    "quaternius_props": {
+      "source_name": "Quaternius",
+      "source_url": "https://quaternius.com/packs/fantasypropsmegakit.html",
+      "license_id": "CC0-1.0",
+      "license_entry": "License_Standard.txt",
+      "prefix": "Exports/glTF/",
+      "source_format": "gltf",
+      "texture_max_size": 512
+    }
+  },
+  "assets": [
+    {
+      "pack": "kaykit_forest",
+      "file": "Tree_1_A_Color1.gltf",
+      "category": "tree",
+      "semantic_keys": [
+        "tree",
+        "round_tree"
+      ]
+    },
+    {
+      "pack": "kaykit_forest",
+      "file": "Tree_1_B_Color1.gltf",
+      "category": "tree",
+      "semantic_keys": [
+        "tree",
+        "round_tree"
+      ]
+    },
+    {
+      "pack": "kaykit_forest",
+      "file": "Tree_2_A_Color1.gltf",
+      "category": "tree",
+      "semantic_keys": [
+        "tree",
+        "branching_tree"
+      ]
+    },
+    {
+      "pack": "kaykit_forest",
+      "file": "Tree_2_C_Color1.gltf",
+      "category": "tree",
+      "semantic_keys": [
+        "tree",
+        "branching_tree"
+      ]
+    },
+    {
+      "pack": "kaykit_forest",
+      "file": "Tree_3_A_Color1.gltf",
+      "category": "tree",
+      "semantic_keys": [
+        "tree",
+        "pine_tree"
+      ]
+    },
+    {
+      "pack": "kaykit_forest",
+      "file": "Tree_3_C_Color1.gltf",
+      "category": "tree",
+      "semantic_keys": [
+        "tree",
+        "pine_tree"
+      ]
+    },
+    {
+      "pack": "kaykit_forest",
+      "file": "Tree_4_A_Color1.gltf",
+      "category": "tree",
+      "semantic_keys": [
+        "tree",
+        "stylized_tree"
+      ]
+    },
+    {
+      "pack": "kaykit_forest",
+      "file": "Tree_4_C_Color1.gltf",
+      "category": "tree",
+      "semantic_keys": [
+        "tree",
+        "stylized_tree"
+      ]
+    },
+    {
+      "pack": "kaykit_forest",
+      "file": "Tree_Bare_1_A_Color1.gltf",
+      "category": "tree",
+      "semantic_keys": [
+        "tree",
+        "bare_tree"
+      ]
+    },
+    {
+      "pack": "kaykit_forest",
+      "file": "Bush_1_A_Color1.gltf",
+      "category": "plant",
+      "semantic_keys": [
+        "bush",
+        "plant"
+      ]
+    },
+    {
+      "pack": "kaykit_forest",
+      "file": "Bush_1_D_Color1.gltf",
+      "category": "plant",
+      "semantic_keys": [
+        "bush",
+        "plant"
+      ]
+    },
+    {
+      "pack": "kaykit_forest",
+      "file": "Bush_2_A_Color1.gltf",
+      "category": "plant",
+      "semantic_keys": [
+        "bush",
+        "plant"
+      ]
+    },
+    {
+      "pack": "kaykit_forest",
+      "file": "Bush_3_A_Color1.gltf",
+      "category": "plant",
+      "semantic_keys": [
+        "bush",
+        "plant"
+      ]
+    },
+    {
+      "pack": "kaykit_forest",
+      "file": "Bush_4_A_Color1.gltf",
+      "category": "plant",
+      "semantic_keys": [
+        "bush",
+        "plant"
+      ]
+    },
+    {
+      "pack": "kaykit_forest",
+      "file": "Grass_1_A_Color1.gltf",
+      "category": "grass",
+      "semantic_keys": [
+        "grass",
+        "grass_patch"
+      ]
+    },
+    {
+      "pack": "kaykit_forest",
+      "file": "Grass_1_C_Color1.gltf",
+      "category": "grass",
+      "semantic_keys": [
+        "grass",
+        "grass_patch"
+      ]
+    },
+    {
+      "pack": "kaykit_forest",
+      "file": "Grass_2_A_Color1.gltf",
+      "category": "grass",
+      "semantic_keys": [
+        "grass",
+        "grass_patch"
+      ]
+    },
+    {
+      "pack": "kaykit_forest",
+      "file": "Grass_2_C_Color1.gltf",
+      "category": "grass",
+      "semantic_keys": [
+        "grass",
+        "grass_patch"
+      ]
+    },
+    {
+      "pack": "kaykit_forest",
+      "file": "Rock_1_A_Color1.gltf",
+      "category": "rock",
+      "semantic_keys": [
+        "rock",
+        "small_rock"
+      ]
+    },
+    {
+      "pack": "kaykit_forest",
+      "file": "Rock_1_D_Color1.gltf",
+      "category": "rock",
+      "semantic_keys": [
+        "rock",
+        "small_rock"
+      ]
+    },
+    {
+      "pack": "kaykit_forest",
+      "file": "Rock_2_A_Color1.gltf",
+      "category": "rock",
+      "semantic_keys": [
+        "rock",
+        "medium_rock"
+      ]
+    },
+    {
+      "pack": "kaykit_forest",
+      "file": "Rock_2_D_Color1.gltf",
+      "category": "rock",
+      "semantic_keys": [
+        "rock",
+        "medium_rock"
+      ]
+    },
+    {
+      "pack": "kaykit_forest",
+      "file": "Rock_3_A_Color1.gltf",
+      "category": "rock",
+      "semantic_keys": [
+        "rock",
+        "large_rock"
+      ]
+    },
+    {
+      "pack": "kaykit_forest",
+      "file": "Rock_3_C_Color1.gltf",
+      "category": "rock",
+      "semantic_keys": [
+        "rock",
+        "large_rock"
+      ]
+    },
+    {
+      "pack": "kenney_town",
+      "file": "fence.glb",
+      "category": "architecture",
+      "semantic_keys": [
+        "fence"
+      ]
+    },
+    {
+      "pack": "kenney_town",
+      "file": "fence-gate.glb",
+      "category": "architecture",
+      "semantic_keys": [
+        "fence",
+        "gate"
+      ]
+    },
+    {
+      "pack": "kenney_town",
+      "file": "fence-curved.glb",
+      "category": "architecture",
+      "semantic_keys": [
+        "fence",
+        "curved_fence"
+      ]
+    },
+    {
+      "pack": "kenney_town",
+      "file": "lantern.glb",
+      "category": "prop",
+      "semantic_keys": [
+        "lantern",
+        "lamp"
+      ]
+    },
+    {
+      "pack": "kenney_town",
+      "file": "pillar-stone.glb",
+      "category": "architecture",
+      "semantic_keys": [
+        "pillar",
+        "stone_pillar"
+      ]
+    },
+    {
+      "pack": "kenney_town",
+      "file": "pillar-wood.glb",
+      "category": "architecture",
+      "semantic_keys": [
+        "pillar",
+        "wood_pillar"
+      ]
+    },
+    {
+      "pack": "kenney_town",
+      "file": "planks.glb",
+      "category": "architecture",
+      "semantic_keys": [
+        "planks",
+        "bridge_deck"
+      ]
+    },
+    {
+      "pack": "kenney_town",
+      "file": "road.glb",
+      "category": "architecture",
+      "semantic_keys": [
+        "road",
+        "path"
+      ]
+    },
+    {
+      "pack": "kenney_town",
+      "file": "road-bend.glb",
+      "category": "architecture",
+      "semantic_keys": [
+        "road",
+        "path",
+        "bend"
+      ]
+    },
+    {
+      "pack": "kenney_town",
+      "file": "road-corner.glb",
+      "category": "architecture",
+      "semantic_keys": [
+        "road",
+        "path",
+        "corner"
+      ]
+    },
+    {
+      "pack": "kenney_town",
+      "file": "roof.glb",
+      "category": "architecture",
+      "semantic_keys": [
+        "roof"
+      ]
+    },
+    {
+      "pack": "kenney_town",
+      "file": "roof-gable.glb",
+      "category": "architecture",
+      "semantic_keys": [
+        "roof",
+        "gable_roof"
+      ]
+    },
+    {
+      "pack": "kenney_town",
+      "file": "roof-window.glb",
+      "category": "architecture",
+      "semantic_keys": [
+        "roof",
+        "roof_window"
+      ]
+    },
+    {
+      "pack": "kenney_town",
+      "file": "stairs-stone.glb",
+      "category": "architecture",
+      "semantic_keys": [
+        "stairs",
+        "stone_stairs"
+      ]
+    },
+    {
+      "pack": "kenney_town",
+      "file": "stairs-wood-handrail.glb",
+      "category": "architecture",
+      "semantic_keys": [
+        "stairs",
+        "wood_stairs",
+        "handrail"
+      ]
+    },
+    {
+      "pack": "kenney_town",
+      "file": "wall.glb",
+      "category": "architecture",
+      "semantic_keys": [
+        "wall"
+      ]
+    },
+    {
+      "pack": "kenney_town",
+      "file": "wall-corner.glb",
+      "category": "architecture",
+      "semantic_keys": [
+        "wall",
+        "wall_corner"
+      ]
+    },
+    {
+      "pack": "kenney_town",
+      "file": "wall-door.glb",
+      "category": "architecture",
+      "semantic_keys": [
+        "wall",
+        "door"
+      ]
+    },
+    {
+      "pack": "kenney_town",
+      "file": "wall-window-round.glb",
+      "category": "architecture",
+      "semantic_keys": [
+        "wall",
+        "window",
+        "round_window"
+      ]
+    },
+    {
+      "pack": "kenney_town",
+      "file": "wall-window-shutters.glb",
+      "category": "architecture",
+      "semantic_keys": [
+        "wall",
+        "window",
+        "shutters"
+      ]
+    },
+    {
+      "pack": "kenney_town",
+      "file": "wall-wood.glb",
+      "category": "architecture",
+      "semantic_keys": [
+        "wall",
+        "wood_wall"
+      ]
+    },
+    {
+      "pack": "kenney_town",
+      "file": "wall-wood-door.glb",
+      "category": "architecture",
+      "semantic_keys": [
+        "wall",
+        "door",
+        "wood_wall"
+      ]
+    },
+    {
+      "pack": "kenney_town",
+      "file": "wall-wood-window-small.glb",
+      "category": "architecture",
+      "semantic_keys": [
+        "wall",
+        "window",
+        "wood_wall"
+      ]
+    },
+    {
+      "pack": "kenney_town",
+      "file": "windmill.glb",
+      "category": "architecture",
+      "semantic_keys": [
+        "windmill",
+        "landmark"
+      ]
+    },
+    {
+      "pack": "kenney_town",
+      "file": "fountain-round.glb",
+      "category": "prop",
+      "semantic_keys": [
+        "fountain",
+        "water_feature"
+      ]
+    },
+    {
+      "pack": "quaternius_nature",
+      "file": "CommonTree_1.gltf",
+      "category": "tree",
+      "semantic_keys": [
+        "tree",
+        "scenic_tree"
+      ]
+    },
+    {
+      "pack": "quaternius_nature",
+      "file": "CommonTree_3.gltf",
+      "category": "tree",
+      "semantic_keys": [
+        "tree",
+        "scenic_tree"
+      ]
+    },
+    {
+      "pack": "quaternius_nature",
+      "file": "Pine_2.gltf",
+      "category": "tree",
+      "semantic_keys": [
+        "tree",
+        "pine_tree",
+        "scenic_tree"
+      ]
+    },
+    {
+      "pack": "quaternius_nature",
+      "file": "TwistedTree_2.gltf",
+      "category": "tree",
+      "semantic_keys": [
+        "tree",
+        "twisted_tree",
+        "fantasy_tree"
+      ]
+    },
+    {
+      "pack": "quaternius_nature",
+      "file": "Bush_Common_Flowers.gltf",
+      "category": "plant",
+      "semantic_keys": [
+        "bush",
+        "flower_bush"
+      ]
+    },
+    {
+      "pack": "quaternius_nature",
+      "file": "Flower_3_Group.gltf",
+      "category": "plant",
+      "semantic_keys": [
+        "flower",
+        "flower_patch"
+      ]
+    },
+    {
+      "pack": "quaternius_nature",
+      "file": "Fern_1.gltf",
+      "category": "plant",
+      "semantic_keys": [
+        "fern",
+        "plant"
+      ]
+    },
+    {
+      "pack": "quaternius_nature",
+      "file": "Mushroom_Common.gltf",
+      "category": "mushroom",
+      "semantic_keys": [
+        "mushroom"
+      ]
+    },
+    {
+      "pack": "quaternius_nature",
+      "file": "Rock_Medium_1.gltf",
+      "category": "rock",
+      "semantic_keys": [
+        "rock",
+        "medium_rock"
+      ]
+    },
+    {
+      "pack": "quaternius_nature",
+      "file": "Grass_Common_Short.gltf",
+      "category": "grass",
+      "semantic_keys": [
+        "grass",
+        "grass_patch"
+      ]
+    },
+    {
+      "pack": "quaternius_props",
+      "file": "Bench.gltf",
+      "category": "prop",
+      "semantic_keys": [
+        "bench",
+        "seat"
+      ]
+    },
+    {
+      "pack": "quaternius_props",
+      "file": "Lantern_Wall.gltf",
+      "category": "prop",
+      "semantic_keys": [
+        "lantern",
+        "wall_lantern"
+      ]
+    },
+    {
+      "pack": "quaternius_props",
+      "file": "Chest_Wood.gltf",
+      "category": "prop",
+      "semantic_keys": [
+        "chest",
+        "storage"
+      ]
+    },
+    {
+      "pack": "quaternius_props",
+      "file": "Book_Stack_1.gltf",
+      "category": "prop",
+      "semantic_keys": [
+        "book",
+        "book_stack"
+      ]
+    },
+    {
+      "pack": "quaternius_props",
+      "file": "Potion_1.gltf",
+      "category": "prop",
+      "semantic_keys": [
+        "potion",
+        "bottle"
+      ]
+    },
+    {
+      "pack": "quaternius_props",
+      "file": "CandleStick_Triple.gltf",
+      "category": "prop",
+      "semantic_keys": [
+        "candle",
+        "light"
+      ]
+    },
+    {
+      "pack": "quaternius_props",
+      "file": "Cauldron.gltf",
+      "category": "prop",
+      "semantic_keys": [
+        "cauldron",
+        "magic_prop"
+      ]
+    },
+    {
+      "pack": "quaternius_props",
+      "file": "Table_Large.gltf",
+      "category": "prop",
+      "semantic_keys": [
+        "table"
+      ]
+    },
+    {
+      "pack": "quaternius_props",
+      "file": "Chair_1.gltf",
+      "category": "prop",
+      "semantic_keys": [
+        "chair",
+        "seat"
+      ]
+    },
+    {
+      "pack": "quaternius_props",
+      "file": "Crate_Wooden.gltf",
+      "category": "prop",
+      "semantic_keys": [
+        "crate",
+        "storage"
+      ]
+    }
+  ]
+}
