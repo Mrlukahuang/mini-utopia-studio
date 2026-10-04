@@ -215,7 +215,7 @@ class WorldHeroAssetService:
                         source=ReusableAssetSourceSpec(
                             origin_kind="generated",
                             source_name=result.provider,
-                            source_url=str(result.metadata.get("space_id", "") or ""),
+                            source_url=str(result.metadata.get("space_url", "") or ""),
                             license_id="GENERATED",
                             attribution_required=False,
                             generator_model=result.model,
