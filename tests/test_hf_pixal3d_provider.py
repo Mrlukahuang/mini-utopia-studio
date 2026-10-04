@@ -30,7 +30,8 @@ class FakeClient:
     instances = []
 
     def __init__(self, src, *, token, verbose, download_files):
-        self.src = src
+        self.space_id = src
+        self.src = "https://tencentarc-pixal3d.hf.space/"
         self.token = token
         self.verbose = verbose
         self.download_files = Path(download_files)
@@ -57,9 +58,8 @@ class FakeClient:
                 "distance": 3.0,
             }
         if api_name == "/extract_glb_api":
-            path = self.download_files / "hero.glb"
-            path.write_bytes(_valid_glb())
-            return {"path": str(path)}
+            assert self.download_files is False
+            return {"path": "/home/user/app/tmp/result_123.glb"}
         raise AssertionError(f"unexpected api_name: {api_name}")
 
 
@@ -67,8 +67,25 @@ def fake_handle_file(path: str):
     return {"fake_upload_path": path}
 
 
-def test_hf_pixal3d_provider_calls_authenticated_three_stage_space_api():
+class FakeStaticResponse:
+    def __init__(self, content: bytes):
+        self.content = content
+
+    def raise_for_status(self):
+        return None
+
+
+def test_hf_pixal3d_provider_calls_authenticated_three_stage_space_api(monkeypatch):
     FakeClient.instances.clear()
+    static_fetch = {}
+
+    def fake_get(url, *, headers, timeout):
+        static_fetch.update(
+            {"url": url, "headers": headers, "timeout": timeout}
+        )
+        return FakeStaticResponse(_valid_glb())
+
+    monkeypatch.setattr("studio.providers.hero_asset.requests.get", fake_get)
     provider = HuggingFacePixal3DProvider(
         token="hf-test-secret",
         space_id="TencentARC/Pixal3D",
@@ -88,7 +105,8 @@ def test_hf_pixal3d_provider_calls_authenticated_three_stage_space_api():
     )
 
     client = FakeClient.instances[-1]
-    assert client.src == "TencentARC/Pixal3D"
+    assert client.space_id == "TencentARC/Pixal3D"
+    assert client.src == "https://tencentarc-pixal3d.hf.space/"
     assert client.token == "hf-test-secret"
     assert [call["api_name"] for call in client.calls] == [
         "/preprocess",
@@ -103,6 +121,13 @@ def test_hf_pixal3d_provider_calls_authenticated_three_stage_space_api():
     assert extract["state_path"] == "/remote/tmp/state_123.npz"
     assert extract["decimation_target"] == 300000
     assert extract["texture_size"] == 2048
+    assert client.download_files is False
+    assert static_fetch["url"] == (
+        "https://tencentarc-pixal3d.hf.space/tmp/result_123.glb"
+    )
+    assert static_fetch["headers"]["Authorization"] == "Bearer hf-test-secret"
+    assert static_fetch["headers"]["X-HF-Authorization"] == "Bearer hf-test-secret"
+    assert static_fetch["timeout"] == 120
     assert result.payload == _valid_glb()
     assert result.provider == "huggingface_space"
     assert result.model == "pixal3d"

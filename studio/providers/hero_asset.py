@@ -197,6 +197,29 @@ class HuggingFacePixal3DProvider(HeroAssetProvider):
             ) from exc
         return Client, handle_file
 
+    def _download_tmp_file(self, *, client, remote_path: str) -> bytes:
+        from pathlib import PurePosixPath
+        from urllib.parse import urljoin
+
+        name = PurePosixPath(remote_path).name
+        if not name:
+            raise RuntimeError("Pixal3D returned an invalid remote tmp path.")
+
+        base = getattr(client, "src", "")
+        if not base:
+            raise RuntimeError("Gradio client did not expose the Space base URL.")
+        url = urljoin(base if base.endswith("/") else base + "/", f"tmp/{name}")
+        response = requests.get(
+            url,
+            headers={
+                "Authorization": f"Bearer {self.token}",
+                "X-HF-Authorization": f"Bearer {self.token}",
+            },
+            timeout=120,
+        )
+        response.raise_for_status()
+        return response.content
+
     def generate(
         self,
         *,
@@ -234,6 +257,11 @@ class HuggingFacePixal3DProvider(HeroAssetProvider):
             )
             preprocessed_path = self._file_path(preprocessed)
 
+            # Pixal3D /generate_3d returns many render preview FileData
+            # objects. Mini Utopia only needs state_path, and Gradio's generic
+            # file route can reject those absolute TMP_DIR paths with 403.
+            client.download_files = False
+
             generated = client.predict(
                 image=handle_file(preprocessed_path),
                 seed=self.seed,
@@ -268,12 +296,11 @@ class HuggingFacePixal3DProvider(HeroAssetProvider):
                 session_id=session_id,
                 api_name="/extract_glb_api",
             )
-            glb_path = Path(self._file_path(glb_result))
-            if not glb_path.exists():
-                raise RuntimeError(
-                    f"Pixal3D GLB download was not materialized: {glb_path}"
-                )
-            payload = glb_path.read_bytes()
+            remote_glb_path = self._file_path(glb_result)
+            payload = self._download_tmp_file(
+                client=client,
+                remote_path=remote_glb_path,
+            )
             if len(payload) < 12 or payload[:4] != b"glTF":
                 raise RuntimeError("Pixal3D returned an invalid GLB payload.")
 
