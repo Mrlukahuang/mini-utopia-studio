@@ -13,7 +13,10 @@ from studio.providers.base import ImageGenerationProvider
 from studio.repositories.base import StudioRepository
 from studio.services.world_concept_prompt_service import WorldConceptPromptService
 from studio.services.world_blueprint_service import WorldBlueprintService
-from studio.services.world_appearance_service import WorldAppearanceService
+from studio.services.world_appearance_service import (
+    WorldAppearancePlanningError,
+    WorldAppearanceService,
+)
 from studio.services.world_geometry_compiler_service import WorldGeometryCompilerService
 from studio.services.world_hero_asset_service import WorldHeroAssetService
 from studio.storage.base import ObjectStorage
@@ -325,6 +328,67 @@ class WorldConceptService:
             and world.metadata.get("world_render_blueprint_fingerprint")
             == blueprint_fingerprint
         )
+        appearance_fallback_source = ""
+
+        def generate_fresh_appearance() -> WorldAppearancePlan:
+            nonlocal appearance_fallback_source
+            try:
+                result = self.appearance_service.plan_from_blueprint(
+                    profile=profile,
+                    blueprint=blueprint,
+                    style_profile=style_profile,
+                    strict_provider=strict_appearance,
+                    repair_weak_heroes=repair_weak_heroes,
+                )
+            except WorldAppearancePlanningError as exc:
+                if not strict_appearance:
+                    raise
+
+                # A transient GPT timeout must not throw away a previously valid
+                # world. Prefer the last saved plan because it preserves object
+                # identity and detail better than the deterministic fallback.
+                saved_plan = None
+                if raw_plan:
+                    try:
+                        saved_plan = WorldAppearancePlan.model_validate(raw_plan)
+                    except Exception:
+                        saved_plan = None
+
+                if saved_plan is not None:
+                    result = saved_plan
+                    appearance_fallback_source = "saved_plan_gpt_fallback"
+                    fallback_message = (
+                        "⚠️ GPT AppearancePlan 暂时不可用 · 沿用已保存外观，继续生成 Preview…"
+                    )
+                else:
+                    result = self.appearance_service.fallback_from_blueprint(
+                        profile=profile,
+                        blueprint=blueprint,
+                    )
+                    appearance_fallback_source = "deterministic_gpt_fallback"
+                    fallback_message = (
+                        "⚠️ GPT AppearancePlan 暂时不可用 · 使用 Blueprint 安全外观继续构建…"
+                    )
+
+                world.metadata["world_appearance_generation_status"] = "fallback"
+                world.metadata["world_appearance_generation_error"] = str(exc)
+                world.metadata["world_appearance_generation_fallback"] = (
+                    appearance_fallback_source
+                )
+                self._report_progress(
+                    progress_callback,
+                    "appearance_fallback",
+                    fallback_message,
+                    0.22 if not preview_image_bytes else 0.72,
+                )
+                return result
+
+            appearance_fallback_source = ""
+            world.metadata["world_appearance_generation_status"] = "success"
+            world.metadata.pop("world_appearance_generation_error", None)
+            world.metadata.pop("world_appearance_generation_fallback", None)
+            return result
+
         if can_reuse_plan:
             self._report_progress(
                 progress_callback,
@@ -341,13 +405,7 @@ class WorldConceptService:
                     "✨ 外观设计需要更新 · 正在重新设计各个世界物件…",
                     0.18 if not preview_image_bytes else 0.71,
                 )
-                appearance = self.appearance_service.plan_from_blueprint(
-                    profile=profile,
-                    blueprint=blueprint,
-                    style_profile=style_profile,
-                    strict_provider=strict_appearance,
-                    repair_weak_heroes=repair_weak_heroes,
-                )
+                appearance = generate_fresh_appearance()
         else:
             self._report_progress(
                 progress_callback,
@@ -355,13 +413,7 @@ class WorldConceptService:
                 "✨ 正在根据 Blueprint 设计每个世界物件的形状、部件与材质…",
                 0.16,
             )
-            appearance = self.appearance_service.plan_from_blueprint(
-                profile=profile,
-                blueprint=blueprint,
-                style_profile=style_profile,
-                strict_provider=strict_appearance,
-                repair_weak_heroes=repair_weak_heroes,
-            )
+            appearance = generate_fresh_appearance()
 
         if not preview_image_bytes:
             diagnostics = self.appearance_service.summarize_plan(
@@ -440,9 +492,13 @@ class WorldConceptService:
                 )
         else:
             world.metadata["world_appearance_source"] = (
-                "blueprint+gpt_fresh"
-                if force_appearance_regeneration
-                else "blueprint+creator_prompt"
+                f"blueprint+{appearance_fallback_source}"
+                if appearance_fallback_source
+                else (
+                    "blueprint+gpt_fresh"
+                    if force_appearance_regeneration
+                    else "blueprint+creator_prompt"
+                )
             )
 
         if preview_image_bytes:
