@@ -154,3 +154,67 @@ def test_world_hero_service_reuses_exact_global_generated_asset(tmp_path):
     assert cache["SCENE_WHALE"]["metadata"]["reused_from_library"] is True
     whale = enriched.objects[0]
     assert any(node.geometry.source_type == "glb" for node in whale.nodes)
+
+
+
+def test_first_generation_enters_global_library_and_second_world_reuses_it(tmp_path):
+    repo = SQLiteStudioRepository(tmp_path / "studio.db")
+    storage = LocalObjectStorage(tmp_path / "storage")
+    library = ReusableAssetLibraryService(repo, storage)
+    provider = NeverCalledProvider()
+    appearance = _appearance()
+    blueprint = _blueprint()
+    compiler = WorldGeometryCompilerService()
+    service = WorldHeroAssetService(
+        storage=storage,
+        provider=provider,
+        reusable_library=library,
+    )
+
+    first_render = compiler.compile(
+        profile=_profile(),
+        blueprint=blueprint,
+        appearance=appearance,
+        style_profile={},
+    )
+    first, first_builds, _ = service.enrich_render_spec(
+        location_asset_id="LOC_FIRST",
+        blueprint=blueprint,
+        appearance=appearance,
+        render_spec=first_render,
+        preview_image_bytes=_preview(),
+        preview_mime_type="image/png",
+    )
+
+    assert provider.calls == 1
+    assert first_builds[0].status == "generated"
+    reusable = library.list_reusable()
+    assert len(reusable) == 1
+    reusable_spec = library.get_spec(reusable[0])
+    assert reusable_spec.category == "hero"
+    assert reusable_spec.source.generator_model == "pixal3d"
+    assert reusable_spec.source_fingerprint == first_builds[0].input_sha256
+
+    second_render = compiler.compile(
+        profile=_profile(),
+        blueprint=blueprint,
+        appearance=appearance,
+        style_profile={},
+    )
+    second, second_builds, _ = service.enrich_render_spec(
+        location_asset_id="LOC_SECOND",
+        blueprint=blueprint,
+        appearance=appearance,
+        render_spec=second_render,
+        preview_image_bytes=_preview(),
+        preview_mime_type="image/png",
+    )
+
+    assert provider.calls == 1
+    assert second_builds[0].status == "cached"
+    assert second_builds[0].asset_path == reusable_spec.storage_path
+    assert any(
+        node.geometry.asset_path == reusable_spec.storage_path
+        for node in second.objects[0].nodes
+        if node.geometry.source_type == "glb"
+    )
