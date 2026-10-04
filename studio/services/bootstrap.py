@@ -28,7 +28,7 @@ from studio.services.reusable_asset_pack_service import ReusableAssetPackService
 from studio.providers.openai_image import OpenAIImageProvider
 from studio.providers.openai_vision import OpenAIVisionProvider
 from studio.providers.openai_text import OpenAIStructuredTextProvider
-from studio.providers.hero_asset import HttpHeroAssetProvider
+from studio.providers.hero_asset import HttpHeroAssetProvider, HuggingFacePixal3DProvider
 from studio.storage.base import ObjectStorage
 from studio.storage.local import LocalObjectStorage
 from studio.storage.supabase import SupabaseObjectStorage
@@ -144,23 +144,34 @@ def build_context(settings: Settings) -> StudioContext:
         image_analysis_provider=vision_provider,
     )
     world_geometry_compiler = WorldGeometryCompilerService()
-    hero_asset_provider = (
-        HttpHeroAssetProvider(
+    reusable_assets = ReusableAssetLibraryService(repository, storage)
+    reusable_asset_packs = ReusableAssetPackService(reusable_assets)
+
+    if settings.hero_asset_worker_url:
+        hero_asset_provider = HttpHeroAssetProvider(
             base_url=settings.hero_asset_worker_url,
             model=settings.hero_asset_model,
             token=settings.hero_asset_worker_token,
             timeout_seconds=settings.hero_asset_timeout_seconds,
         )
-        if settings.hero_asset_worker_url
-        else None
-    )
+    elif settings.hf_token:
+        hero_asset_provider = HuggingFacePixal3DProvider(
+            token=settings.hf_token,
+            space_id=settings.hf_hero_space_id,
+            resolution=settings.hf_pixal3d_resolution,
+            decimation_target=settings.hf_pixal3d_decimation_target,
+            texture_size=settings.hf_pixal3d_texture_size,
+            seed=settings.hf_pixal3d_seed,
+        )
+    else:
+        hero_asset_provider = None
+
     world_hero_assets = WorldHeroAssetService(
         storage=storage,
         provider=hero_asset_provider,
         max_assets_per_world=settings.hero_asset_max_per_world,
+        reusable_library=reusable_assets,
     )
-    reusable_assets = ReusableAssetLibraryService(repository, storage)
-    reusable_asset_packs = ReusableAssetPackService(reusable_assets)
 
     return StudioContext(
         settings=settings,

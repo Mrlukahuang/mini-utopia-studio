@@ -250,3 +250,30 @@ World.
 
 See `docs/M3_ASSET_LIBRARY_STRATEGY.md` for the durable sourcing and reuse
 policy.
+
+
+## M3.6 Authenticated Hugging Face Hero provider
+
+During the family/development stage, Mini Utopia can call the public
+`TencentARC/Pixal3D` ZeroGPU Space directly using `HF_TOKEN`.
+
+Provider precedence is:
+
+```text
+explicit self-hosted Worker
+→ authenticated Hugging Face Pixal3D
+→ procedural fallback
+```
+
+The direct provider follows the Space's current three-step Gradio API:
+`/preprocess` → `/generate_3d` → `/extract_glb_api`.
+
+Generated GLBs are promoted into the reusable Asset Library. Their exact source
+fingerprint includes provider quality settings + Preview crop +
+ObjectAppearanceSpec, so an identical request in another World can reuse the
+same stored GLB without another GPU call.
+
+Generated assets remain `style_status=raw` until the Mini Utopia visual
+normalization/approval stage. Exact-cache reuse does not imply broad semantic
+reuse: a different child-created whale must not silently become an existing
+whale merely because both share `sky_whale`.

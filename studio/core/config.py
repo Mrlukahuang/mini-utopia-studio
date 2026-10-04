@@ -29,6 +29,12 @@ class Settings:
     hero_asset_model: str = "pixal3d"
     hero_asset_timeout_seconds: float = 900.0
     hero_asset_max_per_world: int = 1
+    hf_token: str | None = None
+    hf_hero_space_id: str = "TencentARC/Pixal3D"
+    hf_pixal3d_resolution: int = 1024
+    hf_pixal3d_decimation_target: int = 300000
+    hf_pixal3d_texture_size: int = 2048
+    hf_pixal3d_seed: int = 42
 
 
 def get_settings(root_dir: Path | None = None) -> Settings:
@@ -65,5 +71,21 @@ def get_settings(root_dir: Path | None = None) -> Settings:
         ),
         hero_asset_max_per_world=int(
             os.getenv("HERO_ASSET_MAX_PER_WORLD", "1")
+        ),
+        hf_token=os.getenv("HF_TOKEN") or None,
+        hf_hero_space_id=os.getenv(
+            "HF_HERO_SPACE_ID", "TencentARC/Pixal3D"
+        ).strip(),
+        hf_pixal3d_resolution=int(
+            os.getenv("HF_PIXAL3D_RESOLUTION", "1024")
+        ),
+        hf_pixal3d_decimation_target=int(
+            os.getenv("HF_PIXAL3D_DECIMATION_TARGET", "300000")
+        ),
+        hf_pixal3d_texture_size=int(
+            os.getenv("HF_PIXAL3D_TEXTURE_SIZE", "2048")
+        ),
+        hf_pixal3d_seed=int(
+            os.getenv("HF_PIXAL3D_SEED", "42")
         ),
     )

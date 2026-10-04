@@ -67,6 +67,26 @@ class ReusableAssetLibraryService:
                 return asset
         return None
 
+    def find_by_source_fingerprint(self, fingerprint: str) -> Asset | None:
+        if not fingerprint:
+            return None
+        for asset in self.list_reusable():
+            spec = self._spec(asset)
+            if (
+                spec is not None
+                and spec.source_fingerprint == fingerprint
+                and not spec.parent_asset_id
+            ):
+                return asset
+        return None
+
+    @classmethod
+    def get_spec(cls, asset: Asset) -> ReusableGLBSpec:
+        spec = cls._spec(asset)
+        if spec is None:
+            raise ValueError(f"Asset is not a reusable GLB: {asset.asset_id}")
+        return spec
+
     def find_for_semantic_key(
         self,
         semantic_key: str,
@@ -99,6 +119,7 @@ class ReusableAssetLibraryService:
         tags: list[str] | None = None,
         normalization: ReusableAssetNormalizationSpec | None = None,
         variant_policy: ReusableAssetVariantPolicy | None = None,
+        source_fingerprint: str = "",
     ) -> Asset:
         self._validate_glb(payload)
         if asset_type not in {AssetType.PROP, AssetType.VEHICLE, AssetType.WEARABLE}:
@@ -122,6 +143,7 @@ class ReusableAssetLibraryService:
             sha256=digest,
             byte_size=len(payload),
             source=source,
+            source_fingerprint=source_fingerprint,
             normalization=normalization or ReusableAssetNormalizationSpec(),
             variant_policy=variant_policy or ReusableAssetVariantPolicy(),
         )
