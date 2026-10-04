@@ -528,6 +528,26 @@ function bufferGeometryFromSpec(buffer) {{
   return geometry;
 }}
 
+function wedgeGeometry() {{
+  const geometry = new THREE.BufferGeometry();
+  const positions = new Float32Array([
+    -.5,-.5,-.5,  .5,-.5,-.5,  -.5,.5,-.5,
+    -.5,-.5,.5,   .5,-.5,.5,   -.5,.5,.5
+  ]);
+  const indices = [
+    0,1,2,
+    3,5,4,
+    0,3,4, 0,4,1,
+    0,2,5, 0,5,3,
+    1,4,5, 1,5,2,
+    2,1,4, 2,4,5
+  ];
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions,3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}}
+
 function primitiveGeometry(spec) {{
   const size = spec.primitive_size || {{x:1,y:1,z:1}};
   const primitive = spec.primitive || 'box';
@@ -539,27 +559,55 @@ function primitiveGeometry(spec) {{
   }}
 
   if (primitive === 'sphere' || primitive === 'ellipsoid') {{
-    geometry = new THREE.SphereGeometry(.5, 24, 16);
+    geometry = new THREE.SphereGeometry(.5, 28, 20);
+    baseScale.set(size.x || 1, size.y || 1, size.z || 1);
+  }} else if (primitive === 'capsule') {{
+    geometry = new THREE.CapsuleGeometry(.35,.30,8,18);
+    baseScale.set(
+      (size.x || 1) / .70,
+      size.y || 1,
+      (size.z || 1) / .70
+    );
+  }} else if (primitive === 'hemisphere' || primitive === 'dome') {{
+    geometry = new THREE.SphereGeometry(.5,28,14,0,Math.PI*2,0,Math.PI/2);
+    geometry.translate(0,-.22,0);
     baseScale.set(size.x || 1, size.y || 1, size.z || 1);
   }} else if (primitive === 'cylinder') {{
     geometry = new THREE.CylinderGeometry(.5,.5,1,24);
     baseScale.set(size.x || 1, size.y || 1, size.z || 1);
   }} else if (primitive === 'cone') {{
-    geometry = new THREE.ConeGeometry(.5,1,20);
+    geometry = new THREE.ConeGeometry(.5,1,24);
     baseScale.set(size.x || 1, size.y || 1, size.z || 1);
-  }} else if (primitive === 'torus') {{
-    geometry = new THREE.TorusGeometry(.34,.12,12,32);
+  }} else if (primitive === 'tapered_box') {{
+    geometry = new THREE.CylinderGeometry(.34,.5,1,4,1,false);
+    geometry.rotateY(Math.PI/4);
+    baseScale.set(size.x || 1, size.y || 1, size.z || 1);
+  }} else if (primitive === 'wedge') {{
+    geometry = wedgeGeometry();
+    baseScale.set(size.x || 1, size.y || 1, size.z || 1);
+  }} else if (primitive === 'disc') {{
+    geometry = new THREE.CylinderGeometry(.5,.5,.12,28);
+    baseScale.set(size.x || 1, (size.y || 1) / .12, size.z || 1);
+  }} else if (primitive === 'torus' || primitive === 'ring') {{
+    geometry = new THREE.TorusGeometry(
+      primitive === 'ring' ? .40 : .34,
+      primitive === 'ring' ? .07 : .12,
+      14,
+      36
+    );
     baseScale.set(size.x || 1, size.y || 1, size.z || 1);
   }} else if (primitive === 'plane') {{
     geometry = new THREE.PlaneGeometry(1,1);
     geometry.rotateX(-Math.PI/2);
-    baseScale.set(size.x || 1, size.z || 1, size.y || .08);
+    baseScale.set(size.x || 1, size.z || 1, Math.max(.04,size.y || .08));
   }} else if (primitive === 'arch') {{
-    geometry = new THREE.TorusGeometry(.36,.11,12,32,Math.PI);
+    geometry = new THREE.TorusGeometry(.36,.11,14,36,Math.PI);
     geometry.rotateZ(Math.PI);
     baseScale.set(size.x || 1, size.y || 1, size.z || 1);
+  }} else if (primitive === 'rounded_box' || primitive === 'voxel_cluster') {{
+    geometry = new RoundedBoxGeometry(1,1,1,4,primitive === 'voxel_cluster' ? .06 : .12);
+    baseScale.set(size.x || 1, size.y || 1, size.z || 1);
   }} else {{
-    // box, rounded_box and voxel_cluster share the stable block fallback.
     geometry = new THREE.BoxGeometry(1,1,1);
     baseScale.set(size.x || 1, size.y || 1, size.z || 1);
   }}
@@ -596,11 +644,10 @@ function addCompiledRenderObject(spec) {{
     nodeGroups.set(node.node_id, {{group, parent: node.parent_node_id || ''}});
   }});
 
-  nodeGroups.forEach(entry => {{
-    const parent = entry.parent ? nodeGroups.get(entry.parent) : null;
-    if (parent) parent.group.add(entry.group);
-    else objectGroup.add(entry.group);
-  }});
+  // RenderSpec v0.2 mesh-node transforms are all object-local.
+  // attachment_parent_part_id remains semantic metadata; no nested transform
+  // accumulation is applied here.
+  nodeGroups.forEach(entry => objectGroup.add(entry.group));
 
   const transform = spec.transform || {{}};
   const p = transform.position || {{}};
