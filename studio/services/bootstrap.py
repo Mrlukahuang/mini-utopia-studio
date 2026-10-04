@@ -171,6 +171,7 @@ def build_context(settings: Settings) -> StudioContext:
         provider=hero_asset_provider,
         max_assets_per_world=settings.hero_asset_max_per_world,
         reusable_library=reusable_assets,
+        reference_image_provider=image_provider,
     )
 
     return StudioContext(
