@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from studio.models.world import WorldPoint
 
 
-RENDER_SPEC_SCHEMA_VERSION = "0.1"
+RENDER_SPEC_SCHEMA_VERSION = "0.2"
 
 
 class RenderVec3(BaseModel):
@@ -61,7 +61,14 @@ PrimitiveType = Literal[
     "ellipsoid",
     "cylinder",
     "cone",
+    "capsule",
+    "hemisphere",
+    "dome",
+    "wedge",
+    "tapered_box",
+    "disc",
     "torus",
+    "ring",
     "plane",
     "arch",
     "voxel_cluster",
@@ -69,7 +76,17 @@ PrimitiveType = Literal[
 
 
 class ShapePartSpec(BaseModel):
-    """GPT-facing local shape grammar. No world-space placement lives here."""
+    """GPT-facing object-local shape grammar.
+
+    relative_scale is the fraction of the authoritative Blueprint envelope
+    occupied by the part on each axis. local_position is normalized from
+    -1..1 across the envelope half-extents: 0 is the object center, -1/+1 are
+    the negative/positive envelope faces before part-size clamping.
+
+    parent_part_id is semantic attachment metadata in RenderSpec v0.2. It does
+    not create an additional transform space; compiled mesh transforms remain
+    object-local so GPT cannot accidentally accumulate parent transforms.
+    """
 
     part_id: str
     role: str
