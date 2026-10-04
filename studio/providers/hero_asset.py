@@ -102,12 +102,6 @@ class HttpHeroAssetProvider(HeroAssetProvider):
                 f"{content_type}"
             )
 
-        quota_after = self._zero_gpu_quota_snapshot()
-        zero_gpu_usage = self._zero_gpu_usage(quota_before, quota_after)
-        zero_gpu_usage["wall_seconds"] = max(
-            0.0, time.perf_counter() - started_at
-        )
-
         return HeroAssetResult(
             payload=payload,
             mime_type="model/gltf-binary",
@@ -390,6 +384,12 @@ class HuggingFacePixal3DProvider(HeroAssetProvider):
             )
             if len(payload) < 12 or payload[:4] != b"glTF":
                 raise RuntimeError("Pixal3D returned an invalid GLB payload.")
+
+        quota_after = self._zero_gpu_quota_snapshot()
+        zero_gpu_usage = self._zero_gpu_usage(quota_before, quota_after)
+        zero_gpu_usage["wall_seconds"] = max(
+            0.0, time.perf_counter() - started_at
+        )
 
         return HeroAssetResult(
             payload=payload,
