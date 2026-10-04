@@ -392,23 +392,52 @@ class WorldConceptService:
                 "👁️ 正在让 Vision 对照 Preview 校正轮廓、部件、颜色角色和材质…",
                 0.74,
             )
-            appearance = self.appearance_service.refine_from_preview(
-                profile=profile,
-                blueprint=blueprint,
-                style_profile=style_profile,
-                base_plan=appearance,
-                image_bytes=preview_image_bytes,
-                mime_type=preview_mime_type,
-                strict_provider=strict_appearance,
-                repair_weak_heroes=repair_weak_heroes,
-            )
-            world.metadata["world_appearance_source"] = "blueprint+preview_vision"
-            world.metadata["world_appearance_diagnostics"] = (
-                self.appearance_service.summarize_plan(
+            try:
+                appearance = self.appearance_service.refine_from_preview(
+                    profile=profile,
                     blueprint=blueprint,
-                    plan=appearance,
+                    style_profile=style_profile,
+                    base_plan=appearance,
+                    image_bytes=preview_image_bytes,
+                    mime_type=preview_mime_type,
+                    strict_provider=strict_appearance,
+                    repair_weak_heroes=repair_weak_heroes,
                 )
-            )
+            except Exception as exc:
+                # Preview Vision is a quality-enhancement pass. By this point
+                # Blueprint, the fresh GPT AppearancePlan and the rendered
+                # Preview already exist, so a transient image-analysis timeout
+                # must not prevent Geometry/Hero generation or entering World.
+                world.metadata["world_appearance_source"] = (
+                    "blueprint+gpt_vision_fallback"
+                )
+                world.metadata["world_preview_vision_status"] = "fallback"
+                world.metadata["world_preview_vision_error"] = str(exc)
+                world.metadata["world_appearance_diagnostics"] = (
+                    self.appearance_service.summarize_plan(
+                        blueprint=blueprint,
+                        plan=appearance,
+                    )
+                )
+                self._report_progress(
+                    progress_callback,
+                    "vision_fallback",
+                    (
+                        "⚠️ Vision 校正暂时不可用 · 保留已完成的 AppearancePlan，"
+                        "继续构建 3D 世界…"
+                    ),
+                    0.78,
+                )
+            else:
+                world.metadata["world_appearance_source"] = "blueprint+preview_vision"
+                world.metadata["world_preview_vision_status"] = "success"
+                world.metadata.pop("world_preview_vision_error", None)
+                world.metadata["world_appearance_diagnostics"] = (
+                    self.appearance_service.summarize_plan(
+                        blueprint=blueprint,
+                        plan=appearance,
+                    )
+                )
         else:
             world.metadata["world_appearance_source"] = (
                 "blueprint+gpt_fresh"
