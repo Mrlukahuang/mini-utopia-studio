@@ -68,6 +68,7 @@ def build_world_runtime_html(
   body {{ font-family: ui-rounded, "Nunito", "Noto Sans SC", system-ui, sans-serif; }}
   #wrap {{ position:relative; width:100%; height:100vh; min-height:660px; overflow:hidden; border-radius:24px; }}
   #canvas {{ position:absolute; inset:0; }}
+  #canvas canvas {{ touch-action:none; cursor:grab; }}
   .hud {{
     position:absolute; left:18px; top:18px; z-index:5; max-width:340px;
     background:rgba(255,255,255,.84); backdrop-filter:blur(14px);
@@ -109,7 +110,7 @@ def build_world_runtime_html(
   <div id="canvas"></div>
   <div class="hud">
     <h2>🌍 {escape(world_name)}</h2>
-    <p><b>Explore Mode</b> · WASD / Arrow Keys</p>
+    <p><b>Explore Mode</b> · WASD / Arrow Keys · Drag to Orbit</p>
     <p>Blueprint v{escape(blueprint.schema_version)} · {blueprint.grid.width}×{blueprint.grid.depth} · {len(blueprint.chunks)} chunks</p>
     <span class="pill">🧸 {escape(character_name)}</span>
     <span class="pill" id="animState">Idle</span>
@@ -124,7 +125,7 @@ def build_world_runtime_html(
     <button id="reset">↺ Reset</button>
     <button id="tour" class="primary">🎬 Start Director Tour</button>
   </div>
-  <div class="tip">WASD / 方向键移动 · Shift 奔跑 · Mouse Wheel / 滚轮缩放 · 🌐 Overview 看全景</div>
+  <div class="tip">WASD / 方向键移动 · Shift 奔跑 · Mouse Drag / 拖动旋转 360° · Mouse Wheel / 滚轮缩放 · 🌐 Overview 看全景</div>
   <div id="runtimeError" style="
     display:none; position:absolute; inset:120px 24px auto 24px; z-index:20;
     padding:16px 18px; border-radius:18px; background:rgba(255,235,238,.96);
@@ -1177,12 +1178,29 @@ const velocity = new THREE.Vector3();
 const cameraTarget = new THREE.Vector3();
 const clock = new THREE.Clock();
 
+const FOLLOW_TARGET_HEIGHT = 1.8;
 const baseFollowOffset = new THREE.Vector3(-7, 7, 9);
+const defaultOrbitOffset = baseFollowOffset.clone().sub(
+  new THREE.Vector3(0, FOLLOW_TARGET_HEIGHT, 0)
+);
+const baseFollowDistance = defaultOrbitOffset.length();
 const scaledFollowOffset = new THREE.Vector3();
 const ZOOM_MIN = .60;
 const ZOOM_MAX = 3.80;
+const ORBIT_PITCH_MIN = THREE.MathUtils.degToRad(-12);
+const ORBIT_PITCH_MAX = THREE.MathUtils.degToRad(82);
+const ORBIT_SENSITIVITY = .006;
+const DEFAULT_ORBIT_YAW = Math.atan2(defaultOrbitOffset.x, defaultOrbitOffset.z);
+const DEFAULT_ORBIT_PITCH = Math.asin(defaultOrbitOffset.y / baseFollowDistance);
 let followZoom = 1.0;
 let overviewMode = false;
+let overviewDistance = 1;
+let orbitYaw = DEFAULT_ORBIT_YAW;
+let orbitPitch = DEFAULT_ORBIT_PITCH;
+let orbitDragging = false;
+let orbitPointerId = null;
+let orbitPointerX = 0;
+let orbitPointerY = 0;
 
 const layoutTopY = Math.max(
   0,
@@ -1215,6 +1233,32 @@ const overviewTarget = new THREE.Vector3(
   bp.grid.depth * cell * .5,
 );
 
+function resetOrbitAngle() {{
+  orbitYaw = DEFAULT_ORBIT_YAW;
+  orbitPitch = DEFAULT_ORBIT_PITCH;
+}}
+
+function setOrbitFromOffset(offset) {{
+  const distance = Math.max(.001, offset.length());
+  orbitYaw = Math.atan2(offset.x, offset.z);
+  orbitPitch = THREE.MathUtils.clamp(
+    Math.asin(THREE.MathUtils.clamp(offset.y / distance, -1, 1)),
+    ORBIT_PITCH_MIN,
+    ORBIT_PITCH_MAX,
+  );
+  return distance;
+}}
+
+function positionCameraOnOrbit(target, distance) {{
+  const cosPitch = Math.cos(orbitPitch);
+  camera.position.set(
+    target.x + Math.sin(orbitYaw) * cosPitch * distance,
+    target.y + Math.sin(orbitPitch) * distance,
+    target.z + Math.cos(orbitYaw) * cosPitch * distance,
+  );
+  camera.lookAt(target);
+}}
+
 function updateZoomLabel() {{
   const label = document.getElementById('zoomState');
   if (!label) return;
@@ -1241,6 +1285,7 @@ function zoomCamera(direction) {{
       worldSpan * .35,
       worldSpan * 2.2,
     );
+    overviewDistance = nextDistance;
     delta.setLength(nextDistance);
     camera.position.copy(cameraTarget).add(delta);
     camera.lookAt(cameraTarget);
@@ -1260,6 +1305,7 @@ function showOverview() {{
     Math.max(worldTopY + horizontal * .58, 30),
     overviewTarget.z + horizontal * .88,
   );
+  overviewDistance = setOrbitFromOffset(camera.position.clone().sub(cameraTarget));
   camera.lookAt(cameraTarget);
   updateZoomLabel();
 }}
@@ -1345,11 +1391,20 @@ function updatePlayer(dt) {{
 
 function updateFollowCamera(dt) {{
   if (!manualMode || overviewMode) return;
-  scaledFollowOffset.copy(baseFollowOffset).multiplyScalar(followZoom);
-  const desired = player.position.clone().add(scaledFollowOffset);
+  const target = player.position.clone().add(
+    new THREE.Vector3(0, FOLLOW_TARGET_HEIGHT, 0)
+  );
+  const distance = baseFollowDistance * followZoom;
+  const cosPitch = Math.cos(orbitPitch);
+  scaledFollowOffset.set(
+    Math.sin(orbitYaw) * cosPitch * distance,
+    Math.sin(orbitPitch) * distance,
+    Math.cos(orbitYaw) * cosPitch * distance,
+  );
+  const desired = target.clone().add(scaledFollowOffset);
   const blend = 1 - Math.pow(.001, dt);
   camera.position.lerp(desired, blend);
-  cameraTarget.lerp(player.position.clone().add(new THREE.Vector3(0,1.8,0)), blend);
+  cameraTarget.lerp(target, blend);
   camera.lookAt(cameraTarget);
 }}
 
@@ -1409,9 +1464,51 @@ document.getElementById('reset').addEventListener('click', () => {{
   stopTour();
   overviewMode = false;
   followZoom = 1.0;
+  resetOrbitAngle();
   resetPlayer();
   updateZoomLabel();
 }});
+
+renderer.domElement.addEventListener('pointerdown', event => {{
+  if (!manualMode || event.button !== 0) return;
+  orbitDragging = true;
+  orbitPointerId = event.pointerId;
+  orbitPointerX = event.clientX;
+  orbitPointerY = event.clientY;
+  renderer.domElement.setPointerCapture?.(event.pointerId);
+  renderer.domElement.style.cursor = 'grabbing';
+}});
+
+renderer.domElement.addEventListener('pointermove', event => {{
+  if (!orbitDragging || event.pointerId !== orbitPointerId || !manualMode) return;
+  const dx = event.clientX - orbitPointerX;
+  const dy = event.clientY - orbitPointerY;
+  orbitPointerX = event.clientX;
+  orbitPointerY = event.clientY;
+
+  orbitYaw -= dx * ORBIT_SENSITIVITY;
+  orbitPitch = THREE.MathUtils.clamp(
+    orbitPitch - dy * ORBIT_SENSITIVITY,
+    ORBIT_PITCH_MIN,
+    ORBIT_PITCH_MAX,
+  );
+
+  if (overviewMode) {{
+    positionCameraOnOrbit(cameraTarget, overviewDistance);
+  }}
+}});
+
+function endOrbitDrag(event) {{
+  if (!orbitDragging || event.pointerId !== orbitPointerId) return;
+  orbitDragging = false;
+  orbitPointerId = null;
+  renderer.domElement.releasePointerCapture?.(event.pointerId);
+  renderer.domElement.style.cursor = 'grab';
+}}
+
+renderer.domElement.addEventListener('pointerup', endOrbitDrag);
+renderer.domElement.addEventListener('pointercancel', endOrbitDrag);
+
 renderer.domElement.addEventListener('wheel', event => {{
   event.preventDefault();
   if (!manualMode) return;
@@ -1432,7 +1529,7 @@ camera.position.set(
   (spawn.y || 0) + baseFollowOffset.y,
   spawn.z + baseFollowOffset.z,
 );
-cameraTarget.copy(player.position).add(new THREE.Vector3(0,1.8,0));
+cameraTarget.copy(player.position).add(new THREE.Vector3(0,FOLLOW_TARGET_HEIGHT,0));
 camera.lookAt(cameraTarget);
 updateZoomLabel();
 
