@@ -223,6 +223,7 @@ class ThreeMaterialSpec(BaseModel):
 class ThreeMeshNodeSpec(BaseModel):
     node_id: str
     parent_node_id: str = ""
+    attachment_parent_part_id: str = ""
     geometry: ThreeGeometrySpec
     material_id: str
     local_position: RenderVec3 = Field(default_factory=RenderVec3)
