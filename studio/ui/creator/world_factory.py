@@ -756,6 +756,45 @@ def render_world_factory(
                         f"Three.js nodes={rendered.get('node_count', 0)}"
                     )
 
+                composition = saved_world.metadata.get(
+                    "world_hero_composition_plan", {}
+                )
+                clusters = composition.get("clusters", []) if composition else []
+                if clusters:
+                    st.divider()
+                    st.write("**🧩 Hero Composition / 创意主体结构**")
+                    st.caption(
+                        "这里只决定哪些视觉元素应该一起生成、哪些以后挂载；"
+                        "Blueprint ID 仍全部保留。"
+                    )
+                    element_names = {
+                        element.element_id: element.name
+                        for element in blueprint.layout_elements
+                    }
+                    for cluster in clusters:
+                        root_id = cluster.get("root_element_id", "")
+                        root_name = element_names.get(root_id, root_id or "Hero")
+                        mode = cluster.get("mode", "—")
+                        intrinsic = [
+                            element_names.get(item.get("element_id"), item.get("element_id"))
+                            for item in cluster.get("members", [])
+                            if item.get("role") == "intrinsic"
+                        ]
+                        attachments = [
+                            element_names.get(item.get("element_id"), item.get("element_id"))
+                            for item in cluster.get("members", [])
+                            if item.get("role") == "attachment"
+                        ]
+                        st.write(f"**{root_name}** · {mode}")
+                        st.caption(
+                            "Intrinsic / 同体生成 · "
+                            + (", ".join(intrinsic) if intrinsic else "—")
+                        )
+                        st.caption(
+                            "Attachments / 独立挂载 · "
+                            + (", ".join(attachments) if attachments else "—")
+                        )
+
                 hero_diagnostics = saved_world.metadata.get(
                     "world_hero_asset_diagnostics", []
                 )
