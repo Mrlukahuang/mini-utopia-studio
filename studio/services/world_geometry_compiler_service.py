@@ -94,11 +94,6 @@ class WorldGeometryCompilerService:
             part_id = raw_part_id
             if part_id in seen_part_ids:
                 part_id = f"{raw_part_id}_{index:02d}"
-            parent_part_id = (
-                part.parent_part_id
-                if part.parent_part_id in seen_part_ids
-                else ""
-            )
             seen_part_ids.add(part_id)
 
             material_id = self._material_id(
@@ -113,55 +108,40 @@ class WorldGeometryCompilerService:
                     palette=palette,
                 )
 
+            sx, px = self._compile_axis(
+                extent=element.width,
+                relative_scale=part.relative_scale.x,
+                local_position=part.local_position.x,
+                center_offset=0.0,
+            )
+            sy, py = self._compile_axis(
+                extent=element.height,
+                relative_scale=part.relative_scale.y,
+                local_position=part.local_position.y,
+                center_offset=element.height * .5,
+            )
+            sz, pz = self._compile_axis(
+                extent=element.depth,
+                relative_scale=part.relative_scale.z,
+                local_position=part.local_position.z,
+                center_offset=0.0,
+            )
+
             nodes.append(
                 ThreeMeshNodeSpec(
                     node_id=f"{element.element_id}:{part_id}",
-                    parent_node_id=(
-                        f"{element.element_id}:{parent_part_id}"
-                        if parent_part_id
-                        else ""
-                    ),
+                    # RenderSpec v0.2 uses one object-local coordinate space for
+                    # every part. Keep parent metadata for semantics/attachments,
+                    # but do not accumulate transforms in Three.js.
+                    parent_node_id="",
+                    attachment_parent_part_id=part.parent_part_id,
                     geometry=ThreeGeometrySpec(
-                        # Strategy is planning intent. Until an actual GLB/buffer
-                        # artifact exists, the compiled runtime source stays primitive.
                         source_type="primitive",
                         primitive=part.primitive,
-                        primitive_size=RenderVec3(
-                            x=max(
-                                .08,
-                                element.width
-                                * self._clamp(abs(part.relative_scale.x), .05, 2.5),
-                            ),
-                            y=max(
-                                .08,
-                                element.height
-                                * self._clamp(abs(part.relative_scale.y), .05, 2.5),
-                            ),
-                            z=max(
-                                .08,
-                                element.depth
-                                * self._clamp(abs(part.relative_scale.z), .05, 2.5),
-                            ),
-                        ),
+                        primitive_size=RenderVec3(x=sx, y=sy, z=sz),
                     ),
                     material_id=material_id,
-                    # Blueprint y is the object's base/support elevation.
-                    # Shape grammar local positions are center-relative, while
-                    # Three.js primitives are centered on their local origin.
-                    # Lift every compiled part by half the authoritative object
-                    # height so geometry occupies y .. y+height instead of
-                    # straddling the Blueprint base plane.
-                    local_position=RenderVec3(
-                        x=self._clamp(part.local_position.x, -1.5, 1.5)
-                        * element.width,
-                        y=(
-                            element.height * .5
-                            + self._clamp(part.local_position.y, -1.5, 1.5)
-                            * element.height
-                        ),
-                        z=self._clamp(part.local_position.z, -1.5, 1.5)
-                        * element.depth,
-                    ),
+                    local_position=RenderVec3(x=px, y=py, z=pz),
                     local_quaternion=self._quaternion_from_euler_degrees(
                         part.rotation_degrees.x,
                         part.rotation_degrees.y,
@@ -304,6 +284,31 @@ class WorldGeometryCompilerService:
                 ),
             ],
         )
+
+    @classmethod
+    def _compile_axis(
+        cls,
+        *,
+        extent: float,
+        relative_scale: float,
+        local_position: float,
+        center_offset: float,
+    ) -> tuple[float, float]:
+        """Compile one shape axis inside the authoritative Blueprint envelope.
+
+        relative_scale is a fraction of the full envelope axis.
+        local_position is normalized -1..1 from center to envelope faces.
+        The center is automatically clamped by part half-size so geometry
+        remains within the envelope.
+        """
+        extent = max(.08, float(extent))
+        fraction = cls._clamp(abs(float(relative_scale)), .03, 1.0)
+        size = max(.08, extent * fraction)
+        normalized = cls._clamp(float(local_position), -1.0, 1.0)
+        safe_limit = max(0.0, 1.0 - fraction)
+        normalized = cls._clamp(normalized, -safe_limit, safe_limit)
+        center = center_offset + normalized * extent * .5
+        return size, center
 
     @staticmethod
     def _clamp(value: float, low: float, high: float) -> float:
