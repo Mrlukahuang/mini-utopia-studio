@@ -284,6 +284,7 @@ class HuggingFacePixal3DProvider(HeroAssetProvider):
             provider="huggingface_space",
             metadata={
                 "space_id": self.space_id,
+                "space_url": f"https://huggingface.co/spaces/{self.space_id}",
                 "resolution": self.resolution,
                 "decimation_target": self.decimation_target,
                 "texture_size": self.texture_size,
