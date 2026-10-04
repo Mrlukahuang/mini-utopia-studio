@@ -636,8 +636,9 @@ def test_runtime_supports_richer_procedural_shape_vocabulary():
 
 
 class FakeHeroAssetProvider(HeroAssetProvider):
-    def __init__(self, *, fail: bool = False):
+    def __init__(self, *, fail: bool = False, model: str = "pixal3d"):
         self.fail = fail
+        self.model = model
         self.calls = []
 
     def generate(
@@ -661,7 +662,7 @@ class FakeHeroAssetProvider(HeroAssetProvider):
         return HeroAssetResult(
             payload=b"glTF-fake-hero-binary",
             mime_type="model/gltf-binary",
-            model="pixal3d",
+            model=self.model,
             provider="fake",
             metadata={"quality": "spike"},
         )
@@ -900,3 +901,57 @@ def test_manual_hero_glb_attach_works_without_gpu_provider(tmp_path):
     ]
     assert len(hero_nodes) == 1
     assert hero_nodes[0].geometry.asset_path == build.asset_path
+
+
+def test_hero_cache_changes_when_3d_model_changes(tmp_path):
+    storage = LocalObjectStorage(tmp_path / "storage")
+    appearance = _normalized_appearance()
+    compiler = WorldGeometryCompilerService()
+
+    pixal = FakeHeroAssetProvider(model="pixal3d")
+    pixal_service = WorldHeroAssetService(
+        storage=storage,
+        provider=pixal,
+        max_assets_per_world=1,
+    )
+    first_render = compiler.compile(
+        profile=_profile(),
+        blueprint=_blueprint(),
+        appearance=appearance,
+        style_profile={},
+    )
+    _, _, cache = pixal_service.enrich_render_spec(
+        location_asset_id="LOC_RENDER",
+        blueprint=_blueprint(),
+        appearance=appearance,
+        render_spec=first_render,
+        preview_image_bytes=_preview_png(),
+        preview_mime_type="image/png",
+    )
+
+    triposr = FakeHeroAssetProvider(model="triposr")
+    triposr_service = WorldHeroAssetService(
+        storage=storage,
+        provider=triposr,
+        max_assets_per_world=1,
+    )
+    second_render = compiler.compile(
+        profile=_profile(),
+        blueprint=_blueprint(),
+        appearance=appearance,
+        style_profile={},
+    )
+    _, builds, updated_cache = triposr_service.enrich_render_spec(
+        location_asset_id="LOC_RENDER",
+        blueprint=_blueprint(),
+        appearance=appearance,
+        render_spec=second_render,
+        preview_image_bytes=_preview_png(),
+        preview_mime_type="image/png",
+        existing_assets=cache,
+    )
+
+    assert builds[0].status == "generated"
+    assert builds[0].model == "triposr"
+    assert len(triposr.calls) == 1
+    assert updated_cache["SCENE_WHALE"]["model"] == "triposr"
