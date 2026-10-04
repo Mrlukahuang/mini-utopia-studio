@@ -153,10 +153,24 @@ BLUEPRINT AUTHORITY
 
 THREE.JS / GEOMETRY OUTPUT INTENT
 - Produce compact shape grammar, not JavaScript and not vertex arrays.
+- Blueprint width/depth/height define the object's MAXIMUM spatial envelope,
+  not a solid block that must be filled.
 - main_body + parts must be sufficient for a Geometry Compiler to create a
-  recognizable silhouette using primitive/procedural/voxel geometry.
-- Use local normalized positions and relative scales. Blueprint dimensions will
-  supply final world scale.
+  recognizable silhouette inside that envelope.
+- Every part uses ONE object-local coordinate space.
+- relative_scale is the fraction of the full Blueprint envelope occupied by
+  that part on x/y/z. Keep each axis between about 0.03 and 1.0; never use a
+  part larger than the whole envelope.
+- local_position uses normalized -1..1 half-extents: 0 is object center,
+  -1/+1 are the negative/positive envelope faces. Keep parts inside the
+  envelope and use offsets to form a readable silhouette.
+- parent_part_id describes semantic attachment only; do not assume a second
+  nested coordinate system.
+- Available primitives include box, rounded_box, sphere, ellipsoid, cylinder,
+  cone, capsule, hemisphere, dome, wedge, tapered_box, disc, torus, ring,
+  plane, arch and voxel_cluster.
+- Prefer rounded_box/capsule/ellipsoid/dome/wedge/tapered_box over giant plain
+  boxes when they better explain the silhouette.
 - Keep part count economical. Prefer strong silhouette over micro-detail.
 - Use sockets for surfaces/attachment points that other Blueprint objects need.
 
@@ -229,7 +243,10 @@ STYLE SAFETY
             + "- Return the same element_id values exactly.\n"
             + "- One ObjectAppearanceSpec per Blueprint object.\n"
             + "- Do not create world-space positions or dimensions.\n"
+            + "- Treat Blueprint size as the maximum object envelope, not a solid box.\n"
             + "- Build recognizable silhouettes with main_body + attached parts.\n"
+            + "- Use object-local normalized positions and keep all parts inside the envelope.\n"
+            + "- Avoid a full-envelope box unless the subject is genuinely one solid block.\n"
             + "- Keep all objects inside one Mini Utopia visual language.\n"
             + (
                 "- Use visible Preview evidence to refine silhouette and local parts.\n"
@@ -308,13 +325,18 @@ STYLE SAFETY
         element: WorldLayoutElement,
         item: ObjectAppearanceSpec,
     ) -> bool:
-        organic = (
+        needs_composed_silhouette = (
             element.geometry_role == "organic"
-            or item.silhouette_family == "organic_creature"
+            or item.silhouette_family in {"organic_creature", "architecture"}
         )
         hero_scale = max(element.width, element.depth, element.height) >= 6.0
         hero_kind = element.kind in {"landmark", "structure"}
-        return bool(organic and hero_scale and hero_kind and len(item.parts) < 2)
+        return bool(
+            needs_composed_silhouette
+            and hero_scale
+            and hero_kind
+            and len(item.parts) < 2
+        )
 
     def _repair_weak_heroes_from_text(
         self,
@@ -488,13 +510,16 @@ STYLE SAFETY
             "CURRENT WEAK SPEC\n"
             + json.dumps(current.model_dump(mode="json"), ensure_ascii=False, indent=2)
             + "\n\nQUALITY REQUIREMENT\n"
-            + "This is a major organic Hero object. A body-only primitive is not "
-              "recognizable enough. Keep one clear main body and add 2-8 "
-              "silhouette-defining local parts appropriate to the creator's named "
-              "subject: e.g. head/muzzle, rear appendage/tail, paired side "
-              "appendages, wings/fins/limbs/tentacles when appropriate. Do not "
-              "invent traits that contradict the creator. Strong readable silhouette "
-              "matters more than micro-detail. Keep Mini Utopia toy/soft-voxel style.\n"
+            + "This is a major Hero object. A single full-envelope primitive is not "
+              "recognizable enough. Keep one clear main mass and add 2-8 "
+              "silhouette-defining object-local parts appropriate to the creator's "
+              "named subject. For organic subjects use meaningful head/muzzle, tail, "
+              "paired fins/wings/limbs/tentacles where appropriate. For architecture "
+              "use meaningful roof/dome/canopy, base, columns, openings, trims or "
+              "other silhouette-defining masses where appropriate. Do not invent "
+              "traits that contradict the creator. Blueprint size is the maximum "
+              "envelope, not a solid box. Strong readable silhouette matters more "
+              "than micro-detail. Keep Mini Utopia toy/soft-voxel style.\n"
             + (
                 "Use the Preview as the primary appearance evidence while preserving "
                 "the Blueprint identity."
