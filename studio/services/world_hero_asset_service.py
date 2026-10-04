@@ -34,6 +34,7 @@ class HeroAssetBuild:
     glb_sha256: str = ""
     bytes: int = 0
     reference_mode: str = ""
+    usage: dict | None = None
     message: str = ""
 
 
@@ -157,6 +158,9 @@ class WorldHeroAssetService:
                             (cached.get("metadata", {}) or {}).get(
                                 "reference_mode", reference_mode
                             )
+                        ),
+                        usage=(cached.get("metadata", {}) or {}).get(
+                            "zero_gpu_usage"
                         ),
                     )
                 )
@@ -300,6 +304,7 @@ class WorldHeroAssetService:
                         glb_sha256=glb_sha,
                         bytes=len(result.payload),
                         reference_mode=reference_mode,
+                        usage=result.metadata.get("zero_gpu_usage"),
                     )
                 )
             except Exception as exc:
