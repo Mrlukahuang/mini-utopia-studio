@@ -958,6 +958,17 @@ def test_hero_cache_changes_when_3d_model_changes(tmp_path):
 
 
 
+class TimeoutStructuredAppearanceProvider(StructuredTextProvider):
+    def generate_structured(
+        self,
+        *,
+        system: str,
+        user: str,
+        schema: Type[BaseModel],
+    ):
+        raise TimeoutError("text appearance request timed out")
+
+
 class TimeoutVisionAppearanceProvider(ImageAnalysisProvider):
     def analyze_structured(
         self,
@@ -968,6 +979,107 @@ class TimeoutVisionAppearanceProvider(ImageAnalysisProvider):
         schema: Type[BaseModel],
     ):
         raise TimeoutError("vision request timed out")
+
+
+def test_gpt_appearance_timeout_reuses_saved_plan_and_continues_preview(tmp_path):
+    repo = SQLiteStudioRepository(tmp_path / "studio.db")
+    storage = LocalObjectStorage(tmp_path / "storage")
+    assets = AssetService(repo)
+    style = StyleService(repo).ensure_mini_utopia_base()
+    profile = _profile()
+    world = assets.create_world(
+        name=profile.world_name,
+        description=profile.source_description,
+        profile=profile,
+    )
+
+    service = WorldConceptService(
+        repo,
+        storage,
+        WorldConceptPromptService(),
+        WorldBlueprintService(),
+        image_provider=FakeWorldImageProvider(),
+        appearance_service=WorldAppearanceService(
+            structured_provider=FakeStructuredAppearanceProvider(_appearance_payload())
+        ),
+        geometry_compiler=WorldGeometryCompilerService(),
+    )
+    scene_plan = WorldScenePlan(
+        source_mode="prompt",
+        summary="Sky whale station",
+        route_intent="Climb to the station and discover the Portal.",
+        elements=[
+            WorldSceneElement(
+                scene_id="SCENE_WHALE",
+                name="Gentle Sky Whale",
+                semantic_key="sky_whale",
+                kind="landmark",
+                source="creator_required",
+                spatial_mode="aerial",
+                elevation="high",
+                geometry_role="organic",
+                traversability="scenic",
+            ),
+            WorldSceneElement(
+                scene_id="SCENE_STATION",
+                name="Whale Back Garden",
+                semantic_key="whale_back_garden",
+                kind="terrain",
+                source="creator_required",
+                spatial_mode="elevated",
+                elevation="high",
+                geometry_role="platform",
+                traversability="walkable",
+            ),
+            WorldSceneElement(
+                scene_id="SCENE_PORTAL",
+                name="Moon Portal",
+                semantic_key="moon_portal",
+                kind="portal",
+                source="creator_required",
+                geometry_role="arch",
+                traversability="walkable",
+            ),
+        ],
+        exploration_order=["SCENE_STATION", "SCENE_PORTAL"],
+    )
+
+    service.plan_blueprint(
+        location_asset_id=world.asset_id,
+        style_asset_id=style.asset_id,
+        scene_plan=scene_plan,
+    )
+    before = repo.get_asset(world.asset_id)
+    assert before is not None
+    saved_plan = before.metadata["world_appearance_plan"]
+
+    service.appearance_service = WorldAppearanceService(
+        structured_provider=TimeoutStructuredAppearanceProvider()
+    )
+    progress_events: list[tuple[str, str, float]] = []
+    service.render_blueprint_preview(
+        location_asset_id=world.asset_id,
+        style_asset_id=style.asset_id,
+        progress_callback=lambda stage, message, progress: progress_events.append(
+            (stage, message, progress)
+        ),
+    )
+
+    rendered = repo.get_asset(world.asset_id)
+    assert rendered is not None
+    assert rendered.metadata["world_preview_path"]
+    assert rendered.metadata["world_render_spec"]["objects"]
+    assert rendered.metadata["world_appearance_plan"] == saved_plan
+    assert rendered.metadata["world_appearance_generation_status"] == "fallback"
+    assert (
+        rendered.metadata["world_appearance_generation_fallback"]
+        == "saved_plan_gpt_fallback"
+    )
+    assert "text appearance request timed out" in (
+        rendered.metadata["world_appearance_generation_error"]
+    )
+    assert "appearance_fallback" in [stage for stage, _, _ in progress_events]
+    assert [stage for stage, _, _ in progress_events][-1] == "ready"
 
 
 def test_preview_vision_timeout_keeps_gpt_appearance_and_continues_build(tmp_path):
