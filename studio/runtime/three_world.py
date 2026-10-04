@@ -149,6 +149,7 @@ window.addEventListener('unhandledrejection', event => {{
 <script type="module">
 import * as THREE from 'three';
 import {{ GLTFLoader }} from 'three/addons/loaders/GLTFLoader.js';
+import {{ RoundedBoxGeometry }} from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 const DATA = {data_json};
 const profile = DATA.profile;
