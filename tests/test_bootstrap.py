@@ -6,6 +6,7 @@ from studio.services.style_service import StyleService
 from studio.services.character_master_prompt_service import CharacterMasterPromptService
 from studio.services.reusable_asset_library_service import ReusableAssetLibraryService
 from studio.services.reusable_asset_pack_service import ReusableAssetPackService
+from studio.services.world_hero_composition_service import WorldHeroCompositionService
 from studio.providers.hero_asset import HuggingFacePixal3DProvider, HttpHeroAssetProvider
 
 
@@ -74,6 +75,23 @@ def test_build_context_exposes_reusable_asset_pack_service(tmp_path):
     assert isinstance(ctx.reusable_asset_packs, ReusableAssetPackService)
     assert ctx.reusable_asset_packs.library is ctx.reusable_assets
 
+
+
+def test_build_context_exposes_hero_composition_resolver(tmp_path):
+    settings = Settings(
+        root_dir=tmp_path,
+        data_dir=tmp_path / "data",
+        database_path=tmp_path / "data" / "studio.db",
+        app_env="test",
+        openai_api_key=None,
+        gemini_api_key=None,
+    )
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+
+    ctx = build_context(settings)
+
+    assert isinstance(ctx.world_hero_compositions, WorldHeroCompositionService)
+    assert ctx.world_concepts.hero_composition_service is ctx.world_hero_compositions
 
 
 def test_build_context_uses_hf_pixal3d_when_token_is_configured(tmp_path):
