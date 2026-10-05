@@ -1,8 +1,9 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/village.gd" id="1_village"]
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="2_player"]
 [ext_resource type="Script" path="res://scripts/camera_rig.gd" id="3_camera"]
+[ext_resource type="Script" path="res://scripts/hero_zone.gd" id="4_zone"]
 
 [node name="MiniUtopiaWorld" type="Node3D"]
 script = ExtResource("1_village")
@@ -17,6 +18,10 @@ target_path = NodePath("../Player")
 [node name="Camera3D" type="Camera3D" parent="CameraRig"]
 current = true
 fov = 48.0
+
+[node name="Zone01CloudWhale" type="Node3D" parent="."]
+position = Vector3(0, 0, -55)
+script = ExtResource("4_zone")
 
 [node name="HUD" type="CanvasLayer" parent="."]
 
@@ -39,4 +44,4 @@ offset_left = 16.0
 offset_top = 42.0
 offset_right = 390.0
 offset_bottom = 82.0
-text = "WASD / Arrows · Move   Shift · Run   Space · Jump\nMouse · Look   Esc · Release mouse"
+text = "WASD / Arrows · Move   Shift · Run   Space · Jump\nMouse · Look   E · Unlock gate   Esc · Release mouse"
