@@ -60,6 +60,18 @@ class GodotHeroExportService:
                     "source_asset_path": asset_path,
                     "source_model": str(hero.get("model") or ""),
                     "source_status": str(hero.get("status") or ""),
+                    "cluster_id": str(hero.get("cluster_id") or ""),
+                    "member_element_ids": list(
+                        hero.get("member_element_ids") or []
+                    ),
+                    "render_strategy": (
+                        "unified_glb"
+                        if hero.get("cluster_id")
+                        else "single_object"
+                    ),
+                    "reference_mode": str(
+                        hero.get("reference_mode") or ""
+                    ),
                 }
             ],
         }

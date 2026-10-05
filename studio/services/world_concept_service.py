@@ -537,10 +537,24 @@ class WorldConceptService:
             and self.hero_asset_service is not None
             and self.hero_asset_service.is_available
         ):
+            composition_plan = None
+            raw_composition = world.metadata.get("world_hero_composition_plan")
+            if raw_composition:
+                try:
+                    composition_plan = WorldHeroCompositionPlan.model_validate(
+                        raw_composition
+                    )
+                except Exception:
+                    composition_plan = None
+
             self._report_progress(
                 progress_callback,
                 "hero_asset",
-                "🐋 正在把主要 Hero 从 Preview 转成真正的 3D GLB…",
+                (
+                    "🐋 正在把完整 Hero Cluster 转成一个统一 3D GLB…"
+                    if composition_plan and composition_plan.clusters
+                    else "🐋 正在把主要 Hero 从 Preview 转成真正的 3D GLB…"
+                ),
                 0.91,
             )
             render_spec, hero_builds, hero_cache = (
@@ -554,6 +568,7 @@ class WorldConceptService:
                     profile=profile,
                     style_profile=style_profile,
                     existing_assets=world.metadata.get("world_hero_assets", {}),
+                    composition_plan=composition_plan,
                 )
             )
             world.metadata["world_hero_assets"] = hero_cache
@@ -568,6 +583,13 @@ class WorldConceptService:
                     "reference_mode": item.reference_mode,
                     "usage": item.usage,
                     "message": item.message,
+                    "cluster_id": item.cluster_id,
+                    "member_element_ids": list(item.member_element_ids),
+                    "target_size": (
+                        list(item.target_size)
+                        if item.target_size is not None
+                        else None
+                    ),
                 }
                 for item in hero_builds
             ]

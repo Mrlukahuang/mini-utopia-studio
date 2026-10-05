@@ -849,6 +849,25 @@ def render_world_factory(
                                 "HF ZeroGPU usage · "
                                 f"{usage.get('status', 'unavailable')}"
                             )
+                        cluster_id = hero.get("cluster_id") or ""
+                        member_ids = hero.get("member_element_ids") or []
+                        target_size = hero.get("target_size")
+                        if cluster_id:
+                            member_names = [
+                                element_names.get(element_id, element_id)
+                                for element_id in member_ids
+                            ]
+                            st.caption(
+                                f"Unified Cluster · {cluster_id} · "
+                                + ", ".join(member_names)
+                            )
+                            if target_size and len(target_size) >= 3:
+                                st.caption(
+                                    "Cluster Envelope · "
+                                    f"{float(target_size[0]):.1f} × "
+                                    f"{float(target_size[1]):.1f} × "
+                                    f"{float(target_size[2]):.1f}"
+                                )
                         if hero.get("asset_path"):
                             st.caption(f"GLB · {hero.get('asset_path')}")
                             hero_element = next(
@@ -878,9 +897,13 @@ def render_world_factory(
                                     ).build_bundle(
                                         hero=hero,
                                         target_size=(
-                                            float(hero_element.width),
-                                            float(hero_element.height),
-                                            float(hero_element.depth),
+                                            tuple(float(value) for value in target_size[:3])
+                                            if target_size and len(target_size) >= 3
+                                            else (
+                                                float(hero_element.width),
+                                                float(hero_element.height),
+                                                float(hero_element.depth),
+                                            )
                                         ),
                                     )
                                     st.session_state[bundle_key] = {
@@ -906,15 +929,19 @@ def render_world_factory(
                                     "godot/assets/external/；"
                                     "Godot 会读取 heroes/hero_manifest.json。"
                                 )
-                                if reference_mode in {
+                                if reference_mode == "generated_unified_cluster_v1":
+                                    st.success(
+                                        "这是 Unified Hero Cluster GLB："
+                                        "Godot 会把完整 Hero 作为一个主体加载，不做拆分重组。"
+                                    )
+                                elif reference_mode in {
                                     "generated_isolated_v1",
                                     "preview_bbox_isolated_v1",
                                 }:
                                     st.info(
                                         "这份 GLB 可用于验证 Godot Runtime 通路，"
-                                        "但它仍可能是旧的单对象 Hero。最终版本会在 "
-                                        "Unified Hero Cluster generation 落地后重新生成，"
-                                        "不会拆分完整 Hero。"
+                                        "但它仍可能是旧的单对象 Hero。请重新 Render Preview "
+                                        "生成 Unified Hero Cluster 后再作为最终资产使用。"
                                     )
                         if message:
                             st.warning(message)
