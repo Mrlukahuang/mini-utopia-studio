@@ -756,6 +756,41 @@ def render_world_factory(
                         f"Three.js nodes={rendered.get('node_count', 0)}"
                     )
 
+                composition = saved_world.metadata.get(
+                    "world_hero_composition_plan", {}
+                )
+                clusters = composition.get("clusters", []) if composition else []
+                if clusters:
+                    st.divider()
+                    st.write("**🧩 Unified Hero Composition / 整体 Hero 渲染**")
+                    st.caption(
+                        "Hero 内部对象保留 Blueprint 语义 ID，但渲染时不拆开；"
+                        "整个 Hero Cluster 将使用同一 Reference、同一 GLB。"
+                    )
+                    element_names = {
+                        element.element_id: element.name
+                        for element in blueprint.layout_elements
+                    }
+                    for cluster in clusters:
+                        root_id = cluster.get("root_element_id", "")
+                        root_name = element_names.get(root_id, root_id or "Hero")
+                        baked = [
+                            element_names.get(
+                                item.get("element_id"),
+                                item.get("element_id"),
+                            )
+                            for item in cluster.get("members", [])
+                            if item.get("role") == "baked"
+                        ]
+                        st.write(
+                            f"**{root_name}** · "
+                            f"{cluster.get('render_strategy', 'unified_glb')}"
+                        )
+                        st.caption(
+                            "Baked together / 整体生成 · "
+                            + (", ".join(baked) if baked else "仅 Root")
+                        )
+
                 hero_diagnostics = saved_world.metadata.get(
                     "world_hero_asset_diagnostics", []
                 )
