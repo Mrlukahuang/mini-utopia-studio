@@ -619,7 +619,20 @@ class WorldHeroAssetService:
                         bytes=len(result.payload),
                         reference_mode=reference_mode,
                         usage=usage,
-                        message="Generated as one unified Hero Cluster GLB.",
+                        message=(
+                            "Generated as one unified Hero Cluster GLB."
+                            + (
+                                " Quality fallback: "
+                                + "; ".join(
+                                    str(item.get("stage", "provider"))
+                                    for item in result.metadata.get(
+                                        "quality_fallbacks", []
+                                    )
+                                )
+                                if result.metadata.get("quality_fallbacks")
+                                else ""
+                            )
+                        ),
                         cluster_id=cluster.cluster_id,
                         member_element_ids=member_ids,
                         target_size=target_size,
