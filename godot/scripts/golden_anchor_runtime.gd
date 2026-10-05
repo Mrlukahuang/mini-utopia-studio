@@ -18,6 +18,17 @@ static func installed_entries() -> Array:
     var anchors = parsed.get("anchors", [])
     return anchors if typeof(anchors) == TYPE_ARRAY else []
 
+static func profile_available(profile_id: String) -> bool:
+    if profile_id.is_empty():
+        return true
+    var found := false
+    for entry in installed_entries():
+        var profile_paths = entry.get("profile_res_paths", {})
+        if typeof(profile_paths) == TYPE_DICTIONARY and not String(profile_paths.get(profile_id, "")).is_empty():
+            found = true
+            break
+    return found
+
 static func entry_by_id(anchor_id: String) -> Dictionary:
     for entry in installed_entries():
         if String(entry.get("id", "")) == anchor_id:
@@ -29,13 +40,20 @@ static func instantiate_anchor(
     anchor_id: String,
     position: Vector3,
     target_height_override: float = 0.0,
-    yaw_override: float = INF
+    yaw_override: float = INF,
+    profile_id: String = ""
 ) -> Node3D:
     var entry := entry_by_id(anchor_id)
     if entry.is_empty():
         return null
 
     var res_path := String(entry.get("res_path", ""))
+    if not profile_id.is_empty():
+        var profile_paths = entry.get("profile_res_paths", {})
+        if typeof(profile_paths) == TYPE_DICTIONARY:
+            var candidate_path := String(profile_paths.get(profile_id, ""))
+            if not candidate_path.is_empty():
+                res_path = candidate_path
     if res_path.is_empty() or not ResourceLoader.exists(res_path):
         return null
 
