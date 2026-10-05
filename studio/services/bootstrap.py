@@ -23,6 +23,7 @@ from studio.services.world_scene_plan_service import WorldScenePlanService
 from studio.services.world_appearance_service import WorldAppearanceService
 from studio.services.world_geometry_compiler_service import WorldGeometryCompilerService
 from studio.services.world_hero_asset_service import WorldHeroAssetService
+from studio.services.world_hero_composition_service import WorldHeroCompositionService
 from studio.services.reusable_asset_library_service import ReusableAssetLibraryService
 from studio.services.reusable_asset_pack_service import ReusableAssetPackService
 from studio.providers.openai_image import OpenAIImageProvider
@@ -56,6 +57,7 @@ class StudioContext:
     world_appearances: WorldAppearanceService
     world_geometry_compiler: WorldGeometryCompilerService
     world_hero_assets: WorldHeroAssetService
+    world_hero_compositions: WorldHeroCompositionService
     reusable_assets: ReusableAssetLibraryService
     reusable_asset_packs: ReusableAssetPackService
     world_concept_match: WorldConceptMatchService
@@ -144,6 +146,9 @@ def build_context(settings: Settings) -> StudioContext:
         image_analysis_provider=vision_provider,
     )
     world_geometry_compiler = WorldGeometryCompilerService()
+    world_hero_compositions = WorldHeroCompositionService(
+        structured_provider=text_provider,
+    )
     reusable_assets = ReusableAssetLibraryService(repository, storage)
     reusable_asset_packs = ReusableAssetPackService(reusable_assets)
 
@@ -204,6 +209,7 @@ def build_context(settings: Settings) -> StudioContext:
             appearance_service=world_appearances,
             geometry_compiler=world_geometry_compiler,
             hero_asset_service=world_hero_assets,
+            hero_composition_service=world_hero_compositions,
         ),
         world_scene_plans=WorldScenePlanService(
             structured_provider=text_provider,
@@ -211,6 +217,7 @@ def build_context(settings: Settings) -> StudioContext:
         world_appearances=world_appearances,
         world_geometry_compiler=world_geometry_compiler,
         world_hero_assets=world_hero_assets,
+        world_hero_compositions=world_hero_compositions,
         reusable_assets=reusable_assets,
         reusable_asset_packs=reusable_asset_packs,
         world_concept_match=WorldConceptMatchService(repository),
