@@ -1,0 +1,29 @@
+{
+  "schema_version": "0.1",
+  "profile_id": "core_candidate_b",
+  "name": "Mini Utopia Core Candidate B Semantic Profile",
+  "inherits": null,
+  "palette_source": "godot/config/style/core_palette_candidates_v0_9.json",
+  "slot_to_palette_key": {
+    "neutral_light": "cream_base",
+    "neutral_warm": "cream_warm",
+    "structure_dark": "deep_ink",
+    "wood_light": "warm_taupe",
+    "wood_base": "cocoa",
+    "wood_dark": "deep_ink",
+    "stone_light": "cream_warm",
+    "stone_base": "warm_taupe",
+    "stone_dark": "deep_ink",
+    "foliage_light": "mint",
+    "foliage_base": "sage",
+    "foliage_dark": "moss",
+    "roof_warm": "peach",
+    "roof_accent": "strawberry",
+    "water_base": "aqua",
+    "sky_accent": "powder_blue",
+    "magic_light": "glow_gold",
+    "magic_base": "lavender",
+    "metal_light": "powder_blue",
+    "metal_dark": "lilac"
+  }
+}
