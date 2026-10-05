@@ -5,6 +5,7 @@ import json
 import re
 import zipfile
 from dataclasses import dataclass
+from pathlib import Path
 
 from studio.storage.base import ObjectStorage
 
@@ -14,6 +15,12 @@ class GodotHeroBundle:
     filename: str
     payload: bytes
     manifest: dict
+
+
+@dataclass(frozen=True)
+class GodotHeroInstallResult:
+    hero_path: Path
+    manifest_path: Path
 
 
 class GodotHeroExportService:
@@ -109,6 +116,79 @@ class GodotHeroExportService:
             filename=f"mini-utopia-{slug}-godot.zip",
             payload=buffer.getvalue(),
             manifest=manifest,
+        )
+
+    def install_bundle(
+        self,
+        *,
+        bundle: GodotHeroBundle,
+        repository_root: Path,
+    ) -> GodotHeroInstallResult:
+        """Install a prepared Hero bundle into this checkout's Godot project."""
+        repository_root = repository_root.resolve()
+        godot_project = repository_root / "godot" / "project.godot"
+        if not godot_project.exists():
+            raise ValueError(
+                "Godot project not found under repository_root/godot/project.godot."
+            )
+
+        destination = (
+            repository_root
+            / "godot"
+            / "assets"
+            / "external"
+            / "heroes"
+        )
+        destination.mkdir(parents=True, exist_ok=True)
+
+        with zipfile.ZipFile(io.BytesIO(bundle.payload), "r") as archive:
+            manifest_member = "heroes/hero_manifest.json"
+            if manifest_member not in archive.namelist():
+                raise ValueError("Hero bundle is missing hero_manifest.json.")
+
+            manifest = json.loads(
+                archive.read(manifest_member).decode("utf-8")
+            )
+            heroes = manifest.get("heroes") or []
+            if not heroes:
+                raise ValueError("Hero bundle manifest has no Hero entries.")
+
+            source = str(heroes[0].get("source") or "")
+            prefix = "res://assets/external/heroes/"
+            if not source.startswith(prefix):
+                raise ValueError(
+                    "Hero bundle manifest source is not a Godot Hero path."
+                )
+
+            glb_name = source[len(prefix):]
+            if not glb_name or "/" in glb_name or "\\" in glb_name:
+                raise ValueError(
+                    "Hero bundle manifest contains an unsafe GLB filename."
+                )
+
+            glb_member = f"heroes/{glb_name}"
+            if glb_member not in archive.namelist():
+                raise ValueError(
+                    "Hero bundle is missing the referenced GLB."
+                )
+
+            hero_bytes = archive.read(glb_member)
+            if len(hero_bytes) < 12 or hero_bytes[:4] != b"glTF":
+                raise ValueError(
+                    "Hero bundle contains an invalid GLB payload."
+                )
+
+            hero_path = destination / glb_name
+            manifest_path = destination / "hero_manifest.json"
+            hero_path.write_bytes(hero_bytes)
+            manifest_path.write_text(
+                json.dumps(manifest, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+
+        return GodotHeroInstallResult(
+            hero_path=hero_path,
+            manifest_path=manifest_path,
         )
 
     @staticmethod
