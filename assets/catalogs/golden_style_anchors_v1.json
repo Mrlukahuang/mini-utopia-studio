@@ -1,0 +1,165 @@
+{
+  "schema_version": "1.0",
+  "name": "Mini Utopia Golden Style Anchors v1",
+  "purpose": "First real-asset geometry/style lineup for C+ calibration. Source archives remain local and immutable.",
+  "install_root": "godot/assets/external/golden",
+  "packs": {
+    "kaykit_forest": {
+      "archive_candidates": [
+        "KayKit_Forest_Nature_Pack_1.0_FREE.zip",
+        "KayKit_Forest_Nature_Pack_1.0_FREE (1).zip"
+      ],
+      "license_member": "KayKit_Forest_Nature_Pack_1.0_FREE/License.txt",
+      "license_id": "CC0-1.0"
+    },
+    "kaykit_medieval": {
+      "archive_candidates": ["KayKit_Medieval_Hexagon_Pack_1.0_FREE.zip"],
+      "license_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/License.txt",
+      "license_id": "CC0-1.0"
+    },
+    "kaykit_platformer": {
+      "archive_candidates": ["KayKit_Platformer_Pack_1.0_FREE.zip"],
+      "license_member": "KayKit_Platformer_Pack_1.0_FREE/License.txt",
+      "license_id": "CC0-1.0"
+    },
+    "kaykit_dungeon": {
+      "archive_candidates": ["KayKit_Dungeon_Pack_1.1_FREE.zip"],
+      "license_member": "KayKit_Dungeon_Pack_1.1_FREE/License.txt",
+      "license_id": "CC0-1.0"
+    },
+    "kaykit_adventurers": {
+      "archive_candidates": ["KayKit_Adventurers_2.0_FREE.zip"],
+      "license_member": "KayKit_Adventurers_2.0_FREE/License.txt",
+      "license_id": "CC0-1.0"
+    },
+    "kaykit_skeletons": {
+      "archive_candidates": ["KayKit_Skeletons_1.1_FREE.zip"],
+      "license_member": "KayKit_Skeletons_1.1_FREE/License.txt",
+      "license_id": "CC0-1.0"
+    },
+    "kenney_castle": {
+      "archive_candidates": ["kenney_castle-kit.zip"],
+      "license_member": "License.txt",
+      "license_id": "CC0-1.0"
+    }
+  },
+  "anchors": [
+    {
+      "id": "forest_tree_round",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Tree_1_A_Color1.gltf",
+      "calibration_slot": "nature_primary",
+      "target_height": 4.8,
+      "yaw_degrees": -22.0
+    },
+    {
+      "id": "forest_tree_branching",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Tree_2_A_Color1.gltf",
+      "calibration_slot": "lineup",
+      "target_height": 4.8,
+      "yaw_degrees": -18.0
+    },
+    {
+      "id": "forest_bush",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Bush_1_A_Color1.gltf",
+      "calibration_slot": "lineup",
+      "target_height": 1.6,
+      "yaw_degrees": 0.0
+    },
+    {
+      "id": "forest_rock",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Rock_2_A_Color1.gltf",
+      "calibration_slot": "nature_secondary",
+      "target_height": 1.25,
+      "yaw_degrees": 18.0
+    },
+    {
+      "id": "medieval_home",
+      "pack": "kaykit_medieval",
+      "category": "architecture",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/red/building_home_A_red.gltf",
+      "calibration_slot": "architecture_primary",
+      "target_height": 4.4,
+      "yaw_degrees": 28.0
+    },
+    {
+      "id": "medieval_tower",
+      "pack": "kaykit_medieval",
+      "category": "architecture",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/blue/building_tower_A_blue.gltf",
+      "calibration_slot": "lineup",
+      "target_height": 5.2,
+      "yaw_degrees": 24.0
+    },
+    {
+      "id": "medieval_bridge",
+      "pack": "kaykit_medieval",
+      "category": "architecture",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/neutral/building_bridge_A.gltf",
+      "calibration_slot": "lineup",
+      "target_height": 1.9,
+      "yaw_degrees": 22.0
+    },
+    {
+      "id": "platformer_platform",
+      "pack": "kaykit_platformer",
+      "category": "gameplay",
+      "source_member": "KayKit_Platformer_Pack_1.0_FREE/Assets/gltf/blue/platform_4x4x2_blue.gltf",
+      "calibration_slot": "lineup",
+      "target_height": 1.7,
+      "yaw_degrees": 24.0
+    },
+    {
+      "id": "platformer_slope",
+      "pack": "kaykit_platformer",
+      "category": "gameplay",
+      "source_member": "KayKit_Platformer_Pack_1.0_FREE/Assets/gltf/blue/platform_slope_4x4x4_blue.gltf",
+      "calibration_slot": "lineup",
+      "target_height": 2.0,
+      "yaw_degrees": 24.0
+    },
+    {
+      "id": "dungeon_chest",
+      "pack": "kaykit_dungeon",
+      "category": "prop",
+      "source_member": "KayKit_Dungeon_Pack_1.1_FREE/Assets/gltf/chest.gltf",
+      "calibration_slot": "prop_primary",
+      "target_height": 1.25,
+      "yaw_degrees": 28.0
+    },
+    {
+      "id": "adventurer_knight",
+      "pack": "kaykit_adventurers",
+      "category": "character",
+      "source_member": "KayKit_Adventurers_2.0_FREE/Characters/gltf/Knight.glb",
+      "calibration_slot": "character_primary",
+      "target_height": 3.4,
+      "yaw_degrees": 18.0
+    },
+    {
+      "id": "skeleton_minion",
+      "pack": "kaykit_skeletons",
+      "category": "creature",
+      "source_member": "KayKit_Skeletons_1.1_FREE/characters/gltf/Skeleton_Minion.glb",
+      "calibration_slot": "lineup",
+      "target_height": 3.3,
+      "yaw_degrees": -18.0
+    },
+    {
+      "id": "kenney_castle_tower",
+      "pack": "kenney_castle",
+      "category": "compatibility",
+      "source_member": "Models/GLB format/tower-square.glb",
+      "calibration_slot": "lineup",
+      "target_height": 4.8,
+      "yaw_degrees": 28.0
+    }
+  ]
+}

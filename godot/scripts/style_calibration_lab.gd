@@ -1,6 +1,7 @@
 extends Node3D
 
 const PALETTE_PATH := "res://config/style/core_palette_candidates_v0_9.json"
+const GoldenAnchorRuntime = preload("res://scripts/golden_anchor_runtime.gd")
 
 var palette: Dictionary = {}
 var color_materials: Array[StandardMaterial3D] = []
@@ -138,10 +139,13 @@ func _build_station(origin: Vector3, title: String, mode: String) -> void:
     root.position = origin
     add_child(root)
 
-    _build_architecture(root, Vector3(-3.6, 0.0, 0.0), mode)
-    _build_nature(root, Vector3(0.0, 0.0, 0.0), mode)
-    _build_character(root, Vector3(3.0, 0.0, 0.0), mode)
-    _build_hero_mass(root, Vector3(0.3, 0.4, -3.4), mode)
+    if mode == "color" and GoldenAnchorRuntime.has_installed():
+        _build_real_golden_station(root)
+    else:
+        _build_architecture(root, Vector3(-3.6, 0.0, 0.0), mode)
+        _build_nature(root, Vector3(0.0, 0.0, 0.0), mode)
+        _build_character(root, Vector3(3.0, 0.0, 0.0), mode)
+        _build_hero_mass(root, Vector3(0.3, 0.4, -3.4), mode)
 
     var label := Label3D.new()
     label.text = title
@@ -152,6 +156,27 @@ func _build_station(origin: Vector3, title: String, mode: String) -> void:
     label.position = Vector3(0.0, 5.85, 0.0)
     label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
     root.add_child(label)
+
+func _build_real_golden_station(parent: Node3D) -> void:
+    # Five representative real assets replace the procedural COLOR lane once
+    # the local Golden lineup has been installed. Grayscale/Silhouette lanes
+    # remain deterministic procedural controls until palette remapping exists.
+    GoldenAnchorRuntime.instantiate_anchor(
+        parent, "medieval_home", Vector3(-3.6, 0.0, 0.0), 4.25
+    )
+    GoldenAnchorRuntime.instantiate_anchor(
+        parent, "forest_tree_round", Vector3(0.0, 0.0, -0.15), 4.75
+    )
+    GoldenAnchorRuntime.instantiate_anchor(
+        parent, "adventurer_knight", Vector3(3.1, 0.0, 0.3), 3.25
+    )
+    GoldenAnchorRuntime.instantiate_anchor(
+        parent, "dungeon_chest", Vector3(-1.85, 0.0, 1.85), 1.1
+    )
+    GoldenAnchorRuntime.instantiate_anchor(
+        parent, "forest_rock", Vector3(1.6, 0.0, 1.65), 1.05
+    )
+
 
 func _build_architecture(parent: Node3D, origin: Vector3, mode: String) -> void:
     _box(parent, origin + Vector3(0.0, 1.5, 0.0), Vector3(3.7, 3.0, 3.0), _color("cream_base"), mode)
@@ -250,5 +275,6 @@ func _build_hud() -> void:
     info.offset_top = 40.0
     info.offset_right = 610.0
     info.offset_bottom = 76.0
-    info.text = "Palette v0.9 candidates · COLOR / GRAYSCALE / SILHOUETTE\nUse this scene to lock Palette v1.0 before prompt or atlas production."
+    var real_state := "REAL GOLDEN ASSETS INSTALLED" if GoldenAnchorRuntime.has_installed() else "PROCEDURAL FALLBACK · run tools/install_golden_anchors.py"
+    info.text = "Palette v0.9 · COLOR / GRAYSCALE / SILHOUETTE\n" + real_state
     panel.add_child(info)
