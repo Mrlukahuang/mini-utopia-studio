@@ -99,7 +99,12 @@ func _instantiate_glb(entry: Dictionary, bytes: PackedByteArray, base_path: Stri
     var target := _vec3(entry.get("target_size", [18.0, 8.0, 9.0]))
     _fit_to_envelope(generated as Node3D, target)
 
-    if bool(entry.get("collision_proxy", false)):
+    var render_strategy := String(entry.get("render_strategy", ""))
+    var should_collide := (
+        bool(entry.get("collision_proxy", false))
+        or render_strategy == "unified_glb"
+    )
+    if should_collide:
         _add_collision_proxy(wrapper, target)
 
     hero_loaded.emit(hero_id, wrapper)

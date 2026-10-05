@@ -55,6 +55,7 @@ def test_build_bundle_contains_unified_glb_and_manifest(tmp_path):
     assert hero["source_asset_path"] == "assets/library/hero.glb"
     assert hero["cluster_id"] == "HERO_CLUSTER_CLOUD_WHALE"
     assert hero["render_strategy"] == "unified_glb"
+    assert hero["collision_proxy"] is True
     assert hero["reference_mode"] == "generated_unified_cluster_v1"
     assert hero["member_element_ids"] == [
         "SCENE_WHALE",
@@ -136,3 +137,22 @@ def test_install_bundle_requires_godot_checkout(tmp_path):
             bundle=bundle,
             repository_root=tmp_path / "not-a-repo",
         )
+
+
+def test_single_object_bundle_keeps_collision_disabled_by_default(tmp_path):
+    storage = LocalObjectStorage(tmp_path)
+    storage.put_bytes("assets/library/hero.glb", _valid_glb())
+    service = GodotHeroExportService(storage)
+
+    bundle = service.build_bundle(
+        hero={
+            "element_id": "SCENE_PROP",
+            "name": "Decorative Prop",
+            "asset_path": "assets/library/hero.glb",
+        },
+        target_size=(2.0, 2.0, 2.0),
+    )
+
+    hero = bundle.manifest["heroes"][0]
+    assert hero["render_strategy"] == "single_object"
+    assert hero["collision_proxy"] is False

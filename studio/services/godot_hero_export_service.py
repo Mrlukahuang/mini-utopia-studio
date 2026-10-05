@@ -39,7 +39,7 @@ class GodotHeroExportService:
         hero: dict,
         target_size: tuple[float, float, float],
         position: tuple[float, float, float] = (0.0, 4.5, -7.0),
-        collision_proxy: bool = False,
+        collision_proxy: bool | None = None,
     ) -> GodotHeroBundle:
         asset_path = str(hero.get("asset_path") or "").strip()
         if not asset_path:
@@ -54,6 +54,17 @@ class GodotHeroExportService:
         slug = self._slug(hero_id)
         glb_name = f"{slug}.glb"
 
+        render_strategy = (
+            "unified_glb"
+            if hero.get("cluster_id")
+            else "single_object"
+        )
+        effective_collision_proxy = (
+            render_strategy == "unified_glb"
+            if collision_proxy is None
+            else bool(collision_proxy)
+        )
+
         manifest = {
             "schema_version": "0.1",
             "heroes": [
@@ -63,7 +74,7 @@ class GodotHeroExportService:
                     "source": f"res://assets/external/heroes/{glb_name}",
                     "position": [float(value) for value in position],
                     "target_size": [float(value) for value in target_size],
-                    "collision_proxy": bool(collision_proxy),
+                    "collision_proxy": effective_collision_proxy,
                     "source_asset_path": asset_path,
                     "source_model": str(hero.get("model") or ""),
                     "source_status": str(hero.get("status") or ""),
@@ -71,11 +82,7 @@ class GodotHeroExportService:
                     "member_element_ids": list(
                         hero.get("member_element_ids") or []
                     ),
-                    "render_strategy": (
-                        "unified_glb"
-                        if hero.get("cluster_id")
-                        else "single_object"
-                    ),
+                    "render_strategy": render_strategy,
                     "reference_mode": str(
                         hero.get("reference_mode") or ""
                     ),
