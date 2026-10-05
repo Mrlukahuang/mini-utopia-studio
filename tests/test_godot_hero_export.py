@@ -27,6 +27,13 @@ def test_build_bundle_contains_unified_glb_and_manifest(tmp_path):
             "asset_path": "assets/library/hero.glb",
             "model": "pixal3d",
             "status": "generated",
+            "reference_mode": "generated_unified_cluster_v1",
+            "cluster_id": "HERO_CLUSTER_CLOUD_WHALE",
+            "member_element_ids": [
+                "SCENE_WHALE",
+                "SCENE_GARDEN",
+                "SCENE_LIGHTHOUSE",
+            ],
         },
         target_size=(18.0, 8.0, 9.0),
     )
@@ -46,6 +53,14 @@ def test_build_bundle_contains_unified_glb_and_manifest(tmp_path):
     )
     assert hero["target_size"] == [18.0, 8.0, 9.0]
     assert hero["source_asset_path"] == "assets/library/hero.glb"
+    assert hero["cluster_id"] == "HERO_CLUSTER_CLOUD_WHALE"
+    assert hero["render_strategy"] == "unified_glb"
+    assert hero["reference_mode"] == "generated_unified_cluster_v1"
+    assert hero["member_element_ids"] == [
+        "SCENE_WHALE",
+        "SCENE_GARDEN",
+        "SCENE_LIGHTHOUSE",
+    ]
 
 
 def test_build_bundle_rejects_invalid_glb(tmp_path):
