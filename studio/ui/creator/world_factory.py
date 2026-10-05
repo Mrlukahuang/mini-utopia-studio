@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -27,6 +29,7 @@ from studio.ui.creator.concept_match_review import _layout_svg
 from studio.ui.theme import render_game_hero, render_quest
 
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
 MAX_GENERATIONS_PER_SESSION = 20
 def _default_profile() -> WorldProfile:
     return WorldProfile(
@@ -916,6 +919,50 @@ def render_world_factory(
                                     )
                             prepared = st.session_state.get(bundle_key)
                             if prepared:
+                                prepared_bundle = GodotHeroExportService(
+                                    ctx.storage
+                                ).build_bundle(
+                                    hero=hero,
+                                    target_size=(
+                                        tuple(float(value) for value in target_size[:3])
+                                        if target_size and len(target_size) >= 3
+                                        else (
+                                            float(hero_element.width),
+                                            float(hero_element.height),
+                                            float(hero_element.depth),
+                                        )
+                                    ),
+                                )
+                                local_checkout_ready = (
+                                    (REPO_ROOT / ".git").exists()
+                                    and (REPO_ROOT / "godot" / "project.godot").exists()
+                                )
+                                if local_checkout_ready:
+                                    if st.button(
+                                        "⚡ Install directly into local Godot / 一键装入 Godot",
+                                        key=f"install_{bundle_key}",
+                                        use_container_width=True,
+                                    ):
+                                        try:
+                                            installed = GodotHeroExportService(
+                                                ctx.storage
+                                            ).install_bundle(
+                                                bundle=prepared_bundle,
+                                                repository_root=REPO_ROOT,
+                                            )
+                                            st.success(
+                                                "Installed to local Godot · "
+                                                f"{installed.hero_path.name} + "
+                                                "hero_manifest.json"
+                                            )
+                                            st.caption(
+                                                "Godot 会自动检测文件；"
+                                                "如果已打开项目，等待 Import 完成后直接 Run。"
+                                            )
+                                        except Exception as exc:
+                                            st.error(
+                                                f"Local Godot install failed: {exc}"
+                                            )
                                 st.download_button(
                                     "⬇️ Download Godot Hero Bundle",
                                     data=prepared["payload"],
@@ -925,9 +972,8 @@ def render_world_factory(
                                     use_container_width=True,
                                 )
                                 st.caption(
-                                    "解压到本机仓库的 "
-                                    "godot/assets/external/；"
-                                    "Godot 会读取 heroes/hero_manifest.json。"
+                                    "Download 是 Cloud/手动 fallback。"
+                                    "本地运行 Streamlit 时优先使用一键安装。"
                                 )
                                 if reference_mode == "generated_unified_cluster_v1":
                                     st.success(
