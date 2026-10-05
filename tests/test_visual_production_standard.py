@@ -61,5 +61,9 @@ def test_style_calibration_lab_scene_contract():
     assert '"COLOR"' in script
     assert '"GRAYSCALE"' in script
     assert '"SILHOUETTE"' in script
+    assert 'material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED' in script
+    assert '_add_palette_row_label("RAW"' in script
+    assert '_add_palette_row_label("LIT"' in script
+    assert 'env.background_color = Color("#8E8B86")' in script
     assert "Environment.TONE_MAPPER_FILMIC" in script
     assert "env.tonemap_exposure = 1.0" in script

@@ -36,6 +36,13 @@ func _material(color: Color, roughness: float = 0.88) -> StandardMaterial3D:
     material.roughness = roughness
     return material
 
+func _raw_material(color: Color) -> StandardMaterial3D:
+    var material := StandardMaterial3D.new()
+    material.albedo_color = color
+    material.roughness = 1.0
+    material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    return material
+
 func _mode_color(source: Color, mode: String) -> Color:
     if mode == "grayscale":
         var luma := source.get_luminance()
@@ -85,10 +92,10 @@ func _setup_environment() -> void:
     var world_env := WorldEnvironment.new()
     var env := Environment.new()
     env.background_mode = Environment.BG_COLOR
-    env.background_color = Color("#D5D1CB")
+    env.background_color = Color("#8E8B86")
     env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-    env.ambient_light_color = Color("#FFF4E2")
-    env.ambient_light_energy = 0.52
+    env.ambient_light_color = Color("#F6F0E7")
+    env.ambient_light_energy = 0.24
     env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
     env.tonemap_exposure = 1.0
     world_env.environment = env
@@ -96,15 +103,15 @@ func _setup_environment() -> void:
 
     var key_light := DirectionalLight3D.new()
     key_light.rotation_degrees = Vector3(-48.0, -32.0, 0.0)
-    key_light.light_color = Color("#FFF0D6")
-    key_light.light_energy = 1.0
+    key_light.light_color = Color("#FFF3E0")
+    key_light.light_energy = 0.62
     key_light.shadow_enabled = true
     add_child(key_light)
 
     var fill := DirectionalLight3D.new()
     fill.rotation_degrees = Vector3(-25.0, 142.0, 0.0)
     fill.light_color = Color("#AFCFE5")
-    fill.light_energy = 0.22
+    fill.light_energy = 0.08
     fill.shadow_enabled = false
     add_child(fill)
 
@@ -122,7 +129,7 @@ func _build_floor() -> void:
     mesh.size = Vector3(42.0, 0.35, 18.0)
     floor.mesh = mesh
     floor.position = Vector3(0.0, -0.25, 0.0)
-    floor.material_override = _material(Color("#C9C3BA"), 0.94)
+    floor.material_override = _material(Color("#817D78"), 0.94)
     add_child(floor)
 
 func _build_station(origin: Vector3, title: String, mode: String) -> void:
@@ -138,9 +145,11 @@ func _build_station(origin: Vector3, title: String, mode: String) -> void:
 
     var label := Label3D.new()
     label.text = title
-    label.font_size = 42
+    label.font_size = 78
     label.modulate = Color("#343447")
-    label.position = Vector3(0.0, 6.3, 0.0)
+    label.outline_size = 10
+    label.outline_modulate = Color("#F6F0E7")
+    label.position = Vector3(0.0, 5.85, 0.0)
     label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
     root.add_child(label)
 
@@ -185,13 +194,36 @@ func _build_palette_strip() -> void:
     var start_x := -12.8
     for i in keys.size():
         var key: String = keys[i]
-        var swatch := MeshInstance3D.new()
-        var mesh := BoxMesh.new()
-        mesh.size = Vector3(1.35, 0.35, 1.35)
-        swatch.mesh = mesh
-        swatch.position = Vector3(start_x + float(i) * 1.6, 0.15, 6.2)
-        swatch.material_override = _material(_color(key), 0.9)
-        add_child(swatch)
+
+        var raw := MeshInstance3D.new()
+        var raw_mesh := BoxMesh.new()
+        raw_mesh.size = Vector3(1.38, 0.28, 1.05)
+        raw.mesh = raw_mesh
+        raw.position = Vector3(start_x + float(i) * 1.6, 0.18, 7.15)
+        raw.material_override = _raw_material(_color(key))
+        add_child(raw)
+
+        var lit := MeshInstance3D.new()
+        var lit_mesh := BoxMesh.new()
+        lit_mesh.size = Vector3(1.38, 0.28, 1.05)
+        lit.mesh = lit_mesh
+        lit.position = Vector3(start_x + float(i) * 1.6, 0.18, 5.75)
+        lit.material_override = _material(_color(key), 0.9)
+        add_child(lit)
+
+    _add_palette_row_label("RAW", Vector3(-14.35, 0.75, 7.15))
+    _add_palette_row_label("LIT", Vector3(-14.35, 0.75, 5.75))
+
+func _add_palette_row_label(text_value: String, pos: Vector3) -> void:
+    var label := Label3D.new()
+    label.text = text_value
+    label.font_size = 54
+    label.modulate = Color("#343447")
+    label.outline_size = 8
+    label.outline_modulate = Color("#F6F0E7")
+    label.position = pos
+    label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+    add_child(label)
 
 func _build_hud() -> void:
     var hud := CanvasLayer.new()
