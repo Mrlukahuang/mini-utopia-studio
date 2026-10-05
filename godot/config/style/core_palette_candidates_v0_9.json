@@ -1,8 +1,10 @@
 {
   "schema_version": "0.9",
   "status": "calibration_candidate",
-  "name": "Mini Utopia Core Macaron Candidates",
-  "note": "Candidate HEX values only. Lock v1.0 after Godot Style Calibration Lab review.",
+  "candidate_id": "storybook_macaron_a",
+  "name": "Mini Utopia Storybook Macaron Candidate A",
+  "direction": "higher-chroma fairy-tale macaron; playful and saturated without neon",
+  "note": "Candidate HEX values only. Keep calibration lighting fixed and lock v1.0 only after Godot RAW/LIT review.",
   "value_area_targets": {
     "light": "60-70%",
     "mid": "20-30%",
@@ -10,22 +12,30 @@
     "glow": "<5%"
   },
   "colors": {
-    "cream_base": "#FFF0D6",
-    "cream_warm": "#F8E7B0",
-    "peach": "#F6B89A",
-    "strawberry": "#EF8FA3",
-    "apricot": "#F4A261",
-    "butter_yellow": "#F5D879",
-    "mint": "#A9DDB5",
-    "sage": "#8FB38A",
-    "moss": "#667C58",
-    "powder_blue": "#AFCFE5",
-    "aqua": "#88C9C4",
-    "lavender": "#C4AFE8",
-    "lilac": "#A98BCD",
-    "warm_taupe": "#A68D7A",
-    "cocoa": "#5F4A43",
-    "deep_ink": "#343447",
-    "glow_gold": "#FFD56A"
-  }
+    "cream_base": "#F6F1E7",
+    "cream_warm": "#F2E5C8",
+    "peach": "#F4B77F",
+    "strawberry": "#F39BB8",
+    "apricot": "#EDA45F",
+    "butter_yellow": "#F2D85F",
+    "mint": "#AFE596",
+    "sage": "#8FBD72",
+    "moss": "#647F52",
+    "powder_blue": "#A7D8F0",
+    "aqua": "#8DDEDD",
+    "lavender": "#CEACEF",
+    "lilac": "#AB8BDE",
+    "warm_taupe": "#B98D70",
+    "cocoa": "#7A5547",
+    "deep_ink": "#48425F",
+    "glow_gold": "#FFD54F"
+  },
+  "review_focus": [
+    "RAW and LIT swatches should keep clearly different hue identities",
+    "mint and sage must not collapse together",
+    "powder_blue, aqua, lavender and lilac must remain distinct",
+    "cream colors must not wash to the same near-white",
+    "cocoa and deep_ink must anchor the scene",
+    "glow_gold must read as an accent, not a base color"
+  ]
 }
