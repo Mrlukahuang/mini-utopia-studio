@@ -7,6 +7,10 @@ from dataclasses import dataclass
 
 from PIL import Image
 
+from studio.models.hero_composition import (
+    HeroCompositionCluster,
+    WorldHeroCompositionPlan,
+)
 from studio.models.render import (
     ObjectAppearanceSpec,
     RenderVec3,
@@ -36,6 +40,9 @@ class HeroAssetBuild:
     reference_mode: str = ""
     usage: dict | None = None
     message: str = ""
+    cluster_id: str = ""
+    member_element_ids: tuple[str, ...] = ()
+    target_size: tuple[float, float, float] | None = None
 
 
 class WorldHeroAssetService:
@@ -72,11 +79,23 @@ class WorldHeroAssetService:
         profile=None,
         style_profile: dict | None = None,
         existing_assets: dict | None = None,
+        composition_plan: WorldHeroCompositionPlan | None = None,
     ) -> tuple[WorldRenderSpec, list[HeroAssetBuild], dict]:
         if not self.is_available:
             return render_spec, [], existing_assets or {}
 
         appearance_by_id = {item.element_id: item for item in appearance.objects}
+        if composition_plan is not None and composition_plan.clusters:
+            return self._enrich_unified_clusters(
+                location_asset_id=location_asset_id,
+                blueprint=blueprint,
+                appearance=appearance,
+                render_spec=render_spec,
+                style_profile=style_profile or {},
+                existing_assets=existing_assets,
+                composition_plan=composition_plan,
+            )
+
         candidates = [
             element
             for element in blueprint.layout_elements
@@ -327,6 +346,462 @@ class WorldHeroAssetService:
                 )
 
         return updated, builds, cache
+
+    def _enrich_unified_clusters(
+        self,
+        *,
+        location_asset_id: str,
+        blueprint: WorldBlueprint,
+        appearance: WorldAppearancePlan,
+        render_spec: WorldRenderSpec,
+        style_profile: dict,
+        existing_assets: dict | None,
+        composition_plan: WorldHeroCompositionPlan,
+    ) -> tuple[WorldRenderSpec, list[HeroAssetBuild], dict]:
+        """Generate each selected Hero cluster as one inseparable GLB."""
+        appearance_by_id = {item.element_id: item for item in appearance.objects}
+        element_by_id = {item.element_id: item for item in blueprint.layout_elements}
+        updated = render_spec.model_copy(deep=True)
+        updated_by_id = {item.element_id: item for item in updated.objects}
+        cache = dict(existing_assets or {})
+        builds: list[HeroAssetBuild] = []
+
+        clusters = composition_plan.clusters[: self.max_assets_per_world]
+        provider_key = str(
+            getattr(
+                self.provider,
+                "cache_identity",
+                getattr(self.provider, "model", self.provider.__class__.__name__),
+            )
+        )
+
+        for cluster in clusters:
+            root = element_by_id.get(cluster.root_element_id)
+            root_appearance = appearance_by_id.get(cluster.root_element_id)
+            render_object = updated_by_id.get(cluster.root_element_id)
+            if root is None or root_appearance is None or render_object is None:
+                continue
+
+            member_ids = tuple(
+                member.element_id
+                for member in cluster.members
+                if member.element_id in element_by_id
+            )
+            if cluster.root_element_id not in member_ids:
+                member_ids = (cluster.root_element_id, *member_ids)
+
+            reference_mode, reference_fingerprint, reference_prompt = (
+                self._prepare_cluster_reference(
+                    cluster=cluster,
+                    blueprint=blueprint,
+                    appearance_by_id=appearance_by_id,
+                    style_profile=style_profile,
+                )
+            )
+            input_sha = self._cluster_input_sha(
+                reference_fingerprint=reference_fingerprint,
+                cluster=cluster,
+                member_ids=member_ids,
+                appearance_by_id=appearance_by_id,
+                provider_key=provider_key,
+                reference_mode=reference_mode,
+                visual_anchor=blueprint.visual_anchor.model_dump(mode="json"),
+            )
+            cache_key = f"cluster:{cluster.cluster_id}"
+            target_size = self._cluster_target_size(
+                member_ids=member_ids,
+                element_by_id=element_by_id,
+            )
+            cached = cache.get(cache_key, {}) or {}
+            cached_path = str(cached.get("asset_path", "") or "")
+
+            if (
+                cached.get("input_sha256") == input_sha
+                and cached_path
+                and self.storage.exists(cached_path)
+            ):
+                self._attach_glb_node(
+                    render_object=render_object,
+                    element=root,
+                    asset_path=cached_path,
+                    asset_sha256=str(cached.get("glb_sha256", "") or ""),
+                    model=str(cached.get("model", "") or "cached"),
+                )
+                self._suppress_baked_members(
+                    updated_by_id=updated_by_id,
+                    cluster=cluster,
+                )
+                builds.append(
+                    HeroAssetBuild(
+                        element_id=root.element_id,
+                        name=root.name,
+                        status="cached",
+                        asset_path=cached_path,
+                        model=str(cached.get("model", "") or "cached"),
+                        input_sha256=input_sha,
+                        glb_sha256=str(cached.get("glb_sha256", "") or ""),
+                        bytes=int(cached.get("bytes", 0) or 0),
+                        reference_mode=reference_mode,
+                        usage=(
+                            (cached.get("metadata", {}) or {}).get("zero_gpu_usage")
+                            or self.provider.usage_snapshot()
+                        ),
+                        message="Reused exact unified Hero Cluster cache.",
+                        cluster_id=cluster.cluster_id,
+                        member_element_ids=member_ids,
+                        target_size=target_size,
+                    )
+                )
+                continue
+
+            if self.reusable_library is not None:
+                reusable = self.reusable_library.find_by_source_fingerprint(input_sha)
+                if reusable is not None:
+                    reusable_spec = self.reusable_library.get_spec(reusable)
+                    if self.storage.exists(reusable_spec.storage_path):
+                        self._attach_glb_node(
+                            render_object=render_object,
+                            element=root,
+                            asset_path=reusable_spec.storage_path,
+                            asset_sha256=reusable_spec.sha256,
+                            model=reusable_spec.source.generator_model or "library",
+                        )
+                        self._suppress_baked_members(
+                            updated_by_id=updated_by_id,
+                            cluster=cluster,
+                        )
+                        cache[cache_key] = {
+                            "asset_path": reusable_spec.storage_path,
+                            "mime_type": "model/gltf-binary",
+                            "model": reusable_spec.source.generator_model or "library",
+                            "provider": reusable_spec.source.source_name,
+                            "input_sha256": input_sha,
+                            "glb_sha256": reusable_spec.sha256,
+                            "bytes": reusable_spec.byte_size,
+                            "metadata": {
+                                "reusable_asset_id": reusable.asset_id,
+                                "reused_from_library": True,
+                                "reference_mode": reference_mode,
+                                "cluster_id": cluster.cluster_id,
+                                "member_element_ids": list(member_ids),
+                                "render_strategy": "unified_glb",
+                            },
+                        }
+                        builds.append(
+                            HeroAssetBuild(
+                                element_id=root.element_id,
+                                name=root.name,
+                                status="cached",
+                                asset_path=reusable_spec.storage_path,
+                                model=reusable_spec.source.generator_model or "library",
+                                input_sha256=input_sha,
+                                glb_sha256=reusable_spec.sha256,
+                                bytes=reusable_spec.byte_size,
+                                reference_mode=reference_mode,
+                                usage=self.provider.usage_snapshot(),
+                                message="Reused exact unified Hero Cluster from global library.",
+                                cluster_id=cluster.cluster_id,
+                                member_element_ids=member_ids,
+                                target_size=target_size,
+                            )
+                        )
+                        continue
+
+            try:
+                if self.reference_image_provider is None:
+                    raise RuntimeError(
+                        "Unified Hero Cluster needs a dedicated reference image provider; "
+                        "the whole World Preview will not be forwarded to Pixal3D."
+                    )
+
+                reference_image = self.reference_image_provider.generate(
+                    prompt=reference_prompt,
+                    size="1024x1024",
+                    quality="medium",
+                )
+                reference_image = self._normalize_reference_image(reference_image)
+
+                result = self.provider.generate(
+                    image_bytes=reference_image,
+                    mime_type="image/png",
+                    element_id=cluster.cluster_id,
+                    appearance=root_appearance,
+                )
+                glb_sha = hashlib.sha256(result.payload).hexdigest()
+                reusable_asset_id = ""
+
+                semantic_keys = [
+                    element_by_id[element_id].semantic_key
+                    for element_id in member_ids
+                    if element_by_id[element_id].semantic_key
+                ]
+                if self.reusable_library is not None:
+                    reusable = self.reusable_library.import_glb(
+                        payload=result.payload,
+                        display_name=f"{root.name} / Unified Hero Cluster",
+                        category="hero",
+                        semantic_keys=list(
+                            dict.fromkeys([*semantic_keys, "hero", "hero-cluster"])
+                        ),
+                        source=ReusableAssetSourceSpec(
+                            origin_kind="generated",
+                            source_name=result.provider,
+                            source_url=str(result.metadata.get("space_url", "") or ""),
+                            license_id="GENERATED",
+                            attribution_required=False,
+                            generator_model=result.model,
+                        ),
+                        tags=["generated-hero", "hero-cluster", "mini-utopia"],
+                        source_fingerprint=input_sha,
+                    )
+                    reusable_spec = self.reusable_library.get_spec(reusable)
+                    asset_path = reusable_spec.storage_path
+                    reusable_asset_id = reusable.asset_id
+                else:
+                    safe_cluster_id = cluster.cluster_id.replace("/", "_")
+                    asset_path = self.storage.put_bytes(
+                        (
+                            f"assets/{location_asset_id}/hero_cluster/"
+                            f"{safe_cluster_id}_{glb_sha[:12]}.glb"
+                        ),
+                        result.payload,
+                    )
+
+                usage = (
+                    result.metadata.get("zero_gpu_usage")
+                    or self.provider.usage_snapshot()
+                )
+                cache[cache_key] = {
+                    "asset_path": asset_path,
+                    "mime_type": result.mime_type,
+                    "model": result.model,
+                    "provider": result.provider,
+                    "input_sha256": input_sha,
+                    "glb_sha256": glb_sha,
+                    "bytes": len(result.payload),
+                    "metadata": {
+                        **result.metadata,
+                        "reference_mode": reference_mode,
+                        "cluster_id": cluster.cluster_id,
+                        "member_element_ids": list(member_ids),
+                        "render_strategy": "unified_glb",
+                        **(
+                            {"reusable_asset_id": reusable_asset_id}
+                            if reusable_asset_id
+                            else {}
+                        ),
+                    },
+                }
+                self._attach_glb_node(
+                    render_object=render_object,
+                    element=root,
+                    asset_path=asset_path,
+                    asset_sha256=glb_sha,
+                    model=result.model,
+                )
+                self._suppress_baked_members(
+                    updated_by_id=updated_by_id,
+                    cluster=cluster,
+                )
+                builds.append(
+                    HeroAssetBuild(
+                        element_id=root.element_id,
+                        name=root.name,
+                        status="generated",
+                        asset_path=asset_path,
+                        model=result.model,
+                        input_sha256=input_sha,
+                        glb_sha256=glb_sha,
+                        bytes=len(result.payload),
+                        reference_mode=reference_mode,
+                        usage=usage,
+                        message="Generated as one unified Hero Cluster GLB.",
+                        cluster_id=cluster.cluster_id,
+                        member_element_ids=member_ids,
+                        target_size=target_size,
+                    )
+                )
+            except Exception as exc:
+                builds.append(
+                    HeroAssetBuild(
+                        element_id=root.element_id,
+                        name=root.name,
+                        status="fallback",
+                        input_sha256=input_sha,
+                        reference_mode=reference_mode,
+                        usage=self.provider.usage_snapshot(),
+                        message=str(exc),
+                        cluster_id=cluster.cluster_id,
+                        member_element_ids=member_ids,
+                        target_size=target_size,
+                    )
+                )
+
+        return updated, builds, cache
+
+    def _prepare_cluster_reference(
+        self,
+        *,
+        cluster: HeroCompositionCluster,
+        blueprint: WorldBlueprint,
+        appearance_by_id: dict[str, ObjectAppearanceSpec],
+        style_profile: dict,
+    ) -> tuple[str, bytes, str]:
+        prompt = self._hero_cluster_reference_prompt(
+            cluster=cluster,
+            blueprint=blueprint,
+            appearance_by_id=appearance_by_id,
+            style_profile=style_profile,
+        )
+        return (
+            "generated_unified_cluster_v1",
+            prompt.encode("utf-8"),
+            prompt,
+        )
+
+    @staticmethod
+    def _hero_cluster_reference_prompt(
+        *,
+        cluster: HeroCompositionCluster,
+        blueprint: WorldBlueprint,
+        appearance_by_id: dict[str, ObjectAppearanceSpec],
+        style_profile: dict,
+    ) -> str:
+        element_by_id = {item.element_id: item for item in blueprint.layout_elements}
+        member_lines: list[str] = []
+        for member in cluster.members:
+            element = element_by_id.get(member.element_id)
+            if element is None:
+                continue
+            appearance = appearance_by_id.get(member.element_id)
+            appearance_note = ""
+            if appearance is not None:
+                appearance_note = (
+                    f"; silhouette={appearance.silhouette_family}; "
+                    f"notes={appearance.silhouette_notes or appearance.name}"
+                )
+            member_lines.append(
+                (
+                    f"- {member.role.upper()} · {element.name} "
+                    f"[{element.element_id}] · semantic={element.semantic_key or element.name}; "
+                    f"kind={element.kind}; geometry={element.geometry_role}; "
+                    f"relation={member.relation_to_root or 'root composition'}"
+                    f"{appearance_note}"
+                )
+            )
+
+        anchor = blueprint.visual_anchor
+        visual_dna = ", ".join(style_profile.get("visual_dna_pillars", []))
+        shape_language = style_profile.get("shape_language", "")
+        material_language = style_profile.get(
+            "runtime_material_rule",
+            style_profile.get("material_language", ""),
+        )
+        preserve = "; ".join(anchor.must_preserve)
+        composition = "; ".join(anchor.composition_notes)
+        relations = "; ".join(anchor.spatial_relations)
+
+        return (
+            "MINI UTOPIA UNIFIED HERO CLUSTER · IMAGE-TO-3D REFERENCE\n\n"
+            "Render ONE complete inseparable fantasy Hero composition. "
+            "The listed members are semantic parts of the SAME Hero and must read "
+            "as one authored object, not as separate assets placed near each other.\n\n"
+            f"Cluster concept: {cluster.concept_summary or anchor.concept_summary}.\n"
+            f"Visual anchor concept: {anchor.concept_summary}.\n"
+            + (f"Must preserve: {preserve}.\n" if preserve else "")
+            + (f"Composition notes: {composition}.\n" if composition else "")
+            + (f"Spatial relations: {relations}.\n" if relations else "")
+            + (f"Visual DNA: {visual_dna}.\n" if visual_dna else "")
+            + (f"Shape language: {shape_language}.\n" if shape_language else "")
+            + (f"Material language: {material_language}.\n" if material_language else "")
+            + "\nHERO MEMBERS — ALL MUST BE INTEGRATED INTO THE SAME SUBJECT\n"
+            + "\n".join(member_lines)
+            + "\n\nSTRICT COMPOSITION RULES\n"
+            + "- Include every listed Hero member in one visually coherent, fused composition.\n"
+            + "- Preserve support/contact relationships: carried structures must feel designed into the root body/surface, not floating as unrelated props.\n"
+            + "- Preserve the original imaginative silhouette and composition language from the Visual Anchor.\n"
+            + "- Show the complete Hero Cluster centered, large, filling about 82-90% of a square frame.\n"
+            + "- Use a clean three-quarter view that reveals the overall silhouette and the integrated top/side structures.\n"
+            + "- Plain soft neutral studio background with clear separation from the Hero.\n"
+            + "- NO unrelated world scenery, distant islands, entrance plaza, generic roads, ambient lamps, background characters, labels, UI or text.\n"
+            + "- This is ONE image-to-3D subject. Do not create detached pieces for later assembly.\n"
+            + "- Keep Mini Utopia rounded storybook/toy stylization; avoid photorealism."
+        )
+
+    @staticmethod
+    def _cluster_input_sha(
+        *,
+        reference_fingerprint: bytes,
+        cluster: HeroCompositionCluster,
+        member_ids: tuple[str, ...],
+        appearance_by_id: dict[str, ObjectAppearanceSpec],
+        provider_key: str,
+        reference_mode: str,
+        visual_anchor: dict,
+    ) -> str:
+        digest = hashlib.sha256()
+        digest.update(b"hero-unified-cluster-v1\0")
+        digest.update(provider_key.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(reference_mode.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(reference_fingerprint)
+        digest.update(
+            json.dumps(
+                {
+                    "cluster": cluster.model_dump(mode="json"),
+                    "member_ids": list(member_ids),
+                    "appearances": {
+                        element_id: appearance_by_id[element_id].model_dump(mode="json")
+                        for element_id in member_ids
+                        if element_id in appearance_by_id
+                    },
+                    "visual_anchor": visual_anchor,
+                },
+                sort_keys=True,
+                ensure_ascii=False,
+            ).encode("utf-8")
+        )
+        return digest.hexdigest()
+
+    @staticmethod
+    def _cluster_target_size(
+        *,
+        member_ids: tuple[str, ...],
+        element_by_id: dict[str, WorldLayoutElement],
+    ) -> tuple[float, float, float]:
+        elements = [
+            element_by_id[element_id]
+            for element_id in member_ids
+            if element_id in element_by_id
+        ]
+        if not elements:
+            return (1.0, 1.0, 1.0)
+
+        min_x = min(item.position.x - item.width / 2.0 for item in elements)
+        max_x = max(item.position.x + item.width / 2.0 for item in elements)
+        min_y = min(item.position.y - item.height / 2.0 for item in elements)
+        max_y = max(item.position.y + item.height / 2.0 for item in elements)
+        min_z = min(item.position.z - item.depth / 2.0 for item in elements)
+        max_z = max(item.position.z + item.depth / 2.0 for item in elements)
+        return (
+            max(0.1, max_x - min_x),
+            max(0.1, max_y - min_y),
+            max(0.1, max_z - min_z),
+        )
+
+    @staticmethod
+    def _suppress_baked_members(
+        *,
+        updated_by_id: dict,
+        cluster: HeroCompositionCluster,
+    ) -> None:
+        for member in cluster.members:
+            if member.role != "baked":
+                continue
+            render_object = updated_by_id.get(member.element_id)
+            if render_object is not None:
+                render_object.visible = False
 
     def attach_existing_glb(
         self,
