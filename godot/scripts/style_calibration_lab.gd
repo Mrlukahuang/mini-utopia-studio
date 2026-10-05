@@ -1,8 +1,6 @@
 extends Node3D
 
 const PALETTE_PATH := "res://config/style/core_palette_candidates_v0_9.json"
-const GoldenAnchorRuntime = preload("res://scripts/golden_anchor_runtime.gd")
-
 var palette: Dictionary = {}
 var color_materials: Array[StandardMaterial3D] = []
 
@@ -125,13 +123,13 @@ func _setup_camera() -> void:
     camera.look_at(Vector3(0.0, 2.1, 0.0), Vector3.UP)
 
 func _build_floor() -> void:
-    var floor := MeshInstance3D.new()
+    var floor_node := MeshInstance3D.new()
     var mesh := BoxMesh.new()
     mesh.size = Vector3(42.0, 0.35, 18.0)
-    floor.mesh = mesh
-    floor.position = Vector3(0.0, -0.25, 0.0)
-    floor.material_override = _material(Color("#817D78"), 0.94)
-    add_child(floor)
+    floor_node.mesh = mesh
+    floor_node.position = Vector3(0.0, -0.25, 0.0)
+    floor_node.material_override = _material(Color("#817D78"), 0.94)
+    add_child(floor_node)
 
 func _build_station(origin: Vector3, title: String, mode: String) -> void:
     var root := Node3D.new()
