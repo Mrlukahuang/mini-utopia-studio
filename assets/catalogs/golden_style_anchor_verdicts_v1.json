@@ -1,0 +1,87 @@
+{
+  "schema_version": "1.0",
+  "name": "Mini Utopia Golden Style Anchor Verdicts v1",
+  "review_basis": "First real-asset Godot lineup under fixed Style Calibration Lab lighting",
+  "status_definitions": {
+    "style_anchor": "May define Mini Utopia geometry/style language and appear in GPT style sheets.",
+    "direct_use": "Compatible for production use after palette/scale/gameplay checks, but does not define the style.",
+    "gameplay_utility": "Useful structural/gameplay module; do not use as a primary visual style reference.",
+    "conditional": "Potentially usable but requires another compatibility/material/palette check before Golden promotion.",
+    "archive": "Do not use for current Canon production."
+  },
+  "verdicts": {
+    "forest_tree_round": {
+      "status": "style_anchor",
+      "reason": "Strong C+ silhouette: rounded organic crown, simple trunk, readable toy masses."
+    },
+    "forest_tree_branching": {
+      "status": "direct_use",
+      "reason": "Compatible but more cuboid; useful variation, not a primary anti-voxel style reference."
+    },
+    "forest_bush": {
+      "status": "direct_use",
+      "reason": "Simple rounded mass, highly reusable environment dressing."
+    },
+    "forest_rock": {
+      "status": "direct_use",
+      "reason": "Clean faceted mass and readable scale; good utility nature prop."
+    },
+    "medieval_home": {
+      "status": "style_anchor",
+      "reason": "Excellent architecture anchor: chunky structure, clear roof/body hierarchy, toy-like proportions."
+    },
+    "medieval_tower": {
+      "status": "style_anchor",
+      "reason": "Strong vertical landmark language with readable large/medium forms."
+    },
+    "medieval_bridge": {
+      "status": "direct_use",
+      "reason": "Compatible modular architecture; useful for assembly but not identity-bearing enough to anchor style."
+    },
+    "platformer_platform": {
+      "status": "gameplay_utility",
+      "reason": "Useful gameplay geometry but too prototype/block-like to define final visual language."
+    },
+    "platformer_slope": {
+      "status": "gameplay_utility",
+      "reason": "Useful traversal module; retain for mechanics and blockout, not GPT style reference."
+    },
+    "dungeon_chest": {
+      "status": "direct_use",
+      "reason": "Readable chunky prop with strong primary/secondary mass separation."
+    },
+    "adventurer_knight": {
+      "status": "style_anchor",
+      "reason": "Matches compact playable character proportions and supports the character Canon."
+    },
+    "skeleton_minion": {
+      "status": "direct_use",
+      "reason": "Good gameplay creature/enemy fit; secondary to Adventurer for character style authority."
+    },
+    "kenney_castle_tower": {
+      "status": "conditional",
+      "reason": "Current lineup presentation does not blend cleanly as-is. Retest one additional representative Kenney Castle asset after material/palette normalization before broader promotion."
+    }
+  },
+  "style_sheet_include": [
+    "forest_tree_round",
+    "medieval_home",
+    "medieval_tower",
+    "adventurer_knight"
+  ],
+  "production_direct_use": [
+    "forest_tree_branching",
+    "forest_bush",
+    "forest_rock",
+    "medieval_bridge",
+    "dungeon_chest",
+    "skeleton_minion"
+  ],
+  "gameplay_only": [
+    "platformer_platform",
+    "platformer_slope"
+  ],
+  "conditional_review": [
+    "kenney_castle_tower"
+  ]
+}
