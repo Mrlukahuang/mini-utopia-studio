@@ -50,3 +50,31 @@ After the first Golden Asset curation, replace/proxy the procedural forms with a
 - one Mini Utopia Hero component
 
 Palette v1.0 should be locked only after the real-asset lineup passes color, grayscale and 64 px silhouette review.
+
+
+## Golden Style Anchor install
+
+The v1 lineup is versioned in:
+
+`assets/catalogs/golden_style_anchors_v1.json`
+
+The source ZIPs remain local and immutable. From the repository root run:
+
+```bash
+python3 tools/install_golden_anchors.py
+```
+
+The installer searches common local folders such as `~/Downloads`, extracts only the 13 curated anchor models plus their direct GLTF dependencies, and writes them under:
+
+`godot/assets/external/golden/`
+
+Those extracted binaries/textures are ignored by git.
+
+After Godot finishes importing them:
+
+- run `scenes/golden_anchor_lineup.tscn` to inspect all 13 source-geometry anchors
+- run `scenes/style_calibration_lab.tscn` to compare the representative real COLOR lineup against the deterministic GRAYSCALE / SILHOUETTE controls
+
+The first 13 anchors cover KayKit nature, architecture, gameplay modules, prop, character and creature geometry plus one Kenney Castle compatibility check.
+
+This stage is for **geometry/style compatibility**, not final palette approval. The source materials remain unchanged until the semantic-slot atlas mapping step.
