@@ -1,0 +1,16 @@
+{
+  "schema_version": "0.1",
+  "pack": "kaykit_forest",
+  "atlas_name": "forest_texture.png",
+  "layout": {
+    "type": "horizontal_bands",
+    "bands": 4
+  },
+  "regions": [
+    {"band": 0, "slot": "foliage_base"},
+    {"band": 1, "slot": "wood_base"},
+    {"band": 2, "slot": "stone_base"},
+    {"band": 3, "slot": "neutral_warm"}
+  ],
+  "note": "First-pass semantic map validated against the Forest atlas layout and Golden nature anchors. Preserve gradients; only remap hue/chroma/value center."
+}
