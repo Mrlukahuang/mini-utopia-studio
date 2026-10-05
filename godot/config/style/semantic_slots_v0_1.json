@@ -1,0 +1,27 @@
+{
+  "schema_version": "0.1",
+  "name": "Mini Utopia Static Material Semantic Slots",
+  "note": "Static asset/material slots. Gameplay state roles are intentionally separate.",
+  "slots": [
+    "neutral_light",
+    "neutral_warm",
+    "structure_dark",
+    "wood_light",
+    "wood_base",
+    "wood_dark",
+    "stone_light",
+    "stone_base",
+    "stone_dark",
+    "foliage_light",
+    "foliage_base",
+    "foliage_dark",
+    "roof_warm",
+    "roof_accent",
+    "water_base",
+    "sky_accent",
+    "magic_light",
+    "magic_base",
+    "metal_light",
+    "metal_dark"
+  ]
+}

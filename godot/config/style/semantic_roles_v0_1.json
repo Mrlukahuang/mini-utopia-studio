@@ -1,0 +1,12 @@
+{
+  "schema_version": "0.1",
+  "name": "Mini Utopia Gameplay Semantic Color Roles",
+  "note": "Runtime/state roles. These are not baked into static environment atlases.",
+  "roles": {
+    "interact": "glow_gold",
+    "quest": "lavender",
+    "danger": "strawberry",
+    "selection": "butter_yellow",
+    "friendly": "mint"
+  }
+}

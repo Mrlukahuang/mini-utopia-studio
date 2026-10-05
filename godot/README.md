@@ -47,3 +47,10 @@ The Hero runtime loader supports:
 - HTTP(S) GLB URLs through `HTTPRequest`
 
 Runtime GLB import uses Godot's `GLTFDocument` / `GLTFState` API, then uniformly fits the generated scene to the manifest target envelope and grounds it at the Hero root.
+
+
+## Style Calibration Lab
+
+Before locking palette HEX values or rewriting Canon asset-generation prompts, open `res://scenes/style_calibration_lab.tscn` and run the current scene (F6).
+
+The Lab fixes camera, Filmic tonemapping, exposure and lighting, then shows the v0.9 Core Macaron candidate palette in COLOR / GRAYSCALE / SILHOUETTE lanes. See `STYLE_CALIBRATION_LAB.md` for the review workflow.

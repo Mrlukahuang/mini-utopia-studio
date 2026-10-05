@@ -1,0 +1,31 @@
+{
+  "schema_version": "0.9",
+  "status": "calibration_candidate",
+  "name": "Mini Utopia Core Macaron Candidates",
+  "note": "Candidate HEX values only. Lock v1.0 after Godot Style Calibration Lab review.",
+  "value_area_targets": {
+    "light": "60-70%",
+    "mid": "20-30%",
+    "dark": "5-10%",
+    "glow": "<5%"
+  },
+  "colors": {
+    "cream_base": "#FFF0D6",
+    "cream_warm": "#F8E7B0",
+    "peach": "#F6B89A",
+    "strawberry": "#EF8FA3",
+    "apricot": "#F4A261",
+    "butter_yellow": "#F5D879",
+    "mint": "#A9DDB5",
+    "sage": "#8FB38A",
+    "moss": "#667C58",
+    "powder_blue": "#AFCFE5",
+    "aqua": "#88C9C4",
+    "lavender": "#C4AFE8",
+    "lilac": "#A98BCD",
+    "warm_taupe": "#A68D7A",
+    "cocoa": "#5F4A43",
+    "deep_ink": "#343447",
+    "glow_gold": "#FFD56A"
+  }
+}
