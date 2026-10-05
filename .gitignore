@@ -19,3 +19,8 @@ data/**/*.db
 # IDE
 .vscode/
 .idea/
+
+# Godot extracts embedded GLB textures/import metadata beside runtime Hero assets.
+# Source-of-truth is the unified .glb + hero_manifest.json.
+godot/assets/external/heroes/*.webp
+godot/assets/external/heroes/*.import
