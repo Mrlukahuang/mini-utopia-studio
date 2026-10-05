@@ -76,3 +76,63 @@ def test_build_bundle_rejects_invalid_glb(tmp_path):
             },
             target_size=(1.0, 1.0, 1.0),
         )
+
+
+def test_install_bundle_writes_glb_and_manifest(tmp_path):
+    storage = LocalObjectStorage(tmp_path / "storage")
+    storage.put_bytes("assets/library/hero.glb", _valid_glb())
+    service = GodotHeroExportService(storage)
+    bundle = service.build_bundle(
+        hero={
+            "element_id": "SCENE_WHALE",
+            "name": "Unified Whale",
+            "asset_path": "assets/library/hero.glb",
+            "status": "generated",
+            "reference_mode": "generated_unified_cluster_v1",
+            "cluster_id": "HERO_CLUSTER_WHALE",
+            "member_element_ids": ["SCENE_WHALE", "SCENE_GARDEN"],
+        },
+        target_size=(18.0, 8.0, 9.0),
+    )
+
+    repo_root = tmp_path / "repo"
+    (repo_root / "godot").mkdir(parents=True)
+    (repo_root / "godot" / "project.godot").write_text(
+        "[application]\nconfig/name=\"Mini Utopia\"\n",
+        encoding="utf-8",
+    )
+
+    installed = service.install_bundle(
+        bundle=bundle,
+        repository_root=repo_root,
+    )
+
+    assert installed.hero_path.exists()
+    assert installed.hero_path.read_bytes() == _valid_glb()
+    assert installed.manifest_path.exists()
+
+    manifest = json.loads(
+        installed.manifest_path.read_text(encoding="utf-8")
+    )
+    hero = manifest["heroes"][0]
+    assert hero["render_strategy"] == "unified_glb"
+    assert hero["reference_mode"] == "generated_unified_cluster_v1"
+
+
+def test_install_bundle_requires_godot_checkout(tmp_path):
+    storage = LocalObjectStorage(tmp_path / "storage")
+    storage.put_bytes("assets/library/hero.glb", _valid_glb())
+    service = GodotHeroExportService(storage)
+    bundle = service.build_bundle(
+        hero={
+            "element_id": "SCENE_WHALE",
+            "asset_path": "assets/library/hero.glb",
+        },
+        target_size=(1.0, 1.0, 1.0),
+    )
+
+    with pytest.raises(ValueError, match="Godot project not found"):
+        service.install_bundle(
+            bundle=bundle,
+            repository_root=tmp_path / "not-a-repo",
+        )
