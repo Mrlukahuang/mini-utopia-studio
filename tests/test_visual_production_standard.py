@@ -23,10 +23,10 @@ def test_palette_candidates_are_versioned_and_not_marked_final():
 
     assert data["status"] == "calibration_candidate"
     assert data["schema_version"] == "0.9"
-    assert data["candidate_id"] == "storybook_macaron_a"
-    assert data["colors"]["cream_base"] == "#F6F1E7"
-    assert data["colors"]["deep_ink"] == "#48425F"
-    assert data["colors"]["glow_gold"] == "#FFD54F"
+    assert data["candidate_id"] == "storybook_macaron_b"
+    assert data["colors"]["cream_base"] == "#EEDFC7"
+    assert data["colors"]["deep_ink"] == "#403A57"
+    assert data["colors"]["glow_gold"] == "#FFC83D"
     assert len(data["colors"]) >= 16
 
 
