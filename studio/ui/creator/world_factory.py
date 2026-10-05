@@ -4,6 +4,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from studio.models.world import WorldBlueprint, WorldProfile, WorldScenePlan
+from studio.services.godot_hero_export_service import GodotHeroExportService
 from studio.ui.creator.world_presets import (
     ARCHITECTURE_OPTIONS,
     LANDMARK_OPTIONS,
@@ -850,6 +851,71 @@ def render_world_factory(
                             )
                         if hero.get("asset_path"):
                             st.caption(f"GLB · {hero.get('asset_path')}")
+                            hero_element = next(
+                                (
+                                    element
+                                    for element in blueprint.layout_elements
+                                    if element.element_id == hero.get("element_id")
+                                ),
+                                None,
+                            )
+                            bundle_key = (
+                                f"godot_hero_bundle_{saved_world.asset_id}_"
+                                f"{hero.get('element_id', 'hero')}"
+                            )
+                            if st.button(
+                                "🎮 Prepare Godot Hero Bundle / 导出到 Godot",
+                                key=f"prepare_{bundle_key}",
+                                use_container_width=True,
+                            ):
+                                try:
+                                    if hero_element is None:
+                                        raise ValueError(
+                                            "Hero Blueprint element is missing."
+                                        )
+                                    bundle = GodotHeroExportService(
+                                        ctx.storage
+                                    ).build_bundle(
+                                        hero=hero,
+                                        target_size=(
+                                            float(hero_element.width),
+                                            float(hero_element.height),
+                                            float(hero_element.depth),
+                                        ),
+                                    )
+                                    st.session_state[bundle_key] = {
+                                        "filename": bundle.filename,
+                                        "payload": bundle.payload,
+                                    }
+                                except Exception as exc:
+                                    st.error(
+                                        f"Godot Hero bundle failed: {exc}"
+                                    )
+                            prepared = st.session_state.get(bundle_key)
+                            if prepared:
+                                st.download_button(
+                                    "⬇️ Download Godot Hero Bundle",
+                                    data=prepared["payload"],
+                                    file_name=prepared["filename"],
+                                    mime="application/zip",
+                                    key=f"download_{bundle_key}",
+                                    use_container_width=True,
+                                )
+                                st.caption(
+                                    "解压到本机仓库的 "
+                                    "godot/assets/external/；"
+                                    "Godot 会读取 heroes/hero_manifest.json。"
+                                )
+                                if reference_mode in {
+                                    "generated_isolated_v1",
+                                    "preview_bbox_isolated_v1",
+                                }:
+                                    st.info(
+                                        "这份 GLB 可用于验证 Godot Runtime 通路，"
+                                        "但它仍可能是旧的单对象 Hero。最终版本会在 "
+                                        "Unified Hero Cluster generation 落地后重新生成，"
+                                        "不会拆分完整 Hero。"
+                                    )
                         if message:
                             st.warning(message)
 

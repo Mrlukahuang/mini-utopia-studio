@@ -1,0 +1,13 @@
+{
+  "schema_version": "0.1",
+  "heroes": [
+    {
+      "hero_id": "SCENE_HERO",
+      "display_name": "Unified Hero",
+      "source": "res://assets/external/heroes/cloud_whale.glb",
+      "position": [0.0, 4.5, -7.0],
+      "target_size": [18.0, 8.0, 9.0],
+      "collision_proxy": false
+    }
+  ]
+}
