@@ -1,0 +1,42 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/village.gd" id="1_village"]
+[ext_resource type="PackedScene" path="res://scenes/player.tscn" id="2_player"]
+[ext_resource type="Script" path="res://scripts/camera_rig.gd" id="3_camera"]
+
+[node name="MiniUtopiaWorld" type="Node3D"]
+script = ExtResource("1_village")
+
+[node name="Player" parent="." instance=ExtResource("2_player")]
+position = Vector3(0, 1.2, 8)
+
+[node name="CameraRig" type="Node3D" parent="."]
+script = ExtResource("3_camera")
+target_path = NodePath("../Player")
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig"]
+current = true
+fov = 48.0
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="Panel" type="ColorRect" parent="HUD"]
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 430.0
+offset_bottom = 116.0
+color = Color(0.08, 0.06, 0.08, 0.72)
+
+[node name="Title" type="Label" parent="HUD/Panel"]
+offset_left = 16.0
+offset_top = 12.0
+offset_right = 390.0
+offset_bottom = 38.0
+text = "Mini Utopia · Newbie Village"
+
+[node name="Help" type="Label" parent="HUD/Panel"]
+offset_left = 16.0
+offset_top = 42.0
+offset_right = 390.0
+offset_bottom = 82.0
+text = "WASD / Arrows · Move   Shift · Run   Space · Jump\nMouse · Look   Esc · Release mouse"
