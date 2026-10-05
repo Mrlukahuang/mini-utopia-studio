@@ -1,5 +1,7 @@
 # Mini Utopia Visual DNA v1
 
+> **Production standard note:** for Canon 3D asset geometry, Golden Asset acceptance, reconstruction references, palette architecture, and Hero assembly rules, see `MINI_UTOPIA_VISUAL_PRODUCTION_STANDARD_V1.md`. Where this earlier DNA document is broader or more illustrative, the Production Standard is authoritative for asset production.
+
 > The child decides what exists. The Studio decides how it belongs to Mini Utopia.
 
 Mini Utopia separates **creative content freedom** from **visual language consistency**.
