@@ -516,10 +516,14 @@ class WorldHeroAssetService:
 
                 reference_image = self.reference_image_provider.generate(
                     prompt=reference_prompt,
-                    size="1024x1024",
+                    size="1536x1024",
                     quality="medium",
                 )
-                reference_image = self._normalize_reference_image(reference_image)
+                reference_image = self._normalize_reference_image(
+                    reference_image,
+                    size=1536,
+                    max_fill=0.96,
+                )
 
                 result = self.provider.generate(
                     image_bytes=reference_image,
@@ -654,7 +658,7 @@ class WorldHeroAssetService:
             style_profile=style_profile,
         )
         return (
-            "generated_unified_cluster_v1",
+            "generated_unified_cluster_v2",
             prompt.encode("utf-8"),
             prompt,
         )
@@ -720,8 +724,11 @@ class WorldHeroAssetService:
             + "- Include every listed Hero member in one visually coherent, fused composition.\n"
             + "- Preserve support/contact relationships: carried structures must feel designed into the root body/surface, not floating as unrelated props.\n"
             + "- Preserve the original imaginative silhouette and composition language from the Visual Anchor.\n"
-            + "- Show the complete Hero Cluster centered, large, filling about 82-90% of a square frame.\n"
-            + "- Use a clean three-quarter view that reveals the overall silhouette and the integrated top/side structures.\n"
+            + "- Show the complete Hero Cluster centered and VERY LARGE, filling about 92-96% of the frame while keeping the full silhouette visible.\n"
+            + "- Use a clean three-quarter view that clearly exposes the whale body plus the integrated top/side structures.\n"
+            + "- Favor a few bold, thick, readable toy-scale architectural masses over tiny micro-detail. Make the lighthouse, portal and station forms chunky enough to survive image-to-3D reconstruction.\n"
+            + "- Reduce tiny flowers, thin rails, hairline trim and fragile ornament. Preserve their design intent using larger simplified shapes instead.\n"
+            + "- Keep strong color-block separation between the whale body, carried station, lighthouse and portal so the 3D model can distinguish them.\n"
             + "- Plain soft neutral studio background with clear separation from the Hero.\n"
             + "- NO unrelated world scenery, distant islands, entrance plaza, generic roads, ambient lamps, background characters, labels, UI or text.\n"
             + "- This is ONE image-to-3D subject. Do not create detached pieces for later assembly.\n"
@@ -740,7 +747,7 @@ class WorldHeroAssetService:
         visual_anchor: dict,
     ) -> str:
         digest = hashlib.sha256()
-        digest.update(b"hero-unified-cluster-v1\0")
+        digest.update(b"hero-unified-cluster-v2\0")
         digest.update(provider_key.encode("utf-8"))
         digest.update(b"\0")
         digest.update(reference_mode.encode("utf-8"))
@@ -982,9 +989,13 @@ class WorldHeroAssetService:
         )
 
     @staticmethod
-    def _normalize_reference_image(image_bytes: bytes, size: int = 1024) -> bytes:
+    def _normalize_reference_image(
+        image_bytes: bytes,
+        size: int = 1024,
+        max_fill: float = 0.88,
+    ) -> bytes:
         image = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
-        max_object = int(size * 0.88)
+        max_object = int(size * max(0.5, min(0.98, max_fill)))
         image.thumbnail((max_object, max_object), Image.Resampling.LANCZOS)
         canvas = Image.new("RGBA", (size, size), (246, 246, 248, 255))
         left = (size - image.width) // 2

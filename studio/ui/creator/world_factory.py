@@ -975,7 +975,10 @@ def render_world_factory(
                                     "Download 是 Cloud/手动 fallback。"
                                     "本地运行 Streamlit 时优先使用一键安装。"
                                 )
-                                if reference_mode == "generated_unified_cluster_v1":
+                                if reference_mode in {
+                                    "generated_unified_cluster_v1",
+                                    "generated_unified_cluster_v2",
+                                }:
                                     st.success(
                                         "这是 Unified Hero Cluster GLB："
                                         "Godot 会把完整 Hero 作为一个主体加载，不做拆分重组。"

@@ -264,6 +264,8 @@ def test_unified_cluster_generates_one_reference_and_one_glb(tmp_path):
     assert len(ref_provider.calls) == 1
     prompt = ref_provider.calls[0]["prompt"]
     assert "ONE complete inseparable fantasy Hero composition" in prompt
+    assert "92-96%" in prompt
+    assert "bold, thick, readable toy-scale" in prompt
     assert "Whale Back Garden Station" in prompt
     assert "Lighthouse Pavilion" in prompt
     assert "Moon Star Portal" in prompt
@@ -274,7 +276,7 @@ def test_unified_cluster_generates_one_reference_and_one_glb(tmp_path):
     assert len(builds) == 1
     build = builds[0]
     assert build.status == "generated"
-    assert build.reference_mode == "generated_unified_cluster_v1"
+    assert build.reference_mode == "generated_unified_cluster_v2"
     assert build.cluster_id == "HERO_CLUSTER_CLOUD_WHALE_STATION"
     assert set(build.member_element_ids) == {
         "SCENE_WHALE",
