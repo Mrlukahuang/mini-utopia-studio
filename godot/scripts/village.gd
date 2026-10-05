@@ -1,5 +1,8 @@
 extends Node3D
 
+var gate_unlocked := false
+var gate_label: Label3D
+
 var palette = {
     "grass": Color("#6E9F61"),
     "grass2": Color("#86B970"),
@@ -30,6 +33,36 @@ func _ready() -> void:
     _build_storybook_dressing()
     _build_locked_gate()
 
+func _process(_delta: float) -> void:
+    if gate_unlocked or gate_label == null:
+        return
+
+    var player := get_node_or_null("Player") as Node3D
+    if player == null:
+        return
+
+    var gate_pos := Vector3(0, 0, -31)
+    var distance := Vector2(player.global_position.x, player.global_position.z).distance_to(
+        Vector2(gate_pos.x, gate_pos.z)
+    )
+    if distance <= 6.0:
+        gate_label.text = "🔓 PRESS E\nCloud Whale District"
+        if Input.is_action_just_pressed("interact"):
+            _unlock_gate()
+    else:
+        gate_label.text = "🔒 NEW WORLD\nCloud Whale District"
+
+func _unlock_gate() -> void:
+    gate_unlocked = true
+    var barrier := get_node_or_null("LockedBarrier")
+    if barrier:
+        barrier.queue_free()
+    var collision := get_node_or_null("LockedBarrierCollision")
+    if collision:
+        collision.queue_free()
+    if gate_label:
+        gate_label.text = "✨ ZONE 01 UNLOCKED\nCloud Whale District"
+
 func _mat(color: Color, roughness := 0.86) -> StandardMaterial3D:
     var m := StandardMaterial3D.new()
     m.albedo_color = color
@@ -47,6 +80,7 @@ func _box(name: String, pos: Vector3, size: Vector3, color: Color, collision := 
     add_child(node)
     if collision:
         var body := StaticBody3D.new()
+        body.name = name + "Collision"
         var shape := CollisionShape3D.new()
         var box := BoxShape3D.new()
         box.size = size
@@ -276,12 +310,12 @@ func _build_locked_gate() -> void:
     _box("GateBeam", Vector3(0,4.1,z), Vector3(7.2,0.65,0.8), palette.pink, true)
     _box("LockedBarrier", Vector3(0,1.5,z), Vector3(5.5,3.0,0.45), Color("#D9B8E8"), true)
 
-    var label := Label3D.new()
-    label.text = "🔒 NEW WORLD\nComing next"
-    label.font_size = 42
-    label.modulate = Color("#FFF7E7")
-    label.outline_size = 8
-    label.outline_modulate = Color(0.2,0.12,0.18,0.9)
-    label.position = Vector3(0,5.2,z + 0.1)
-    label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-    add_child(label)
+    gate_label = Label3D.new()
+    gate_label.text = "🔒 NEW WORLD\nCloud Whale District"
+    gate_label.font_size = 42
+    gate_label.modulate = Color("#FFF7E7")
+    gate_label.outline_size = 8
+    gate_label.outline_modulate = Color(0.2,0.12,0.18,0.9)
+    gate_label.position = Vector3(0,5.2,z + 0.1)
+    gate_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+    add_child(gate_label)
