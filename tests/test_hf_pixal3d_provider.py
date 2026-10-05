@@ -353,3 +353,84 @@ def test_hf_pixal3d_high_quality_extract_falls_back_without_regeneration(monkeyp
     assert result.metadata["texture_size"] == 2048
     assert result.metadata["decimation_target"] == 300000
     assert result.metadata["quality_fallbacks"][0]["stage"] == "extract_glb"
+
+
+class FailExtractionFor1536LatentClient(FakeClient):
+    def __init__(self, src, *, token, verbose, download_files):
+        super().__init__(
+            src,
+            token=token,
+            verbose=verbose,
+            download_files=download_files,
+        )
+        self.last_resolution = None
+
+    def predict(self, *args, api_name, **kwargs):
+        if api_name == "/generate_3d":
+            self.last_resolution = kwargs.get("resolution")
+        if api_name == "/extract_glb_api" and self.last_resolution == 1536:
+            self.calls.append(
+                {"args": args, "kwargs": kwargs, "api_name": api_name}
+            )
+            raise RuntimeError("decode/remesh failed for 1536 latent")
+        return super().predict(*args, api_name=api_name, **kwargs)
+
+
+def test_hf_pixal3d_extract_failure_on_1536_regenerates_same_reference_at_1024(
+    monkeypatch,
+):
+    FakeClient.instances.clear()
+
+    def fake_get(url, *, headers, timeout):
+        return FakeStaticResponse(_valid_glb())
+
+    monkeypatch.setattr("studio.providers.hero_asset.requests.get", fake_get)
+    provider = HuggingFacePixal3DProvider(
+        token="hf-test-secret",
+        resolution=1536,
+        decimation_target=500000,
+        texture_size=4096,
+        client_factory=FailExtractionFor1536LatentClient,
+        handle_file_fn=fake_handle_file,
+        quota_fetcher=lambda: {
+            "base": 2400,
+            "remaining": 2000,
+            "overquota_used": 0,
+            "resets_at": "same",
+        },
+    )
+
+    result = provider.generate(
+        image_bytes=b"same-reference-png",
+        mime_type="image/png",
+        element_id="SCENE_HERO",
+        appearance=_appearance(),
+    )
+
+    client = FakeClient.instances[-1]
+    generate_resolutions = [
+        call["kwargs"].get("resolution")
+        for call in client.calls
+        if call["api_name"] == "/generate_3d"
+    ]
+    extract_profiles = [
+        (
+            call["kwargs"].get("decimation_target"),
+            call["kwargs"].get("texture_size"),
+        )
+        for call in client.calls
+        if call["api_name"] == "/extract_glb_api"
+    ]
+
+    assert generate_resolutions == [1536, 1024]
+    assert extract_profiles == [
+        (500000, 4096),
+        (300000, 2048),
+        (300000, 2048),
+    ]
+    assert result.payload == _valid_glb()
+    assert result.metadata["requested_resolution"] == 1536
+    assert result.metadata["resolution"] == 1024
+    assert [
+        item["stage"] for item in result.metadata["quality_fallbacks"]
+    ] == ["extract_glb", "extract_glb_regenerate"]

@@ -447,10 +447,11 @@ class HuggingFacePixal3DProvider(HeroAssetProvider):
             except RuntimeError as exc:
                 fallback_decimation = min(effective_decimation_target, 300_000)
                 fallback_texture = min(effective_texture_size, 2048)
-                if (
-                    fallback_decimation == effective_decimation_target
-                    and fallback_texture == effective_texture_size
-                ):
+                can_lower_extract = (
+                    fallback_decimation != effective_decimation_target
+                    or fallback_texture != effective_texture_size
+                )
+                if not can_lower_extract:
                     raise
                 quality_fallbacks.append(
                     {
@@ -468,10 +469,50 @@ class HuggingFacePixal3DProvider(HeroAssetProvider):
                 )
                 effective_decimation_target = fallback_decimation
                 effective_texture_size = fallback_texture
-                glb_result = extract_glb(
-                    effective_decimation_target,
-                    effective_texture_size,
-                )
+                try:
+                    glb_result = extract_glb(
+                        effective_decimation_target,
+                        effective_texture_size,
+                    )
+                except RuntimeError as low_extract_exc:
+                    # A 1536 latent can still be too expensive to decode/remesh
+                    # even after lowering decimation and texture export settings.
+                    # Regenerate the SAME reference at 1024 once, then retry the
+                    # known-good low extraction profile. This does not spend
+                    # another OpenAI image generation.
+                    if effective_resolution != 1536:
+                        raise
+                    quality_fallbacks.append(
+                        {
+                            "stage": "extract_glb_regenerate",
+                            "from": {
+                                "resolution": 1536,
+                                "decimation_target": effective_decimation_target,
+                                "texture_size": effective_texture_size,
+                            },
+                            "to": {
+                                "resolution": 1024,
+                                "decimation_target": effective_decimation_target,
+                                "texture_size": effective_texture_size,
+                            },
+                            "reason": str(low_extract_exc)[:500],
+                        }
+                    )
+                    effective_resolution = 1024
+                    generated = self._unwrap_single(
+                        generate_3d(effective_resolution)
+                    )
+                    if (
+                        not isinstance(generated, dict)
+                        or not generated.get("state_path")
+                    ):
+                        raise RuntimeError(
+                            "Pixal3D 1024 recovery generation returned no state_path."
+                        )
+                    glb_result = extract_glb(
+                        effective_decimation_target,
+                        effective_texture_size,
+                    )
 
             remote_glb_path = self._file_path(glb_result)
             try:
