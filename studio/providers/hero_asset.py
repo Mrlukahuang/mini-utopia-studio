@@ -337,6 +337,10 @@ class HuggingFacePixal3DProvider(HeroAssetProvider):
         started_at = time.perf_counter()
         session_id = f"mu-{uuid.uuid4().hex}"
         suffix = ".png" if "png" in mime_type.lower() else ".jpg"
+        quality_fallbacks: list[dict] = []
+        effective_resolution = self.resolution
+        effective_decimation_target = self.decimation_target
+        effective_texture_size = self.texture_size
 
         with tempfile.TemporaryDirectory(prefix="mini-utopia-pixal3d-") as temp_dir:
             temp = Path(temp_dir)
@@ -350,10 +354,16 @@ class HuggingFacePixal3DProvider(HeroAssetProvider):
                 download_files=str(temp / "downloads"),
             )
 
-            preprocessed = client.predict(
-                handle_file(str(input_path)),
-                api_name="/preprocess",
-            )
+            try:
+                preprocessed = client.predict(
+                    handle_file(str(input_path)),
+                    api_name="/preprocess",
+                )
+            except Exception as exc:
+                raise RuntimeError(
+                    "Pixal3D preprocess failed: "
+                    f"{type(exc).__name__}: {exc}"
+                ) from exc
             preprocessed_path = self._file_path(preprocessed)
 
             # Pixal3D /generate_3d returns many render preview FileData
@@ -361,45 +371,119 @@ class HuggingFacePixal3DProvider(HeroAssetProvider):
             # file route can reject those absolute TMP_DIR paths with 403.
             client.download_files = False
 
-            generated = client.predict(
-                image=handle_file(preprocessed_path),
-                seed=self.seed,
-                resolution=self.resolution,
-                ss_guidance_strength=7.5,
-                ss_guidance_rescale=0.7,
-                ss_sampling_steps=12,
-                ss_rescale_t=5.0,
-                shape_slat_guidance_strength=7.5,
-                shape_slat_guidance_rescale=0.5,
-                shape_slat_sampling_steps=12,
-                shape_slat_rescale_t=3.0,
-                tex_slat_guidance_strength=1.0,
-                tex_slat_guidance_rescale=0.0,
-                tex_slat_sampling_steps=12,
-                tex_slat_rescale_t=3.0,
-                manual_fov=-1.0,
-                fov_unit="deg",
-                session_id=session_id,
-                api_name="/generate_3d",
-            )
+            def generate_3d(resolution: int):
+                try:
+                    return client.predict(
+                        image=handle_file(preprocessed_path),
+                        seed=self.seed,
+                        resolution=resolution,
+                        ss_guidance_strength=7.5,
+                        ss_guidance_rescale=0.7,
+                        ss_sampling_steps=12,
+                        ss_rescale_t=5.0,
+                        shape_slat_guidance_strength=7.5,
+                        shape_slat_guidance_rescale=0.5,
+                        shape_slat_sampling_steps=12,
+                        shape_slat_rescale_t=3.0,
+                        tex_slat_guidance_strength=1.0,
+                        tex_slat_guidance_rescale=0.0,
+                        tex_slat_sampling_steps=12,
+                        tex_slat_rescale_t=3.0,
+                        manual_fov=-1.0,
+                        fov_unit="deg",
+                        session_id=session_id,
+                        api_name="/generate_3d",
+                    )
+                except Exception as exc:
+                    raise RuntimeError(
+                        "Pixal3D generate_3d failed "
+                        f"(resolution={resolution}): "
+                        f"{type(exc).__name__}: {exc}"
+                    ) from exc
+
+            try:
+                generated = generate_3d(effective_resolution)
+            except RuntimeError as exc:
+                if effective_resolution != 1536:
+                    raise
+                quality_fallbacks.append(
+                    {
+                        "stage": "generate_3d",
+                        "from": {"resolution": 1536},
+                        "to": {"resolution": 1024},
+                        "reason": str(exc)[:500],
+                    }
+                )
+                effective_resolution = 1024
+                generated = generate_3d(effective_resolution)
+
             generated = self._unwrap_single(generated)
             if not isinstance(generated, dict) or not generated.get("state_path"):
                 raise RuntimeError(
-                    "Pixal3D /generate_3d did not return a state_path."
+                    "Pixal3D generate_3d failed: no state_path was returned."
                 )
 
-            glb_result = client.predict(
-                state_path=str(generated["state_path"]),
-                decimation_target=self.decimation_target,
-                texture_size=self.texture_size,
-                session_id=session_id,
-                api_name="/extract_glb_api",
-            )
+            def extract_glb(decimation_target: int, texture_size: int):
+                try:
+                    return client.predict(
+                        state_path=str(generated["state_path"]),
+                        decimation_target=decimation_target,
+                        texture_size=texture_size,
+                        session_id=session_id,
+                        api_name="/extract_glb_api",
+                    )
+                except Exception as exc:
+                    raise RuntimeError(
+                        "Pixal3D extract_glb failed "
+                        f"(decimation={decimation_target}, texture={texture_size}): "
+                        f"{type(exc).__name__}: {exc}"
+                    ) from exc
+
+            try:
+                glb_result = extract_glb(
+                    effective_decimation_target,
+                    effective_texture_size,
+                )
+            except RuntimeError as exc:
+                fallback_decimation = min(effective_decimation_target, 300_000)
+                fallback_texture = min(effective_texture_size, 2048)
+                if (
+                    fallback_decimation == effective_decimation_target
+                    and fallback_texture == effective_texture_size
+                ):
+                    raise
+                quality_fallbacks.append(
+                    {
+                        "stage": "extract_glb",
+                        "from": {
+                            "decimation_target": effective_decimation_target,
+                            "texture_size": effective_texture_size,
+                        },
+                        "to": {
+                            "decimation_target": fallback_decimation,
+                            "texture_size": fallback_texture,
+                        },
+                        "reason": str(exc)[:500],
+                    }
+                )
+                effective_decimation_target = fallback_decimation
+                effective_texture_size = fallback_texture
+                glb_result = extract_glb(
+                    effective_decimation_target,
+                    effective_texture_size,
+                )
+
             remote_glb_path = self._file_path(glb_result)
-            payload = self._download_tmp_file(
-                client=client,
-                remote_path=remote_glb_path,
-            )
+            try:
+                payload = self._download_tmp_file(
+                    client=client,
+                    remote_path=remote_glb_path,
+                )
+            except Exception as exc:
+                raise RuntimeError(
+                    "Pixal3D GLB download failed: "
+                    f"{type(exc).__name__}: {exc}"
+                ) from exc
             if len(payload) < 12 or payload[:4] != b"glTF":
                 raise RuntimeError("Pixal3D returned an invalid GLB payload.")
 
@@ -417,9 +501,13 @@ class HuggingFacePixal3DProvider(HeroAssetProvider):
             metadata={
                 "space_id": self.space_id,
                 "space_url": f"https://huggingface.co/spaces/{self.space_id}",
-                "resolution": self.resolution,
-                "decimation_target": self.decimation_target,
-                "texture_size": self.texture_size,
+                "resolution": effective_resolution,
+                "decimation_target": effective_decimation_target,
+                "texture_size": effective_texture_size,
+                "requested_resolution": self.resolution,
+                "requested_decimation_target": self.decimation_target,
+                "requested_texture_size": self.texture_size,
+                "quality_fallbacks": quality_fallbacks,
                 "seed": self.seed,
                 "element_id": element_id,
                 "appearance_element_id": appearance.element_id,

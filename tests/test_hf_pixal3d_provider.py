@@ -244,3 +244,112 @@ def test_hf_pixal3d_provider_validates_quality_profile(kwargs, message):
 def test_hf_pixal3d_provider_requires_token():
     with pytest.raises(ValueError, match="HF_TOKEN"):
         HuggingFacePixal3DProvider(token="")
+
+
+class FailHighResolutionClient(FakeClient):
+    def predict(self, *args, api_name, **kwargs):
+        if api_name == "/generate_3d" and kwargs.get("resolution") == 1536:
+            self.calls.append(
+                {"args": args, "kwargs": kwargs, "api_name": api_name}
+            )
+            raise RuntimeError("CUDA out of memory")
+        return super().predict(*args, api_name=api_name, **kwargs)
+
+
+class FailHighExtractionClient(FakeClient):
+    def predict(self, *args, api_name, **kwargs):
+        if (
+            api_name == "/extract_glb_api"
+            and kwargs.get("texture_size") == 4096
+        ):
+            self.calls.append(
+                {"args": args, "kwargs": kwargs, "api_name": api_name}
+            )
+            raise RuntimeError("GPU extraction failed")
+        return super().predict(*args, api_name=api_name, **kwargs)
+
+
+def test_hf_pixal3d_high_resolution_falls_back_to_1024(monkeypatch):
+    FakeClient.instances.clear()
+
+    def fake_get(url, *, headers, timeout):
+        return FakeStaticResponse(_valid_glb())
+
+    monkeypatch.setattr("studio.providers.hero_asset.requests.get", fake_get)
+    provider = HuggingFacePixal3DProvider(
+        token="hf-test-secret",
+        resolution=1536,
+        decimation_target=500000,
+        texture_size=4096,
+        client_factory=FailHighResolutionClient,
+        handle_file_fn=fake_handle_file,
+        quota_fetcher=lambda: {
+            "base": 2400,
+            "remaining": 2000,
+            "overquota_used": 0,
+            "resets_at": "same",
+        },
+    )
+
+    result = provider.generate(
+        image_bytes=b"input-png",
+        mime_type="image/png",
+        element_id="SCENE_HERO",
+        appearance=_appearance(),
+    )
+
+    client = FakeClient.instances[-1]
+    resolutions = [
+        call["kwargs"].get("resolution")
+        for call in client.calls
+        if call["api_name"] == "/generate_3d"
+    ]
+    assert resolutions == [1536, 1024]
+    assert result.metadata["requested_resolution"] == 1536
+    assert result.metadata["resolution"] == 1024
+    assert result.metadata["quality_fallbacks"][0]["stage"] == "generate_3d"
+
+
+def test_hf_pixal3d_high_quality_extract_falls_back_without_regeneration(monkeypatch):
+    FakeClient.instances.clear()
+
+    def fake_get(url, *, headers, timeout):
+        return FakeStaticResponse(_valid_glb())
+
+    monkeypatch.setattr("studio.providers.hero_asset.requests.get", fake_get)
+    provider = HuggingFacePixal3DProvider(
+        token="hf-test-secret",
+        resolution=1024,
+        decimation_target=500000,
+        texture_size=4096,
+        client_factory=FailHighExtractionClient,
+        handle_file_fn=fake_handle_file,
+        quota_fetcher=lambda: {
+            "base": 2400,
+            "remaining": 2000,
+            "overquota_used": 0,
+            "resets_at": "same",
+        },
+    )
+
+    result = provider.generate(
+        image_bytes=b"input-png",
+        mime_type="image/png",
+        element_id="SCENE_HERO",
+        appearance=_appearance(),
+    )
+
+    client = FakeClient.instances[-1]
+    generate_calls = [
+        call for call in client.calls if call["api_name"] == "/generate_3d"
+    ]
+    extract_calls = [
+        call for call in client.calls if call["api_name"] == "/extract_glb_api"
+    ]
+    assert len(generate_calls) == 1
+    assert extract_calls[0]["kwargs"]["texture_size"] == 4096
+    assert extract_calls[1]["kwargs"]["texture_size"] == 2048
+    assert extract_calls[1]["kwargs"]["decimation_target"] == 300000
+    assert result.metadata["texture_size"] == 2048
+    assert result.metadata["decimation_target"] == 300000
+    assert result.metadata["quality_fallbacks"][0]["stage"] == "extract_glb"
