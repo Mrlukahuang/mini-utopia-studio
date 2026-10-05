@@ -906,6 +906,16 @@ def render_world_factory(
                                     "godot/assets/external/；"
                                     "Godot 会读取 heroes/hero_manifest.json。"
                                 )
+                                if reference_mode in {
+                                    "generated_isolated_v1",
+                                    "preview_bbox_isolated_v1",
+                                }:
+                                    st.info(
+                                        "这份 GLB 可用于验证 Godot Runtime 通路，"
+                                        "但它仍可能是旧的单对象 Hero。最终版本会在 "
+                                        "Unified Hero Cluster generation 落地后重新生成，"
+                                        "不会拆分完整 Hero。"
+                                    )
                         if message:
                             st.warning(message)
 
