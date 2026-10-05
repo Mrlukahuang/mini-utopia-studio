@@ -80,12 +80,12 @@ func _instantiate_glb(entry: Dictionary, bytes: PackedByteArray, base_path: Stri
     var document := GLTFDocument.new()
     var state := GLTFState.new()
     state.base_path = base_path
-    var error := document.append_from_buffer(bytes, base_path, state)
+    var error: Error = document.append_from_buffer(bytes, base_path, state)
     if error != OK:
         _fail_entry(entry, "Godot could not parse GLB: %s" % error)
         return
 
-    var generated := document.generate_scene(state)
+    var generated: Node = document.generate_scene(state)
     if generated == null or not (generated is Node3D):
         _fail_entry(entry, "GLB did not generate a 3D scene.")
         return
@@ -105,15 +105,15 @@ func _instantiate_glb(entry: Dictionary, bytes: PackedByteArray, base_path: Stri
     hero_loaded.emit(hero_id, wrapper)
 
 func _fit_to_envelope(model: Node3D, target: Vector3) -> void:
-    var bounds := _scene_aabb(model)
+    var bounds: AABB = _scene_aabb(model)
     if bounds.size.x <= 0.001 or bounds.size.y <= 0.001 or bounds.size.z <= 0.001:
         return
 
-    var sx := target.x / bounds.size.x
-    var sy := target.y / bounds.size.y
-    var sz := target.z / bounds.size.z
-    var uniform := min(sx, min(sy, sz)) * 0.94
-    var center := bounds.position + bounds.size * 0.5
+    var sx: float = target.x / bounds.size.x
+    var sy: float = target.y / bounds.size.y
+    var sz: float = target.z / bounds.size.z
+    var uniform: float = minf(sx, minf(sy, sz)) * 0.94
+    var center: Vector3 = bounds.position + bounds.size * 0.5
 
     model.scale = Vector3.ONE * uniform
     model.position = Vector3(
@@ -123,18 +123,18 @@ func _fit_to_envelope(model: Node3D, target: Vector3) -> void:
     )
 
 func _scene_aabb(root: Node3D) -> AABB:
-    var root_inverse := root.global_transform.affine_inverse()
-    var found := false
-    var merged := AABB()
+    var root_inverse: Transform3D = root.global_transform.affine_inverse()
+    var found: bool = false
+    var merged: AABB = AABB()
     var stack: Array[Node] = [root]
 
     while not stack.is_empty():
-        var node := stack.pop_back()
+        var node: Node = stack.pop_back()
         if node is MeshInstance3D:
             var mesh_instance := node as MeshInstance3D
             if mesh_instance.mesh != null:
-                var relative := root_inverse * mesh_instance.global_transform
-                var transformed := _transform_aabb(mesh_instance.mesh.get_aabb(), relative)
+                var relative: Transform3D = root_inverse * mesh_instance.global_transform
+                var transformed: AABB = _transform_aabb(mesh_instance.mesh.get_aabb(), relative)
                 if not found:
                     merged = transformed
                     found = true
@@ -146,9 +146,9 @@ func _scene_aabb(root: Node3D) -> AABB:
     return merged if found else AABB(Vector3.ZERO, Vector3.ONE)
 
 func _transform_aabb(box: AABB, transform: Transform3D) -> AABB:
-    var p := box.position
-    var s := box.size
-    var points := [
+    var p: Vector3 = box.position
+    var s: Vector3 = box.size
+    var points: Array[Vector3] = [
         p,
         p + Vector3(s.x, 0, 0),
         p + Vector3(0, s.y, 0),
@@ -159,19 +159,19 @@ func _transform_aabb(box: AABB, transform: Transform3D) -> AABB:
         p + s,
     ]
     var first: Vector3 = transform * points[0]
-    var minimum := first
-    var maximum := first
+    var minimum: Vector3 = first
+    var maximum: Vector3 = first
     for point in points:
         var value: Vector3 = transform * point
         minimum = Vector3(
-            min(minimum.x, value.x),
-            min(minimum.y, value.y),
-            min(minimum.z, value.z)
+            minf(minimum.x, value.x),
+            minf(minimum.y, value.y),
+            minf(minimum.z, value.z)
         )
         maximum = Vector3(
-            max(maximum.x, value.x),
-            max(maximum.y, value.y),
-            max(maximum.z, value.z)
+            maxf(maximum.x, value.x),
+            maxf(maximum.y, value.y),
+            maxf(maximum.z, value.z)
         )
     return AABB(minimum, maximum - minimum)
 
@@ -180,7 +180,7 @@ func _add_collision_proxy(wrapper: Node3D, size: Vector3) -> void:
     body.name = "HeroCollisionProxy"
     var shape_node := CollisionShape3D.new()
     var shape := BoxShape3D.new()
-    shape.size = Vector3(size.x * 0.72, max(1.0, size.y * 0.55), size.z * 0.72)
+    shape.size = Vector3(size.x * 0.72, maxf(1.0, size.y * 0.55), size.z * 0.72)
     shape_node.shape = shape
     shape_node.position.y = shape.size.y * 0.5
     body.add_child(shape_node)
