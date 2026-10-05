@@ -929,7 +929,10 @@ def render_world_factory(
                                     "godot/assets/external/；"
                                     "Godot 会读取 heroes/hero_manifest.json。"
                                 )
-                                if reference_mode == "generated_unified_cluster_v1":
+                                if reference_mode in {
+                                    "generated_unified_cluster_v1",
+                                    "generated_unified_cluster_v2",
+                                }:
                                     st.success(
                                         "这是 Unified Hero Cluster GLB："
                                         "Godot 会把完整 Hero 作为一个主体加载，不做拆分重组。"
