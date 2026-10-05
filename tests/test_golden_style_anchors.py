@@ -77,3 +77,17 @@ def test_locally_extracted_golden_binaries_are_ignored():
 
     assert "assets/external/golden/*" in ignore
     assert "!assets/external/golden/README.md" in ignore
+
+
+def test_golden_anchor_scripts_avoid_reload_warning_names():
+    lineup = (
+        ROOT / "godot" / "scripts" / "golden_anchor_lineup.gd"
+    ).read_text(encoding="utf-8")
+    calibration = (
+        ROOT / "godot" / "scripts" / "style_calibration_lab.gd"
+    ).read_text(encoding="utf-8")
+
+    for source in (lineup, calibration):
+        assert 'const GoldenAnchorRuntime = preload(' not in source
+        assert "var floor :=" not in source
+        assert "var floor_node :=" in source
