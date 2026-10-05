@@ -1,7 +1,5 @@
 extends Node3D
 
-const GoldenAnchorRuntime = preload("res://scripts/golden_anchor_runtime.gd")
-
 const ANCHOR_ORDER := [
     "forest_tree_round",
     "forest_tree_branching",
@@ -66,16 +64,16 @@ func _setup_camera() -> void:
     camera.look_at(Vector3(0.0, 2.0, 0.0), Vector3.UP)
 
 func _build_floor() -> void:
-    var floor := MeshInstance3D.new()
+    var floor_node := MeshInstance3D.new()
     var mesh := BoxMesh.new()
     mesh.size = Vector3(34.0, 0.35, 14.0)
-    floor.mesh = mesh
-    floor.position = Vector3(0.0, -0.25, 0.0)
+    floor_node.mesh = mesh
+    floor_node.position = Vector3(0.0, -0.25, 0.0)
     var material := StandardMaterial3D.new()
     material.albedo_color = Color("#817D78")
     material.roughness = 0.94
-    floor.material_override = material
-    add_child(floor)
+    floor_node.material_override = material
+    add_child(floor_node)
 
 func _build_lineup() -> void:
     var front_count := 7
