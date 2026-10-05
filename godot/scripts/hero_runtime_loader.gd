@@ -105,7 +105,12 @@ func _instantiate_glb(entry: Dictionary, bytes: PackedByteArray, base_path: Stri
         or render_strategy == "unified_glb"
     )
     if should_collide:
-        _add_collision_proxy(wrapper, target)
+        if render_strategy == "unified_glb":
+            var mesh_collision_count := _add_mesh_collisions(generated as Node3D)
+            if mesh_collision_count == 0:
+                _add_collision_proxy(wrapper, target)
+        else:
+            _add_collision_proxy(wrapper, target)
 
     hero_loaded.emit(hero_id, wrapper)
 
@@ -179,6 +184,31 @@ func _transform_aabb(box: AABB, transform: Transform3D) -> AABB:
             maxf(maximum.z, value.z)
         )
     return AABB(minimum, maximum - minimum)
+
+func _add_mesh_collisions(root: Node3D) -> int:
+    var created := 0
+    var stack: Array[Node] = [root]
+
+    while not stack.is_empty():
+        var node: Node = stack.pop_back()
+        if node is MeshInstance3D:
+            var mesh_instance := node as MeshInstance3D
+            if mesh_instance.mesh != null:
+                var shape := mesh_instance.mesh.create_trimesh_shape()
+                if shape != null:
+                    var body := StaticBody3D.new()
+                    body.name = "HeroMeshCollisionBody"
+                    var shape_node := CollisionShape3D.new()
+                    shape_node.name = "HeroMeshCollisionShape"
+                    shape_node.shape = shape
+                    body.add_child(shape_node)
+                    mesh_instance.add_child(body)
+                    created += 1
+        for child in node.get_children():
+            stack.append(child)
+
+    return created
+
 
 func _add_collision_proxy(wrapper: Node3D, size: Vector3) -> void:
     var body := StaticBody3D.new()
