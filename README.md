@@ -1451,3 +1451,20 @@ If README and Charter ever conflict on a major architectural principle, stop and
 
 > **We want imagination to stay free,  
 > while the system makes creativity reusable, continuous and producible.**
+
+
+---
+
+## Godot World Baseline
+
+The current playable-world source of truth is:
+
+**[Newbie Village 100×100 World Baseline](docs/WORLD_BASELINE_NEWBIE_VILLAGE_V1.md)**
+
+Current smoke-test scene:
+
+`res://scenes/newbie_village_100x100_v0_2.tscn`
+
+The baseline locks the simple road hierarchy, yellow/green Block Bits language,
+layered Forest Nature mountain treatment, larger road-facing houses, solid
+collision, Resource Bits work areas and two separated skeleton encounters.
