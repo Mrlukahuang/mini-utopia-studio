@@ -22,7 +22,7 @@ def test_character_profile_v1_core_completion():
         english_level=6,
     )
 
-    assert profile.schema_version == "1.2"
+    assert profile.schema_version == "1.3"
     assert profile.missing_core_fields() == []
 
 
