@@ -37,6 +37,15 @@ GODOT_ROOT = REPO_ROOT / "godot"
 VAULT_ROOT = GODOT_ROOT / "assets" / "external" / "library"
 MANIFEST_PATH = VAULT_ROOT / "asset_vault_manifest.json"
 SUPPORTED_EXTENSIONS = {".gltf", ".glb"}
+SUPPORT_EXTENSIONS = {
+    ".bin",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".webp",
+    ".ktx",
+    ".ktx2",
+}
 DEFAULT_NAME_HINTS = ("kaykit", "kenney", "quaternius", "megakit")
 
 
@@ -244,6 +253,33 @@ def install_archive(
         assets: list[dict] = []
         copied_members: set[str] = set()
 
+        # Some GLB packs (notably Kenney) still reference shared external
+        # textures such as ../Textures/colormap.png. GLB is allowed to use
+        # external URIs, but those references are binary and are not reliably
+        # enumerable without fully parsing every container. Copy the pack's
+        # lightweight shared support files up front while preserving paths.
+        support_members = [
+            safe_member(info.filename)
+            for info in zf.infolist()
+            if (
+                not info.is_dir()
+                and Path(info.filename).suffix.lower()
+                in SUPPORT_EXTENSIONS
+            )
+        ]
+        for support_member in sorted(support_members):
+            support_rel = relative_member(
+                support_member,
+                common_root,
+            )
+            support_destination = pack_root / support_rel
+            copy_member(
+                zf,
+                support_member,
+                support_destination,
+            )
+            copied_members.add(support_member)
+
         for source_member in sorted(asset_members):
             rel = relative_member(source_member, common_root)
             destination = pack_root / rel
@@ -298,6 +334,7 @@ def install_archive(
         "archive_path": str(archive),
         "sha256": archive_hash,
         "asset_count": len(assets),
+        "support_file_count": len(support_members),
         "license_files": license_files,
         "assets": assets,
     }
