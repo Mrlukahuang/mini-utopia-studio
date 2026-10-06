@@ -134,3 +134,61 @@ def test_asset_vault_runtime_can_search_by_id_and_filename():
     assert "entries_by_filename" in text
     assert "instantiate_by_id" in text
     assert "instantiate_first_filename" in text
+
+
+def test_asset_vault_extracts_shared_support_files_for_glb_pack(tmp_path):
+    module = _load_vault_module()
+    module.GODOT_ROOT = tmp_path / "godot"
+    module.VAULT_ROOT = (
+        module.GODOT_ROOT / "assets" / "external" / "library"
+    )
+
+    archive = tmp_path / "Kenney_Castle_Kit.zip"
+
+    with zipfile.ZipFile(archive, "w") as zf:
+        zf.writestr(
+            "Kenney_Castle_Kit/GLB format/Castle/siege-ram.glb",
+            b"glTF" + b"\x00" * 32,
+        )
+        zf.writestr(
+            "Kenney_Castle_Kit/GLB format/Textures/colormap.png",
+            b"png-data",
+        )
+        zf.writestr(
+            "Kenney_Castle_Kit/GLB format/Textures/normal.png",
+            b"png-normal",
+        )
+        zf.writestr(
+            "Kenney_Castle_Kit/License.txt",
+            "CC0",
+        )
+
+    result = module.install_archive(archive, "fakehash")
+    pack_root = module.VAULT_ROOT / result["pack"]
+
+    assert result["asset_count"] == 1
+    assert result["support_file_count"] == 2
+    assert (
+        pack_root
+        / "GLB format"
+        / "Textures"
+        / "colormap.png"
+    ).is_file()
+    assert (
+        pack_root
+        / "GLB format"
+        / "Textures"
+        / "normal.png"
+    ).is_file()
+
+
+def test_asset_vault_support_extensions_cover_external_3d_textures():
+    text = (
+        ROOT / "tools" / "install_full_asset_vault.py"
+    ).read_text(encoding="utf-8")
+
+    assert "SUPPORT_EXTENSIONS" in text
+    assert '".png"' in text
+    assert '".webp"' in text
+    assert '".ktx2"' in text
+    assert '"support_file_count"' in text
