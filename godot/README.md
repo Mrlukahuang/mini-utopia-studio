@@ -137,3 +137,44 @@ Then run:
 `res://scenes/green_terraced_mountain_town_50x50_v0_4.tscn`
 
 This version fixes the yellow terrain with a dedicated green-terrain palette profile, uses one main street plus four winding side roads, removes the floating bridge object in favor of the integrated river crossing tile, builds layered terraces, places 30 street-facing buildings, and surrounds the valley with high/low hills and mountains.
+
+
+## Full local Asset Vault
+
+To avoid repeatedly extracting/importing small subsets of third-party packs, install the complete local 3D library once:
+
+```bash
+python3 tools/install_full_asset_vault.py
+```
+
+The installer scans common folders for KayKit / Kenney / Quaternius / MegaKit ZIPs, extracts all `.gltf` / `.glb` assets plus direct glTF dependencies into:
+
+`res://assets/external/library/`
+
+The vault is local and gitignored. A manifest is written to:
+
+`res://assets/external/library/asset_vault_manifest.json`
+
+Later runs are incremental: unchanged ZIPs are reused instead of extracted again.
+
+Godot helper:
+
+`res://scripts/asset_vault_runtime.gd`
+
+This means Godot does the large third-party import once, then future worlds can reuse the same library.
+
+## Storybook Terraced Town 50×50 v0.5
+
+Run:
+
+`res://scenes/storybook_terraced_town_50x50_v0_5.tscn`
+
+This version simplifies the town plan to:
+- one broad horizontal avenue
+- two vertical side streets
+- two built-in river crossings
+- 30 street-facing buildings
+- layered green terraces and mountain ring
+- real Forest Nature dressing
+
+The separate floating bridge object remains removed.
