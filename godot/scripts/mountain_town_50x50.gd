@@ -318,7 +318,8 @@ func _build_forest_dressing() -> void:
         "forest_tree_4_b_color1"
     ]
     var profile_id := String(config.get("profile_id", "core_candidate_b"))
-    var river_row := int(config.get("river", {}).get("row", 9))
+    var river_cfg: Dictionary = config.get("river", {})
+    var river_row := int(river_cfg.get("row", 9))
 
     for r in range(rows):
         for c in range(columns):
@@ -390,12 +391,12 @@ func _build_forest_dressing() -> void:
 
 func _build_fences() -> void:
     var profile_id := String(config.get("profile_id", "core_candidate_b"))
-    var fence_cells := [
+    var fence_cells: Array[Vector2i] = [
         Vector2i(1, 4), Vector2i(1, 5), Vector2i(7, 3),
         Vector2i(8, 4), Vector2i(2, 7), Vector2i(6, 8)
     ]
 
-    for cell in fence_cells:
+    for cell: Vector2i in fence_cells:
         var level := _terrain_level(cell.x, cell.y)
         var center := _hex_position(cell.x, cell.y, float(level) * tile_scale)
         WorldKitRuntime.instantiate_asset(
