@@ -13,6 +13,7 @@ from studio.models.equipment import (
     StatBlock,
 )
 from studio.services.baby_service import BabyService
+from studio.services.combat_drop_service import CombatDropService
 from studio.ui.theme import render_game_hero
 
 
@@ -64,6 +65,17 @@ def render_my_stuff(ctx) -> None:
         "这是你的收藏柜。装备属于你的 Collection，可以换给不同角色使用。",
         kicker="COLLECT · EQUIP · GROW",
     )
+
+    claimed_rewards = CombatDropService(
+        ctx.repository,
+        equipment=ctx.equipment,
+    ).claim_available()
+    for reward in claimed_rewards:
+        st.success(
+            "🎁 Battle Reward / 战斗奖励 · "
+            f"{reward.display_name} · {reward.rarity.value.title()} · "
+            "已放入 My Stuff"
+        )
 
     characters = [
         asset
