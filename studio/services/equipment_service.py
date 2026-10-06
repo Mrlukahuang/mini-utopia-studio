@@ -109,6 +109,15 @@ STARTER_DEFINITIONS = (
         compatible_tags=["humanoid"],
         base_stats=StatBlock(hp=2, atk=1, defense=2),
     ),
+    EquipmentDefinition(
+        definition_id="reward_bone_buckler",
+        display_name="Bone Buckler / 骨盾",
+        slot=EquipmentSlot.WEAPON_OFFHAND,
+        description="A defensive reward dropped by the Newbie Village Skeleton.",
+        animation_class="shield",
+        compatible_tags=["humanoid"],
+        base_stats=StatBlock(hp=5, defense=9),
+    ),
 )
 
 

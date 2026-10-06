@@ -11,6 +11,7 @@ var _arm_r: Node3D
 var _leg_l: Node3D
 var _leg_r: Node3D
 var _elapsed := 0.0
+var _attack_pose_remaining := 0.0
 var _baby: MiniUtopiaBabyFollowRuntime
 
 
@@ -37,6 +38,10 @@ func apply_to_player(player: CharacterBody3D) -> Dictionary:
     _player.set_meta(
         "mini_utopia_character_asset_id",
         String(payload.get("character_asset_id", ""))
+    )
+    _player.set_meta(
+        "mini_utopia_session_id",
+        String(payload.get("session_id", "NO_SESSION"))
     )
 
     var raw_baby = payload.get("baby", {})
@@ -69,6 +74,10 @@ func update_motion(
         return
 
     _elapsed += delta
+    _attack_pose_remaining = maxf(
+        0.0,
+        _attack_pose_remaining - delta
+    )
     var horizontal_speed := Vector2(
         player_velocity.x,
         player_velocity.z
@@ -80,6 +89,12 @@ func update_motion(
         _leg_l.rotation = Vector3.ZERO
     if _leg_r != null:
         _leg_r.rotation = Vector3.ZERO
+
+    if _attack_pose_remaining > 0.0:
+        _arm_l.rotation.z = 0.18
+        _arm_r.rotation.x = -1.12
+        _arm_r.rotation.z = -0.72
+        return
 
     if not on_floor:
         _arm_l.rotation.z = 0.62
@@ -100,6 +115,10 @@ func update_motion(
         var idle := sin(_elapsed * 1.8) * 0.035
         _arm_l.rotation.z = idle
         _arm_r.rotation.z = -idle
+
+
+func play_attack_swing() -> void:
+    _attack_pose_remaining = 0.22
 
 
 func _load_session() -> Dictionary:

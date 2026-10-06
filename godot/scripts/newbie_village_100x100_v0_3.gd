@@ -34,6 +34,7 @@ func _ready() -> void:
     _build_resource_yard()
     _build_forest_reference_dressing()
     _build_skeletons()
+    _build_training_skeleton()
     _build_world_boundary()
     _build_hud()
 
@@ -906,6 +907,26 @@ func _build_skeletons() -> void:
         )
 
 
+
+
+func _build_training_skeleton() -> void:
+    var player := get_node_or_null("Player") as CharacterBody3D
+    if player == null:
+        push_warning("PLAY-03: Player missing; Training Skeleton not spawned.")
+        return
+
+    var enemy := MiniUtopiaSkeletonEnemy.new()
+    enemy.name = "TrainingSkeleton"
+    enemy.position = Vector3(4.0, 0.45, 27.5)
+    add_child(enemy)
+    enemy.configure(player, "training_skeleton_01")
+
+    print(
+        "PLAY-03 Training Skeleton ready near spawn · "
+        + "F / Left Click to attack."
+    )
+
+
 func _build_skeleton_fallback(position: Vector3, node_name: String) -> void:
     var root := Node3D.new()
     root.name = node_name
@@ -1012,7 +1033,8 @@ func _build_hud() -> void:
         "新手村 · 100×100 v0.3\n"
         + "SOLID aligned Block Bits ground + visible yellow road\n"
         + "houses sit on exact green-block top surfaces · irregular layered cliffs\n"
-        + "Forest Nature trees / rocks / bushes / grass · 2 skeletons"
+        + "Forest Nature dressing · Training Skeleton combat\n"
+        + "F / Left Click · Attack · defeat Skeleton → Bone Buckler"
     )
     label.add_theme_font_size_override("font_size", 16)
     panel.add_child(label)
