@@ -7,6 +7,15 @@ extends CharacterBody3D
 @export var turn_speed := 12.0
 
 var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
+var creator_play_runtime: MiniUtopiaCreatorPlayRuntime
+
+
+func _ready() -> void:
+    creator_play_runtime = MiniUtopiaCreatorPlayRuntime.new()
+    creator_play_runtime.name = "CreatorPlayRuntime"
+    add_child(creator_play_runtime)
+    creator_play_runtime.apply_to_player(self)
+
 
 func _physics_process(delta: float) -> void:
     if not is_on_floor():
@@ -37,6 +46,14 @@ func _physics_process(delta: float) -> void:
         rotation.y = lerp_angle(rotation.y, desired_yaw, min(1.0, turn_speed * delta))
 
     move_and_slide()
+
+    if creator_play_runtime != null:
+        creator_play_runtime.update_motion(
+            delta,
+            velocity,
+            is_on_floor(),
+            Input.is_action_pressed("run")
+        )
 
     if global_position.y < -10.0:
         global_position = Vector3(0, 2, 8)
