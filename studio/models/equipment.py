@@ -12,11 +12,35 @@ from studio.models.asset import now_utc
 
 
 class EquipmentSlot(str, Enum):
-    OUTFIT = "outfit"
+    """Durable equipment slot IDs.
+
+    OUTFIT is kept only so existing v1 records can still be parsed and migrated.
+    New gameplay/UI uses PLAYABLE_EQUIPMENT_SLOTS.
+    """
+
+    TOP = "top"
+    BOTTOM = "bottom"
+    SHOES = "shoes"
+    HEADWEAR = "headwear"
     WEAPON_MAIN = "weapon_main"
+    WEAPON_OFFHAND = "weapon_offhand"
     BACKPACK = "backpack"
     WINGS = "wings"
     ACCESSORY = "accessory"
+    OUTFIT = "outfit"  # legacy v1 compatibility only
+
+
+PLAYABLE_EQUIPMENT_SLOTS: tuple[EquipmentSlot, ...] = (
+    EquipmentSlot.TOP,
+    EquipmentSlot.BOTTOM,
+    EquipmentSlot.SHOES,
+    EquipmentSlot.HEADWEAR,
+    EquipmentSlot.WEAPON_MAIN,
+    EquipmentSlot.WEAPON_OFFHAND,
+    EquipmentSlot.BACKPACK,
+    EquipmentSlot.WINGS,
+    EquipmentSlot.ACCESSORY,
+)
 
 
 class EquipmentRarity(str, Enum):
@@ -80,17 +104,40 @@ class EquipmentInstance(BaseModel):
 
 class CharacterLoadout(BaseModel):
     character_asset_id: str
-    outfit_item_id: str | None = None
+
+    # Equipment v2
+    top_item_id: str | None = None
+    bottom_item_id: str | None = None
+    shoes_item_id: str | None = None
+    headwear_item_id: str | None = None
     weapon_main_item_id: str | None = None
+    weapon_offhand_item_id: str | None = None
     backpack_item_id: str | None = None
     wings_item_id: str | None = None
     accessory_item_id: str | None = None
+
+    # v1 compatibility. EquipmentService migrates this pointer to TOP.
+    outfit_item_id: str | None = None
 
     def item_id_for_slot(self, slot: EquipmentSlot) -> str | None:
         return getattr(self, f"{slot.value}_item_id")
 
     def with_item(self, slot: EquipmentSlot, item_id: str | None) -> "CharacterLoadout":
         return self.model_copy(update={f"{slot.value}_item_id": item_id})
+
+    def migrate_v2(self) -> "CharacterLoadout":
+        """Move the legacy whole-body Outfit pointer into Top without loss."""
+
+        if self.outfit_item_id and not self.top_item_id:
+            return self.model_copy(
+                update={
+                    "top_item_id": self.outfit_item_id,
+                    "outfit_item_id": None,
+                }
+            )
+        if self.outfit_item_id:
+            return self.model_copy(update={"outfit_item_id": None})
+        return self
 
 
 class CreatorCollection(BaseModel):
