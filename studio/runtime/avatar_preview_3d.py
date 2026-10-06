@@ -375,12 +375,12 @@ function animateAvatar(t) {{
 
   if (state==='Walk' || state==='Run') {{
     const speed=state==='Run'?7.2:4.2;
-    const swing=Math.sin(t*speed)*(state==='Run'?.72:.43);
+    const swing=Math.sin(t*speed)*(state==='Run' ? .72 : .43);
     if (arms[0]) arms[0].rotation.x=swing;
     if (arms[1]) arms[1].rotation.x=-swing;
     if (legs[0]) legs[0].rotation.x=-swing*.70;
     if (legs[1]) legs[1].rotation.x=swing*.70;
-    avatar.position.y=Math.abs(Math.sin(t*speed*2))*(state==='Run'?.045:.022);
+    avatar.position.y=Math.abs(Math.sin(t*speed*2))*(state==='Run' ? .045 : .022);
   }} else if (state==='Jump') {{
     const phase=(elapsed%1.25)/1.25;
     avatar.position.y=Math.sin(Math.PI*phase)*.62;
