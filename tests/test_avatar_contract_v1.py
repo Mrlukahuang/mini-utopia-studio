@@ -146,8 +146,11 @@ def test_godot_avatar_contract_and_smoke_scene_are_wired():
     assert 'const ANIMATION_RUN := "Run"' in contract
 
     assert "_probe_local_kaykit_animation_pack" in preview
-    assert "Skeleton bones" in preview
-    assert "animations =" in preview
+    assert "Rig_Medium skeleton bones" in preview
+    assert "Idle mapping" in preview
+    assert "Walk mapping" in preview
+    assert "Run mapping" in preview
+    assert "locomotion contract" in preview
     assert "avatar_contract_preview.gd" in scene
 
 
