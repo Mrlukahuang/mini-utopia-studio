@@ -99,14 +99,32 @@ class CharacterRuntimeService:
         if asset is None:
             return CharacterRuntimeSpec()
 
-        profile = CharacterProfile.model_validate(
-            asset.metadata.get("character_profile", {})
-        )
+        raw_profile = asset.metadata.get("character_profile", {}) or {}
+        profile = CharacterProfile.model_validate(raw_profile)
         runtime_meta = asset.metadata.get("runtime_3d", {}) or {}
 
         favorite = list(profile.favorite_color_hexes)
-        body = favorite[0] if favorite else "#FFF4D7"
+        has_avatar = isinstance(raw_profile, dict) and bool(raw_profile.get("avatar"))
+        avatar = profile.avatar
+
+        # Old Character records remain visually compatible until they are
+        # explicitly upgraded in Character Builder v2.
+        body = (
+            avatar.surface_color_hex
+            if has_avatar
+            else (favorite[0] if favorite else "#FFF4D7")
+        )
         accent = favorite[1] if len(favorite) > 1 else "#B9E7D0"
+        hair = (
+            avatar.hair_color_hex
+            if has_avatar
+            else (profile.hair_or_fur_color_hex or "#5B4036")
+        )
+        eyes = (
+            avatar.eye_color_hex
+            if has_avatar
+            else (profile.eyes.color_hex or "#7A5238")
+        )
 
         model_data_uri = runtime_meta.get("model_data_uri")
         if not model_data_uri:
@@ -118,6 +136,17 @@ class CharacterRuntimeService:
         return CharacterRuntimeSpec(
             mode=mode,
             model_data_uri=model_data_uri,
+            rig_family=avatar.rig_family,
+            body_type=avatar.body_type,
+            socket_names=tuple(socket.value for socket in __import__(
+                "studio.models.avatar",
+                fromlist=["AvatarSocket"],
+            ).AvatarSocket),
+            species_head_id=avatar.species_head_id,
+            surface_type=avatar.surface_type,
+            surface_color_hex=body,
+            eye_style_id=avatar.eye_style_id,
+            hair_style_id=avatar.hair_style_id,
             scale=float(runtime_meta.get("scale", 1.0)),
             animation_clips=RuntimeAnimationSpec(
                 idle=clips.get("idle", "Idle"),
@@ -126,6 +155,6 @@ class CharacterRuntimeService:
             ),
             body_color_hex=body,
             accent_color_hex=accent,
-            hair_color_hex=profile.hair_or_fur_color_hex or "#5B4036",
-            eye_color_hex=profile.eyes.color_hex or "#7A5238",
+            hair_color_hex=hair,
+            eye_color_hex=eyes,
         )
