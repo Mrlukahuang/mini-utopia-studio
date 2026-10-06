@@ -26,6 +26,7 @@ from studio.ui.creator.world_factory import render_world_factory
 from studio.ui.creator.concept_match_review import render_concept_match_review
 from studio.ui.creator.story_builder import render_story_builder
 from studio.ui.creator.my_stuff import render_my_stuff
+from studio.ui.creator.my_baby import render_my_baby
 from studio.ui.theme import apply_mini_utopia_theme, render_brandbar, render_game_hero, render_quest
 
 
@@ -178,7 +179,7 @@ render_brandbar(studio=(mode == "🛠 Studio"))
 NAV_GROUPS = [
     (
         "🎭 Characters / 角色",
-        ["🎭 My Characters", "✨ Character Factory", "🎒 My Stuff"],
+        ["🎭 My Characters", "✨ Character Factory", "🎒 My Stuff", "🐣 My Baby"],
     ),
     (
         "🗺️ Worlds / 世界",
@@ -234,6 +235,7 @@ creator_protected_pages = {
     "🎭 My Characters",
     "✨ Character Factory",
     "🎒 My Stuff",
+    "🐣 My Baby",
     "🗺️ My Worlds",
     "🌍 World Factory",
     "🎮 Explore World",
@@ -324,6 +326,13 @@ elif page == "🎭 My Characters":
         "这些都是你创造过的伙伴。随时回来换衣服、改设定，再带 TA 去新的世界。",
         kicker="CHARACTER LIBRARY",
     )
+
+    active_baby = ctx.babies.active_baby()
+    if active_baby is not None:
+        st.info(
+            f"🐣 Active Baby · {active_baby.display_name} · "
+            f"Lv.{active_baby.level} · 💞 Bond {active_baby.bond}"
+        )
 
     create_col, _ = st.columns([1, 3])
     with create_col:
@@ -604,6 +613,10 @@ elif page == "✨ Character Factory":
 
 elif page == "🎒 My Stuff":
     render_my_stuff(ctx)
+
+
+elif page == "🐣 My Baby":
+    render_my_baby(ctx)
 
 
 elif page == "🗺️ My Worlds":

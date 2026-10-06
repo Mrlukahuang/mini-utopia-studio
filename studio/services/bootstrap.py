@@ -7,6 +7,7 @@ from studio.repositories.sqlite import SQLiteStudioRepository
 from studio.repositories.supabase import SupabaseStudioRepository
 from studio.services.asset_service import AssetService
 from studio.services.equipment_service import EquipmentService
+from studio.services.baby_service import BabyService
 from studio.services.story_service import StoryService
 from studio.services.style_service import StyleService
 from studio.services.universe_service import UniverseService
@@ -63,6 +64,10 @@ class StudioContext:
     reusable_assets: ReusableAssetLibraryService
     reusable_asset_packs: ReusableAssetPackService
     world_concept_match: WorldConceptMatchService
+
+    @property
+    def babies(self) -> BabyService:
+        return BabyService(self.repository)
 
 
 def _build_storage(settings: Settings) -> ObjectStorage:

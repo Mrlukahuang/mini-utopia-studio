@@ -7,6 +7,7 @@ from studio.models.universe import Universe
 from studio.models.story import Story
 from studio.models.job import Job
 from studio.models.equipment import CreatorCollection
+from studio.models.baby import BabyRoster
 from studio.repositories.base import StudioRepository
 
 SCHEMA = """
@@ -33,6 +34,12 @@ CREATE TABLE IF NOT EXISTS stories (
   updated_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS collections (
+  id TEXT PRIMARY KEY,
+  owner_key TEXT NOT NULL,
+  data TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS baby_rosters (
   id TEXT PRIMARY KEY,
   owner_key TEXT NOT NULL,
   data TEXT NOT NULL,
@@ -138,6 +145,26 @@ class SQLiteStudioRepository(StudioRepository):
                 (collection_id,),
             ).fetchone()
         return CreatorCollection.model_validate_json(row[0]) if row else None
+
+    def save_baby_roster(self, roster: BabyRoster) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO baby_rosters VALUES (?,?,?,?)",
+                (
+                    roster.roster_id,
+                    roster.owner_key,
+                    self._json(roster),
+                    roster.updated_at.isoformat(),
+                ),
+            )
+
+    def get_baby_roster(self, roster_id: str) -> BabyRoster | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT data FROM baby_rosters WHERE id=?",
+                (roster_id,),
+            ).fetchone()
+        return BabyRoster.model_validate_json(row[0]) if row else None
 
     def save_job(self, job: Job) -> None:
         with self._connect() as conn:

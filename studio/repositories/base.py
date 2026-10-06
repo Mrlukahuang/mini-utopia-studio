@@ -6,6 +6,7 @@ from studio.models.universe import Universe
 from studio.models.story import Story
 from studio.models.job import Job
 from studio.models.equipment import CreatorCollection
+from studio.models.baby import BabyRoster
 
 
 class StudioRepository(ABC):
@@ -31,6 +32,11 @@ class StudioRepository(ABC):
     def save_collection(self, collection: CreatorCollection) -> None: ...
     @abstractmethod
     def get_collection(self, collection_id: str) -> CreatorCollection | None: ...
+    def save_baby_roster(self, roster: BabyRoster) -> None:
+        raise NotImplementedError
+
+    def get_baby_roster(self, roster_id: str) -> BabyRoster | None:
+        raise NotImplementedError
     @abstractmethod
     def save_job(self, job: Job) -> None: ...
     @abstractmethod
