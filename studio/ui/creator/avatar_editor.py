@@ -20,6 +20,23 @@ from studio.ui.creator.avatar_catalog import (
 from studio.ui.creator.avatar_preview import render_avatar_preview
 
 
+AVATAR_EDITOR_STATE_KEYS = (
+    "avatar_body_type",
+    "avatar_species_head",
+    "avatar_surface_type",
+    "avatar_surface_color",
+    "avatar_eye_style",
+    "avatar_eye_color",
+    "avatar_hair_style",
+    "avatar_hair_color",
+)
+
+
+def reset_avatar_editor_state() -> None:
+    for key in AVATAR_EDITOR_STATE_KEYS:
+        st.session_state.pop(key, None)
+
+
 def _safe_index(values: list[str], current: str) -> int:
     try:
         return values.index(current)
