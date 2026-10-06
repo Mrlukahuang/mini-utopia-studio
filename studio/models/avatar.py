@@ -36,6 +36,7 @@ class AvatarAppearance(BaseModel):
     """
 
     schema_version: str = AVATAR_SCHEMA_VERSION
+    customized: bool = False
     rig_family: str = AVATAR_RIG_FAMILY
     body_type: BodyType = BodyType.STANDARD
 
