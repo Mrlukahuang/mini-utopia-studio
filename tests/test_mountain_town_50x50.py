@@ -77,9 +77,9 @@ def test_mountain_town_preparation_is_one_command_and_source_preserving():
     assert "python3 tools/prepare_mountain_town_assets.py" in text
     assert "source archives" in text.lower()
     assert "profile_res_paths" in text
-    assert "kaykit_medieval" in text
-    assert "kaykit_forest" in text
-    assert "kaykit_resource" in text
+    assert "CATALOG_PATH" in text
+    assert 'catalog["packs"]' in text
+    assert 'catalog["assets"]' in text
 
 
 def test_block_bits_are_not_used_as_visible_primary_terrain():
