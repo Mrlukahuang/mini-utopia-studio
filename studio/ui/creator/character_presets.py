@@ -22,8 +22,9 @@ AGE_OPTIONS = [
 ]
 
 BODY_BUILD_OPTIONS = [
-    "很瘦 / Very slim", "偏瘦 / Slim", "普通 / Average",
-    "圆润 / Round", "胖胖的 / Chubby", "壮壮的 / Strong", CUSTOM,
+    "偏瘦 / Slim",
+    "普通 / Standard",
+    "圆润 / Chubby",
 ]
 
 HEIGHT_OPTIONS = [
