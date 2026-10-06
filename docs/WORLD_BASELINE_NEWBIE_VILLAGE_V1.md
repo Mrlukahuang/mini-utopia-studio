@@ -1,7 +1,7 @@
 # Mini Utopia World Baseline — 新手村 100×100 v1
 
 Status: **LOCKED BASELINE**  
-Scene: `res://scenes/newbie_village_100x100_v0_1.tscn`
+Current scene: `res://scenes/newbie_village_100x100_v0_2.tscn`
 
 This document is the source of truth for the first explorable Mini Utopia village world. Future village iterations should preserve these rules unless this baseline is explicitly versioned.
 
@@ -21,8 +21,10 @@ The design must balance:
 - Playable footprint: approximately **100 × 100 world units**.
 - Terrain language: **NO hex / honeycomb terrain**.
 - Settlement sits on a broad valley floor enclosed by layered highlands.
-- Structural terrain uses solid terraced masses with grassy caps; visible natural dressing is led by **KayKit Forest Nature Pack**.
-- Outer terrain should read as hills / cliffs / mountain shelves, not as repeated hex tiles.
+- The visible village-floor language uses the **plain green KayKit Block Bits cube** over a reliable solid collision foundation.
+- Outer terrain uses solid grey cliff masses with green block caps, then Forest Nature trees / rocks / bushes / grass to create the lush layered reference feel.
+- The outer mountain composition must have **valley level + at least two additional elevation bands**.
+- Outer terrain should read as layered hills / cliffs / mountain shelves, not as repeated hex tiles.
 - Major terrain is solid collision.
 
 ## 3. Road hierarchy
@@ -30,20 +32,22 @@ The design must balance:
 The road network remains deliberately simple:
 
 - **1 north–south main road**
-  - built from **KayKit Block Bits dirt blocks**
+  - built from the **plain yellow KayKit Block Bits cube**
   - **3 blocks wide**
 - **2 east–west branch roads**
-  - built from the same Block Bits dirt language
+  - built from the same **plain yellow Block Bits cube**
   - **2 blocks wide**
 - Roads organize the settlement; buildings support the roads instead of competing with them.
 - The central plaza sits at the road core.
 
-If a requested Block Bits dirt mesh cannot be found in the installed Asset Vault, the runtime may use a temporary solid dirt-block fallback and should emit a warning. The layout rules do not change.
+The runtime should prefer the plain Block Bits meshes whose filenames contain **yellow** for roads and **green** for village ground / house pads. If a matching local mesh cannot be found, it may use a temporary solid color fallback and must emit a warning. The layout rules do not change.
 
 ## 4. Buildings and scale
 
 - The village must contain **many buildings**, not a sparse demo row.
 - Houses line both sides of roads and face the nearest road.
+- Houses must visibly sit **on green block terrain / raised green-capped pads**, not look pasted onto a flat plane.
+- Edge neighborhoods should step upward so the village participates in the terrain rather than remaining completely flat.
 - Building scale must be comfortable next to the current ~1.6 m player.
 - Ordinary homes target roughly **4.5–5.2 m visual height**.
 - Landmark buildings can be larger.
@@ -62,7 +66,7 @@ Use Forest Nature Pack as the primary natural visual language for:
 - terrace edges,
 - scenic pockets.
 
-The structural terrain may use simple solid procedural masses underneath so the world remains reliable and collision-safe. Those masses should be visually softened and covered by Forest Nature assets rather than shown as a naked prototype grid.
+The user's current Forest Nature archive is the free tier, so modular terrain meshes are not assumed. The world may use simple solid procedural cliff masses underneath, but they must be softened with green Block Bits caps plus Forest Nature trees, rocks, bushes and grass so the result follows the supplied layered-island reference rather than looking like naked prototype geometry.
 
 ## 6. Resource Bits role
 
@@ -100,10 +104,11 @@ Use simple box / cylinder collision proxies when exact mesh collision is unneces
 
 The first implementation should include:
 
-- 100×100 valley floor,
-- layered outer terraces / mountains,
-- one 3-block-wide main road,
-- two 2-block-wide horizontal branch roads,
+- 100×100 solid valley floor,
+- visible green Block Bits village ground,
+- layered outer terraces / mountains with two additional elevation bands,
+- one yellow Block Bits 3-block-wide main road,
+- two yellow Block Bits 2-block-wide horizontal branch roads,
 - central plaza,
 - 36+ road-oriented buildings,
 - multiple Forest Nature clusters,
