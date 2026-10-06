@@ -67,7 +67,8 @@ static func instantiate_first_filename(
         entries[0],
         world_position,
         yaw_degrees,
-        native_scale
+        native_scale,
+        target_height
     )
 
 
