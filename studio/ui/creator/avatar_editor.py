@@ -64,10 +64,10 @@ def render_avatar_appearance_editor(
 
     st.markdown("#### 🧸 Playable Avatar / 可玩外观")
     st.caption(
-        "身体和骨骼保持统一。你主要在换种族头、材质、眼睛、头发和颜色。"
+        "身体和骨骼保持统一。右侧是真 3D 可玩 Avatar 预览；你可以拖动旋转，并即时查看种族头、材质、眼睛、头发和颜色。"
     )
 
-    left, preview_col = st.columns([1, 1.35], gap="large")
+    left, preview_col = st.columns([0.86, 1.74], gap="large")
 
     with left:
         body_values = [item.value for item, _label in BODY_TYPE_OPTIONS]
