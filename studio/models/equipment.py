@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import random
+from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field, model_validator
@@ -74,7 +75,7 @@ class EquipmentInstance(BaseModel):
     rolled_stats: StatBlock
     affixes: list[str] = Field(default_factory=list)
     special_effect_ids: list[str] = Field(default_factory=list)
-    created_at: object = Field(default_factory=now_utc)
+    created_at: datetime = Field(default_factory=now_utc)
 
 
 class CharacterLoadout(BaseModel):
@@ -97,7 +98,7 @@ class CreatorCollection(BaseModel):
     owner_key: str = "default_creator"
     items: list[EquipmentInstance] = Field(default_factory=list)
     loadouts: dict[str, CharacterLoadout] = Field(default_factory=dict)
-    updated_at: object = Field(default_factory=now_utc)
+    updated_at: datetime = Field(default_factory=now_utc)
 
     @model_validator(mode="after")
     def unique_item_instances(self) -> "CreatorCollection":
