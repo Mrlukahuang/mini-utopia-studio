@@ -1,7 +1,7 @@
 # Mini Utopia World Baseline — 新手村 100×100 v1
 
 Status: **LOCKED BASELINE**  
-Current scene: `res://scenes/newbie_village_100x100_v0_2.tscn`
+Current scene: `res://scenes/newbie_village_100x100_v0_3.tscn`
 
 This document is the source of truth for the first explorable Mini Utopia village world. Future village iterations should preserve these rules unless this baseline is explicitly versioned.
 
@@ -100,13 +100,23 @@ The following must be solid enough that the player cannot obviously walk through
 
 Use simple box / cylinder collision proxies when exact mesh collision is unnecessary. Playability and reliability are more important than perfect collision fidelity.
 
+## 8.1 Surface-alignment rule
+
+This is a hard technical rule after the v0.2 smoke-test failure:
+
+- A visible Block Bits surface and its physical collision top must resolve to the **same world Y**.
+- Valley green blocks must finish at **Y = 0**.
+- Yellow road tops must sit slightly above the green surface so they cannot disappear through coplanar overlap.
+- Raised house pads must return one authoritative `surface_y`; the house bottom, cap collision, and visible green-block cap must all use that same value.
+- Asset pivots must never be guessed. Block Bits cubes are box-fitted from measured mesh bounds.
+
 ## 9. v0.1 composition target
 
 The first implementation should include:
 
 - 100×100 solid valley floor,
 - visible green Block Bits village ground,
-- layered outer terraces / mountains with two additional elevation bands,
+- irregular layered outer cliff clusters with two additional elevation bands plus compact peaks,
 - one yellow Block Bits 3-block-wide main road,
 - two yellow Block Bits 2-block-wide horizontal branch roads,
 - central plaza,
