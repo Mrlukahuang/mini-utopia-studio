@@ -2,6 +2,7 @@ import requests
 
 from studio.core.enums import AssetType
 from studio.models.asset import Asset
+from studio.models.equipment import CreatorCollection
 from studio.repositories.supabase import SupabaseStudioRepository
 
 
@@ -92,3 +93,46 @@ def test_list_assets_filters_by_asset_type(monkeypatch):
     loaded = _repo().list_assets(AssetType.CHARACTER)
 
     assert [asset.asset_id for asset in loaded] == [char.asset_id]
+
+
+
+def test_save_collection_uses_collection_record_kind(monkeypatch):
+    calls = {}
+
+    def fake_post(url, *, params, headers, json, timeout):
+        calls.update(url=url, params=params, headers=headers, json=json, timeout=timeout)
+        return FakeResponse(201)
+
+    monkeypatch.setattr(requests, "post", fake_post)
+    collection = CreatorCollection(
+        collection_id="COLL_DEFAULT",
+        owner_key="default_creator",
+    )
+
+    _repo().save_collection(collection)
+
+    assert calls["json"]["kind"] == "collection"
+    assert calls["json"]["record_id"] == "COLL_DEFAULT"
+    assert calls["json"]["name"] == "default_creator"
+
+
+def test_get_collection_reads_json_payload(monkeypatch):
+    collection = CreatorCollection(
+        collection_id="COLL_DEFAULT",
+        owner_key="default_creator",
+    )
+
+    monkeypatch.setattr(
+        requests,
+        "get",
+        lambda *args, **kwargs: FakeResponse(
+            200,
+            [{"data": collection.model_dump(mode="json")}],
+        ),
+    )
+
+    loaded = _repo().get_collection("COLL_DEFAULT")
+
+    assert loaded is not None
+    assert loaded.collection_id == "COLL_DEFAULT"
+    assert loaded.owner_key == "default_creator"
