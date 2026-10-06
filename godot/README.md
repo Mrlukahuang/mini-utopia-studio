@@ -103,3 +103,22 @@ The richer world layout is:
 `res://config/worlds/forest_village_50x50_rich_v0_2.json`
 
 The earlier v0.1 scene remains available as a sparse baseline for comparison.
+
+
+## Mountain Town 50×50 v0.3 — real KayKit terrain
+
+This scene uses the actual Medieval Hexagon road / river / hill system plus Forest Nature dressing and Resource Bits.
+
+Prepare local assets once:
+
+```bash
+python3 tools/prepare_mountain_town_assets.py
+```
+
+Then open:
+
+`res://scenes/mountain_town_50x50_v0_3.tscn`
+
+and run the current scene (F6 / fn+F6 on macOS).
+
+The scene contains a real hex-terrain village with roads, river crossing, bridge, raised hill terrace, mountain ring and exactly 30 buildings.
