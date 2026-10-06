@@ -28,6 +28,7 @@ from studio.ui.creator.concept_match_review import render_concept_match_review
 from studio.ui.creator.story_builder import render_story_builder
 from studio.ui.creator.my_stuff import render_my_stuff
 from studio.ui.creator.my_baby import render_my_baby
+from studio.ui.creator.dressing_room import render_dressing_room
 from studio.ui.theme import apply_mini_utopia_theme, render_brandbar, render_game_hero, render_quest
 
 
@@ -181,7 +182,13 @@ render_brandbar(studio=(mode == "🛠 Studio"))
 NAV_GROUPS = [
     (
         "🎭 Characters / 角色",
-        ["🎭 My Characters", "✨ Character Factory", "🎒 My Stuff", "🐣 My Baby"],
+        [
+            "🎭 My Characters",
+            "✨ Character Factory",
+            "🪞 Dressing Room",
+            "🎒 My Stuff",
+            "🐣 My Baby",
+        ],
     ),
     (
         "🗺️ Worlds / 世界",
@@ -611,6 +618,10 @@ elif page == "✨ Character Factory":
         studio_mode=(mode == "🛠 Studio" and studio_unlocked),
     )
 
+
+
+elif page == "🪞 Dressing Room":
+    render_dressing_room(ctx)
 
 
 elif page == "🎒 My Stuff":
