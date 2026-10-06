@@ -7,6 +7,7 @@ from studio.repositories.sqlite import SQLiteStudioRepository
 from studio.repositories.supabase import SupabaseStudioRepository
 from studio.services.asset_service import AssetService
 from studio.services.equipment_service import EquipmentService
+from studio.services.baby_service import BabyService
 from studio.services.story_service import StoryService
 from studio.services.style_service import StyleService
 from studio.services.universe_service import UniverseService
@@ -44,6 +45,7 @@ class StudioContext:
     registry: PluginRegistry
     assets: AssetService
     equipment: EquipmentService
+    babies: BabyService
     stories: StoryService
     styles: StyleService
     universes: UniverseService
@@ -188,6 +190,7 @@ def build_context(settings: Settings) -> StudioContext:
         registry=registry,
         assets=AssetService(repository),
         equipment=EquipmentService(repository),
+        babies=BabyService(repository),
         stories=StoryService(repository),
         styles=StyleService(repository),
         universes=UniverseService(repository),
