@@ -1,0 +1,95 @@
+{
+  "schema_version": "1.0",
+  "session_id": "PLAY_EXAMPLE_001",
+  "source": "creator",
+  "character_asset_id": "CHAR_PLAY_EXAMPLE",
+  "character_name": "Mini Traveler",
+  "character": {
+    "mode": "procedural",
+    "model_data_uri": null,
+    "rig_family": "humanoid_kaykit_v1",
+    "body_type": "standard",
+    "socket_names": [
+      "Socket_Weapon_R",
+      "Socket_Weapon_L",
+      "Socket_Backpack",
+      "Socket_Wings",
+      "Socket_Accessory",
+      "Socket_Headwear"
+    ],
+    "species_head_id": "species_head_human_v1",
+    "surface_type": "skin",
+    "surface_color_hex": "#F2C7A5",
+    "eye_style_id": "eyes_round_soft_v1",
+    "hair_style_id": "hair_none",
+    "scale": 1.0,
+    "animation_clips": {"idle": "Idle", "walk": "Walk", "run": "Run"},
+    "body_color_hex": "#F2C7A5",
+    "accent_color_hex": "#B9E7D0",
+    "hair_color_hex": "#5B4036",
+    "eye_color_hex": "#7A5238",
+    "playable_height_units": 3.4,
+    "head_to_body_ratio": 0.34
+  },
+  "equipment": {
+    "schema_version": "1.0",
+    "character_asset_id": "CHAR_PLAY_EXAMPLE",
+    "rig_family": "humanoid_kaykit_v1",
+    "body_type": "standard",
+    "socket_names": [
+      "Socket_Weapon_R",
+      "Socket_Weapon_L",
+      "Socket_Backpack",
+      "Socket_Wings",
+      "Socket_Accessory",
+      "Socket_Headwear"
+    ],
+    "final_stats": {"hp": 108, "atk": 22, "defense": 14},
+    "equipped": {
+      "weapon_main": {
+        "item_instance_id": "ITEM_EXAMPLE_SWORD",
+        "definition_id": "EQ_EXAMPLE_SWORD",
+        "display_name": "Starwood Sword / 星木剑",
+        "slot": "weapon_main",
+        "rarity": "purple",
+        "mesh_asset_id": null,
+        "animation_class": "one_handed",
+        "rolled_stats": {"hp": 0, "atk": 12, "defense": 0}
+      },
+      "weapon_offhand": {
+        "item_instance_id": "ITEM_EXAMPLE_SHIELD",
+        "definition_id": "EQ_EXAMPLE_SHIELD",
+        "display_name": "Wood Shield / 木盾",
+        "slot": "weapon_offhand",
+        "rarity": "blue",
+        "mesh_asset_id": null,
+        "animation_class": "shield",
+        "rolled_stats": {"hp": 3, "atk": 0, "defense": 6}
+      },
+      "headwear": {
+        "item_instance_id": "ITEM_EXAMPLE_CROWN",
+        "definition_id": "EQ_EXAMPLE_CROWN",
+        "display_name": "Tiny Crown / 小皇冠",
+        "slot": "headwear",
+        "rarity": "gold",
+        "mesh_asset_id": null,
+        "animation_class": null,
+        "rolled_stats": {"hp": 2, "atk": 1, "defense": 2}
+      }
+    }
+  },
+  "baby": {
+    "baby_id": "BABY_EXAMPLE_NOVA",
+    "display_name": "Nova",
+    "species_id": "star_baby",
+    "appearance_seed": "BSEED_EXAMPLE_NOVA",
+    "growth_stage": "baby",
+    "level": 1,
+    "active": true,
+    "cosmetic_item_ids": [],
+    "follow_enabled": true
+  },
+  "world_asset_id": "LOC_NEWBIE_VILLAGE",
+  "world_name": "Newbie Village",
+  "created_at": "2026-10-07T00:00:00Z"
+}
