@@ -264,59 +264,136 @@ func _probe_local_kaykit_animation_pack() -> void:
         print("AV-01 probe: Asset Vault is not installed.")
         return
 
-    var entry := AssetVaultRuntime.first_entry_matching(
-        ["character", "animation"],
-        []
+    var entries := AssetVaultRuntime.entries_matching(
+        ["kaykit", "character", "animations"],
+        ["rig_medium"]
     )
-    if entry.is_empty():
-        entry = AssetVaultRuntime.first_entry_matching(
-            ["kaykit"],
-            ["idle"]
+    if entries.is_empty():
+        entries = AssetVaultRuntime.entries_matching(
+            ["character", "animation"],
+            ["rig_medium"]
         )
 
-    if entry.is_empty():
+    if entries.is_empty():
         print(
-            "AV-01 probe: KayKit Character Animations not detected. "
-            + "Install the ZIP into the local Asset Vault, then rerun this scene."
+            "AV-01 probe: KayKit Rig_Medium animations not detected. "
+            + "Install the Character Animations ZIP into the local Asset Vault."
         )
         return
 
-    var res_path := String(entry.get("res_path", ""))
+    print("AV-01 probe: primary rig = Rig_Medium")
+    print("AV-01 probe: Rig_Medium animation sets found = ", entries.size())
+
+    var best_skeleton_names: Array[String] = []
+    var semantic_map := {
+        "Idle": {},
+        "Walk": {},
+        "Run": {},
+    }
+
+    for entry in entries:
+        var result := _inspect_animation_entry(entry)
+        var skeleton_names: Array[String] = result.get("skeleton_names", [])
+        if best_skeleton_names.is_empty() and not skeleton_names.is_empty():
+            best_skeleton_names = skeleton_names
+
+        var clips: Array[String] = result.get("clips", [])
+        for semantic_name in semantic_map.keys():
+            if not semantic_map[semantic_name].is_empty():
+                continue
+            var matched_clip := _best_semantic_clip(
+                clips,
+                String(semantic_name).to_lower()
+            )
+            if matched_clip.is_empty():
+                continue
+            semantic_map[semantic_name] = {
+                "clip": matched_clip,
+                "source_member": String(entry.get("source_member", "")),
+            }
+
+    if not best_skeleton_names.is_empty():
+        print(
+            "AV-01 probe: Rig_Medium skeleton bones = ",
+            ", ".join(best_skeleton_names)
+        )
+
+    var all_found := true
+    for semantic_name in ["Idle", "Walk", "Run"]:
+        var mapping: Dictionary = semantic_map[semantic_name]
+        if mapping.is_empty():
+            all_found = false
+            print(
+                "AV-01 probe: ",
+                semantic_name,
+                " mapping = NOT FOUND"
+            )
+            continue
+        print(
+            "AV-01 probe: ",
+            semantic_name,
+            " mapping = ",
+            mapping.get("clip", ""),
+            " @ ",
+            mapping.get("source_member", "")
+        )
+
     print(
-        "AV-01 probe: KayKit animation candidate = ",
-        entry.get("source_member", "")
+        "AV-01 probe: locomotion contract = ",
+        "PASS" if all_found else "INCOMPLETE"
     )
+
+
+func _inspect_animation_entry(entry: Dictionary) -> Dictionary:
+    var res_path := String(entry.get("res_path", ""))
     if res_path.is_empty() or not ResourceLoader.exists(res_path):
-        print("AV-01 probe: candidate resource is not loadable: ", res_path)
-        return
+        return {}
 
     var resource := ResourceLoader.load(res_path)
     if not resource is PackedScene:
-        print("AV-01 probe: candidate is not a PackedScene.")
-        return
+        return {}
 
-    var instance = (resource as PackedScene).instantiate()
-    _print_rig_details(instance)
+    var instance := (resource as PackedScene).instantiate()
+    var skeleton_names: Array[String] = []
+    var clips: Array[String] = []
+    _collect_rig_details(instance, skeleton_names, clips)
     instance.queue_free()
+    return {
+        "skeleton_names": skeleton_names,
+        "clips": clips,
+    }
 
 
-func _print_rig_details(node: Node) -> void:
-    if node is Skeleton3D:
+func _collect_rig_details(
+    node: Node,
+    skeleton_names: Array[String],
+    clips: Array[String]
+) -> void:
+    if node is Skeleton3D and skeleton_names.is_empty():
         var skeleton := node as Skeleton3D
-        var names: Array[String] = []
         for bone_index in range(skeleton.get_bone_count()):
-            names.append(skeleton.get_bone_name(bone_index))
-        print("AV-01 probe: Skeleton bones = ", ", ".join(names))
+            skeleton_names.append(skeleton.get_bone_name(bone_index))
 
     if node is AnimationPlayer:
         var animation_player := node as AnimationPlayer
-        print(
-            "AV-01 probe: animations = ",
-            ", ".join(animation_player.get_animation_list())
-        )
+        for clip_name in animation_player.get_animation_list():
+            var clip_text := String(clip_name)
+            if not clips.has(clip_text):
+                clips.append(clip_text)
 
     for child in node.get_children():
-        _print_rig_details(child)
+        _collect_rig_details(child, skeleton_names, clips)
+
+
+func _best_semantic_clip(clips: Array[String], needle: String) -> String:
+    var best := ""
+    for clip_name in clips:
+        var lowered := clip_name.to_lower()
+        if not lowered.contains(needle):
+            continue
+        if best.is_empty() or clip_name.length() < best.length():
+            best = clip_name
+    return best
 
 
 func _add_box(

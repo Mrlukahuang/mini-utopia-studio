@@ -30,6 +30,25 @@ static func entries_by_filename(filename: String) -> Array:
     return _asset_by_filename_cache.get(filename.to_lower(), [])
 
 
+static func entries_matching(
+    pack_terms: Array,
+    source_terms: Array = []
+) -> Array:
+    var matches: Array = []
+    for raw_entry in _manifest().get("assets", []):
+        if typeof(raw_entry) != TYPE_DICTIONARY:
+            continue
+        var entry: Dictionary = raw_entry
+        var pack_text := String(entry.get("pack", "")).to_lower()
+        var source_text := String(entry.get("source_member", "")).to_lower()
+        if not _contains_all(pack_text, pack_terms):
+            continue
+        if not _contains_all(source_text, source_terms):
+            continue
+        matches.append(entry)
+    return matches
+
+
 static func instantiate_by_id(
     parent: Node3D,
     asset_id: String,

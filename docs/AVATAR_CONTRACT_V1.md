@@ -3,7 +3,8 @@
 **Track:** AV-01 — Humanoid Rig & Avatar Contract  
 **Status:** Implementation contract  
 **Runtime:** Godot 4.7.x  
-**Rig family:** `humanoid_kaykit_v1`
+**Rig family:** `humanoid_kaykit_v1`  
+**Primary KayKit source rig:** `Rig_Medium` for regular playable Avatars
 
 ---
 
@@ -160,9 +161,12 @@ The scene:
 
 1. shows Slim / Standard / Chubby using one shared Idle / Walk / Run contract,
 2. checks the local Asset Vault,
-3. searches for a KayKit Character Animations candidate,
-4. prints discovered Skeleton bone names,
-5. prints discovered AnimationPlayer clip names.
+3. scans the installed KayKit Character Animations `Rig_Medium` sets,
+4. prints the discovered `Rig_Medium` Skeleton bone names,
+5. resolves actual source clips for semantic `Idle`, `Walk`, and `Run`,
+6. prints `locomotion contract = PASS` only when all three mappings are found.
+
+KayKit documents `Rig_Medium` for regular characters and `Rig_Large` for large characters. Mini Utopia v1 therefore standardizes primary playable Avatars on `Rig_Medium`; `Rig_Large` remains available later for deliberately large character families.
 
 ### Local smoke-test output
 
@@ -171,9 +175,12 @@ Open Godot Output while running the scene.
 Expected probe output will include lines such as:
 
 ```text
-AV-01 probe: KayKit animation candidate = ...
-AV-01 probe: Skeleton bones = ...
-AV-01 probe: animations = ...
+AV-01 probe: primary rig = Rig_Medium
+AV-01 probe: Rig_Medium skeleton bones = ...
+AV-01 probe: Idle mapping = ... @ ...
+AV-01 probe: Walk mapping = ... @ ...
+AV-01 probe: Run mapping = ... @ ...
+AV-01 probe: locomotion contract = PASS
 ```
 
 If the pack is not detected:
@@ -233,8 +240,8 @@ AV-01 is complete only when:
 - the five socket names are stable,
 - Godot parses the smoke-test scene,
 - Idle / Walk / Run semantic animations switch on all three preview bodies,
-- local KayKit probe discovers and reports the actual rig / animation data, or reports that the pack is not installed,
+- local KayKit probe discovers the actual `Rig_Medium` rig and resolves Idle / Walk / Run source clips,
 - one local Godot smoke test is completed,
 - CI is green.
 
-The issue should stay open until the local KayKit probe is smoke-tested on the user's machine.
+The issue should stay open until the local KayKit probe prints `locomotion contract = PASS` on the user's machine.
