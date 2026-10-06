@@ -72,8 +72,10 @@ def test_v03_mountains_are_irregular_clusters_not_rectangular_ring_shelves():
     assert "peak_shape: Array[Vector2i]" in text
     assert "NorthWestUpper" in text
     assert "SouthEastPeak" in text
-    assert "WestShelf" not in text
-    assert "EastShelf" not in text
+    # Reject the old single rectangular ring identifiers, while allowing
+    # descriptive names such as NorthWestShelf / WestMidShelf.
+    assert '"WestShelf"' not in text
+    assert '"EastShelf"' not in text
 
 
 def test_v03_uses_forest_nature_to_soften_cliff_edges():
