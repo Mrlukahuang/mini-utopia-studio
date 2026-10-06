@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from studio.services.baby_service import BABY_ARCHETYPES, BABY_XP_PER_LEVEL
+from studio.services.baby_service import BABY_ARCHETYPES, BABY_XP_PER_LEVEL, BabyService
 from studio.ui.theme import render_game_hero
 
 
@@ -46,7 +46,8 @@ def render_my_baby(ctx) -> None:
         kicker="COMPANION · GROW · BOND",
     )
 
-    roster = ctx.babies.get_roster()
+    babies = BabyService(ctx.repository)
+    roster = babies.get_roster()
 
     if not roster.babies:
         st.markdown("### Meet Your Initial Baby / 选择你的第一个宝宝")
@@ -72,7 +73,7 @@ def render_my_baby(ctx) -> None:
                 use_container_width=True,
             ):
                 try:
-                    ctx.babies.create_initial_baby(
+                    babies.create_initial_baby(
                         display_name=display_name,
                         species_id=species_id,
                     )
@@ -132,7 +133,7 @@ def render_my_baby(ctx) -> None:
                 use_container_width=True,
             ):
                 try:
-                    ctx.babies.rename(baby_id=active.baby_id, display_name=new_name)
+                    babies.rename(baby_id=active.baby_id, display_name=new_name)
                     st.rerun()
                 except ValueError as exc:
                     st.error(str(exc))
@@ -152,7 +153,7 @@ def render_my_baby(ctx) -> None:
                 key=f"baby_xp_{active.baby_id}",
                 use_container_width=True,
             ):
-                ctx.babies.add_xp(baby_id=active.baby_id, amount=25)
+                babies.add_xp(baby_id=active.baby_id, amount=25)
                 st.rerun()
         with bond_col:
             if st.button(
@@ -160,7 +161,7 @@ def render_my_baby(ctx) -> None:
                 key=f"baby_bond_{active.baby_id}",
                 use_container_width=True,
             ):
-                ctx.babies.add_bond(baby_id=active.baby_id, amount=5)
+                babies.add_bond(baby_id=active.baby_id, amount=5)
                 st.rerun()
 
         with st.expander("Baby Identity / 永久身份", expanded=False):
@@ -184,5 +185,5 @@ def render_my_baby(ctx) -> None:
             if baby.baby_id == roster.active_baby_id:
                 cols[1].caption("Active")
             elif cols[1].button("Set Active", key=f"set_active_{baby.baby_id}"):
-                ctx.babies.set_active(baby_id=baby.baby_id)
+                babies.set_active(baby_id=baby.baby_id)
                 st.rerun()
