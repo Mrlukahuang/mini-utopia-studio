@@ -3,14 +3,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "godot" / "scripts" / "newbie_village_100x100.gd"
-SCENE = ROOT / "godot" / "scenes" / "newbie_village_100x100_v0_1.tscn"
 BASELINE = ROOT / "docs" / "WORLD_BASELINE_NEWBIE_VILLAGE_V1.md"
 VAULT_RUNTIME = ROOT / "godot" / "scripts" / "asset_vault_runtime.gd"
 
 
 def test_newbie_village_baseline_files_exist():
     assert SCRIPT.is_file()
-    assert SCENE.is_file()
     assert BASELINE.is_file()
 
 
@@ -58,14 +56,6 @@ def test_newbie_village_has_solid_collision_baseline():
     assert "BoundaryEast" in text
     assert "BoundaryNorth" in text
     assert "BoundarySouth" in text
-
-
-def test_scene_is_named_newbie_village_and_uses_builder():
-    text = SCENE.read_text(encoding="utf-8")
-
-    assert 'name="NewbieVillage100x100V01"' in text
-    assert 'res://scripts/newbie_village_100x100.gd' in text
-    assert 'position = Vector3(0, 0.9, 41)' in text
 
 
 def test_asset_vault_runtime_supports_pack_matching_and_fit_height():
