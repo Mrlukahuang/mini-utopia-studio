@@ -13,6 +13,7 @@ const SOCKET_WEAPON_L := "Socket_Weapon_L"
 const SOCKET_BACKPACK := "Socket_Backpack"
 const SOCKET_WINGS := "Socket_Wings"
 const SOCKET_ACCESSORY := "Socket_Accessory"
+const SOCKET_HEADWEAR := "Socket_Headwear"
 
 const SOCKET_NAMES := [
     SOCKET_WEAPON_R,
@@ -20,6 +21,7 @@ const SOCKET_NAMES := [
     SOCKET_BACKPACK,
     SOCKET_WINGS,
     SOCKET_ACCESSORY,
+    SOCKET_HEADWEAR,
 ]
 
 const ANIMATION_IDLE := "Idle"
@@ -93,4 +95,8 @@ static func apply_default_socket_positions(
 
     var accessory := sockets.get_node_or_null(SOCKET_ACCESSORY) as Node3D
     if accessory != null:
-        accessory.position = Vector3(0.0, 1.75, 0.0)
+        accessory.position = Vector3(0.30 * width_scale, 1.08, 0.26)
+
+    var headwear := sockets.get_node_or_null(SOCKET_HEADWEAR) as Node3D
+    if headwear != null:
+        headwear.position = Vector3(0.0, 2.34, 0.0)
