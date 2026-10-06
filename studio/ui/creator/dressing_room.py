@@ -11,6 +11,7 @@ from studio.models.equipment import (
 )
 from studio.services.baby_service import BabyService
 from studio.services.equipment_service import EquipmentService
+from studio.services.play_session_service import CreatorPlaySessionService
 from studio.ui.creator.avatar_preview import render_avatar_preview
 from studio.ui.theme import render_game_hero
 
@@ -172,6 +173,29 @@ def render_dressing_room(ctx) -> None:
             "这里和 My Stuff 使用同一份 CharacterLoadout；换装会持久保存，"
             "不是临时预览。"
         )
+
+        play_sessions = CreatorPlaySessionService(
+            ctx.repository,
+            ctx.character_runtime,
+            equipment=equipment,
+            babies=babies,
+        )
+        if st.button(
+            "🎮 Play This Loadout / 带这套装备出发",
+            type="primary",
+            use_container_width=True,
+            key=f"play_loadout_{selected_character.asset_id}",
+        ):
+            try:
+                play_sessions.export(
+                    character_asset_id=selected_character.asset_id,
+                )
+                st.session_state.play_character_id = selected_character.asset_id
+                st.session_state.pop("runtime_character_asset", None)
+                st.session_state.pending_app_page = "🎮 Explore World"
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Play session export failed / 导出失败: {exc}")
 
         with st.expander("Current Runtime / 当前运行时", expanded=False):
             for slot in PLAYABLE_EQUIPMENT_SLOTS:

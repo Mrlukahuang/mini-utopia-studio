@@ -14,6 +14,7 @@ from studio.runtime.three_world import build_world_runtime_html, runtime_summary
 from studio.services.bootstrap import build_context
 from studio.services.style_service import StyleService
 from studio.services.baby_service import BabyService
+from studio.services.play_session_service import CreatorPlaySessionService
 from studio.ui.auth import (
     lock_creator,
     lock_studio,
@@ -47,6 +48,12 @@ universe = ctx.universes.ensure_mini_utopia()
 # object may briefly remain in memory while app.py has already refreshed.
 style_service = StyleService(ctx.repository)
 baby_service = BabyService(ctx.repository)
+play_session_service = CreatorPlaySessionService(
+    ctx.repository,
+    ctx.character_runtime,
+    equipment=ctx.equipment,
+    babies=baby_service,
+)
 universe = style_service.attach_base_style(universe)
 character_factory = CharacterFactoryRecipe(ctx.registry, ctx.assets)
 
@@ -947,6 +954,15 @@ elif page == "🎮 Explore World":
         selected_character = None
         character_profile = None
         character_runtime = ctx.character_runtime.resolve(None)
+        preferred_character_id = st.session_state.get("play_character_id")
+        preferred_character_index = next(
+            (
+                index
+                for index, asset in enumerate(playable_characters)
+                if asset.asset_id == preferred_character_id
+            ),
+            0,
+        )
 
         with traveler_col:
             st.markdown(
@@ -959,10 +975,12 @@ elif page == "🎮 Explore World":
                 selected_character = st.selectbox(
                     "Traveler",
                     playable_characters,
+                    index=preferred_character_index,
                     format_func=lambda asset: asset.display_name,
                     key="runtime_character_asset",
                     label_visibility="collapsed",
                 )
+                st.session_state.play_character_id = selected_character.asset_id
                 character_profile = CharacterProfile.model_validate(
                     selected_character.metadata.get("character_profile", {})
                 )
@@ -1011,6 +1029,16 @@ elif page == "🎮 Explore World":
                         + base64.b64encode(payload).decode("ascii")
                     )
 
+        godot_play_session = None
+        if selected_character is not None:
+            try:
+                godot_play_session = play_session_service.export(
+                    character_asset_id=selected_character.asset_id,
+                    world_asset_id=selected.asset_id,
+                )
+            except Exception as exc:
+                st.warning(f"Godot play-session sync failed: {exc}")
+
         summary = runtime_summary(
             profile=profile,
             blueprint=blueprint,
@@ -1033,6 +1061,17 @@ elif page == "🎮 Explore World":
             f"Today: {selected_character.display_name if selected_character else 'Mini Traveler'} "
             f"→ {selected.display_name} · Portal and Director Tour are ready."
         )
+        if godot_play_session is not None:
+            st.success(
+                "🎮 Godot Play Session Ready · "
+                f"{godot_play_session.character_name} + "
+                f"{len(godot_play_session.equipment.equipped)} equipped slots"
+                + (
+                    f" + 🐣 {godot_play_session.baby.display_name}"
+                    if godot_play_session.baby is not None
+                    else ""
+                )
+            )
 
         components.html(
             build_world_runtime_html(
