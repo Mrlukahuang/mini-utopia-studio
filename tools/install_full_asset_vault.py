@@ -68,20 +68,27 @@ def discover_archives(
     directories: list[Path],
     include_all_3d_zips: bool,
 ) -> list[Path]:
-    found: dict[Path, None] = {}
+    # Keep the first archive with a given filename according to directory
+    # priority. This avoids importing duplicate downloads into the same pack
+    # slug and keeps the one-time vault deterministic.
+    found_by_name: dict[str, Path] = {}
     for directory in directories:
         try:
-            entries = list(directory.glob("*.zip"))
+            entries = sorted(directory.glob("*.zip"))
         except OSError:
             continue
         for archive in entries:
             name = archive.name.lower()
-            if (
+            if not (
                 include_all_3d_zips
                 or any(hint in name for hint in DEFAULT_NAME_HINTS)
             ):
-                found[archive.resolve()] = None
-    return sorted(found.keys(), key=lambda p: p.name.lower())
+                continue
+            found_by_name.setdefault(name, archive.resolve())
+    return sorted(
+        found_by_name.values(),
+        key=lambda p: p.name.lower(),
+    )
 
 
 def safe_member(member: str) -> str:
