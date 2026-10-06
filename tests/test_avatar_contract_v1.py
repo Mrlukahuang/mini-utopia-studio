@@ -147,9 +147,8 @@ def test_godot_avatar_contract_and_smoke_scene_are_wired():
 
     assert "_probe_local_kaykit_animation_pack" in preview
     assert "Rig_Medium skeleton bones" in preview
-    assert "Idle mapping" in preview
-    assert "Walk mapping" in preview
-    assert "Run mapping" in preview
+    assert 'for semantic_name in ["Idle", "Walk", "Run"]' in preview
+    assert '" mapping = "' in preview
     assert "locomotion contract" in preview
     assert "avatar_contract_preview.gd" in scene
 
