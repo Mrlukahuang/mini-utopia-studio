@@ -1,0 +1,45 @@
+{
+  "schema_version": "0.1",
+  "world_id": "forest_village_50x50_v01",
+  "display_name": "Mini Utopia · Forest Village",
+  "profile_id": "core_candidate_b",
+  "size_meters": [50, 50],
+  "spawn": [0.0, 1.2, 20.0],
+  "anchors": [
+    {"id": "medieval_home", "position": [-7.0, 0.0, -3.5], "height": 4.5, "yaw": 18.0, "collision": {"type": "box", "size": [5.0, 4.0, 4.2], "offset": [0.0, 2.0, 0.0]}},
+    {"id": "medieval_home", "position": [7.5, 0.0, -6.0], "height": 4.25, "yaw": -22.0, "collision": {"type": "box", "size": [4.8, 3.8, 4.0], "offset": [0.0, 1.9, 0.0]}},
+    {"id": "medieval_home", "position": [-10.5, 0.0, -12.0], "height": 3.9, "yaw": 36.0, "collision": {"type": "box", "size": [4.4, 3.5, 3.8], "offset": [0.0, 1.75, 0.0]}},
+    {"id": "medieval_tower", "position": [5.5, 0.0, -15.5], "height": 6.2, "yaw": 14.0, "collision": {"type": "cylinder", "radius": 1.7, "height": 5.4, "offset": [0.0, 2.7, 0.0]}},
+    {"id": "medieval_bridge", "position": [0.0, 0.0, 7.0], "height": 2.0, "yaw": 0.0, "collision": {"type": "box", "size": [6.4, 0.55, 2.5], "offset": [0.0, 0.15, 0.0]}},
+
+    {"id": "forest_tree_round", "position": [-20.0, 0.0, 17.0], "height": 5.8, "yaw": -10.0, "collision": {"type": "cylinder", "radius": 0.7, "height": 3.3, "offset": [0.0, 1.65, 0.0]}},
+    {"id": "forest_tree_round", "position": [-17.5, 0.0, 10.5], "height": 5.2, "yaw": 18.0, "collision": {"type": "cylinder", "radius": 0.65, "height": 3.0, "offset": [0.0, 1.5, 0.0]}},
+    {"id": "forest_tree_round", "position": [19.0, 0.0, 16.0], "height": 5.6, "yaw": 20.0, "collision": {"type": "cylinder", "radius": 0.7, "height": 3.2, "offset": [0.0, 1.6, 0.0]}},
+    {"id": "forest_tree_round", "position": [21.0, 0.0, 6.5], "height": 5.0, "yaw": -22.0, "collision": {"type": "cylinder", "radius": 0.65, "height": 2.9, "offset": [0.0, 1.45, 0.0]}},
+    {"id": "forest_tree_round", "position": [-19.0, 0.0, -7.5], "height": 5.4, "yaw": 8.0, "collision": {"type": "cylinder", "radius": 0.7, "height": 3.1, "offset": [0.0, 1.55, 0.0]}},
+    {"id": "forest_tree_round", "position": [19.5, 0.0, -8.0], "height": 5.5, "yaw": -8.0, "collision": {"type": "cylinder", "radius": 0.7, "height": 3.2, "offset": [0.0, 1.6, 0.0]}},
+    {"id": "forest_tree_round", "position": [-16.0, 0.0, -19.0], "height": 5.0, "yaw": 28.0, "collision": {"type": "cylinder", "radius": 0.65, "height": 2.9, "offset": [0.0, 1.45, 0.0]}},
+    {"id": "forest_tree_round", "position": [15.5, 0.0, -20.5], "height": 5.7, "yaw": -18.0, "collision": {"type": "cylinder", "radius": 0.7, "height": 3.2, "offset": [0.0, 1.6, 0.0]}},
+
+    {"id": "forest_tree_branching", "position": [-22.0, 0.0, 3.0], "height": 4.8, "yaw": -14.0, "collision": {"type": "cylinder", "radius": 0.6, "height": 3.0, "offset": [0.0, 1.5, 0.0]}},
+    {"id": "forest_tree_branching", "position": [22.0, 0.0, -1.0], "height": 4.7, "yaw": 12.0, "collision": {"type": "cylinder", "radius": 0.6, "height": 3.0, "offset": [0.0, 1.5, 0.0]}},
+    {"id": "forest_tree_branching", "position": [-8.0, 0.0, -22.0], "height": 4.6, "yaw": 25.0, "collision": {"type": "cylinder", "radius": 0.6, "height": 2.8, "offset": [0.0, 1.4, 0.0]}},
+    {"id": "forest_tree_branching", "position": [7.0, 0.0, -22.5], "height": 4.8, "yaw": -25.0, "collision": {"type": "cylinder", "radius": 0.6, "height": 2.9, "offset": [0.0, 1.45, 0.0]}},
+
+    {"id": "forest_bush", "position": [-13.0, 0.0, 13.5], "height": 1.4, "yaw": 0.0},
+    {"id": "forest_bush", "position": [-11.0, 0.0, 9.0], "height": 1.25, "yaw": 10.0},
+    {"id": "forest_bush", "position": [13.5, 0.0, 12.0], "height": 1.5, "yaw": 0.0},
+    {"id": "forest_bush", "position": [14.5, 0.0, 5.0], "height": 1.2, "yaw": 0.0},
+    {"id": "forest_bush", "position": [-14.0, 0.0, -4.0], "height": 1.3, "yaw": 0.0},
+    {"id": "forest_bush", "position": [13.5, 0.0, -9.0], "height": 1.4, "yaw": 0.0},
+    {"id": "forest_bush", "position": [-11.0, 0.0, -18.0], "height": 1.2, "yaw": 0.0},
+    {"id": "forest_bush", "position": [11.0, 0.0, -19.0], "height": 1.35, "yaw": 0.0},
+
+    {"id": "forest_rock", "position": [-13.5, 0.0, 5.5], "height": 1.15, "yaw": 12.0},
+    {"id": "forest_rock", "position": [12.0, 0.0, 2.5], "height": 1.0, "yaw": -18.0},
+    {"id": "forest_rock", "position": [-6.0, 0.0, 10.5], "height": 0.9, "yaw": 24.0},
+    {"id": "forest_rock", "position": [8.5, 0.0, 10.0], "height": 1.2, "yaw": 0.0},
+    {"id": "forest_rock", "position": [-16.5, 0.0, -14.5], "height": 1.1, "yaw": -12.0},
+    {"id": "forest_rock", "position": [17.0, 0.0, -14.0], "height": 1.25, "yaw": 20.0}
+  ]
+}

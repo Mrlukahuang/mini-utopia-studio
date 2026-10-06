@@ -54,3 +54,20 @@ Runtime GLB import uses Godot's `GLTFDocument` / `GLTFState` API, then uniformly
 Before locking palette HEX values or rewriting Canon asset-generation prompts, open `res://scenes/style_calibration_lab.tscn` and run the current scene (F6).
 
 The Lab fixes camera, Filmic tonemapping, exposure and lighting, then shows the v0.9 Core Macaron candidate palette in COLOR / GRAYSCALE / SILHOUETTE lanes. See `STYLE_CALIBRATION_LAB.md` for the review workflow.
+
+
+## Forest Village 50×50 vertical slice
+
+After installing Golden anchors and baking `core_candidate_b`, open:
+
+`res://scenes/forest_village_50x50_v0_1.tscn`
+
+and run the current scene (F6 / fn+F6 on macOS).
+
+This scene is generated from the versioned layout:
+
+`res://config/worlds/forest_village_50x50_v0_1.json`
+
+It uses real Golden Forest + Medieval assets, prefers the Candidate-B derived profile, adds simple gameplay collision proxies, and keeps the footprint inside a 50×50 meter boundary.
+
+The layout is intentionally data-driven so density, placement and world composition can be iterated without hand-placing every object in the editor.
