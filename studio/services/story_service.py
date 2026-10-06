@@ -8,14 +8,34 @@ class StoryService:
     def __init__(self, repository: StudioRepository):
         self.repository = repository
 
-    def create_story(self, *, title: str, premise: str, mode: StoryMode, asset_ids: list[str], universe_id: str | None = None) -> Story:
+    def create_story(
+        self,
+        *,
+        title: str,
+        premise: str,
+        mode: StoryMode,
+        asset_ids: list[str],
+        universe_id: str | None = None,
+        hook: str = "",
+        discovery: str = "",
+        conflict: str = "",
+        adventure: str = "",
+        twist: str = "",
+        ending: str = "",
+    ) -> Story:
         story = Story(
             story_id=new_id("STORY"),
             title=title,
             premise=premise,
             mode=mode,
             universe_id=universe_id,
-            asset_ids=asset_ids,
+            asset_ids=list(dict.fromkeys(asset_ids)),
+            hook=hook,
+            discovery=discovery,
+            conflict=conflict,
+            adventure=adventure,
+            twist=twist,
+            ending=ending,
             status=ReviewStatus.DRAFT,
         )
         self.repository.save_story(story)
