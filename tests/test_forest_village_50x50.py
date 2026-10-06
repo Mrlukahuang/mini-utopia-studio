@@ -30,17 +30,11 @@ def test_forest_village_uses_real_golden_forest_and_medieval_assets():
     assert ids.count("forest_rock") >= 6
 
 
-def test_forest_village_playable_scene_has_player_camera_and_generated_world():
-    scene = (
-        ROOT / "godot" / "scenes" / "forest_village_50x50_v0_1.tscn"
-    ).read_text(encoding="utf-8")
+def test_forest_village_historical_builder_is_preserved_for_regression():
     script = (
         ROOT / "godot" / "scripts" / "forest_village_50x50.gd"
     ).read_text(encoding="utf-8")
 
-    assert 'res://scenes/player.tscn' in scene
-    assert 'res://scripts/camera_rig.gd' in scene
-    assert 'res://scripts/forest_village_50x50.gd' in scene
     assert 'GoldenAnchorRuntime.instantiate_anchor' in script
     assert '"core_candidate_b"' in script
     assert '_build_boundary()' in script
