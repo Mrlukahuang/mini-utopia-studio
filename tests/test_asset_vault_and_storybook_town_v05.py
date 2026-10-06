@@ -78,7 +78,7 @@ def test_asset_vault_is_incremental_and_pack_scoped():
     assert "archive_sha256" in text
     assert 'previous_pack.get("sha256") == digest' in text
     assert "Reused unchanged packs" in text
-    assert "SUPPORTED_EXTENSIONS = {".gltf", ".glb"}" in text
+    assert 'SUPPORTED_EXTENSIONS = {".gltf", ".glb"}' in text
 
 
 def test_v05_has_one_horizontal_avenue_and_two_vertical_side_streets():
