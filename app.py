@@ -23,6 +23,7 @@ from studio.ui.brand import render_primary_brand, render_sidebar_brand
 from studio.ui.creator.character_factory import render_character_factory, reset_character_creation_state
 from studio.ui.creator.world_factory import render_world_factory
 from studio.ui.creator.concept_match_review import render_concept_match_review
+from studio.ui.creator.story_builder import render_story_builder
 from studio.ui.theme import apply_mini_utopia_theme, render_brandbar, render_game_hero, render_quest
 
 
@@ -182,7 +183,7 @@ NAV_GROUPS = [
     ),
     (
         "🌎 Universe / 宇宙",
-        ["🌎 Mini Utopia", "📖 Stories"],
+        ["🌎 Mini Utopia", "✍️ Story Builder", "📖 Stories"],
     ),
     (
         "🧪 Sandbox / 实验",
@@ -232,6 +233,8 @@ creator_protected_pages = {
     "🗺️ My Worlds",
     "🌍 World Factory",
     "🎮 Explore World",
+    "✍️ Story Builder",
+    "📖 Stories",
 }
 if mode == "🧒 Creator" and page in creator_protected_pages:
     if not require_creator_pin():
@@ -1084,6 +1087,13 @@ elif page == "🌎 Mini Utopia":
         )
 
 
+elif page == "✍️ Story Builder":
+    render_story_builder(
+        ctx,
+        universe=universe,
+    )
+
+
 elif page == "🧪 Playground":
     st.header("🧪 Playground")
     st.write(
@@ -1128,11 +1138,20 @@ elif page == "🧪 Playground":
 elif page == "📖 Stories":
     st.header("📖 Stories")
 
+    create_story_col, _ = st.columns([1, 3])
+    with create_story_col:
+        if st.button(
+            "✍️ Create Story / 创建故事",
+            use_container_width=True,
+        ):
+            st.session_state.pending_app_page = "✍️ Story Builder"
+            st.rerun()
+
     stories = ctx.repository.list_stories()
 
     if not stories:
         st.info(
-            "还没有 Story。可以先在 Playground 保存一个疯狂想法。"
+            "还没有 Story。去 Story Builder 把角色和世界组合成第一个故事吧。"
         )
 
     for story in stories:
@@ -1142,6 +1161,21 @@ elif page == "📖 Stories":
                 f"{story.story_id} · {story.mode.value}"
             )
             st.write(story.premise)
+
+            beats = [
+                ("ARRIVE", story.hook),
+                ("DISCOVER", story.discovery),
+                ("PROBLEM", story.conflict),
+                ("ADVENTURE", story.adventure),
+                ("SURPRISE", story.twist),
+                ("PORTAL", story.ending),
+            ]
+            if any(text for _label, text in beats):
+                with st.expander("Story Beats / 故事结构", expanded=False):
+                    for label, text in beats:
+                        if text:
+                            st.markdown(f"**{label}** · {text}")
+
             st.caption(
                 "Assets: "
                 + (

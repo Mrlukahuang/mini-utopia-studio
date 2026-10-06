@@ -12,7 +12,9 @@ class Story(BaseModel):
     universe_id: str | None = None
     asset_ids: list[str] = Field(default_factory=list)
     hook: str = ""
+    discovery: str = ""
     conflict: str = ""
+    adventure: str = ""
     twist: str = ""
     ending: str = ""
     status: ReviewStatus = ReviewStatus.DRAFT
