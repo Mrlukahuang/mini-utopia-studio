@@ -75,7 +75,8 @@ def test_factory_preview_is_large_real_3d_and_reusable():
     assert 'st.columns([0.86, 1.74], gap="large")' in editor
     assert "Live 3D Avatar / 实时 3D 预览" in preview
     assert "components.html(" in preview
-    assert "height=620" in preview
+    assert "height: int = 620" in preview
+    assert "height=height" in preview
     assert "THREE.WebGLRenderer" in runtime
     assert "OrbitControls" in runtime
     assert "avatar-stage" not in preview

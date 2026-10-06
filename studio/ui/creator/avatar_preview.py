@@ -4,6 +4,8 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from studio.models.avatar import AvatarAppearance
+from studio.models.baby import BabyRuntimeSpec
+from studio.models.equipment_runtime import EquipmentRuntimeSpec
 from studio.runtime.avatar_preview_3d import build_avatar_preview_html
 from studio.ui.creator.avatar_catalog import (
     EYE_STYLE_OPTIONS,
@@ -17,6 +19,9 @@ def render_avatar_preview(
     appearance: AvatarAppearance,
     *,
     title: str = "Live 3D Avatar / 实时 3D 预览",
+    equipment: EquipmentRuntimeSpec | None = None,
+    baby: BabyRuntimeSpec | None = None,
+    height: int = 620,
 ) -> None:
     """Render the reusable WebGL Avatar preview used by Creator/Dressing Room."""
 
@@ -26,8 +31,12 @@ def render_avatar_preview(
     )
 
     components.html(
-        build_avatar_preview_html(appearance),
-        height=620,
+        build_avatar_preview_html(
+            appearance,
+            equipment=equipment,
+            baby=baby,
+        ),
+        height=height,
         scrolling=False,
     )
 

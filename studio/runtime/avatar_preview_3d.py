@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 
 from studio.models.avatar import AVATAR_RIG_FAMILY, AvatarAppearance
+from studio.models.baby import BabyRuntimeSpec
+from studio.models.equipment_runtime import EquipmentRuntimeSpec
 
 
 THREE_VERSION = "0.181.0"
@@ -27,7 +29,12 @@ def _safe_json(value: object) -> str:
     return json.dumps(value, ensure_ascii=False).replace("<", "\\u003c")
 
 
-def build_avatar_preview_html(appearance: AvatarAppearance) -> str:
+def build_avatar_preview_html(
+    appearance: AvatarAppearance,
+    *,
+    equipment: EquipmentRuntimeSpec | None = None,
+    baby: BabyRuntimeSpec | None = None,
+) -> str:
     """Build the reusable Creator/Dressing-Room WebGL Avatar preview.
 
     Geometry and body-width rules intentionally mirror the Godot
@@ -40,6 +47,16 @@ def build_avatar_preview_html(appearance: AvatarAppearance) -> str:
         "appearance": appearance.model_dump(mode="json"),
         "bodyWidthScale": BODY_WIDTH_SCALE,
         "headWidthScale": HEAD_WIDTH_SCALE,
+        "equipment": (
+            equipment.model_dump(mode="json")
+            if equipment is not None
+            else None
+        ),
+        "baby": (
+            baby.model_dump(mode="json")
+            if baby is not None
+            else None
+        ),
     }
     data_json = _safe_json(payload)
 
@@ -129,6 +146,8 @@ import {{ OrbitControls }} from 'three/addons/controls/OrbitControls.js';
 
 const DATA = {data_json};
 const A = DATA.appearance;
+const E = DATA.equipment || {{equipped: {{}}, final_stats: {{}}}};
+const B = DATA.baby || null;
 const host = document.getElementById('canvas');
 const errorBox = document.getElementById('runtimeError');
 
@@ -232,6 +251,151 @@ function addMesh(parent, geometry, material, position, name) {{
 function sphereGeo(rx,ry,rz) {{
   const g = new THREE.SphereGeometry(1,28,18);
   g.scale(rx,ry,rz);
+  return g;
+}}
+
+function rarityColor(rarity) {{
+  return {{
+    green:'#78D66C', blue:'#65A9F5', purple:'#B879F4',
+    gold:'#F4C95D', red:'#F06A6A', rainbow:'#F59BD8'
+  }}[rarity] || '#B879F4';
+}}
+
+function equippedItem(slot) {{
+  return (E.equipped || {{}})[slot] || null;
+}}
+
+function buildSword(width, item) {{
+  const g = new THREE.Group();
+  g.name = 'Equipment_Weapon_Main';
+  const rarity = rarityColor(item.rarity);
+  addMesh(g, roundedBox(.13,.92,.09,.035), mat('#E9EEF7',.26,.55), [0,.43,0], 'Blade');
+  addMesh(g, roundedBox(.42,.09,.12,.035), mat(rarity,.48,.20), [0,-.05,0], 'Guard');
+  addMesh(g, roundedBox(.10,.35,.10,.035), mat('#74513B',.76), [0,-.26,0], 'Handle');
+  const gem = addMesh(g,new THREE.SphereGeometry(.10,16,10),mat(rarity,.34,.14),[0,-.48,0],'Pommel');
+  gem.castShadow=true;
+  g.position.set(.78*width,.98,.08);
+  g.rotation.z=-.12;
+  return g;
+}}
+
+function addEquipment(root) {{
+  const width = root.userData.bodyWidth || 1;
+  const parts = root.userData.parts || {{}};
+
+  const outfit = equippedItem('outfit');
+  if (outfit && parts.body) {{
+    const color = rarityColor(outfit.rarity);
+    parts.body.material = mat(color,.78,.02);
+    addMesh(
+      root,roundedBox(.62*width,.13,.49*width,.05),
+      mat('#FFF4D7',.78),[0,1.18,.01],'OutfitCollar'
+    );
+  }}
+
+  const weapon = equippedItem('weapon_main');
+  if (weapon) root.add(buildSword(width, weapon));
+
+  const backpack = equippedItem('backpack');
+  if (backpack) {{
+    const g=new THREE.Group(); g.name='Equipment_Backpack';
+    addMesh(
+      g,roundedBox(.58*width,.72,.28,.10),
+      mat(rarityColor(backpack.rarity),.76),[0,0,0],'Pack'
+    );
+    addMesh(
+      g,roundedBox(.36*width,.22,.08,.05),
+      mat('#FFF4D7',.82),[0,.10,.18],'PackPocket'
+    );
+    g.position.set(0,1.10,-.47);
+    root.add(g);
+  }}
+
+  const wings = equippedItem('wings');
+  if (wings) {{
+    const g=new THREE.Group(); g.name='Equipment_Wings';
+    const wingMat=mat(rarityColor(wings.rarity),.56,.04);
+    for(const side of [-1,1]) {{
+      const wing=addMesh(
+        g,new THREE.ConeGeometry(.34,.94,4),wingMat,
+        [.48*side,0,0],'Wing'
+      );
+      wing.rotation.z=side*(Math.PI/2.8);
+      wing.rotation.y=Math.PI/4;
+    }}
+    g.position.set(0,1.34,-.39);
+    root.add(g);
+  }}
+
+  const accessory = equippedItem('accessory');
+  if (accessory) {{
+    const color=rarityColor(accessory.rarity);
+    const charm=new THREE.Mesh(
+      new THREE.TorusGeometry(.13,.04,10,20),
+      mat(color,.35,.24)
+    );
+    charm.name='Equipment_Accessory';
+    charm.position.set(.35*width,1.46,.48);
+    charm.rotation.x=Math.PI/2;
+    charm.castShadow=true;
+    root.add(charm);
+  }}
+}}
+
+function buildBabyCompanion() {{
+  if (!B) return null;
+  const g=new THREE.Group();
+  g.name='ActiveBaby_' + B.baby_id;
+  const species=B.species_id || 'star_baby';
+  const palette={{
+    star_baby:['#FFD968','#FFF4BF'],
+    cloud_baby:['#F7FBFF','#DDEEFF'],
+    sheep_baby:['#F6F1E8','#CFA77E'],
+    robot_baby:['#B9DDF4','#8EA3B8'],
+    forest_baby:['#B9E7D0','#7BAF7A'],
+  }}[species] || ['#FFD968','#FFF4BF'];
+  const bodyMat=mat(palette[0],.72,.03);
+  const accentMat=mat(palette[1],.78,.02);
+
+  addMesh(g,sphereGeo(.36,.31,.33),bodyMat,[0,.40,0],'BabyBody');
+  addMesh(g,sphereGeo(.30,.29,.29),accentMat,[0,.78,.02],'BabyHead');
+
+  for(const s of [-1,1]) {{
+    addMesh(
+      g,sphereGeo(.052,.07,.045),mat('#4C4058',.38),
+      [.105*s,.80,.285],'BabyEye'
+    );
+  }}
+
+  if(species==='star_baby') {{
+    const star=new THREE.Mesh(
+      new THREE.OctahedronGeometry(.17,0),
+      mat('#FFD968',.35,.08)
+    );
+    star.position.set(-.36,.84,.02);
+    star.rotation.z=Math.PI/4;
+    g.add(star);
+  }} else if(species==='cloud_baby') {{
+    for(const x of [-.22,0,.22]) addMesh(
+      g,sphereGeo(.18,.14,.16),accentMat,[x,.94,-.03],'CloudPuff'
+    );
+  }} else if(species==='sheep_baby') {{
+    for(const s of [-1,1]) addMesh(
+      g,sphereGeo(.14,.11,.12),bodyMat,[.28*s,.82,0],'BabySheepEar'
+    );
+  }} else if(species==='robot_baby') {{
+    addMesh(g,new THREE.CylinderGeometry(.025,.025,.18,10),mat('#7D8C9B',.4,.4),[0,1.10,0],'BabyAntenna');
+    addMesh(g,new THREE.SphereGeometry(.055,12,8),bodyMat,[0,1.20,0],'BabyAntennaTip');
+  }} else if(species==='forest_baby') {{
+    const leaf=addMesh(
+      g,new THREE.ConeGeometry(.10,.28,5),mat('#7BAF7A',.72),
+      [.10,1.08,0],'BabyLeaf'
+    );
+    leaf.rotation.z=-.45;
+  }}
+
+  g.position.set(-1.42,.02,.20);
+  g.scale.setScalar(.88);
   return g;
 }}
 
@@ -415,11 +579,17 @@ function buildAvatar() {{
   }}
 
   root.userData.parts={{body,head,...limbs}};
+  root.userData.bodyWidth=width;
+  root.userData.sockets=sockets;
   return root;
 }}
 
 const avatar = buildAvatar();
+addEquipment(avatar);
 stage.add(avatar);
+
+const babyCompanion = buildBabyCompanion();
+if (babyCompanion) stage.add(babyCompanion);
 
 let state='Idle';
 let elapsed=0;
@@ -484,6 +654,10 @@ function animate() {{
   elapsed+=dt;
   const t=clock.elapsedTime;
   animateAvatar(t);
+  if (babyCompanion) {{
+    babyCompanion.position.y=.02 + Math.sin(t*2.6)*.035;
+    babyCompanion.rotation.y=Math.sin(t*.85)*.12;
+  }}
   controls.update();
   renderer.render(scene,camera);
 }}
