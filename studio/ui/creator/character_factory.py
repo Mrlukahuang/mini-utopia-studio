@@ -8,7 +8,10 @@ import streamlit as st
 from studio.core.enums import AssetType
 from studio.models.character import CharacterProfile, WearableLoadout
 from studio.models.reference import ReferenceCharacterConfig
-from studio.ui.creator.avatar_editor import render_avatar_appearance_editor
+from studio.ui.creator.avatar_editor import (
+    render_avatar_appearance_editor,
+    reset_avatar_editor_state,
+)
 from studio.ui.creator.character_presets import (
     CUSTOM,
     AGE_OPTIONS,
@@ -233,6 +236,7 @@ def reset_character_creation_state() -> None:
     Session-level generation accounting intentionally survives so Creator
     usage limits still apply across multiple characters in one session.
     """
+    reset_avatar_editor_state()
     for key in (
         "char_draft",
         "char_source",
