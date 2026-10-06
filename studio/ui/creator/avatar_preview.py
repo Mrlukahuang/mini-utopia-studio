@@ -26,16 +26,16 @@ def render_avatar_preview(
     """
 
     body_width = {
-        BodyType.SLIM: 72,
-        BodyType.STANDARD: 84,
-        BodyType.CHUBBY: 98,
+        BodyType.SLIM: 102,
+        BodyType.STANDARD: 118,
+        BodyType.CHUBBY: 138,
     }[appearance.body_type]
 
     species = option_label(SPECIES_HEAD_OPTIONS, appearance.species_head_id)
     eyes = option_label(EYE_STYLE_OPTIONS, appearance.eye_style_id)
     hair = option_label(HAIR_STYLE_OPTIONS, appearance.hair_style_id)
 
-    head_radius = 34 if appearance.body_type != BodyType.CHUBBY else 38
+    head_radius = 48 if appearance.body_type != BodyType.CHUBBY else 54
     ear_html = ""
     if "sheep" in appearance.species_head_id:
         ear_html = '<span class="ear left">☁️</span><span class="ear right">☁️</span>'
@@ -95,7 +95,7 @@ def render_avatar_preview(
             margin-bottom:8px;
           }}
           .avatar-stage {{
-            height:260px;
+            height:390px;
             display:flex;
             align-items:flex-end;
             justify-content:center;
@@ -106,14 +106,14 @@ def render_avatar_preview(
               linear-gradient(#dff4ff,#fff7e7);
           }}
           .avatar {{
-            width:150px;
-            height:220px;
+            width:220px;
+            height:340px;
             position:relative;
             display:flex;
             align-items:center;
             flex-direction:column;
             justify-content:flex-start;
-            padding-top:8px;
+            padding-top:28px;
           }}
           .head {{
             width:calc(var(--head-r) * 2);
@@ -126,25 +126,25 @@ def render_avatar_preview(
           .hair {{
             position:absolute;
             left:4px; right:4px; top:-3px;
-            height:28px;
+            height:38px;
             border-radius:28px 28px 12px 12px;
             opacity:.96;
           }}
           .eyes {{
             position:absolute;
-            top:34px; left:0; right:0;
-            display:flex; justify-content:center; gap:17px;
+            top:48px; left:0; right:0;
+            display:flex; justify-content:center; gap:24px;
           }}
           .eyes span {{
-            width:10px; height:14px;
+            width:14px; height:20px;
             border-radius:50%;
             box-shadow:inset 0 0 0 2px rgba(255,255,255,.65);
           }}
           .body {{
             width:var(--body-w);
-            height:82px;
+            height:122px;
             margin-top:-6px;
-            border-radius:28px 28px 22px 22px;
+            border-radius:36px 36px 28px 28px;
             border:2px solid rgba(60,50,70,.08);
             z-index:2;
           }}
@@ -153,15 +153,15 @@ def render_avatar_preview(
             margin-top:-4px;
           }}
           .legs span {{
-            width:22px; height:48px;
+            width:30px; height:70px;
             border-radius:0 0 12px 12px;
             border:2px solid rgba(60,50,70,.07);
           }}
           .ear {{
-            position:absolute; top:9px; font-size:25px; z-index:-1;
+            position:absolute; top:9px; font-size:34px; z-index:-1;
           }}
-          .ear.left {{ left:-24px; transform:rotate(-18deg); }}
-          .ear.right {{ right:-24px; transform:rotate(18deg); }}
+          .ear.left {{ left:-31px; transform:rotate(-18deg); }}
+          .ear.right {{ right:-31px; transform:rotate(18deg); }}
           .antenna {{
             position:absolute; top:-29px; left:calc(50% - 6px);
             font-size:34px;

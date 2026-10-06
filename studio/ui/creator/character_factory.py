@@ -12,19 +12,14 @@ from studio.ui.creator.avatar_editor import (
     render_avatar_appearance_editor,
     reset_avatar_editor_state,
 )
+from studio.ui.creator.avatar_legacy_bridge import legacy_visual_updates
 from studio.ui.creator.character_presets import (
     CUSTOM,
     AGE_OPTIONS,
-    CHARACTER_TYPE_OPTIONS,
-    COLOR_PRESETS,
     DISTINCTIVE_OPTIONS,
-    EYE_SHAPE_OPTIONS,
     FACE_STYLE_OPTIONS,
     FAVORITE_COLOR_HEX,
     FAVORITE_COLOR_OPTIONS,
-    HAIR_FUR_KIND_OPTIONS,
-    HAIR_FUR_TEXTURE_OPTIONS,
-    HAIRSTYLE_OPTIONS,
     HEIGHT_OPTIONS,
     LANGUAGE_OPTIONS,
     PERSONALITY_OPTIONS,
@@ -147,15 +142,6 @@ def _choice(selected: str, previous: str, options: list[str]) -> str:
         return selected
     if previous and previous not in options:
         return previous
-    return CUSTOM
-
-
-def _color_name(hex_value: str, text_value: str) -> str:
-    for name, value in COLOR_PRESETS.items():
-        if value and value.lower() == (hex_value or "").lower():
-            return name
-    if text_value in COLOR_PRESETS:
-        return text_value
     return CUSTOM
 
 
@@ -367,11 +353,6 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
                 placeholder="给 TA 取一个名字",
                 key="character_name_input",
             )
-            ctype = st.selectbox(
-                "Character Type / 角色类型",
-                CHARACTER_TYPE_OPTIONS,
-                index=_preset_index(CHARACTER_TYPE_OPTIONS, draft.character_type),
-            )
             age = st.selectbox(
                 "Age / 年龄",
                 AGE_OPTIONS,
@@ -396,7 +377,6 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
             st.session_state.char_name = name
             st.session_state.char_draft = draft.model_copy(
                 update={
-                    "character_type": _choice(ctype, draft.character_type, CHARACTER_TYPE_OPTIONS),
                     "age": _choice(age, draft.age, AGE_OPTIONS),
                     "story_role": _choice(role, draft.story_role, STORY_ROLE_OPTIONS),
                     "face": _choice(face, draft.face, FACE_STYLE_OPTIONS),
@@ -409,44 +389,13 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
         st.markdown("### 🎨 Look / TA 长什么样？")
         avatar = render_avatar_appearance_editor(draft.avatar)
         st.divider()
-        st.markdown("#### ✨ Story / Master Image Details")
+        st.markdown("#### ✨ Story Visual Details / 故事视觉细节")
+        st.caption(
+            "角色外观只在上方 Playable Avatar 选择一次；"
+            "Master Image 和 Story 会自动沿用同一套外观。"
+        )
         a, b = st.columns(2)
         with a:
-            hair_kind = st.selectbox(
-                "Hair or Fur / 头发或毛发",
-                HAIR_FUR_KIND_OPTIONS,
-                index=_preset_index(HAIR_FUR_KIND_OPTIONS, draft.hair_or_fur),
-            )
-            texture = st.selectbox(
-                "Texture / 质感",
-                HAIR_FUR_TEXTURE_OPTIONS,
-                index=_preset_index(HAIR_FUR_TEXTURE_OPTIONS, draft.skin_fur_material),
-            )
-            hairstyle = st.selectbox(
-                "Hairstyle / 发型",
-                HAIRSTYLE_OPTIONS,
-                index=_preset_index(HAIRSTYLE_OPTIONS, draft.hair_style),
-            )
-            hair_color = st.selectbox(
-                "Hair / Fur Color / 头发毛发颜色",
-                list(COLOR_PRESETS),
-                index=list(COLOR_PRESETS).index(
-                    _color_name(draft.hair_or_fur_color_hex, draft.hair_or_fur_color)
-                ),
-            )
-        with b:
-            eye_shape = st.selectbox(
-                "Eye Shape / 眼睛形状",
-                EYE_SHAPE_OPTIONS,
-                index=_preset_index(EYE_SHAPE_OPTIONS, draft.eyes.shape),
-            )
-            eye_color = st.selectbox(
-                "Eye Color / 眼睛颜色",
-                list(COLOR_PRESETS),
-                index=list(COLOR_PRESETS).index(
-                    _color_name(draft.eyes.color_hex, draft.eyes.color)
-                ),
-            )
             favorite_colors = st.multiselect(
                 "Favorite Colors / 最喜欢的颜色（最多 3 个）",
                 FAVORITE_COLOR_OPTIONS,
@@ -456,6 +405,7 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
                 ][:3],
                 max_selections=3,
             )
+        with b:
             distinctive = st.selectbox(
                 "Distinctive Feature / 特别特征",
                 DISTINCTIVE_OPTIONS,
@@ -472,53 +422,21 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
                 go(0)
         with nxt:
             if st.button("Next → Personality", type="primary", use_container_width=True):
-                hair_hex = COLOR_PRESETS.get(hair_color) or draft.hair_or_fur_color_hex
-                eye_hex = COLOR_PRESETS.get(eye_color) or draft.eyes.color_hex
                 fav_hexes = [
                     FAVORITE_COLOR_HEX[value]
                     for value in favorite_colors
                     if value in FAVORITE_COLOR_HEX
                 ]
+                visual_updates = legacy_visual_updates(draft, avatar)
                 st.session_state.char_draft = draft.model_copy(
                     update={
-                        "avatar": avatar,
-                        "body_build": {
-                            "slim": "偏瘦 / Slim",
-                            "standard": "普通 / Standard",
-                            "chubby": "圆润 / Chubby",
-                        }[avatar.body_type.value],
-                        "hair_or_fur": _choice(
-                            hair_kind, draft.hair_or_fur, HAIR_FUR_KIND_OPTIONS
-                        ),
-                        "skin_fur_material": _choice(
-                            texture,
-                            draft.skin_fur_material,
-                            HAIR_FUR_TEXTURE_OPTIONS,
-                        ),
-                        "hair_style": _choice(
-                            hairstyle, draft.hair_style, HAIRSTYLE_OPTIONS
-                        ),
-                        "hair_or_fur_color": hair_color,
-                        "hair_or_fur_color_hex": hair_hex,
-                        "eyes": draft.eyes.model_copy(
-                            update={
-                                "shape": _choice(
-                                    eye_shape, draft.eyes.shape, EYE_SHAPE_OPTIONS
-                                ),
-                                "color": eye_color,
-                                "color_hex": eye_hex,
-                            }
-                        ),
+                        **visual_updates,
                         "favorite_colors": favorite_colors,
                         "favorite_color_hexes": (
                             fav_hexes or DEFAULT_FAVORITE_COLOR_HEXES
                         ),
                         "distinctive_features": (
                             [] if not distinctive else [distinctive]
-                        ),
-                        "appearance": (
-                            draft.appearance
-                            or "cute Mini Utopia playable avatar with clean block-built toy forms"
                         ),
                     }
                 )

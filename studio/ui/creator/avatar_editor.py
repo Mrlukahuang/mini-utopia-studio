@@ -67,7 +67,7 @@ def render_avatar_appearance_editor(
         "身体和骨骼保持统一。你主要在换种族头、材质、眼睛、头发和颜色。"
     )
 
-    left, preview_col = st.columns([1.2, 1], gap="large")
+    left, preview_col = st.columns([1, 1.35], gap="large")
 
     with left:
         body_values = [item.value for item, _label in BODY_TYPE_OPTIONS]
