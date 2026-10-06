@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from studio.models.avatar import AvatarAppearance, BodyType
+from studio.runtime.avatar_preview_3d import BODY_WIDTH_SCALE, HEAD_WIDTH_SCALE
 from studio.ui.creator.avatar_catalog import (
     EYE_STYLE_OPTIONS,
     HAIR_STYLE_OPTIONS,
@@ -114,3 +115,49 @@ def test_webgl_avatar_preview_mirrors_godot_contract():
     assert '"chubby": 1.16' in runtime
     assert "return 0.84" in contract
     assert "return 1.16" in contract
+
+
+def test_body_type_changes_body_but_not_q_head_shape():
+    assert BODY_WIDTH_SCALE == {
+        "slim": 0.84,
+        "standard": 1.0,
+        "chubby": 1.16,
+    }
+    assert HEAD_WIDTH_SCALE == {
+        "slim": 1.0,
+        "standard": 1.0,
+        "chubby": 1.0,
+    }
+
+    runtime = (
+        ROOT / "studio" / "runtime" / "avatar_preview_3d.py"
+    ).read_text(encoding="utf-8")
+    godot_contract = (
+        ROOT / "godot" / "scripts" / "avatar_contract.gd"
+    ).read_text(encoding="utf-8")
+    godot_preview = (
+        ROOT / "godot" / "scripts" / "avatar_contract_preview.gd"
+    ).read_text(encoding="utf-8")
+
+    assert "const headWidth = DATA.headWidthScale[A.body_type] || 1;" in runtime
+    assert "sphereGeo(.70*headWidth,.69,.67)" in runtime
+    assert "head_width_scale" in godot_contract
+    assert "return 1.0" in godot_contract
+    assert "0.70 * head_scale" in godot_preview
+    assert "0.15 * head_scale" in godot_preview
+
+
+def test_each_non_none_hair_style_has_visible_3d_geometry():
+    runtime = (
+        ROOT / "studio" / "runtime" / "avatar_preview_3d.py"
+    ).read_text(encoding="utf-8")
+
+    assert "HairFringe" in runtime
+    assert "ShortSweep" in runtime
+    assert "BobSideL" in runtime
+    assert "BobSideR" in runtime
+    assert "LongSideL" in runtime
+    assert "LongSideR" in runtime
+    assert "Ponytail" in runtime
+    assert "Fluff" in runtime
+    assert "[0,2.05,.61]" in runtime
