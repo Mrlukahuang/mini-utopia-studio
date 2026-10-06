@@ -39,7 +39,12 @@ func apply_to_player(player: CharacterBody3D) -> Dictionary:
         String(payload.get("character_asset_id", ""))
     )
 
-    var baby: Dictionary = payload.get("baby", {})
+    var raw_baby = payload.get("baby", {})
+    var baby: Dictionary = (
+        raw_baby
+        if typeof(raw_baby) == TYPE_DICTIONARY
+        else {}
+    )
     if not baby.is_empty() and bool(baby.get("active", false)):
         _spawn_baby(baby)
 
