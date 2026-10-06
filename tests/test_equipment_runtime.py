@@ -80,6 +80,8 @@ def test_runtime_spec_json_round_trip(tmp_path):
 
     assert restored.character_asset_id == character.asset_id
     assert "Socket_Weapon_R" in restored.socket_names
+    assert "Socket_Weapon_L" in restored.socket_names
+    assert "Socket_Headwear" in restored.socket_names
     assert restored.final_stats.hp >= 100
 
 
@@ -127,6 +129,8 @@ def test_godot_equipment_runtime_uses_locked_avatar_sockets():
     assert "SOCKET_BACKPACK" in runtime
     assert "SOCKET_WINGS" in runtime
     assert "SOCKET_ACCESSORY" in runtime
+    assert "SOCKET_WEAPON_L" in runtime
+    assert "SOCKET_HEADWEAR" in runtime
     assert "apply_default_socket_positions" in contract
     assert "MiniUtopiaEquipmentRuntime.attach_loadout" in smoke
     assert "Slim / Standard / Chubby" in smoke
