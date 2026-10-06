@@ -551,7 +551,7 @@ func _small_rock(
     pos: Vector3,
     radius: float,
     color: Color,
-    parent: Node3D = self
+    parent: Node3D = null
 ) -> void:
     var rock := MeshInstance3D.new()
     rock.name = "SmallRock"
@@ -569,7 +569,8 @@ func _small_rock(
     )
     rock.rotation_degrees.y = rng.randf_range(0.0, 180.0)
     rock.material_override = _material(color, 0.96)
-    parent.add_child(rock)
+    var target_parent: Node3D = parent if parent != null else self
+    target_parent.add_child(rock)
 
 func _paver(
     pos: Vector3,
@@ -600,7 +601,7 @@ func _flat_patch(
     scale_value: Vector3,
     segments: int,
     yaw: float = 0.0,
-    parent: Node3D = self
+    parent: Node3D = null
 ) -> MeshInstance3D:
     var node := MeshInstance3D.new()
     node.name = name_value
@@ -614,7 +615,8 @@ func _flat_patch(
     node.scale = scale_value
     node.rotation_degrees.y = yaw
     node.material_override = _material(color, 0.96)
-    parent.add_child(node)
+    var target_parent: Node3D = parent if parent != null else self
+    target_parent.add_child(node)
     return node
 
 func _random_point_in_zone(zone: Dictionary) -> Vector2:
