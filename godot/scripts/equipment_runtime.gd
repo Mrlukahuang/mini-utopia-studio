@@ -27,10 +27,6 @@ static func attach_loadout(
     payload: Dictionary
 ) -> Dictionary:
     var result := {}
-    var sockets := avatar_root.get_node_or_null("Sockets") as Node3D
-    if sockets == null:
-        push_warning("EQ-02: Avatar has no Sockets node.")
-        return result
 
     var equipped: Dictionary = payload.get("equipped", {})
     for raw_slot in equipped.keys():
@@ -44,7 +40,13 @@ static func attach_loadout(
         var socket_name := String(SOCKET_BY_SLOT.get(slot, ""))
         if socket_name.is_empty():
             continue
-        var socket := sockets.get_node_or_null(NodePath(socket_name)) as Node3D
+        # Hand sockets may live under animated arm/bone nodes while body
+        # sockets may remain under the root Sockets container.
+        var socket := avatar_root.find_child(
+            socket_name,
+            true,
+            false
+        ) as Node3D
         if socket == null:
             push_warning("EQ-02: Missing socket " + socket_name)
             continue
