@@ -42,6 +42,11 @@ static func body_width_scale(body_type: String) -> float:
             return 1.0
 
 
+static func head_width_scale(_body_type: String) -> float:
+    # Q-style head silhouette stays stable across body types.
+    return 1.0
+
+
 static func body_label(body_type: String) -> String:
     match body_type:
         BODY_SLIM:
