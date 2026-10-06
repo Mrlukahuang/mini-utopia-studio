@@ -8,6 +8,7 @@ from studio.core.enums import AssetType
 from studio.models.asset import Asset
 from studio.models.job import Job
 from studio.models.equipment import CreatorCollection
+from studio.models.baby import BabyRoster
 from studio.models.story import Story
 from studio.models.universe import Universe
 from studio.repositories.base import StudioRepository
@@ -178,6 +179,19 @@ class SupabaseStudioRepository(StudioRepository):
     def get_collection(self, collection_id: str) -> CreatorCollection | None:
         data = self._get_one(kind="collection", record_id=collection_id)
         return CreatorCollection.model_validate(data) if data else None
+
+    def save_baby_roster(self, roster: BabyRoster) -> None:
+        self._upsert(
+            record_id=roster.roster_id,
+            kind="baby_roster",
+            name=roster.owner_key,
+            data=roster.model_dump(mode="json"),
+            updated_at=roster.updated_at.isoformat(),
+        )
+
+    def get_baby_roster(self, roster_id: str) -> BabyRoster | None:
+        data = self._get_one(kind="baby_roster", record_id=roster_id)
+        return BabyRoster.model_validate(data) if data else None
 
     def save_job(self, job: Job) -> None:
         self._upsert(
