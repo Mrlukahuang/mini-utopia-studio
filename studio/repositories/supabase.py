@@ -7,6 +7,7 @@ import requests
 from studio.core.enums import AssetType
 from studio.models.asset import Asset
 from studio.models.job import Job
+from studio.models.equipment import CreatorCollection
 from studio.models.story import Story
 from studio.models.universe import Universe
 from studio.repositories.base import StudioRepository
@@ -164,6 +165,19 @@ class SupabaseStudioRepository(StudioRepository):
 
     def list_stories(self) -> list[Story]:
         return [Story.model_validate(data) for data in self._list(kind="story")]
+
+    def save_collection(self, collection: CreatorCollection) -> None:
+        self._upsert(
+            record_id=collection.collection_id,
+            kind="collection",
+            name=collection.owner_key,
+            data=collection.model_dump(mode="json"),
+            updated_at=collection.updated_at.isoformat(),
+        )
+
+    def get_collection(self, collection_id: str) -> CreatorCollection | None:
+        data = self._get_one(kind="collection", record_id=collection_id)
+        return CreatorCollection.model_validate(data) if data else None
 
     def save_job(self, job: Job) -> None:
         self._upsert(

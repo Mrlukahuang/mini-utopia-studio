@@ -5,6 +5,7 @@ from studio.models.asset import Asset
 from studio.models.universe import Universe
 from studio.models.story import Story
 from studio.models.job import Job
+from studio.models.equipment import CreatorCollection
 
 
 class StudioRepository(ABC):
@@ -26,6 +27,10 @@ class StudioRepository(ABC):
     def get_story(self, story_id: str) -> Story | None: ...
     @abstractmethod
     def list_stories(self) -> list[Story]: ...
+    @abstractmethod
+    def save_collection(self, collection: CreatorCollection) -> None: ...
+    @abstractmethod
+    def get_collection(self, collection_id: str) -> CreatorCollection | None: ...
     @abstractmethod
     def save_job(self, job: Job) -> None: ...
     @abstractmethod

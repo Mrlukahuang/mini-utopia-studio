@@ -25,6 +25,7 @@ from studio.ui.creator.avatar_editor import reset_avatar_editor_state
 from studio.ui.creator.world_factory import render_world_factory
 from studio.ui.creator.concept_match_review import render_concept_match_review
 from studio.ui.creator.story_builder import render_story_builder
+from studio.ui.creator.my_stuff import render_my_stuff
 from studio.ui.theme import apply_mini_utopia_theme, render_brandbar, render_game_hero, render_quest
 
 
@@ -177,7 +178,7 @@ render_brandbar(studio=(mode == "🛠 Studio"))
 NAV_GROUPS = [
     (
         "🎭 Characters / 角色",
-        ["🎭 My Characters", "✨ Character Factory"],
+        ["🎭 My Characters", "✨ Character Factory", "🎒 My Stuff"],
     ),
     (
         "🗺️ Worlds / 世界",
@@ -232,6 +233,7 @@ page = st.session_state.app_page
 creator_protected_pages = {
     "🎭 My Characters",
     "✨ Character Factory",
+    "🎒 My Stuff",
     "🗺️ My Worlds",
     "🌍 World Factory",
     "🎮 Explore World",
@@ -598,6 +600,10 @@ elif page == "✨ Character Factory":
         studio_mode=(mode == "🛠 Studio" and studio_unlocked),
     )
 
+
+
+elif page == "🎒 My Stuff":
+    render_my_stuff(ctx)
 
 
 elif page == "🗺️ My Worlds":
