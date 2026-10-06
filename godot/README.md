@@ -122,3 +122,18 @@ Then open:
 and run the current scene (F6 / fn+F6 on macOS).
 
 The scene contains a real hex-terrain village with roads, river crossing, bridge, raised hill terrace, mountain ring and exactly 30 buildings.
+
+
+## Green Terraced Mountain Town 50×50 v0.4
+
+After pulling this milestone, rebuild the local world kit once:
+
+```bash
+python3 tools/prepare_mountain_town_assets.py --clean
+```
+
+Then run:
+
+`res://scenes/green_terraced_mountain_town_50x50_v0_4.tscn`
+
+This version fixes the yellow terrain with a dedicated green-terrain palette profile, uses one main street plus four winding side roads, removes the floating bridge object in favor of the integrated river crossing tile, builds layered terraces, places 30 street-facing buildings, and surrounds the valley with high/low hills and mountains.
