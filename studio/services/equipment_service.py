@@ -13,6 +13,10 @@ from studio.models.equipment import (
     StatBlock,
     create_equipment_instance,
 )
+from studio.models.equipment_runtime import (
+    EquipmentRuntimeItemSpec,
+    EquipmentRuntimeSpec,
+)
 from studio.repositories.base import StudioRepository
 
 
@@ -250,6 +254,56 @@ class EquipmentService:
         collection.updated_at = now_utc()
         self.repository.save_collection(collection)
         return collection
+
+
+    def runtime_spec(self, character_asset_id: str) -> EquipmentRuntimeSpec:
+        asset = self.repository.get_asset(character_asset_id)
+        if asset is None or asset.asset_type != AssetType.CHARACTER:
+            raise ValueError(f"Character not found: {character_asset_id}")
+
+        profile = CharacterProfile.model_validate(
+            asset.metadata.get("character_profile", {})
+        )
+        collection = self.ensure_starter_collection()
+        definitions = self.list_definitions()
+        loadout = collection.loadout_for(character_asset_id)
+
+        equipped: dict[str, EquipmentRuntimeItemSpec] = {}
+        for slot in EquipmentSlot:
+            item_id = loadout.item_id_for_slot(slot)
+            if not item_id:
+                continue
+            item = collection.item_by_id(item_id)
+            if item is None:
+                continue
+            definition = definitions.get(item.definition_id)
+            if definition is None:
+                continue
+            equipped[slot.value] = EquipmentRuntimeItemSpec(
+                item_instance_id=item.item_instance_id,
+                definition_id=definition.definition_id,
+                display_name=definition.display_name,
+                slot=definition.slot,
+                rarity=item.rarity,
+                mesh_asset_id=definition.mesh_asset_id,
+                animation_class=definition.animation_class,
+                rolled_stats=item.rolled_stats,
+            )
+
+        return EquipmentRuntimeSpec(
+            character_asset_id=character_asset_id,
+            body_type=profile.avatar.body_type,
+            final_stats=self.final_stats(character_asset_id),
+            equipped=equipped,
+        )
+
+    def export_runtime_spec(
+        self,
+        *,
+        character_asset_id: str,
+        target_path,
+    ):
+        return self.runtime_spec(character_asset_id).save_json(target_path)
 
     def add_instance(self, item: EquipmentInstance) -> CreatorCollection:
         collection = self.get_collection()

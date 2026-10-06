@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0",
+  "character_asset_id": "CHAR_EQ02_SMOKE",
+  "rig_family": "humanoid_kaykit_v1",
+  "body_type": "standard",
+  "socket_names": [
+    "Socket_Weapon_R",
+    "Socket_Weapon_L",
+    "Socket_Backpack",
+    "Socket_Wings",
+    "Socket_Accessory"
+  ],
+  "final_stats": {
+    "hp": 129,
+    "atk": 26,
+    "defense": 19
+  },
+  "equipped": {
+    "outfit": {
+      "item_instance_id": "ITEM_SMOKE_OUTFIT",
+      "definition_id": "EQ_SMOKE_OUTFIT",
+      "display_name": "Explorer Outfit / 探险服",
+      "slot": "outfit",
+      "rarity": "green",
+      "mesh_asset_id": null,
+      "animation_class": null,
+      "rolled_stats": {"hp": 8, "atk": 0, "defense": 5}
+    },
+    "weapon_main": {
+      "item_instance_id": "ITEM_SMOKE_SWORD",
+      "definition_id": "EQ_SMOKE_SWORD",
+      "display_name": "Starwood Sword / 星木剑",
+      "slot": "weapon_main",
+      "rarity": "purple",
+      "mesh_asset_id": null,
+      "animation_class": "one_handed",
+      "rolled_stats": {"hp": 0, "atk": 12, "defense": 0}
+    },
+    "backpack": {
+      "item_instance_id": "ITEM_SMOKE_BACKPACK",
+      "definition_id": "EQ_SMOKE_BACKPACK",
+      "display_name": "Cloud Backpack / 云朵背包",
+      "slot": "backpack",
+      "rarity": "blue",
+      "mesh_asset_id": null,
+      "animation_class": null,
+      "rolled_stats": {"hp": 15, "atk": 0, "defense": 1}
+    },
+    "wings": {
+      "item_instance_id": "ITEM_SMOKE_WINGS",
+      "definition_id": "EQ_SMOKE_WINGS",
+      "display_name": "Tiny Star Wings / 小星星翅膀",
+      "slot": "wings",
+      "rarity": "green",
+      "mesh_asset_id": null,
+      "animation_class": null,
+      "rolled_stats": {"hp": 3, "atk": 2, "defense": 2}
+    },
+    "accessory": {
+      "item_instance_id": "ITEM_SMOKE_CHARM",
+      "definition_id": "EQ_SMOKE_CHARM",
+      "display_name": "Portal Charm / 传送门挂件",
+      "slot": "accessory",
+      "rarity": "blue",
+      "mesh_asset_id": null,
+      "animation_class": null,
+      "rolled_stats": {"hp": 3, "atk": 2, "defense": 3}
+    }
+  }
+}
