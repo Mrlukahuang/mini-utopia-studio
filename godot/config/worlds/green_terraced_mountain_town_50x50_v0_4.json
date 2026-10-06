@@ -59,11 +59,11 @@
       8
     ],
     [
-      5,
+      4,
       7
     ],
     [
-      5,
+      4,
       6
     ],
     [
@@ -75,15 +75,15 @@
       4
     ],
     [
-      5,
+      4,
       3
     ],
     [
-      5,
+      4,
       2
     ],
     [
-      5,
+      4,
       1
     ]
   ],
@@ -112,6 +112,10 @@
     ],
     [
       [
+        4,
+        7
+      ],
+      [
         5,
         7
       ],
@@ -142,16 +146,20 @@
         5
       ],
       [
+        3,
+        4
+      ],
+      [
         2,
         4
       ],
       [
         1,
-        4
+        3
       ],
       [
         1,
-        3
+        2
       ]
     ],
     [
@@ -168,67 +176,71 @@
         4
       ],
       [
+        6,
+        3
+      ],
+      [
         7,
         3
       ],
       [
         8,
-        3
+        2
       ],
       [
         8,
-        2
+        1
       ]
     ]
   ],
   "slope_cells": [
     [
-      5,
+      4,
       2
     ],
     [
       1,
+      7
+    ],
+    [
+      8,
       6
     ],
     [
-      8,
-      5
-    ],
-    [
       1,
-      4
+      3
     ],
     [
       8,
-      3
+      2
     ]
   ],
   "building_front_offset_degrees": 180,
   "buildings": [
     {
       "id": "med_home_A_red",
-      "c": 4,
+      "c": 3,
       "r": 1,
       "height": 3.6,
       "face_road": true
     },
     {
       "id": "med_home_B_blue",
-      "c": 6,
+      "c": 5,
       "r": 1,
       "height": 3.8,
       "face_road": true
     },
     {
       "id": "med_church_red",
-      "c": 4,
+      "c": 3,
       "r": 2,
       "height": 4.7,
       "face_road": true
     },
     {
       "id": "med_tower_A_red",
-      "c": 6,
+      "c": 5,
       "r": 2,
       "height": 5.6,
       "face_road": true
@@ -237,7 +249,14 @@
       "id": "med_windmill_red",
       "c": 7,
       "r": 1,
-      "height": 5.2,
+      "height": 5,
+      "face_road": true
+    },
+    {
+      "id": "med_home_A_yellow",
+      "c": 6,
+      "r": 2,
+      "height": 3.6,
       "face_road": true
     },
     {
@@ -248,15 +267,8 @@
       "face_road": true
     },
     {
-      "id": "med_home_A_yellow",
-      "c": 2,
-      "r": 2,
-      "height": 3.6,
-      "face_road": true
-    },
-    {
       "id": "med_home_B_red",
-      "c": 1,
+      "c": 2,
       "r": 2,
       "height": 3.8,
       "face_road": true
@@ -265,7 +277,7 @@
       "id": "med_lumbermill_red",
       "c": 2,
       "r": 3,
-      "height": 4.4,
+      "height": 4.3,
       "face_road": true
     },
     {
@@ -277,79 +289,93 @@
     },
     {
       "id": "med_home_B_yellow",
-      "c": 6,
+      "c": 5,
       "r": 3,
       "height": 3.8,
       "face_road": true
     },
     {
       "id": "med_home_A_red",
+      "c": 8,
+      "r": 3,
+      "height": 3.5,
+      "face_road": true
+    },
+    {
+      "id": "med_home_B_blue",
+      "c": 1,
+      "r": 4,
+      "height": 3.8,
+      "face_road": true
+    },
+    {
+      "id": "med_home_A_yellow",
       "c": 7,
       "r": 4,
       "height": 3.5,
       "face_road": true
     },
     {
-      "id": "med_home_B_blue",
+      "id": "med_home_B_red",
       "c": 8,
       "r": 4,
       "height": 3.8,
       "face_road": true
     },
     {
-      "id": "med_home_A_yellow",
-      "c": 2,
-      "r": 5,
-      "height": 3.5,
-      "face_road": true
-    },
-    {
-      "id": "med_home_B_red",
-      "c": 6,
-      "r": 5,
-      "height": 3.8,
-      "face_road": true
-    },
-    {
       "id": "med_home_A_blue",
-      "c": 7,
+      "c": 1,
       "r": 5,
       "height": 3.5,
       "face_road": true
     },
     {
       "id": "med_home_B_yellow",
-      "c": 1,
+      "c": 2,
       "r": 5,
       "height": 3.8,
       "face_road": true
     },
     {
       "id": "med_home_A_red",
-      "c": 2,
-      "r": 6,
+      "c": 5,
+      "r": 5,
       "height": 3.5,
       "face_road": true
     },
     {
       "id": "med_home_B_blue",
-      "c": 3,
+      "c": 6,
+      "r": 5,
+      "height": 3.8,
+      "face_road": true
+    },
+    {
+      "id": "med_home_A_yellow",
+      "c": 7,
+      "r": 5,
+      "height": 3.5,
+      "face_road": true
+    },
+    {
+      "id": "med_home_B_red",
+      "c": 2,
       "r": 6,
       "height": 3.8,
       "face_road": true
     },
     {
-      "id": "med_market_red",
-      "c": 4,
+      "id": "med_tavern_red",
+      "c": 3,
       "r": 6,
-      "height": 4.2,
+      "height": 4.4,
       "face_road": true
     },
     {
-      "id": "med_home_A_yellow",
-      "c": 6,
+      "id": "med_market_red",
+      "c": 5,
       "r": 6,
-      "height": 3.5,
+      "height": 4.1,
       "face_road": true
     },
     {
@@ -360,28 +386,21 @@
       "face_road": true
     },
     {
-      "id": "med_home_B_red",
+      "id": "med_home_A_blue",
       "c": 2,
+      "r": 7,
+      "height": 3.5,
+      "face_road": true
+    },
+    {
+      "id": "med_home_B_yellow",
+      "c": 3,
       "r": 7,
       "height": 3.8,
       "face_road": true
     },
     {
-      "id": "med_tavern_red",
-      "c": 3,
-      "r": 7,
-      "height": 4.5,
-      "face_road": true
-    },
-    {
-      "id": "med_well_red",
-      "c": 4,
-      "r": 7,
-      "height": 2.6,
-      "face_road": true
-    },
-    {
-      "id": "med_home_A_blue",
+      "id": "med_home_A_red",
       "c": 8,
       "r": 7,
       "height": 3.5,
@@ -391,28 +410,21 @@
       "id": "med_watermill_red",
       "c": 1,
       "r": 8,
-      "height": 4.5,
+      "height": 4.4,
       "face_road": true
     },
     {
-      "id": "med_home_B_yellow",
+      "id": "med_home_B_blue",
       "c": 6,
       "r": 8,
       "height": 3.8,
       "face_road": true
     },
     {
-      "id": "med_home_A_red",
+      "id": "med_home_A_yellow",
       "c": 3,
       "r": 10,
       "height": 3.5,
-      "face_road": true
-    },
-    {
-      "id": "med_home_B_blue",
-      "c": 5,
-      "r": 10,
-      "height": 3.8,
       "face_road": true
     }
   ],
@@ -535,7 +547,7 @@
     },
     {
       "id": "resource_pallet_wood",
-      "c": 4,
+      "c": 5,
       "r": 6,
       "offset": [
         1,
@@ -546,7 +558,7 @@
     },
     {
       "id": "resource_textiles_stack_small",
-      "c": 4,
+      "c": 5,
       "r": 6,
       "offset": [
         -1,
