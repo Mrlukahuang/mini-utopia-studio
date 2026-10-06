@@ -19,7 +19,7 @@ from studio.storage.local import LocalObjectStorage
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_avatar_contract_locks_three_body_types_and_five_sockets():
+def test_avatar_contract_locks_three_body_types_and_six_sockets():
     assert [item.value for item in BodyType] == [
         "slim",
         "standard",
@@ -31,6 +31,7 @@ def test_avatar_contract_locks_three_body_types_and_five_sockets():
         "Socket_Backpack",
         "Socket_Wings",
         "Socket_Accessory",
+        "Socket_Headwear",
     )
     assert [item.value for item in AvatarSocket] == list(avatar_socket_names())
 
