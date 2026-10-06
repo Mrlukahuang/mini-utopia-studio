@@ -1,0 +1,519 @@
+{
+  "schema_version": "0.5",
+  "world_id": "storybook_terraced_town_50x50_v05",
+  "display_name": "Mini Utopia · Storybook Terraced Town",
+  "building_profile_id": "core_candidate_b",
+  "terrain_profile_id": "core_candidate_b_green_terrain",
+  "forest_profile_id": "",
+  "grid": {
+    "columns": 10,
+    "rows": 12,
+    "tile_scale": 2.05
+  },
+  "terrain": {
+    "terrace_step": 2.05
+  },
+  "spawn": {
+    "col": 5,
+    "row": 11,
+    "y": 0.9
+  },
+  "river": {
+    "row": 9,
+    "crossing_cols": [
+      3,
+      7
+    ]
+  },
+  "main_road": [
+    [
+      1,
+      6
+    ],
+    [
+      2,
+      6
+    ],
+    [
+      3,
+      6
+    ],
+    [
+      4,
+      6
+    ],
+    [
+      5,
+      6
+    ],
+    [
+      6,
+      6
+    ],
+    [
+      7,
+      6
+    ],
+    [
+      8,
+      6
+    ]
+  ],
+  "side_roads": [
+    [
+      [
+        3,
+        1
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        3,
+        10
+      ]
+    ],
+    [
+      [
+        7,
+        1
+      ],
+      [
+        7,
+        2
+      ],
+      [
+        7,
+        3
+      ],
+      [
+        7,
+        4
+      ],
+      [
+        7,
+        5
+      ],
+      [
+        7,
+        6
+      ],
+      [
+        7,
+        7
+      ],
+      [
+        7,
+        8
+      ],
+      [
+        7,
+        9
+      ],
+      [
+        7,
+        10
+      ]
+    ]
+  ],
+  "slope_cells": [
+    [
+      3,
+      1
+    ],
+    [
+      7,
+      1
+    ],
+    [
+      3,
+      10
+    ],
+    [
+      7,
+      10
+    ]
+  ],
+  "building_front_offset_degrees": 180,
+  "buildings": [
+    {
+      "id": "med_home_A_red",
+      "c": 1,
+      "r": 5,
+      "height": 3.2,
+      "face_road": true
+    },
+    {
+      "id": "med_home_B_blue",
+      "c": 2,
+      "r": 5,
+      "height": 3.5,
+      "face_road": true
+    },
+    {
+      "id": "med_tavern_red",
+      "c": 4,
+      "r": 5,
+      "height": 4,
+      "face_road": true
+    },
+    {
+      "id": "med_market_red",
+      "c": 5,
+      "r": 5,
+      "height": 3.8,
+      "face_road": true
+    },
+    {
+      "id": "med_church_red",
+      "c": 6,
+      "r": 5,
+      "height": 4.5,
+      "face_road": true
+    },
+    {
+      "id": "med_home_A_yellow",
+      "c": 8,
+      "r": 5,
+      "height": 3.2,
+      "face_road": true
+    },
+    {
+      "id": "med_home_B_red",
+      "c": 1,
+      "r": 7,
+      "height": 3.5,
+      "face_road": true
+    },
+    {
+      "id": "med_home_A_blue",
+      "c": 2,
+      "r": 7,
+      "height": 3.2,
+      "face_road": true
+    },
+    {
+      "id": "med_well_red",
+      "c": 4,
+      "r": 7,
+      "height": 2.4,
+      "face_road": true
+    },
+    {
+      "id": "med_blacksmith_red",
+      "c": 5,
+      "r": 7,
+      "height": 4,
+      "face_road": true
+    },
+    {
+      "id": "med_home_B_yellow",
+      "c": 6,
+      "r": 7,
+      "height": 3.5,
+      "face_road": true
+    },
+    {
+      "id": "med_home_A_red",
+      "c": 8,
+      "r": 7,
+      "height": 3.2,
+      "face_road": true
+    },
+    {
+      "id": "med_home_B_blue",
+      "c": 2,
+      "r": 2,
+      "height": 3.4,
+      "face_road": true
+    },
+    {
+      "id": "med_home_A_yellow",
+      "c": 4,
+      "r": 2,
+      "height": 3.2,
+      "face_road": true
+    },
+    {
+      "id": "med_home_B_red",
+      "c": 2,
+      "r": 3,
+      "height": 3.4,
+      "face_road": true
+    },
+    {
+      "id": "med_lumbermill_red",
+      "c": 4,
+      "r": 4,
+      "height": 4,
+      "face_road": true
+    },
+    {
+      "id": "med_home_A_blue",
+      "c": 2,
+      "r": 8,
+      "height": 3.2,
+      "face_road": true
+    },
+    {
+      "id": "med_watermill_red",
+      "c": 4,
+      "r": 8,
+      "height": 4.1,
+      "face_road": true
+    },
+    {
+      "id": "med_home_B_yellow",
+      "c": 2,
+      "r": 10,
+      "height": 3.4,
+      "face_road": true
+    },
+    {
+      "id": "med_home_A_red",
+      "c": 4,
+      "r": 10,
+      "height": 3.2,
+      "face_road": true
+    },
+    {
+      "id": "med_home_B_blue",
+      "c": 6,
+      "r": 2,
+      "height": 3.4,
+      "face_road": true
+    },
+    {
+      "id": "med_tower_A_red",
+      "c": 8,
+      "r": 2,
+      "height": 5,
+      "face_road": true
+    },
+    {
+      "id": "med_home_A_yellow",
+      "c": 6,
+      "r": 3,
+      "height": 3.2,
+      "face_road": true
+    },
+    {
+      "id": "med_home_B_red",
+      "c": 8,
+      "r": 4,
+      "height": 3.4,
+      "face_road": true
+    },
+    {
+      "id": "med_home_A_blue",
+      "c": 6,
+      "r": 8,
+      "height": 3.2,
+      "face_road": true
+    },
+    {
+      "id": "med_mine_red",
+      "c": 8,
+      "r": 8,
+      "height": 4.2,
+      "face_road": true
+    },
+    {
+      "id": "med_home_B_yellow",
+      "c": 6,
+      "r": 10,
+      "height": 3.4,
+      "face_road": true
+    },
+    {
+      "id": "med_home_A_red",
+      "c": 8,
+      "r": 10,
+      "height": 3.2,
+      "face_road": true
+    },
+    {
+      "id": "med_windmill_red",
+      "c": 2,
+      "r": 1,
+      "height": 4.8,
+      "face_road": true
+    },
+    {
+      "id": "med_home_B_blue",
+      "c": 8,
+      "r": 1,
+      "height": 3.5,
+      "face_road": true
+    }
+  ],
+  "mountains": [
+    {
+      "id": "med_mountain_A_grass_trees",
+      "c": 0,
+      "r": 0,
+      "height": 7,
+      "yaw": 18
+    },
+    {
+      "id": "med_mountain_B_grass_trees",
+      "c": 3,
+      "r": 0,
+      "height": 6.2,
+      "yaw": -12
+    },
+    {
+      "id": "med_mountain_C_grass_trees",
+      "c": 7,
+      "r": 0,
+      "height": 6.8,
+      "yaw": 15
+    },
+    {
+      "id": "med_mountain_A_grass_trees",
+      "c": 9,
+      "r": 0,
+      "height": 7.2,
+      "yaw": -20
+    },
+    {
+      "id": "med_hills_A_trees",
+      "c": 0,
+      "r": 3,
+      "height": 5.8,
+      "yaw": 10
+    },
+    {
+      "id": "med_hills_B_trees",
+      "c": 9,
+      "r": 3,
+      "height": 5.8,
+      "yaw": -12
+    },
+    {
+      "id": "med_hills_C_trees",
+      "c": 0,
+      "r": 7,
+      "height": 5.6,
+      "yaw": 28
+    },
+    {
+      "id": "med_hills_A_trees",
+      "c": 9,
+      "r": 7,
+      "height": 5.6,
+      "yaw": -25
+    },
+    {
+      "id": "med_mountain_B_grass_trees",
+      "c": 0,
+      "r": 11,
+      "height": 6.7,
+      "yaw": 20
+    },
+    {
+      "id": "med_mountain_C_grass_trees",
+      "c": 9,
+      "r": 11,
+      "height": 6.9,
+      "yaw": -18
+    }
+  ],
+  "resources": [
+    {
+      "id": "resource_wood_log_stack",
+      "c": 2,
+      "r": 4,
+      "offset": [
+        -0.9,
+        0,
+        0.7
+      ],
+      "scale": 0.8
+    },
+    {
+      "id": "resource_wood_planks_stack_medium",
+      "c": 2,
+      "r": 4,
+      "offset": [
+        0.8,
+        0,
+        0.9
+      ],
+      "scale": 0.75
+    },
+    {
+      "id": "resource_stone_bricks_stack_medium",
+      "c": 8,
+      "r": 4,
+      "offset": [
+        0.8,
+        0,
+        -0.8
+      ],
+      "scale": 0.75
+    },
+    {
+      "id": "resource_stone_chunks_large",
+      "c": 8,
+      "r": 8,
+      "offset": [
+        -0.8,
+        0,
+        0.7
+      ],
+      "scale": 0.7
+    },
+    {
+      "id": "resource_pallet_wood",
+      "c": 4,
+      "r": 5,
+      "offset": [
+        0.9,
+        0,
+        0.8
+      ],
+      "scale": 0.75
+    },
+    {
+      "id": "resource_textiles_stack_small",
+      "c": 6,
+      "r": 7,
+      "offset": [
+        -0.8,
+        0,
+        0.8
+      ],
+      "scale": 0.75
+    }
+  ]
+}
