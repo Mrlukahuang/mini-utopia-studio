@@ -96,6 +96,7 @@ func _build_avatar(body_type: String, world_position: Vector3) -> Node3D:
     root.add_child(visual)
 
     var width_scale := MiniUtopiaAvatarContract.body_width_scale(body_type)
+    var head_scale := MiniUtopiaAvatarContract.head_width_scale(body_type)
 
     _add_box(
         visual,
@@ -108,14 +109,14 @@ func _build_avatar(body_type: String, world_position: Vector3) -> Node3D:
         visual,
         "SpeciesHead",
         Vector3(0.0, 1.72, 0.0),
-        Vector3(0.72 * width_scale, 0.67, 0.66),
+        Vector3(0.70 * head_scale, 0.69, 0.67),
         Color("#F2C7A5")
     )
     _add_sphere(
         visual,
         "Hair",
         Vector3(0.0, 1.91, -0.02),
-        Vector3(0.76 * width_scale, 0.30, 0.68),
+        Vector3(0.74 * head_scale, 0.31, 0.69),
         Color("#5B4036")
     )
 
@@ -138,14 +139,14 @@ func _build_avatar(body_type: String, world_position: Vector3) -> Node3D:
     _add_sphere(
         visual,
         "EyeL",
-        Vector3(-0.15 * width_scale, 1.76, 0.31),
+        Vector3(-0.15 * head_scale, 1.76, 0.31),
         Vector3(0.10, 0.12, 0.08),
         Color("#7A5238")
     )
     _add_sphere(
         visual,
         "EyeR",
-        Vector3(0.15 * width_scale, 1.76, 0.31),
+        Vector3(0.15 * head_scale, 1.76, 0.31),
         Vector3(0.10, 0.12, 0.08),
         Color("#7A5238")
     )
