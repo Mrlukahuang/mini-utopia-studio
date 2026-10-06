@@ -81,7 +81,8 @@ def test_character_factory_contains_avatar_editor_and_live_preview():
     assert "render_avatar_preview(result)" in editor
     assert "Live 3D Avatar / 实时 3D 预览" in preview
     assert "components.html(" in preview
-    assert "height=620" in preview
+    assert "height: int = 620" in preview
+    assert "height=height" in preview
     assert "avatar-stage" not in preview
 
 
