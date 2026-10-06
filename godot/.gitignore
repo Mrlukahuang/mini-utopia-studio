@@ -10,3 +10,7 @@ assets/external/golden/*
 # Locally prepared Mountain Town runtime kit.
 assets/external/worldkit/*
 !assets/external/worldkit/README.md
+
+# One-time local 3D Asset Vault. Imported binaries stay local.
+assets/external/library/*
+!assets/external/library/README.md
