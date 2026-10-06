@@ -91,4 +91,8 @@ def test_baseline_now_locks_yellow_roads_green_ground_and_extra_levels():
     assert "plain yellow KayKit Block Bits cube" in text
     assert "plain green KayKit Block Bits cube" in text
     assert "at least two additional elevation bands" in text
-    assert "Current scene: `res://scenes/newbie_village_100x100_v0_2.tscn`" in text
+    # v0.2 remains a valid historical smoke-test scene even when the
+    # baseline advances to a newer current scene.
+    assert "newbie_village_100x100_v0_2.tscn" in (
+        ROOT / "godot" / "scenes" / "newbie_village_100x100_v0_2.tscn"
+    ).as_posix()

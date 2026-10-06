@@ -116,12 +116,129 @@ static func instantiate_first_matching(
     )
 
 
+static func instantiate_by_id_box_fit(
+    parent: Node3D,
+    asset_id: String,
+    world_bottom_position: Vector3,
+    target_size: Vector3,
+    yaw_degrees: float = 0.0
+) -> Node3D:
+    var entry := entry_by_id(asset_id)
+    if entry.is_empty():
+        return null
+    return _instantiate_entry_box_fit(
+        parent,
+        entry,
+        world_bottom_position,
+        target_size,
+        yaw_degrees
+    )
+
+
+static func best_entry_matching(
+    pack_terms: Array,
+    required_filename_terms: Array,
+    excluded_filename_terms: Array = []
+) -> Dictionary:
+    var candidates: Array = []
+
+    for raw_entry in _manifest().get("assets", []):
+        if typeof(raw_entry) != TYPE_DICTIONARY:
+            continue
+
+        var entry: Dictionary = raw_entry
+        var pack_text := String(entry.get("pack", "")).to_lower()
+        var source_member := String(entry.get("source_member", "")).to_lower()
+        var filename := source_member.get_file()
+
+        if not _contains_all(pack_text, pack_terms):
+            continue
+        if not _contains_all(filename, required_filename_terms):
+            continue
+        if _contains_any(filename, excluded_filename_terms):
+            continue
+        candidates.append(entry)
+
+    if candidates.is_empty():
+        return {}
+
+    candidates.sort_custom(
+        func(a: Dictionary, b: Dictionary) -> bool:
+            var a_name := String(a.get("source_member", "")).get_file()
+            var b_name := String(b.get("source_member", "")).get_file()
+            return a_name.length() < b_name.length()
+    )
+    return candidates[0]
+
+
+static func _contains_any(haystack: String, terms: Array) -> bool:
+    for raw_term in terms:
+        var term := String(raw_term).to_lower()
+        if not term.is_empty() and haystack.contains(term):
+            return true
+    return false
+
+
 static func _contains_all(haystack: String, terms: Array) -> bool:
     for raw_term in terms:
         var term := String(raw_term).to_lower()
         if not term.is_empty() and not haystack.contains(term):
             return false
     return true
+
+
+static func _instantiate_entry_box_fit(
+    parent: Node3D,
+    entry: Dictionary,
+    world_bottom_position: Vector3,
+    target_size: Vector3,
+    yaw_degrees: float
+) -> Node3D:
+    var res_path := String(entry.get("res_path", ""))
+    if res_path.is_empty() or not ResourceLoader.exists(res_path):
+        return null
+
+    var resource := ResourceLoader.load(res_path)
+    if not resource is PackedScene:
+        return null
+
+    var instance = (resource as PackedScene).instantiate()
+    if not instance is Node3D:
+        instance.queue_free()
+        return null
+
+    var wrapper := Node3D.new()
+    wrapper.name = "VaultBox_" + String(entry.get("id", "asset"))
+    wrapper.position = world_bottom_position
+    wrapper.rotation_degrees.y = yaw_degrees
+    parent.add_child(wrapper)
+    wrapper.add_child(instance)
+
+    var node := instance as Node3D
+    var bounds := _bounds_in_root(node)
+    if (
+        bounds.size.x <= 0.0001
+        or bounds.size.y <= 0.0001
+        or bounds.size.z <= 0.0001
+    ):
+        return wrapper
+
+    var scale_value := Vector3(
+        target_size.x / bounds.size.x,
+        target_size.y / bounds.size.y,
+        target_size.z / bounds.size.z
+    )
+    node.scale = scale_value
+
+    var center_x := bounds.position.x + bounds.size.x * 0.5
+    var center_z := bounds.position.z + bounds.size.z * 0.5
+    node.position = Vector3(
+        -center_x * scale_value.x,
+        -bounds.position.y * scale_value.y,
+        -center_z * scale_value.z
+    )
+
+    return wrapper
 
 
 static func _instantiate_entry(
