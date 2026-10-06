@@ -105,7 +105,11 @@ class CharacterRuntimeService:
         runtime_meta = asset.metadata.get("runtime_3d", {}) or {}
 
         favorite = list(profile.favorite_color_hexes)
-        has_avatar = isinstance(raw_profile, dict) and bool(raw_profile.get("avatar"))
+        has_avatar = (
+            isinstance(raw_profile, dict)
+            and bool(raw_profile.get("avatar"))
+            and profile.avatar.customized
+        )
         avatar = profile.avatar
 
         # Old Character records remain visually compatible until they are
