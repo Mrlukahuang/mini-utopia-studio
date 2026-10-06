@@ -4,7 +4,11 @@ import streamlit as st
 
 from studio.core.enums import AssetType, ReviewStatus
 from studio.models.character import CharacterProfile
-from studio.models.equipment import EquipmentRarity, EquipmentSlot
+from studio.models.equipment import (
+    EquipmentRarity,
+    EquipmentSlot,
+    PLAYABLE_EQUIPMENT_SLOTS,
+)
 from studio.services.baby_service import BabyService
 from studio.services.equipment_service import EquipmentService
 from studio.ui.creator.avatar_preview import render_avatar_preview
@@ -12,8 +16,12 @@ from studio.ui.theme import render_game_hero
 
 
 SLOT_LABELS = {
-    EquipmentSlot.OUTFIT: "👕 Outfit / 服装",
-    EquipmentSlot.WEAPON_MAIN: "⚔️ Weapon / 武器",
+    EquipmentSlot.TOP: "👕 Top / 上衣",
+    EquipmentSlot.BOTTOM: "👖 Bottom / 裤子",
+    EquipmentSlot.SHOES: "👟 Shoes / 鞋子",
+    EquipmentSlot.HEADWEAR: "👑 Headwear / 帽子·皇冠",
+    EquipmentSlot.WEAPON_MAIN: "⚔️ Main Hand / 主手",
+    EquipmentSlot.WEAPON_OFFHAND: "🛡️ Offhand / 副手·盾牌",
     EquipmentSlot.BACKPACK: "🎒 Backpack / 背包",
     EquipmentSlot.WINGS: "🪽 Wings / 翅膀",
     EquipmentSlot.ACCESSORY: "✨ Accessory / 饰品",
@@ -105,7 +113,7 @@ def render_dressing_room(ctx) -> None:
         st.markdown("#### Quick Equip / 快速换装")
         loadout = collection.loadout_for(selected_character.asset_id)
 
-        for slot in EquipmentSlot:
+        for slot in PLAYABLE_EQUIPMENT_SLOTS:
             current_id = loadout.item_id_for_slot(slot)
             slot_items = []
             for item in collection.items:
@@ -166,7 +174,7 @@ def render_dressing_room(ctx) -> None:
         )
 
         with st.expander("Current Runtime / 当前运行时", expanded=False):
-            for slot in EquipmentSlot:
+            for slot in PLAYABLE_EQUIPMENT_SLOTS:
                 item = equipment_spec.equipped.get(slot.value)
                 if item is None:
                     st.write(f"{SLOT_LABELS[slot]} · —")
