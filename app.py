@@ -30,6 +30,7 @@ from studio.ui.creator.story_builder import render_story_builder
 from studio.ui.creator.my_stuff import render_my_stuff
 from studio.ui.creator.my_baby import render_my_baby
 from studio.ui.creator.dressing_room import render_dressing_room
+from studio.ui.creator.first_adventure import render_first_adventure_progress
 from studio.ui.theme import apply_mini_utopia_theme, render_brandbar, render_game_hero, render_quest
 
 
@@ -250,6 +251,7 @@ page = st.session_state.app_page
 creator_protected_pages = {
     "🎭 My Characters",
     "✨ Character Factory",
+    "🪞 Dressing Room",
     "🎒 My Stuff",
     "🐣 My Baby",
     "🗺️ My Worlds",
@@ -279,6 +281,9 @@ if page == "🏠 Home":
         kicker="WELCOME BACK, CREATOR",
     )
     render_quest("今日任务 / Today’s Quest：创造一个让你一看到就想带去冒险的小伙伴。")
+
+    render_first_adventure_progress(ctx)
+    st.divider()
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric(
