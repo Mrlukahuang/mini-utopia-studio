@@ -71,3 +71,35 @@ This scene is generated from the versioned layout:
 It uses real Golden Forest + Medieval assets, prefers the Candidate-B derived profile, adds simple gameplay collision proxies, and keeps the footprint inside a 50×50 meter boundary.
 
 The layout is intentionally data-driven so density, placement and world composition can be iterated without hand-placing every object in the editor.
+
+
+## Forest Village 50×50 Rich v0.2
+
+To see the richer visual target without manually placing anything, open:
+
+`res://scenes/forest_village_50x50_rich_v0_2.tscn`
+
+and run the current scene (F6 / fn+F6 on macOS).
+
+This keeps the real Candidate-B Golden Forest + Medieval assets, then adds the first reusable Ground & Dressing Kit:
+
+- multi-tone meadow patches
+- warm dirt underlay
+- irregular low-poly stone road
+- curved creek + banks + edge stones
+- grass tufts
+- clustered flowers
+- pebbles
+- mushrooms
+- house-side flower gardens
+- denser forest edge
+
+The dressing is deterministic and driven by:
+
+`res://config/ground/storybook_meadow_v0_1.json`
+
+The richer world layout is:
+
+`res://config/worlds/forest_village_50x50_rich_v0_2.json`
+
+The earlier v0.1 scene remains available as a sparse baseline for comparison.
