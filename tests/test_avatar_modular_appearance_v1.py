@@ -71,7 +71,7 @@ def test_character_factory_contains_avatar_editor_and_live_preview():
     ).read_text(encoding="utf-8")
 
     assert "render_avatar_appearance_editor" in factory
-    assert '"avatar": avatar' in factory
+    assert "legacy_visual_updates(draft, avatar)" in factory
     assert "Species Head / 种族头型" in editor
     assert "Body Type / 体型" in editor
     assert "Surface / 皮肤 · 毛发 · 材质" in editor
