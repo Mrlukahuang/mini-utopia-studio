@@ -49,12 +49,9 @@ def test_mountain_town_layout_has_30_real_buildings_and_multi_level_world():
     assert any(entry.get("slope") is True for entry in data["road_cells"])
 
 
-def test_mountain_town_scene_uses_real_worldkit_runtime_not_procedural_roads():
+def test_mountain_town_historical_builder_uses_real_worldkit_runtime():
     script = (
         ROOT / "godot" / "scripts" / "mountain_town_50x50.gd"
-    ).read_text(encoding="utf-8")
-    scene = (
-        ROOT / "godot" / "scenes" / "mountain_town_50x50_v0_3.tscn"
     ).read_text(encoding="utf-8")
 
     assert "WorldKitRuntime.instantiate_asset" in script
@@ -65,8 +62,6 @@ def test_mountain_town_scene_uses_real_worldkit_runtime_not_procedural_roads():
     assert "_build_resource_yards()" in script
     assert "_build_forest_dressing()" in script
     assert "_add_hill_access_ramp" in script
-    assert "res://scenes/player.tscn" in scene
-    assert "res://scripts/camera_rig.gd" in scene
 
 
 def test_mountain_town_preparation_is_one_command_and_source_preserving():

@@ -281,6 +281,15 @@ func _probe_local_kaykit_animation_pack() -> void:
         )
         return
 
+    entries.sort_custom(
+        func(a: Dictionary, b: Dictionary) -> bool:
+            return _animation_source_priority(
+                String(a.get("source_member", ""))
+            ) < _animation_source_priority(
+                String(b.get("source_member", ""))
+            )
+    )
+
     print("AV-01 probe: primary rig = Rig_Medium")
     print("AV-01 probe: Rig_Medium animation sets found = ", entries.size())
 
@@ -385,14 +394,70 @@ func _collect_rig_details(
         _collect_rig_details(child, skeleton_names, clips)
 
 
+func _animation_source_priority(source_member: String) -> int:
+    var lowered := source_member.to_lower()
+    if lowered.contains("movementbasic"):
+        return 0
+    if lowered.contains("movement"):
+        return 10
+    if lowered.contains("general"):
+        return 20
+    if lowered.contains("combat"):
+        return 100
+    return 50
+
+
 func _best_semantic_clip(clips: Array[String], needle: String) -> String:
     var best := ""
+    var best_score := -100000
+
     for clip_name in clips:
         var lowered := clip_name.to_lower()
         if not lowered.contains(needle):
             continue
-        if best.is_empty() or clip_name.length() < best.length():
+
+        var score := 0
+
+        if lowered == needle:
+            score += 1000
+
+        if needle == "idle":
+            if lowered.begins_with("idle"):
+                score += 500
+        elif needle == "walk":
+            if lowered == "walking":
+                score += 1000
+            if lowered.begins_with("walking"):
+                score += 500
+        elif needle == "run":
+            if lowered == "running":
+                score += 1000
+            if lowered.begins_with("running"):
+                score += 500
+
+        for bad_term in [
+            "backward",
+            "holding",
+            "melee",
+            "combat",
+            "bow",
+            "block",
+            "crouch",
+            "strafe",
+            "kick",
+            "punch",
+            "attack",
+        ]:
+            if lowered.contains(bad_term):
+                score -= 700
+
+        # Prefer the simplest canonical variant when several forward clips exist.
+        score -= clip_name.length()
+
+        if score > best_score:
+            best_score = score
             best = clip_name
+
     return best
 
 

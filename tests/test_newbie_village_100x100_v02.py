@@ -3,13 +3,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "godot" / "scripts" / "newbie_village_100x100_v0_2.gd"
-SCENE = ROOT / "godot" / "scenes" / "newbie_village_100x100_v0_2.tscn"
 BASELINE = ROOT / "docs" / "WORLD_BASELINE_NEWBIE_VILLAGE_V1.md"
 
 
-def test_v02_scene_and_script_exist():
+def test_v02_historical_builder_is_preserved():
     assert SCRIPT.is_file()
-    assert SCENE.is_file()
 
 
 def test_v02_uses_plain_yellow_and_green_block_bits_searches():
@@ -77,22 +75,12 @@ def test_v02_keeps_larger_houses_and_two_scattered_skeletons():
     assert "_spawn_house_on_pad" in text
 
 
-def test_v02_scene_uses_new_builder_and_southern_spawn():
-    text = SCENE.read_text(encoding="utf-8")
-
-    assert 'name="NewbieVillage100x100V02"' in text
-    assert 'res://scripts/newbie_village_100x100_v0_2.gd' in text
-    assert 'position = Vector3(0, 0.9, 34)' in text
-
-
 def test_baseline_now_locks_yellow_roads_green_ground_and_extra_levels():
     text = BASELINE.read_text(encoding="utf-8")
 
     assert "plain yellow KayKit Block Bits cube" in text
     assert "plain green KayKit Block Bits cube" in text
     assert "at least two additional elevation bands" in text
-    # v0.2 remains a valid historical smoke-test scene even when the
-    # baseline advances to a newer current scene.
-    assert "newbie_village_100x100_v0_2.tscn" in (
-        ROOT / "godot" / "scenes" / "newbie_village_100x100_v0_2.tscn"
-    ).as_posix()
+    # v0.2 is preserved as historical builder/config regression coverage;
+    # only the obsolete runnable scene file is removed from the active folder.
+    assert SCRIPT.is_file()

@@ -15,7 +15,6 @@ from studio.ui.creator.avatar_editor import (
 from studio.ui.creator.character_presets import (
     CUSTOM,
     AGE_OPTIONS,
-    BODY_BUILD_OPTIONS,
     CHARACTER_TYPE_OPTIONS,
     COLOR_PRESETS,
     DISTINCTIVE_OPTIONS,
@@ -384,11 +383,6 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
                 STORY_ROLE_OPTIONS,
                 index=_preset_index(STORY_ROLE_OPTIONS, draft.story_role),
             )
-            build = st.selectbox(
-                "Body Build / 体型",
-                BODY_BUILD_OPTIONS,
-                index=_preset_index(BODY_BUILD_OPTIONS, draft.body_build, default=2),
-            )
             face = st.selectbox(
                 "Face Style / 脸部感觉",
                 FACE_STYLE_OPTIONS,
@@ -405,7 +399,6 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
                     "character_type": _choice(ctype, draft.character_type, CHARACTER_TYPE_OPTIONS),
                     "age": _choice(age, draft.age, AGE_OPTIONS),
                     "story_role": _choice(role, draft.story_role, STORY_ROLE_OPTIONS),
-                    "body_build": _choice(build, draft.body_build, BODY_BUILD_OPTIONS),
                     "face": _choice(face, draft.face, FACE_STYLE_OPTIONS),
                 }
             )
@@ -489,6 +482,11 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
                 st.session_state.char_draft = draft.model_copy(
                     update={
                         "avatar": avatar,
+                        "body_build": {
+                            "slim": "偏瘦 / Slim",
+                            "standard": "普通 / Standard",
+                            "chubby": "圆润 / Chubby",
+                        }[avatar.body_type.value],
                         "hair_or_fur": _choice(
                             hair_kind, draft.hair_or_fur, HAIR_FUR_KIND_OPTIONS
                         ),

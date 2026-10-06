@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from html import escape
+from textwrap import dedent
 
 import streamlit as st
 
@@ -52,7 +53,8 @@ def render_avatar_preview(
         )
 
     st.markdown(
-        f"""
+        dedent(
+            f"""
         <div class="mu-avatar-preview">
           <div class="mu-avatar-title">{escape(title)}</div>
           <div class="avatar-stage">
@@ -180,6 +182,7 @@ def render_avatar_preview(
             font-size:12px;
           }}
         </style>
-        """,
+            """
+        ),
         unsafe_allow_html=True,
     )

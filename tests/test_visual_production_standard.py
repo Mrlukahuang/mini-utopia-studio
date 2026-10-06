@@ -49,15 +49,11 @@ def test_static_slots_and_runtime_semantic_roles_stay_separate():
     assert roles["roles"]["danger"] == "strawberry"
 
 
-def test_style_calibration_lab_scene_contract():
-    scene = (ROOT / "godot" / "scenes" / "style_calibration_lab.tscn").read_text(
-        encoding="utf-8"
-    )
+def test_style_calibration_lab_historical_script_contract():
     script = (ROOT / "godot" / "scripts" / "style_calibration_lab.gd").read_text(
         encoding="utf-8"
     )
 
-    assert 'res://scripts/style_calibration_lab.gd' in scene
     assert 'res://config/style/core_palette_candidates_v0_9.json' in script
     assert '"COLOR"' in script
     assert '"GRAYSCALE"' in script

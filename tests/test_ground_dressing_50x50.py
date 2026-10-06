@@ -53,13 +53,7 @@ def test_rich_forest_village_is_true_50x50_and_uses_candidate_b():
     assert ids.count("forest_rock") >= 8
 
 
-def test_rich_scene_builds_ground_paths_creek_and_dressing():
-    scene = (
-        ROOT
-        / "godot"
-        / "scenes"
-        / "forest_village_50x50_rich_v0_2.tscn"
-    ).read_text(encoding="utf-8")
+def test_rich_historical_builder_builds_ground_paths_creek_and_dressing():
     script = (
         ROOT
         / "godot"
@@ -67,8 +61,6 @@ def test_rich_scene_builds_ground_paths_creek_and_dressing():
         / "forest_village_50x50_rich.gd"
     ).read_text(encoding="utf-8")
 
-    assert 'res://scenes/player.tscn' in scene
-    assert 'res://scripts/camera_rig.gd' in scene
     assert "_build_ground_layers()" in script
     assert "_build_creek()" in script
     assert "_build_paths()" in script
