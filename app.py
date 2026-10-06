@@ -13,6 +13,7 @@ from studio.recipes.character_factory import CharacterFactoryRecipe
 from studio.runtime.three_world import build_world_runtime_html, runtime_summary
 from studio.services.bootstrap import build_context
 from studio.services.style_service import StyleService
+from studio.services.baby_service import BabyService
 from studio.ui.auth import (
     lock_creator,
     lock_studio,
@@ -44,6 +45,7 @@ universe = ctx.universes.ensure_mini_utopia()
 # This stays safe during Streamlit hot-reload when an older StudioContext
 # object may briefly remain in memory while app.py has already refreshed.
 style_service = StyleService(ctx.repository)
+baby_service = BabyService(ctx.repository)
 universe = style_service.attach_base_style(universe)
 character_factory = CharacterFactoryRecipe(ctx.registry, ctx.assets)
 
@@ -327,7 +329,7 @@ elif page == "🎭 My Characters":
         kicker="CHARACTER LIBRARY",
     )
 
-    active_baby = ctx.babies.active_baby()
+    active_baby = baby_service.active_baby()
     if active_baby is not None:
         st.info(
             f"🐣 Active Baby · {active_baby.display_name} · "
