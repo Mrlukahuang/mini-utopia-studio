@@ -392,12 +392,12 @@ func _best_yaw_for_connections(connections: Array[int]) -> float:
     return 0.0
 
 
-func _rotation_for_shape(base: Array[int], target: Array[int]) -> int:
-    var target_sorted: Array[int] = target.duplicate()
+func _rotation_for_shape(base: Array, target: Array) -> int:
+    var target_sorted: Array = target.duplicate()
     target_sorted.sort()
 
     for rotation in range(6):
-        var rotated: Array[int] = []
+        var rotated: Array = []
         for direction in base:
             rotated.append((direction + rotation) % 6)
         rotated.sort()
@@ -629,7 +629,8 @@ func _build_forest_dressing() -> void:
         "forest_tree_4_c_color1",
     ]
 
-    var river_row := int(config.get("river", {}).get("row", 9))
+    var river_cfg: Dictionary = config.get("river", {})
+    var river_row := int(river_cfg.get("row", 9))
 
     for r in range(rows):
         for c in range(columns):
@@ -741,7 +742,8 @@ func _dress_river_edge(
 ) -> void:
     var center := _hex_position(c, r, 0.0)
 
-    if c == int(config.get("river", {}).get("crossing_col", 4)):
+    var river_cfg: Dictionary = config.get("river", {})
+    if c == int(river_cfg.get("crossing_col", 4)):
         return
 
     var grass_id: String = grass_ids[
