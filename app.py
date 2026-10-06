@@ -21,6 +21,7 @@ from studio.ui.auth import (
 )
 from studio.ui.brand import render_primary_brand, render_sidebar_brand
 from studio.ui.creator.character_factory import render_character_factory, reset_character_creation_state
+from studio.ui.creator.avatar_editor import reset_avatar_editor_state
 from studio.ui.creator.world_factory import render_world_factory
 from studio.ui.creator.concept_match_review import render_concept_match_review
 from studio.ui.creator.story_builder import render_story_builder
@@ -108,6 +109,7 @@ def edit_world(asset) -> None:
 
 def edit_character(asset) -> None:
     """Load an existing Character Asset back into the Creator flow."""
+    reset_avatar_editor_state()
     profile = CharacterProfile.model_validate(
         asset.metadata.get("character_profile", {})
     )
