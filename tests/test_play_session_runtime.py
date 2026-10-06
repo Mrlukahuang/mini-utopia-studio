@@ -140,3 +140,46 @@ def test_dressing_room_and_explore_world_export_same_play_session():
 def test_local_runtime_state_is_ignored():
     gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
     assert "godot/runtime_state/*.json" in gitignore
+
+
+def test_godot_player_loads_same_session_and_animates_hand_sockets():
+    player = (
+        ROOT / "godot" / "scripts" / "player.gd"
+    ).read_text(encoding="utf-8")
+    runtime = (
+        ROOT / "godot" / "scripts" / "creator_play_runtime.gd"
+    ).read_text(encoding="utf-8")
+    equipment = (
+        ROOT / "godot" / "scripts" / "equipment_runtime.gd"
+    ).read_text(encoding="utf-8")
+
+    assert "MiniUtopiaCreatorPlayRuntime.new()" in player
+    assert "apply_to_player(self)" in player
+    assert "update_motion(" in player
+
+    assert 'SESSION_PATH := "res://runtime_state/creator_play_session.json"' in runtime
+    assert "MiniUtopiaEquipmentRuntime.attach_loadout" in runtime
+    assert "SOCKET_WEAPON_R" in runtime
+    assert "SOCKET_WEAPON_L" in runtime
+    assert "_arm_r" in runtime
+    assert "_arm_l" in runtime
+    assert "MiniUtopiaBabyFollowRuntime.new()" in runtime
+
+    # Equipment runtime must resolve animated sockets recursively, not assume
+    # every socket lives under one static root container.
+    assert "avatar_root.find_child(" in equipment
+
+
+def test_baby_follow_runtime_has_follow_bob_and_recovery_contract():
+    baby = (
+        ROOT / "godot" / "scripts" / "baby_follow_runtime.gd"
+    ).read_text(encoding="utf-8")
+
+    assert "class_name MiniUtopiaBabyFollowRuntime" in baby
+    assert "follow_distance" in baby
+    assert "recovery_distance" in baby
+    assert "global_position.distance_to(desired)" in baby
+    assert "sin(_elapsed * 3.2)" in baby
+    assert "star_baby" in baby
+    assert "sheep_baby" in baby
+    assert "robot_baby" in baby
