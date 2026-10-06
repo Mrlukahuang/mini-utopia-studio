@@ -62,3 +62,30 @@ static func ensure_socket_nodes(parent: Node3D) -> Dictionary:
             parent.add_child(node)
         sockets[socket_name] = node
     return sockets
+
+
+static func apply_default_socket_positions(
+    sockets: Node3D,
+    body_type: String
+) -> void:
+    var width_scale := body_width_scale(body_type)
+
+    var weapon_r := sockets.get_node_or_null(SOCKET_WEAPON_R) as Node3D
+    if weapon_r != null:
+        weapon_r.position = Vector3(0.67 * width_scale, 0.90, 0.0)
+
+    var weapon_l := sockets.get_node_or_null(SOCKET_WEAPON_L) as Node3D
+    if weapon_l != null:
+        weapon_l.position = Vector3(-0.67 * width_scale, 0.90, 0.0)
+
+    var backpack := sockets.get_node_or_null(SOCKET_BACKPACK) as Node3D
+    if backpack != null:
+        backpack.position = Vector3(0.0, 1.12, -0.32)
+
+    var wings := sockets.get_node_or_null(SOCKET_WINGS) as Node3D
+    if wings != null:
+        wings.position = Vector3(0.0, 1.34, -0.33)
+
+    var accessory := sockets.get_node_or_null(SOCKET_ACCESSORY) as Node3D
+    if accessory != null:
+        accessory.position = Vector3(0.0, 1.75, 0.0)
