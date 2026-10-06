@@ -39,7 +39,15 @@ ATLAS_MAPS = {
     "kaykit_forest": REPO_ROOT / "assets" / "catalogs" / "atlas_maps" / "kaykit_forest_v0_1.json",
     "kaykit_medieval": REPO_ROOT / "assets" / "catalogs" / "atlas_maps" / "kaykit_medieval_v0_1.json",
 }
-PROFILE_ID = "core_candidate_b"
+GREEN_TERRAIN_MAP = (
+    REPO_ROOT
+    / "assets"
+    / "catalogs"
+    / "atlas_maps"
+    / "kaykit_medieval_green_terrain_v0_1.json"
+)
+CORE_PROFILE_ID = "core_candidate_b"
+GREEN_TERRAIN_PROFILE_ID = "core_candidate_b_green_terrain"
 
 
 def candidate_dirs(extra: list[Path]) -> list[Path]:
@@ -202,13 +210,18 @@ def recolor_region(image: Image.Image, bounds, target_hex: str) -> None:
             )
 
 
-def bake_profile(entry: dict, mapping: dict, colors: dict[str, str]) -> str:
+def bake_profile(
+    entry: dict,
+    mapping: dict,
+    colors: dict[str, str],
+    profile_id: str,
+) -> str:
     source = GODOT_ROOT / entry["res_path"].removeprefix("res://")
     if source.suffix.lower() != ".gltf":
         return entry["res_path"]
 
     data = json.loads(source.read_text(encoding="utf-8"))
-    derived = source.with_name(f"{source.stem}__{PROFILE_ID}{source.suffix}")
+    derived = source.with_name(f"{source.stem}__{profile_id}{source.suffix}")
     changed = False
 
     for image_entry in data.get("images", []):
@@ -220,7 +233,7 @@ def bake_profile(entry: dict, mapping: dict, colors: dict[str, str]) -> str:
             continue
 
         derived_texture = texture.with_name(
-            f"{texture.stem}__{PROFILE_ID}{texture.suffix}"
+            f"{texture.stem}__{profile_id}{texture.suffix}"
         )
         image = Image.open(texture).convert("RGBA")
         for bounds, slot in region_bounds(image.width, image.height, mapping):
@@ -291,22 +304,56 @@ def main() -> int:
         pack_id: json.loads(path.read_text(encoding="utf-8"))
         for pack_id, path in ATLAS_MAPS.items()
     }
+    green_terrain_mapping = json.loads(
+        GREEN_TERRAIN_MAP.read_text(encoding="utf-8")
+    )
 
-    baked = 0
+    core_baked = 0
+    green_terrain_baked = 0
+    green_categories = {"terrain", "road", "river", "nature"}
+
     for entry in installed:
-        if entry["pack"] not in mappings:
-            continue
-        derived = bake_profile(entry, mappings[entry["pack"]], colors)
-        entry.setdefault("profile_res_paths", {})[PROFILE_ID] = derived
-        baked += 1
-        print(f"Baked {entry['id']} -> {PROFILE_ID}")
+        pack_id = entry["pack"]
+        if pack_id in mappings:
+            derived = bake_profile(
+                entry,
+                mappings[pack_id],
+                colors,
+                CORE_PROFILE_ID,
+            )
+            entry.setdefault("profile_res_paths", {})[CORE_PROFILE_ID] = derived
+            core_baked += 1
+            print(f"Baked {entry['id']} -> {CORE_PROFILE_ID}")
+
+        if (
+            pack_id == "kaykit_medieval"
+            and entry.get("category") in green_categories
+        ):
+            terrain_derived = bake_profile(
+                entry,
+                green_terrain_mapping,
+                colors,
+                GREEN_TERRAIN_PROFILE_ID,
+            )
+            entry.setdefault("profile_res_paths", {})[
+                GREEN_TERRAIN_PROFILE_ID
+            ] = terrain_derived
+            green_terrain_baked += 1
+            print(
+                f"Baked {entry['id']} -> {GREEN_TERRAIN_PROFILE_ID}"
+            )
 
     manifest = {
         "schema_version": "1.0",
         "source_catalog": "assets/catalogs/mountain_town_world_kit_v1.json",
         "count": len(installed),
-        "palette_profile": PROFILE_ID,
-        "palette_baked_count": baked,
+        "palette_profiles": {
+            CORE_PROFILE_ID: {"baked_count": core_baked},
+            GREEN_TERRAIN_PROFILE_ID: {
+                "baked_count": green_terrain_baked,
+                "categories": sorted(green_categories),
+            },
+        },
         "assets": installed,
     }
     (INSTALL_ROOT / "installed_manifest.json").write_text(
@@ -315,7 +362,11 @@ def main() -> int:
     )
 
     print(f"\nPrepared {len(installed)} Mountain Town assets.")
-    print(f"Candidate-B baked assets: {baked}.")
+    print(f"Candidate-B baked assets: {core_baked}.")
+    print(
+        "Green-terrain baked assets: "
+        f"{green_terrain_baked} ({GREEN_TERRAIN_PROFILE_ID})."
+    )
     print(f"Godot destination: {INSTALL_ROOT}")
     print("Return to Godot, let Import finish, then run the Mountain Town scene.")
     return 0

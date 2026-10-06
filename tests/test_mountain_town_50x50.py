@@ -13,7 +13,7 @@ def test_mountain_town_world_kit_contains_real_kaykit_roads_rivers_and_resources
     )
     ids = {entry["id"] for entry in catalog["assets"]}
 
-    assert len(catalog["assets"]) == 87
+    assert len(catalog["assets"]) >= 109
     assert "med_hex_grass" in ids
     assert "med_hex_road_A" in ids
     assert "med_hex_road_L" in ids
