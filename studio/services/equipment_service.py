@@ -194,6 +194,14 @@ class EquipmentService:
             if not raw:
                 continue
             definition = EquipmentDefinition.model_validate(raw)
+            if definition.slot == EquipmentSlot.OUTFIT:
+                # Normalize any v1 whole-body Outfit definition, not only the
+                # built-in starter, so user-owned legacy items remain visible
+                # and equipable after the v2 split.
+                definition = definition.model_copy(update={"slot": EquipmentSlot.TOP})
+                asset.metadata["equipment_definition"] = definition.model_dump(mode="json")
+                asset.metadata["equipment_schema_version"] = 2
+                self.repository.save_asset(asset)
             result[definition.definition_id] = definition
         return result
 
