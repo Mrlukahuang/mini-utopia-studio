@@ -6,6 +6,7 @@ from studio.models.asset import Asset
 from studio.models.universe import Universe
 from studio.models.story import Story
 from studio.models.job import Job
+from studio.models.equipment import CreatorCollection
 from studio.repositories.base import StudioRepository
 
 SCHEMA = """
@@ -28,6 +29,12 @@ CREATE TABLE IF NOT EXISTS stories (
   title TEXT NOT NULL,
   mode TEXT NOT NULL,
   universe_id TEXT,
+  data TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS collections (
+  id TEXT PRIMARY KEY,
+  owner_key TEXT NOT NULL,
   data TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -111,6 +118,26 @@ class SQLiteStudioRepository(StudioRepository):
         with self._connect() as conn:
             rows = conn.execute("SELECT data FROM stories ORDER BY updated_at DESC").fetchall()
         return [Story.model_validate_json(row[0]) for row in rows]
+
+    def save_collection(self, collection: CreatorCollection) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO collections VALUES (?,?,?,?)",
+                (
+                    collection.collection_id,
+                    collection.owner_key,
+                    self._json(collection),
+                    collection.updated_at.isoformat(),
+                ),
+            )
+
+    def get_collection(self, collection_id: str) -> CreatorCollection | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT data FROM collections WHERE id=?",
+                (collection_id,),
+            ).fetchone()
+        return CreatorCollection.model_validate_json(row[0]) if row else None
 
     def save_job(self, job: Job) -> None:
         with self._connect() as conn:
