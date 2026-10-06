@@ -1,0 +1,603 @@
+{
+  "schema_version": "1.0",
+  "name": "Mini Utopia Mountain Town World Kit v1",
+  "install_root": "godot/assets/external/worldkit",
+  "packs": {
+    "kaykit_medieval": {
+      "archive_candidates": [
+        "KayKit_Medieval_Hexagon_Pack_1.0_FREE.zip"
+      ],
+      "license_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/License.txt",
+      "license_id": "CC0-1.0"
+    },
+    "kaykit_forest": {
+      "archive_candidates": [
+        "KayKit_Forest_Nature_Pack_1.0_FREE.zip",
+        "KayKit_Forest_Nature_Pack_1.0_FREE (1).zip"
+      ],
+      "license_member": "KayKit_Forest_Nature_Pack_1.0_FREE/License.txt",
+      "license_id": "CC0-1.0"
+    },
+    "kaykit_resource": {
+      "archive_candidates": [
+        "KayKit_ResourceBits_1.0_FREE.zip"
+      ],
+      "license_member": "KayKit_ResourceBits_1.0_FREE/License.txt",
+      "license_id": "CC0-1.0"
+    }
+  },
+  "assets": [
+    {
+      "id": "med_hex_grass",
+      "pack": "kaykit_medieval",
+      "category": "terrain",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/tiles/base/hex_grass.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "med_hex_grass_bottom",
+      "pack": "kaykit_medieval",
+      "category": "terrain",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/tiles/base/hex_grass_bottom.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "med_hex_grass_sloped_low",
+      "pack": "kaykit_medieval",
+      "category": "terrain",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/tiles/base/hex_grass_sloped_low.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "med_hex_grass_sloped_high",
+      "pack": "kaykit_medieval",
+      "category": "terrain",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/tiles/base/hex_grass_sloped_high.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "med_hex_road_A",
+      "pack": "kaykit_medieval",
+      "category": "road",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/tiles/roads/hex_road_A.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "med_hex_road_B",
+      "pack": "kaykit_medieval",
+      "category": "road",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/tiles/roads/hex_road_B.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "med_hex_road_C",
+      "pack": "kaykit_medieval",
+      "category": "road",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/tiles/roads/hex_road_C.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "med_hex_road_D",
+      "pack": "kaykit_medieval",
+      "category": "road",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/tiles/roads/hex_road_D.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "med_hex_road_E",
+      "pack": "kaykit_medieval",
+      "category": "road",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/tiles/roads/hex_road_E.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "med_hex_road_F",
+      "pack": "kaykit_medieval",
+      "category": "road",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/tiles/roads/hex_road_F.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "med_hex_road_G",
+      "pack": "kaykit_medieval",
+      "category": "road",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/tiles/roads/hex_road_G.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "med_hex_road_H",
+      "pack": "kaykit_medieval",
+      "category": "road",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/tiles/roads/hex_road_H.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "med_hex_road_I",
+      "pack": "kaykit_medieval",
+      "category": "road",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/tiles/roads/hex_road_I.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "med_hex_road_J",
+      "pack": "kaykit_medieval",
+      "category": "road",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/tiles/roads/hex_road_J.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "med_hex_road_K",
+      "pack": "kaykit_medieval",
+      "category": "road",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/tiles/roads/hex_road_K.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "med_hex_road_L",
+      "pack": "kaykit_medieval",
+      "category": "road",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/tiles/roads/hex_road_L.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "med_hex_road_M",
+      "pack": "kaykit_medieval",
+      "category": "road",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/tiles/roads/hex_road_M.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "med_hex_road_A_sloped_low",
+      "pack": "kaykit_medieval",
+      "category": "road",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/tiles/roads/hex_road_A_sloped_low.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "med_hex_road_A_sloped_high",
+      "pack": "kaykit_medieval",
+      "category": "road",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/tiles/roads/hex_road_A_sloped_high.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "med_hex_river_A",
+      "pack": "kaykit_medieval",
+      "category": "river",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/tiles/rivers/hex_river_A.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "med_hex_river_A_curvy",
+      "pack": "kaykit_medieval",
+      "category": "river",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/tiles/rivers/hex_river_A_curvy.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "med_hex_river_B",
+      "pack": "kaykit_medieval",
+      "category": "river",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/tiles/rivers/hex_river_B.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "med_hex_river_C",
+      "pack": "kaykit_medieval",
+      "category": "river",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/tiles/rivers/hex_river_C.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "med_hex_river_crossing_A",
+      "pack": "kaykit_medieval",
+      "category": "river",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/tiles/rivers/hex_river_crossing_A.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "med_hex_river_crossing_B",
+      "pack": "kaykit_medieval",
+      "category": "river",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/tiles/rivers/hex_river_crossing_B.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "med_hill_single_A",
+      "pack": "kaykit_medieval",
+      "category": "nature",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/decoration/nature/hill_single_A.gltf"
+    },
+    {
+      "id": "med_hill_single_B",
+      "pack": "kaykit_medieval",
+      "category": "nature",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/decoration/nature/hill_single_B.gltf"
+    },
+    {
+      "id": "med_hill_single_C",
+      "pack": "kaykit_medieval",
+      "category": "nature",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/decoration/nature/hill_single_C.gltf"
+    },
+    {
+      "id": "med_hills_A_trees",
+      "pack": "kaykit_medieval",
+      "category": "nature",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/decoration/nature/hills_A_trees.gltf"
+    },
+    {
+      "id": "med_hills_B_trees",
+      "pack": "kaykit_medieval",
+      "category": "nature",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/decoration/nature/hills_B_trees.gltf"
+    },
+    {
+      "id": "med_hills_C_trees",
+      "pack": "kaykit_medieval",
+      "category": "nature",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/decoration/nature/hills_C_trees.gltf"
+    },
+    {
+      "id": "med_mountain_A_grass_trees",
+      "pack": "kaykit_medieval",
+      "category": "nature",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/decoration/nature/mountain_A_grass_trees.gltf"
+    },
+    {
+      "id": "med_mountain_B_grass_trees",
+      "pack": "kaykit_medieval",
+      "category": "nature",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/decoration/nature/mountain_B_grass_trees.gltf"
+    },
+    {
+      "id": "med_mountain_C_grass_trees",
+      "pack": "kaykit_medieval",
+      "category": "nature",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/decoration/nature/mountain_C_grass_trees.gltf"
+    },
+    {
+      "id": "med_rock_single_A",
+      "pack": "kaykit_medieval",
+      "category": "nature",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/decoration/nature/rock_single_A.gltf"
+    },
+    {
+      "id": "med_rock_single_B",
+      "pack": "kaykit_medieval",
+      "category": "nature",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/decoration/nature/rock_single_B.gltf"
+    },
+    {
+      "id": "med_rock_single_C",
+      "pack": "kaykit_medieval",
+      "category": "nature",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/decoration/nature/rock_single_C.gltf"
+    },
+    {
+      "id": "med_waterplant_A",
+      "pack": "kaykit_medieval",
+      "category": "nature",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/decoration/nature/waterplant_A.gltf"
+    },
+    {
+      "id": "med_waterplant_B",
+      "pack": "kaykit_medieval",
+      "category": "nature",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/decoration/nature/waterplant_B.gltf"
+    },
+    {
+      "id": "med_building_bridge_A",
+      "pack": "kaykit_medieval",
+      "category": "structure",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/neutral/building_bridge_A.gltf"
+    },
+    {
+      "id": "med_building_bridge_B",
+      "pack": "kaykit_medieval",
+      "category": "structure",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/neutral/building_bridge_B.gltf"
+    },
+    {
+      "id": "med_fence_wood_straight",
+      "pack": "kaykit_medieval",
+      "category": "structure",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/neutral/fence_wood_straight.gltf"
+    },
+    {
+      "id": "med_fence_wood_straight_gate",
+      "pack": "kaykit_medieval",
+      "category": "structure",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/neutral/fence_wood_straight_gate.gltf"
+    },
+    {
+      "id": "med_fence_stone_straight",
+      "pack": "kaykit_medieval",
+      "category": "structure",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/neutral/fence_stone_straight.gltf"
+    },
+    {
+      "id": "med_fence_stone_straight_gate",
+      "pack": "kaykit_medieval",
+      "category": "structure",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/neutral/fence_stone_straight_gate.gltf"
+    },
+    {
+      "id": "med_home_A_red",
+      "pack": "kaykit_medieval",
+      "category": "building",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/red/building_home_A_red.gltf",
+      "scale_mode": "fit_height"
+    },
+    {
+      "id": "med_home_B_red",
+      "pack": "kaykit_medieval",
+      "category": "building",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/red/building_home_B_red.gltf",
+      "scale_mode": "fit_height"
+    },
+    {
+      "id": "med_home_A_blue",
+      "pack": "kaykit_medieval",
+      "category": "building",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/blue/building_home_A_blue.gltf",
+      "scale_mode": "fit_height"
+    },
+    {
+      "id": "med_home_B_blue",
+      "pack": "kaykit_medieval",
+      "category": "building",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/blue/building_home_B_blue.gltf",
+      "scale_mode": "fit_height"
+    },
+    {
+      "id": "med_home_A_yellow",
+      "pack": "kaykit_medieval",
+      "category": "building",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/yellow/building_home_A_yellow.gltf",
+      "scale_mode": "fit_height"
+    },
+    {
+      "id": "med_home_B_yellow",
+      "pack": "kaykit_medieval",
+      "category": "building",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/yellow/building_home_B_yellow.gltf",
+      "scale_mode": "fit_height"
+    },
+    {
+      "id": "med_tavern_red",
+      "pack": "kaykit_medieval",
+      "category": "building",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/red/building_tavern_red.gltf",
+      "scale_mode": "fit_height"
+    },
+    {
+      "id": "med_market_red",
+      "pack": "kaykit_medieval",
+      "category": "building",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/red/building_market_red.gltf",
+      "scale_mode": "fit_height"
+    },
+    {
+      "id": "med_blacksmith_red",
+      "pack": "kaykit_medieval",
+      "category": "building",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/red/building_blacksmith_red.gltf",
+      "scale_mode": "fit_height"
+    },
+    {
+      "id": "med_church_red",
+      "pack": "kaykit_medieval",
+      "category": "building",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/red/building_church_red.gltf",
+      "scale_mode": "fit_height"
+    },
+    {
+      "id": "med_well_red",
+      "pack": "kaykit_medieval",
+      "category": "building",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/red/building_well_red.gltf",
+      "scale_mode": "fit_height"
+    },
+    {
+      "id": "med_lumbermill_red",
+      "pack": "kaykit_medieval",
+      "category": "building",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/red/building_lumbermill_red.gltf",
+      "scale_mode": "fit_height"
+    },
+    {
+      "id": "med_mine_red",
+      "pack": "kaykit_medieval",
+      "category": "building",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/red/building_mine_red.gltf",
+      "scale_mode": "fit_height"
+    },
+    {
+      "id": "med_windmill_red",
+      "pack": "kaykit_medieval",
+      "category": "building",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/red/building_windmill_red.gltf",
+      "scale_mode": "fit_height"
+    },
+    {
+      "id": "med_watermill_red",
+      "pack": "kaykit_medieval",
+      "category": "building",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/red/building_watermill_red.gltf",
+      "scale_mode": "fit_height"
+    },
+    {
+      "id": "med_archeryrange_red",
+      "pack": "kaykit_medieval",
+      "category": "building",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/red/building_archeryrange_red.gltf",
+      "scale_mode": "fit_height"
+    },
+    {
+      "id": "med_barracks_red",
+      "pack": "kaykit_medieval",
+      "category": "building",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/red/building_barracks_red.gltf",
+      "scale_mode": "fit_height"
+    },
+    {
+      "id": "med_tower_A_red",
+      "pack": "kaykit_medieval",
+      "category": "building",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/red/building_tower_A_red.gltf",
+      "scale_mode": "fit_height"
+    },
+    {
+      "id": "med_tower_B_red",
+      "pack": "kaykit_medieval",
+      "category": "building",
+      "source_member": "KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf/buildings/red/building_tower_B_red.gltf",
+      "scale_mode": "fit_height"
+    },
+    {
+      "id": "forest_grass_1_a_color1",
+      "pack": "kaykit_forest",
+      "category": "ground_dressing",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Grass_1_A_Color1.gltf"
+    },
+    {
+      "id": "forest_grass_1_b_color1",
+      "pack": "kaykit_forest",
+      "category": "ground_dressing",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Grass_1_B_Color1.gltf"
+    },
+    {
+      "id": "forest_grass_1_c_color1",
+      "pack": "kaykit_forest",
+      "category": "ground_dressing",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Grass_1_C_Color1.gltf"
+    },
+    {
+      "id": "forest_grass_1_d_color1",
+      "pack": "kaykit_forest",
+      "category": "ground_dressing",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Grass_1_D_Color1.gltf"
+    },
+    {
+      "id": "forest_grass_2_a_color1",
+      "pack": "kaykit_forest",
+      "category": "ground_dressing",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Grass_2_A_Color1.gltf"
+    },
+    {
+      "id": "forest_grass_2_b_color1",
+      "pack": "kaykit_forest",
+      "category": "ground_dressing",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Grass_2_B_Color1.gltf"
+    },
+    {
+      "id": "forest_grass_2_c_color1",
+      "pack": "kaykit_forest",
+      "category": "ground_dressing",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Grass_2_C_Color1.gltf"
+    },
+    {
+      "id": "forest_grass_2_d_color1",
+      "pack": "kaykit_forest",
+      "category": "ground_dressing",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Grass_2_D_Color1.gltf"
+    },
+    {
+      "id": "forest_bush_1_b_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Bush_1_B_Color1.gltf"
+    },
+    {
+      "id": "forest_bush_2_d_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Bush_2_D_Color1.gltf"
+    },
+    {
+      "id": "forest_bush_3_a_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Bush_3_A_Color1.gltf"
+    },
+    {
+      "id": "forest_rock_1_c_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Rock_1_C_Color1.gltf"
+    },
+    {
+      "id": "forest_rock_2_f_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Rock_2_F_Color1.gltf"
+    },
+    {
+      "id": "forest_rock_3_k_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Rock_3_K_Color1.gltf"
+    },
+    {
+      "id": "forest_tree_1_b_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Tree_1_B_Color1.gltf"
+    },
+    {
+      "id": "forest_tree_3_a_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Tree_3_A_Color1.gltf"
+    },
+    {
+      "id": "forest_tree_4_b_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Tree_4_B_Color1.gltf"
+    },
+    {
+      "id": "resource_stone_bricks_stack_medium",
+      "pack": "kaykit_resource",
+      "category": "resource_prop",
+      "source_member": "KayKit_ResourceBits_1.0_FREE/Assets/gltf/Stone_Bricks_Stack_Medium.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "resource_stone_chunks_large",
+      "pack": "kaykit_resource",
+      "category": "resource_prop",
+      "source_member": "KayKit_ResourceBits_1.0_FREE/Assets/gltf/Stone_Chunks_Large.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "resource_wood_log_stack",
+      "pack": "kaykit_resource",
+      "category": "resource_prop",
+      "source_member": "KayKit_ResourceBits_1.0_FREE/Assets/gltf/Wood_Log_Stack.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "resource_wood_planks_stack_medium",
+      "pack": "kaykit_resource",
+      "category": "resource_prop",
+      "source_member": "KayKit_ResourceBits_1.0_FREE/Assets/gltf/Wood_Planks_Stack_Medium.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "resource_pallet_wood",
+      "pack": "kaykit_resource",
+      "category": "resource_prop",
+      "source_member": "KayKit_ResourceBits_1.0_FREE/Assets/gltf/Pallet_Wood.gltf",
+      "scale_mode": "native"
+    },
+    {
+      "id": "resource_textiles_stack_small",
+      "pack": "kaykit_resource",
+      "category": "resource_prop",
+      "source_member": "KayKit_ResourceBits_1.0_FREE/Assets/gltf/Textiles_Stack_Small.gltf",
+      "scale_mode": "native"
+    }
+  ]
+}
