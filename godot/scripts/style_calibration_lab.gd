@@ -160,10 +160,10 @@ func _build_real_golden_station(parent: Node3D) -> void:
     # the local Golden lineup has been installed. Grayscale/Silhouette lanes
     # remain deterministic procedural controls until palette remapping exists.
     GoldenAnchorRuntime.instantiate_anchor(
-        parent, "medieval_home", Vector3(-3.6, 0.0, 0.0), 4.25
+        parent, "medieval_home", Vector3(-3.6, 0.0, 0.0), 4.25, INF, "core_candidate_b"
     )
     GoldenAnchorRuntime.instantiate_anchor(
-        parent, "forest_tree_round", Vector3(0.0, 0.0, -0.15), 4.75
+        parent, "forest_tree_round", Vector3(0.0, 0.0, -0.15), 4.75, INF, "core_candidate_b"
     )
     GoldenAnchorRuntime.instantiate_anchor(
         parent, "adventurer_knight", Vector3(3.1, 0.0, 0.3), 3.25
@@ -172,7 +172,7 @@ func _build_real_golden_station(parent: Node3D) -> void:
         parent, "dungeon_chest", Vector3(-1.85, 0.0, 1.85), 1.1
     )
     GoldenAnchorRuntime.instantiate_anchor(
-        parent, "forest_rock", Vector3(1.6, 0.0, 1.65), 1.05
+        parent, "forest_rock", Vector3(1.6, 0.0, 1.65), 1.05, INF, "core_candidate_b"
     )
 
 
@@ -273,6 +273,10 @@ func _build_hud() -> void:
     info.offset_top = 40.0
     info.offset_right = 610.0
     info.offset_bottom = 76.0
-    var real_state := "REAL GOLDEN ASSETS INSTALLED" if GoldenAnchorRuntime.has_installed() else "PROCEDURAL FALLBACK · run tools/install_golden_anchors.py"
+    var real_state := "REAL GOLDEN ASSETS · SOURCE COLORS"
+    if GoldenAnchorRuntime.profile_available("core_candidate_b"):
+        real_state = "REAL GOLDEN ASSETS · CANDIDATE B REMAP"
+    elif not GoldenAnchorRuntime.has_installed():
+        real_state = "PROCEDURAL FALLBACK · run tools/install_golden_anchors.py"
     info.text = "Palette v0.9 · COLOR / GRAYSCALE / SILHOUETTE\n" + real_state
     panel.add_child(info)
