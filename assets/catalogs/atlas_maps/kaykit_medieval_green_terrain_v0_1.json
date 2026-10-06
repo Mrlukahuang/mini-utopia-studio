@@ -1,0 +1,54 @@
+{
+  "schema_version": "0.1",
+  "pack": "kaykit_medieval",
+  "atlas_name": "hexagons_medieval.png",
+  "profile_id": "core_candidate_b_green_terrain",
+  "layout": {
+    "type": "grid",
+    "rows": 4,
+    "columns": 8
+  },
+  "regions": [
+    [
+      "structure_dark",
+      "stone_light",
+      "stone_base",
+      "stone_dark",
+      "structure_dark",
+      "wood_light",
+      "wood_base",
+      "roof_warm"
+    ],
+    [
+      "sky_accent",
+      "water_base",
+      "wood_base",
+      "magic_light",
+      "foliage_base",
+      "neutral_warm",
+      "stone_base",
+      "stone_dark"
+    ],
+    [
+      "foliage_base",
+      "foliage_base",
+      "stone_base",
+      "neutral_warm",
+      "wood_light",
+      "neutral_light",
+      "roof_accent",
+      "roof_accent"
+    ],
+    [
+      "sky_accent",
+      "roof_accent",
+      "magic_light",
+      "foliage_base",
+      "roof_warm",
+      "wood_light",
+      "wood_base",
+      "wood_dark"
+    ]
+  ],
+  "note": "Terrain-specific Medieval semantic map. The source grass swatch at row 2 / col 0 is forced to foliage_base (Sage) instead of glow_gold, while road tan remains warm neutral and water remains Aqua. Use this profile only for terrain, roads, river and mountain assemblies."
+}
