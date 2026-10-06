@@ -240,8 +240,9 @@ func _build_path_polyline(raw_points: Array, cfg: Dictionary, is_main: bool) -> 
             )
 
             var row_offset := width * 0.23
-            for side in [-1.0, 1.0]:
-                var jitter := perpendicular * (row_offset * side)
+            for side_value in [-1.0, 1.0]:
+                var side: float = float(side_value)
+                var jitter: Vector3 = perpendicular * (row_offset * side)
                 jitter += perpendicular * rng.randf_range(-0.14, 0.14)
                 var paver_color := _color(
                     String(stone_keys[rng.randi_range(0, stone_keys.size() - 1)])
