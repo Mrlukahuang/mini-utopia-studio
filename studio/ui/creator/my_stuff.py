@@ -7,6 +7,7 @@ import streamlit as st
 from studio.core.enums import AssetType, ReviewStatus
 from studio.models.character import CharacterProfile
 from studio.models.equipment import EquipmentRarity, EquipmentSlot, StatBlock
+from studio.services.baby_service import BabyService
 from studio.ui.theme import render_game_hero
 
 
@@ -78,7 +79,7 @@ def render_my_stuff(ctx) -> None:
     profile = CharacterProfile.model_validate(
         selected_character.metadata.get("character_profile", {})
     )
-    active_baby = ctx.babies.active_baby()
+    active_baby = BabyService(ctx.repository).active_baby()
     loadout = collection.loadout_for(selected_character.asset_id)
     base_stats = ctx.equipment.base_stats(selected_character.asset_id)
     final_stats = ctx.equipment.final_stats(selected_character.asset_id)

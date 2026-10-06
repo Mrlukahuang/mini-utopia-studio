@@ -128,3 +128,20 @@ def test_baby_v1_archetypes_are_child_visible():
         "robot_baby",
         "forest_baby",
     }
+
+
+def test_creator_baby_ui_uses_repository_boundary_for_hot_reload_safety():
+    app = (ROOT / "app.py").read_text(encoding="utf-8")
+    my_baby = (
+        ROOT / "studio" / "ui" / "creator" / "my_baby.py"
+    ).read_text(encoding="utf-8")
+    my_stuff = (
+        ROOT / "studio" / "ui" / "creator" / "my_stuff.py"
+    ).read_text(encoding="utf-8")
+
+    assert "baby_service = BabyService(ctx.repository)" in app
+    assert "BabyService(ctx.repository)" in my_baby
+    assert "BabyService(ctx.repository)" in my_stuff
+    assert "ctx.babies" not in app
+    assert "ctx.babies" not in my_baby
+    assert "ctx.babies" not in my_stuff
