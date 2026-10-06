@@ -91,3 +91,15 @@ def test_rich_ground_helpers_do_not_use_self_as_default_argument():
 
     assert "parent: Node3D = self" not in script
     assert "parent: Node3D = null" in script
+
+
+def test_rich_stone_path_jitter_is_explicitly_typed():
+    script = (
+        ROOT
+        / "godot"
+        / "scripts"
+        / "forest_village_50x50_rich.gd"
+    ).read_text(encoding="utf-8")
+
+    assert "var side: float = float(side_value)" in script
+    assert "var jitter: Vector3 = perpendicular * (row_offset * side)" in script
