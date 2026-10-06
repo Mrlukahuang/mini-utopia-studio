@@ -6,3 +6,7 @@ export/
 # Keep the workflow README tracked, but never commit extracted binaries/textures.
 assets/external/golden/*
 !assets/external/golden/README.md
+
+# Locally prepared Mountain Town runtime kit.
+assets/external/worldkit/*
+!assets/external/worldkit/README.md
