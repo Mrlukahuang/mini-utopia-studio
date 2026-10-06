@@ -78,6 +78,7 @@ def render_my_stuff(ctx) -> None:
     profile = CharacterProfile.model_validate(
         selected_character.metadata.get("character_profile", {})
     )
+    active_baby = ctx.babies.active_baby()
     loadout = collection.loadout_for(selected_character.asset_id)
     base_stats = ctx.equipment.base_stats(selected_character.asset_id)
     final_stats = ctx.equipment.final_stats(selected_character.asset_id)
@@ -97,6 +98,14 @@ def render_my_stuff(ctx) -> None:
         st.caption(
             f"Base · HP {base_stats.hp} / ATK {base_stats.atk} / DEF {base_stats.defense}"
         )
+        if active_baby is not None:
+            st.info(
+                f"🐣 Active Baby · {active_baby.display_name} · "
+                f"Lv.{active_baby.level} · ✨ XP {active_baby.xp} · "
+                f"💞 Bond {active_baby.bond}"
+            )
+        else:
+            st.caption("🐣 No Active Baby yet · visit My Baby to meet one.")
 
     with top_right:
         st.markdown("### Equipped / 当前装备")
