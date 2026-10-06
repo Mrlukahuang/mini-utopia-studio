@@ -223,6 +223,10 @@ func _build_path_polyline(raw_points: Array, cfg: Dictionary, is_main: bool) -> 
             var t := float(step_index) / float(steps)
             var center := a.lerp(b, t)
 
+            # Keep the bridge visually clean; the real Golden bridge owns this crossing.
+            if absf(center.z - 7.0) < 1.8 and absf(center.x) < 4.2:
+                continue
+
             _flat_patch(
                 "PathDirt",
                 center + Vector3(0.0, 0.045, 0.0),
