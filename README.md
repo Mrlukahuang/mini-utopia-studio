@@ -1468,3 +1468,21 @@ Current smoke-test scene:
 The baseline locks the simple road hierarchy, yellow/green Block Bits language,
 layered Forest Nature mountain treatment, larger road-facing houses, solid
 collision, Resource Bits work areas and two separated skeleton encounters.
+
+---
+
+## Product Roadmap v2
+
+The current product-development source of truth is:
+
+**[Mini Utopia · Master Product Roadmap v2.0](docs/MINI_UTOPIA_MASTER_PRODUCT_ROADMAP_V2.md)**
+
+The roadmap locks the next main-line phase as the **Engagement Bridge**:
+
+**Playable Avatar → Modular Appearance → My Stuff → Equipment / Rarity / Stats → 3D Loadout → Initial Baby → Dressing Room Playground**
+
+Major Story → Gameplay expansion resumes after that bridge is usable.
+
+Immediate next implementation milestone after the roadmap is merged:
+
+**AV-01 — Humanoid Rig & Avatar Contract**
