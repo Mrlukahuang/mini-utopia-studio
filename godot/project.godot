@@ -42,6 +42,10 @@ interact={
 "deadzone": 0.2,
 "events": [Object(InputEventKey,"physical_keycode":69)]
 }
+attack={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"physical_keycode":70), Object(InputEventMouseButton,"button_index":1)]
+}
 
 [physics]
 3d/physics_engine="Jolt Physics"
