@@ -1463,7 +1463,7 @@ The current playable-world source of truth is:
 
 Current smoke-test scene:
 
-`res://scenes/newbie_village_100x100_v0_2.tscn`
+`res://scenes/newbie_village_100x100_v0_3.tscn`
 
 The baseline locks the simple road hierarchy, yellow/green Block Bits language,
 layered Forest Nature mountain treatment, larger road-facing houses, solid
