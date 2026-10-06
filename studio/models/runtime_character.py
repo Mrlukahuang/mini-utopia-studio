@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from studio.models.avatar import AVATAR_RIG_FAMILY, BodyType, avatar_socket_names
+
 
 class RuntimeAnimationSpec(BaseModel):
     idle: str = "Idle"
@@ -20,6 +22,16 @@ class CharacterRuntimeSpec(BaseModel):
 
     mode: Literal["procedural", "glb"] = "procedural"
     model_data_uri: str | None = None
+
+    rig_family: str = AVATAR_RIG_FAMILY
+    body_type: BodyType = BodyType.STANDARD
+    socket_names: tuple[str, ...] = Field(default_factory=avatar_socket_names)
+
+    species_head_id: str = "species_head_human_v1"
+    surface_type: str = "skin"
+    surface_color_hex: str = "#F2C7A5"
+    eye_style_id: str = "eyes_round_soft_v1"
+    hair_style_id: str = "hair_none"
     scale: float = Field(default=1.0, gt=0, le=10)
     animation_clips: RuntimeAnimationSpec = Field(default_factory=RuntimeAnimationSpec)
 
