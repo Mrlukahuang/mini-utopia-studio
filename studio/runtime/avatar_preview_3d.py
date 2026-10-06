@@ -14,6 +14,14 @@ BODY_WIDTH_SCALE = {
     "chubby": 1.16,
 }
 
+# Head silhouette intentionally stays stable so body type reads from the body,
+# not by turning the face into a vertical/horizontal egg.
+HEAD_WIDTH_SCALE = {
+    "slim": 1.0,
+    "standard": 1.0,
+    "chubby": 1.0,
+}
+
 
 def _safe_json(value: object) -> str:
     return json.dumps(value, ensure_ascii=False).replace("<", "\\u003c")
@@ -31,6 +39,7 @@ def build_avatar_preview_html(appearance: AvatarAppearance) -> str:
         "rigFamily": AVATAR_RIG_FAMILY,
         "appearance": appearance.model_dump(mode="json"),
         "bodyWidthScale": BODY_WIDTH_SCALE,
+        "headWidthScale": HEAD_WIDTH_SCALE,
     }
     data_json = _safe_json(payload)
 
@@ -226,51 +235,117 @@ function sphereGeo(rx,ry,rz) {{
   return g;
 }}
 
-function buildHair(root, width, hairColor) {{
+function buildHair(root, headWidth, hairColor) {{
   if (A.hair_style_id === 'hair_none') return null;
+
   const group = new THREE.Group();
   group.name = 'Hair';
   root.add(group);
+  const hairMat = mat(hairColor,.72);
+
+  // Shared visible cap: deliberately sits outside the head envelope instead
+  // of being buried inside it.
   const cap = addMesh(
-    group, sphereGeo(.56*width,.22,.50), mat(hairColor,.74),
-    [0,1.96,-.04], 'HairCap'
+    group, sphereGeo(.74*headWidth,.27,.70), hairMat,
+    [0,2.13,-.01], 'HairCap'
   );
-  if (A.hair_style_id === 'hair_bob_v1') {{
-    addMesh(group, roundedBox(.22*width,.42,.30,.08), mat(hairColor,.74), [-.42*width,1.72,-.03], 'HairL');
-    addMesh(group, roundedBox(.22*width,.42,.30,.08), mat(hairColor,.74), [.42*width,1.72,-.03], 'HairR');
+
+  // Small front fringe makes every non-none hairstyle visible from the
+  // default camera before the child rotates the Avatar.
+  addMesh(
+    group, roundedBox(.46*headWidth,.16,.14,.06), hairMat,
+    [0,2.05,.61], 'HairFringe'
+  );
+
+  if (A.hair_style_id === 'hair_short_v1') {{
+    addMesh(
+      group, roundedBox(.30*headWidth,.20,.18,.06), hairMat,
+      [-.28*headWidth,2.08,.52], 'ShortSweep'
+    );
+  }} else if (A.hair_style_id === 'hair_bob_v1') {{
+    addMesh(
+      group, roundedBox(.24*headWidth,.58,.34,.09), hairMat,
+      [-.61*headWidth,1.77,.00], 'BobSideL'
+    );
+    addMesh(
+      group, roundedBox(.24*headWidth,.58,.34,.09), hairMat,
+      [.61*headWidth,1.77,.00], 'BobSideR'
+    );
+    addMesh(
+      group, roundedBox(.56*headWidth,.20,.18,.07), hairMat,
+      [0,1.98,.59], 'BobFringe'
+    );
   }} else if (A.hair_style_id === 'hair_long_wavy_v1') {{
-    addMesh(group, roundedBox(.24*width,.68,.32,.08), mat(hairColor,.74), [-.42*width,1.58,-.05], 'HairL');
-    addMesh(group, roundedBox(.24*width,.68,.32,.08), mat(hairColor,.74), [.42*width,1.58,-.05], 'HairR');
+    addMesh(
+      group, roundedBox(.27*headWidth,.86,.38,.10), hairMat,
+      [-.62*headWidth,1.61,-.01], 'LongSideL'
+    );
+    addMesh(
+      group, roundedBox(.27*headWidth,.86,.38,.10), hairMat,
+      [.62*headWidth,1.61,-.01], 'LongSideR'
+    );
+    for (const x of [-.60,.60]) {{
+      addMesh(
+        group, sphereGeo(.18,.20,.18), hairMat,
+        [x*headWidth,1.22,-.01], 'WaveTip'
+      );
+    }}
   }} else if (A.hair_style_id === 'hair_ponytail_v1') {{
-    addMesh(group, sphereGeo(.22,.36,.22), mat(hairColor,.74), [.57*width,1.78,-.30], 'Ponytail');
+    addMesh(
+      group, sphereGeo(.24,.39,.25), hairMat,
+      [.70*headWidth,1.82,-.38], 'Ponytail'
+    );
+    addMesh(
+      group, roundedBox(.17,.34,.17,.06), hairMat,
+      [.57*headWidth,1.93,-.25], 'PonyTie'
+    );
   }} else if (A.hair_style_id === 'hair_fluffy_v1') {{
-    for (const p of [[-.38,1.98,0],[0,2.08,-.02],[.38,1.98,0]]) {{
-      addMesh(group, sphereGeo(.26,.22,.25), mat(hairColor,.74), [p[0]*width,p[1],p[2]], 'Fluff');
+    for (const p of [
+      [-.48,2.07,.00],[-.22,2.28,-.02],[.08,2.31,-.02],
+      [.38,2.18,.00],[.58,1.98,.00],[-.60,1.96,.00]
+    ]) {{
+      addMesh(
+        group, sphereGeo(.25,.22,.24), hairMat,
+        [p[0]*headWidth,p[1],p[2]], 'Fluff'
+      );
     }}
   }}
   return cap;
 }}
 
-function addSpeciesDetails(root, width, surfaceMat) {{
+function addSpeciesDetails(root, headWidth, surfaceMat) {{
   const id = A.species_head_id || '';
   if (id.includes('sheep')) {{
     for (const s of [-1,1]) {{
-      const ear = addMesh(root,sphereGeo(.24,.18,.18),surfaceMat,[.60*width*s,1.78,-.02],'SheepEar');
+      const ear = addMesh(
+        root,sphereGeo(.24,.18,.18),surfaceMat,
+        [.66*headWidth*s,1.82,-.02],'SheepEar'
+      );
       ear.rotation.z = -.28*s;
     }}
   }} else if (id.includes('cat')) {{
     for (const s of [-1,1]) {{
       const ear = addMesh(
-        root,new THREE.ConeGeometry(.21,.42,4),surfaceMat,[.37*width*s,2.23,-.02],'CatEar'
+        root,new THREE.ConeGeometry(.21,.42,4),surfaceMat,
+        [.38*headWidth*s,2.25,-.02],'CatEar'
       );
       ear.rotation.y = Math.PI/4;
     }}
   }} else if (id.includes('robot')) {{
-    const stem = addMesh(root,new THREE.CylinderGeometry(.035,.035,.28,12),mat('#8793A5',.48,.45),[0,2.30,0],'Antenna');
-    const tip = addMesh(root,new THREE.SphereGeometry(.075,16,10),mat(A.eye_color_hex,.4,.12),[0,2.47,0],'AntennaTip');
+    addMesh(
+      root,new THREE.CylinderGeometry(.035,.035,.28,12),
+      mat('#8793A5',.48,.45),[0,2.31,0],'Antenna'
+    );
+    addMesh(
+      root,new THREE.SphereGeometry(.075,16,10),
+      mat(A.eye_color_hex,.4,.12),[0,2.48,0],'AntennaTip'
+    );
   }} else if (id.includes('cloud')) {{
-    for (const p of [[-.34,2.02,-.08],[0,2.13,-.07],[.34,2.02,-.08]]) {{
-      addMesh(root,sphereGeo(.29,.24,.26),surfaceMat,[p[0]*width,p[1],p[2]],'CloudPuff');
+    for (const p of [[-.38,2.03,-.08],[0,2.16,-.07],[.38,2.03,-.08]]) {{
+      addMesh(
+        root,sphereGeo(.30,.25,.27),surfaceMat,
+        [p[0]*headWidth,p[1],p[2]],'CloudPuff'
+      );
     }}
   }}
 }}
@@ -279,6 +354,7 @@ function buildAvatar() {{
   const root = new THREE.Group();
   root.name = 'Avatar_' + A.body_type;
   const width = DATA.bodyWidthScale[A.body_type] || 1;
+  const headWidth = DATA.headWidthScale[A.body_type] || 1;
   const surfaceMat = mat(A.surface_color_hex || '#F2C7A5', A.surface_type === 'metal' ? .38 : .84, A.surface_type === 'metal' ? .38 : .01);
   const outfitMat = mat('#D7C2F3',.80);
   const shoeMat = mat('#EEF2FA',.72);
@@ -288,7 +364,7 @@ function buildAvatar() {{
     root,roundedBox(.78*width,.92,.44*width,.16),outfitMat,[0,.92,0],'Body'
   );
   const head = addMesh(
-    root,sphereGeo(.72*width,.67,.66),surfaceMat,[0,1.72,0],'SpeciesHead'
+    root,sphereGeo(.70*headWidth,.69,.67),surfaceMat,[0,1.72,0],'SpeciesHead'
   );
 
   const limbs = {{arms:[],legs:[]}};
@@ -313,13 +389,13 @@ function buildAvatar() {{
   for (const s of [-1,1]) {{
     const eye = addMesh(
       root,sphereGeo(.10*eyeScale,.12*eyeScale,.08),eyeMat,
-      [.15*width*s,1.76,.58],'Eye'
+      [.15*headWidth*s,1.76,.58],'Eye'
     );
     if (A.eye_style_id === 'eyes_cat_v1') eye.scale.y=.62;
   }}
 
-  addSpeciesDetails(root,width,surfaceMat);
-  buildHair(root,width,A.hair_color_hex || '#5B4036');
+  addSpeciesDetails(root,headWidth,surfaceMat);
+  buildHair(root,headWidth,A.hair_color_hex || '#5B4036');
 
   // Canonical socket nodes are represented as Object3D anchors so later
   // equipment preview can attach to the exact same named contract.
