@@ -11,6 +11,7 @@ def test_active_godot_scene_folder_stays_small_and_current():
         "player.tscn",
         "newbie_village_100x100_v0_3.tscn",
         "avatar_contract_smoke_test.tscn",
+        "equipment_runtime_smoke_test.tscn",
     }
 
 
