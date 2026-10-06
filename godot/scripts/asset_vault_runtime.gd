@@ -35,7 +35,8 @@ static func instantiate_by_id(
     asset_id: String,
     world_position: Vector3,
     yaw_degrees: float = 0.0,
-    native_scale: float = 1.0
+    native_scale: float = 1.0,
+    target_height: float = 0.0
 ) -> Node3D:
     var entry := entry_by_id(asset_id)
     if entry.is_empty():
@@ -45,7 +46,8 @@ static func instantiate_by_id(
         entry,
         world_position,
         yaw_degrees,
-        native_scale
+        native_scale,
+        target_height
     )
 
 
@@ -54,7 +56,8 @@ static func instantiate_first_filename(
     filename: String,
     world_position: Vector3,
     yaw_degrees: float = 0.0,
-    native_scale: float = 1.0
+    native_scale: float = 1.0,
+    target_height: float = 0.0
 ) -> Node3D:
     var entries := entries_by_filename(filename)
     if entries.is_empty():
@@ -64,8 +67,61 @@ static func instantiate_first_filename(
         entries[0],
         world_position,
         yaw_degrees,
-        native_scale
+        native_scale,
+        target_height
     )
+
+
+static func first_entry_matching(
+    pack_terms: Array,
+    filename_terms: Array
+) -> Dictionary:
+    for raw_entry in _manifest().get("assets", []):
+        if typeof(raw_entry) != TYPE_DICTIONARY:
+            continue
+
+        var entry: Dictionary = raw_entry
+        var pack_text := String(entry.get("pack", "")).to_lower()
+        var source_member := String(entry.get("source_member", "")).to_lower()
+        var filename := source_member.get_file()
+
+        if not _contains_all(pack_text, pack_terms):
+            continue
+        if not _contains_all(filename, filename_terms):
+            continue
+        return entry
+
+    return {}
+
+
+static func instantiate_first_matching(
+    parent: Node3D,
+    pack_terms: Array,
+    filename_terms: Array,
+    world_position: Vector3,
+    yaw_degrees: float = 0.0,
+    native_scale: float = 1.0,
+    target_height: float = 0.0
+) -> Node3D:
+    var entry := first_entry_matching(pack_terms, filename_terms)
+    if entry.is_empty():
+        return null
+    return _instantiate_entry(
+        parent,
+        entry,
+        world_position,
+        yaw_degrees,
+        native_scale,
+        target_height
+    )
+
+
+static func _contains_all(haystack: String, terms: Array) -> bool:
+    for raw_term in terms:
+        var term := String(raw_term).to_lower()
+        if not term.is_empty() and not haystack.contains(term):
+            return false
+    return true
 
 
 static func _instantiate_entry(
@@ -73,7 +129,8 @@ static func _instantiate_entry(
     entry: Dictionary,
     world_position: Vector3,
     yaw_degrees: float,
-    native_scale: float
+    native_scale: float,
+    target_height: float = 0.0
 ) -> Node3D:
     var res_path := String(entry.get("res_path", ""))
     if res_path.is_empty() or not ResourceLoader.exists(res_path):
@@ -92,9 +149,25 @@ static func _instantiate_entry(
     wrapper.name = "Vault_" + String(entry.get("id", "asset"))
     wrapper.position = world_position
     wrapper.rotation_degrees.y = yaw_degrees
-    wrapper.scale = Vector3.ONE * native_scale
     parent.add_child(wrapper)
     wrapper.add_child(instance)
+
+    var node := instance as Node3D
+    if target_height > 0.0:
+        var bounds := _bounds_in_root(node)
+        if bounds.size.y > 0.0001:
+            var scale_value := target_height / bounds.size.y
+            node.scale = Vector3.ONE * scale_value
+            var center_x := bounds.position.x + bounds.size.x * 0.5
+            var center_z := bounds.position.z + bounds.size.z * 0.5
+            node.position = Vector3(
+                -center_x * scale_value,
+                -bounds.position.y * scale_value,
+                -center_z * scale_value
+            )
+    else:
+        node.scale = Vector3.ONE * native_scale
+
     return wrapper
 
 
@@ -137,3 +210,55 @@ static func _ensure_indexes() -> void:
         var bucket: Array = _asset_by_filename_cache.get(filename, [])
         bucket.append(entry)
         _asset_by_filename_cache[filename] = bucket
+
+
+static func _bounds_in_root(root: Node3D) -> AABB:
+    var meshes: Array = []
+    _collect_meshes(root, meshes)
+    var found := false
+    var min_point := Vector3.ZERO
+    var max_point := Vector3.ZERO
+    var root_inverse := root.global_transform.affine_inverse()
+
+    for value in meshes:
+        var mesh_node := value as MeshInstance3D
+        if mesh_node == null or mesh_node.mesh == null:
+            continue
+
+        var box := mesh_node.get_aabb()
+        var to_root := root_inverse * mesh_node.global_transform
+        for xi in range(2):
+            for yi in range(2):
+                for zi in range(2):
+                    var corner := Vector3(
+                        box.position.x + box.size.x * float(xi),
+                        box.position.y + box.size.y * float(yi),
+                        box.position.z + box.size.z * float(zi)
+                    )
+                    var point := to_root * corner
+                    if not found:
+                        min_point = point
+                        max_point = point
+                        found = true
+                    else:
+                        min_point = Vector3(
+                            minf(min_point.x, point.x),
+                            minf(min_point.y, point.y),
+                            minf(min_point.z, point.z)
+                        )
+                        max_point = Vector3(
+                            maxf(max_point.x, point.x),
+                            maxf(max_point.y, point.y),
+                            maxf(max_point.z, point.z)
+                        )
+
+    if not found:
+        return AABB(Vector3.ZERO, Vector3.ONE)
+    return AABB(min_point, max_point - min_point)
+
+
+static func _collect_meshes(node: Node, output: Array) -> void:
+    if node is MeshInstance3D:
+        output.append(node)
+    for child in node.get_children():
+        _collect_meshes(child, output)
