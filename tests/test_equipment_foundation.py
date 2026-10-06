@@ -7,10 +7,12 @@ from studio.models.asset import Asset
 from studio.models.character import CharacterProfile
 from studio.models.equipment import (
     RARITY_POWER_MULTIPLIER,
+    CharacterLoadout,
     CreatorCollection,
     EquipmentDefinition,
     EquipmentRarity,
     EquipmentSlot,
+    PLAYABLE_EQUIPMENT_SLOTS,
     StatBlock,
     create_equipment_instance,
     deterministic_roll,
@@ -239,3 +241,87 @@ def test_my_stuff_is_wired_into_creator_navigation():
     assert "HP" in page
     assert "ATK" in page
     assert "DEF" in page
+
+
+def test_equipment_v2_has_nine_playable_slots_and_legacy_outfit_is_hidden():
+    assert PLAYABLE_EQUIPMENT_SLOTS == (
+        EquipmentSlot.TOP,
+        EquipmentSlot.BOTTOM,
+        EquipmentSlot.SHOES,
+        EquipmentSlot.HEADWEAR,
+        EquipmentSlot.WEAPON_MAIN,
+        EquipmentSlot.WEAPON_OFFHAND,
+        EquipmentSlot.BACKPACK,
+        EquipmentSlot.WINGS,
+        EquipmentSlot.ACCESSORY,
+    )
+    assert EquipmentSlot.OUTFIT not in PLAYABLE_EQUIPMENT_SLOTS
+
+
+def test_legacy_outfit_loadout_migrates_to_top_without_losing_item(tmp_path):
+    repo = SQLiteStudioRepository(tmp_path / "studio.db")
+    character = _character(repo)
+
+    legacy_asset = Asset.create(
+        AssetType.EQUIPMENT,
+        display_name="Legacy Outfit",
+        slug="legacy-outfit",
+    )
+    legacy_definition = EquipmentDefinition(
+        definition_id=legacy_asset.asset_id,
+        display_name="Legacy Outfit",
+        slot=EquipmentSlot.OUTFIT,
+        compatible_tags=["humanoid"],
+        base_stats=StatBlock(hp=7, defense=4),
+    )
+    legacy_asset.metadata["equipment_definition"] = (
+        legacy_definition.model_dump(mode="json")
+    )
+    repo.save_asset(legacy_asset)
+
+    item = create_equipment_instance(
+        definition=legacy_definition,
+        rarity=EquipmentRarity.GREEN,
+        generation_seed="legacy-outfit-instance",
+    )
+    repo.save_collection(
+        CreatorCollection(
+            items=[item],
+            loadouts={
+                character.asset_id: CharacterLoadout(
+                    character_asset_id=character.asset_id,
+                    outfit_item_id=item.item_instance_id,
+                )
+            },
+        )
+    )
+
+    service = EquipmentService(repo)
+    collection = service.ensure_starter_collection()
+    loadout = collection.loadout_for(character.asset_id)
+    definitions = service.list_definitions()
+
+    assert collection.item_by_id(item.item_instance_id) is not None
+    assert loadout.top_item_id == item.item_instance_id
+    assert loadout.outfit_item_id is None
+    assert definitions[item.definition_id].slot == EquipmentSlot.TOP
+
+
+def test_starter_collection_covers_every_v2_slot(tmp_path):
+    repo = SQLiteStudioRepository(tmp_path / "studio.db")
+    service = EquipmentService(repo)
+    collection = service.ensure_starter_collection()
+    definitions = service.list_definitions()
+
+    slots = {
+        definitions[item.definition_id].slot
+        for item in collection.items
+        if item.definition_id in definitions
+    }
+
+    assert set(PLAYABLE_EQUIPMENT_SLOTS) <= slots
+    assert sum(
+        1
+        for item in collection.items
+        if definitions[item.definition_id].slot == EquipmentSlot.HEADWEAR
+    ) >= 2

@@ -25,6 +25,7 @@ class AvatarSocket(str, Enum):
     BACKPACK = "Socket_Backpack"
     WINGS = "Socket_Wings"
     ACCESSORY = "Socket_Accessory"
+    HEADWEAR = "Socket_Headwear"
 
 
 class AvatarAppearance(BaseModel):

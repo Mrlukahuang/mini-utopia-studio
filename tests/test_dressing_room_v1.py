@@ -3,7 +3,7 @@ from pathlib import Path
 from studio.core.enums import AssetType, ReviewStatus
 from studio.models.asset import Asset
 from studio.models.character import CharacterProfile
-from studio.models.equipment import EquipmentSlot
+from studio.models.equipment import EquipmentSlot, PLAYABLE_EQUIPMENT_SLOTS
 from studio.repositories.sqlite import SQLiteStudioRepository
 from studio.runtime.avatar_preview_3d import build_avatar_preview_html
 from studio.services.baby_service import BabyService
@@ -124,7 +124,7 @@ def test_dressing_room_is_child_visible_and_uses_shared_runtime():
     assert "baby: BabyRuntimeSpec | None = None" in preview
 
 
-def test_dressing_room_supports_all_five_canonical_slots():
+def test_dressing_room_supports_all_nine_canonical_slots():
     room = (
         ROOT / "studio" / "ui" / "creator" / "dressing_room.py"
     ).read_text(encoding="utf-8")
@@ -132,9 +132,17 @@ def test_dressing_room_supports_all_five_canonical_slots():
         ROOT / "studio" / "runtime" / "avatar_preview_3d.py"
     ).read_text(encoding="utf-8")
 
-    for slot in EquipmentSlot:
-        assert slot.value in runtime or "for slot in EquipmentSlot" in room
+    for slot in PLAYABLE_EQUIPMENT_SLOTS:
+        assert (
+            slot.value in runtime
+            or "PLAYABLE_EQUIPMENT_SLOTS" in room
+        )
 
     assert "Equipment_Backpack" in runtime
     assert "Equipment_Wings" in runtime
     assert "Equipment_Accessory" in runtime
+    assert "Equipment_Weapon_Offhand" in runtime
+    assert "Equipment_Headwear" in runtime
+    assert "armR.add(buildSword(weapon))" in runtime
+    assert "armL.add(buildShield(offhand))" in runtime
+    assert "g.rotation.z=-Math.PI/4" in runtime

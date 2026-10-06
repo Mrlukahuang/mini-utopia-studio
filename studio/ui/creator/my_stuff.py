@@ -6,7 +6,12 @@ import streamlit as st
 
 from studio.core.enums import AssetType, ReviewStatus
 from studio.models.character import CharacterProfile
-from studio.models.equipment import EquipmentRarity, EquipmentSlot, StatBlock
+from studio.models.equipment import (
+    EquipmentRarity,
+    EquipmentSlot,
+    PLAYABLE_EQUIPMENT_SLOTS,
+    StatBlock,
+)
 from studio.services.baby_service import BabyService
 from studio.ui.theme import render_game_hero
 
@@ -22,11 +27,15 @@ RARITY_META = {
 
 
 SLOT_LABELS = {
-    EquipmentSlot.OUTFIT: "👕 Outfit",
-    EquipmentSlot.WEAPON_MAIN: "⚔️ Weapon",
-    EquipmentSlot.BACKPACK: "🎒 Backpack",
-    EquipmentSlot.WINGS: "🪽 Wings",
-    EquipmentSlot.ACCESSORY: "✨ Accessory",
+    EquipmentSlot.TOP: "👕 Top / 上衣",
+    EquipmentSlot.BOTTOM: "👖 Bottom / 裤子",
+    EquipmentSlot.SHOES: "👟 Shoes / 鞋子",
+    EquipmentSlot.HEADWEAR: "👑 Headwear / 帽子·皇冠",
+    EquipmentSlot.WEAPON_MAIN: "⚔️ Main Hand / 主手",
+    EquipmentSlot.WEAPON_OFFHAND: "🛡️ Offhand / 副手·盾牌",
+    EquipmentSlot.BACKPACK: "🎒 Backpack / 背包",
+    EquipmentSlot.WINGS: "🪽 Wings / 翅膀",
+    EquipmentSlot.ACCESSORY: "✨ Accessory / 饰品",
 }
 
 
@@ -110,7 +119,7 @@ def render_my_stuff(ctx) -> None:
 
     with top_right:
         st.markdown("### Equipped / 当前装备")
-        for slot in EquipmentSlot:
+        for slot in PLAYABLE_EQUIPMENT_SLOTS:
             item_id = loadout.item_id_for_slot(slot)
             if not item_id:
                 st.write(f"{SLOT_LABELS[slot]} · —")
@@ -158,7 +167,7 @@ def render_my_stuff(ctx) -> None:
     with filter_a:
         slot_filter = st.selectbox(
             "Slot / 类型",
-            ["all", *[slot.value for slot in EquipmentSlot]],
+            ["all", *[slot.value for slot in PLAYABLE_EQUIPMENT_SLOTS]],
             format_func=lambda value: (
                 "All / 全部"
                 if value == "all"

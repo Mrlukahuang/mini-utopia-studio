@@ -265,7 +265,7 @@ function equippedItem(slot) {{
   return (E.equipped || {{}})[slot] || null;
 }}
 
-function buildSword(width, item) {{
+function buildSword(item) {{
   const g = new THREE.Group();
   g.name = 'Equipment_Weapon_Main';
   const rarity = rarityColor(item.rarity);
@@ -274,27 +274,100 @@ function buildSword(width, item) {{
   addMesh(g, roundedBox(.10,.35,.10,.035), mat('#74513B',.76), [0,-.26,0], 'Handle');
   const gem = addMesh(g,new THREE.SphereGeometry(.10,16,10),mat(rarity,.34,.14),[0,-.48,0],'Pommel');
   gem.castShadow=true;
-  g.position.set(.78*width,.98,.08);
-  g.rotation.z=-.12;
+  // Local hand pose: blade points upward/outward ~45°. Because this group is
+  // parented to ArmR it follows Idle/Walk/Run/Jump arm motion.
+  g.position.set(.04,-.39,.06);
+  g.rotation.z=-Math.PI/4;
+  return g;
+}}
+
+function buildShield(item) {{
+  const g=new THREE.Group();
+  g.name='Equipment_Weapon_Offhand';
+  const color=rarityColor(item.rarity);
+  const shield=addMesh(
+    g,new THREE.CylinderGeometry(.31,.31,.11,12),
+    mat(color,.58,.10),[0,0,0],'Shield'
+  );
+  shield.rotation.x=Math.PI/2;
+  addMesh(
+    g,new THREE.SphereGeometry(.09,14,10),
+    mat('#FFF4D7',.46,.15),[0,0,.09],'ShieldBoss'
+  );
+  g.position.set(-.03,-.22,.18);
+  g.rotation.z=Math.PI/12;
+  return g;
+}}
+
+function buildHeadwear(item, headWidth) {{
+  const g=new THREE.Group();
+  g.name='Equipment_Headwear';
+  const color=rarityColor(item.rarity);
+  const isCrown=(item.display_name || '').toLowerCase().includes('crown');
+
+  if(isCrown) {{
+    const ring=new THREE.Mesh(
+      new THREE.TorusGeometry(.34*headWidth,.055,10,24),
+      mat('#F4C95D',.34,.30)
+    );
+    ring.rotation.x=Math.PI/2;
+    g.add(ring);
+    for(const x of [-.25,0,.25]) {{
+      const point=addMesh(
+        g,new THREE.ConeGeometry(.09,.30,5),
+        mat('#F4C95D',.34,.30),[x*headWidth,.16,0],'CrownPoint'
+      );
+      point.rotation.z=x*.35;
+    }}
+  }} else {{
+    const cap=addMesh(
+      g,sphereGeo(.48*headWidth,.18,.45),
+      mat(color,.72),[0,0,0],'Cap'
+    );
+    addMesh(
+      g,roundedBox(.34,.06,.28,.03),
+      mat(color,.72),[.20*headWidth,-.08,.34],'CapBrim'
+    );
+  }}
+  g.position.set(0,2.38,0);
   return g;
 }}
 
 function addEquipment(root) {{
   const width = root.userData.bodyWidth || 1;
+  const headWidth = root.userData.headWidth || 1;
   const parts = root.userData.parts || {{}};
 
-  const outfit = equippedItem('outfit');
-  if (outfit && parts.body) {{
-    const color = rarityColor(outfit.rarity);
+  const top = equippedItem('top') || equippedItem('outfit');
+  if (top && parts.body) {{
+    const color = rarityColor(top.rarity);
     parts.body.material = mat(color,.78,.02);
     addMesh(
       root,roundedBox(.62*width,.13,.49*width,.05),
-      mat('#FFF4D7',.78),[0,1.18,.01],'OutfitCollar'
+      mat('#FFF4D7',.78),[0,1.18,.01],'TopCollar'
     );
   }}
 
+  const bottom = equippedItem('bottom');
+  if (bottom) {{
+    const color=rarityColor(bottom.rarity);
+    for(const leg of (parts.legs || [])) leg.material=mat(color,.80,.02);
+  }}
+
+  const shoes = equippedItem('shoes');
+  if (shoes) {{
+    const color=rarityColor(shoes.rarity);
+    for(const foot of (parts.feet || [])) foot.material=mat(color,.70,.03);
+  }}
+
   const weapon = equippedItem('weapon_main');
-  if (weapon) root.add(buildSword(width, weapon));
+  if (weapon && parts.armR) parts.armR.add(buildSword(weapon));
+
+  const offhand = equippedItem('weapon_offhand');
+  if (offhand && parts.armL) parts.armL.add(buildShield(offhand));
+
+  const headwear = equippedItem('headwear');
+  if (headwear) root.add(buildHeadwear(headwear, headWidth));
 
   const backpack = equippedItem('backpack');
   if (backpack) {{
@@ -331,11 +404,12 @@ function addEquipment(root) {{
   if (accessory) {{
     const color=rarityColor(accessory.rarity);
     const charm=new THREE.Mesh(
-      new THREE.TorusGeometry(.13,.04,10,20),
+      new THREE.TorusGeometry(.11,.035,10,20),
       mat(color,.35,.24)
     );
     charm.name='Equipment_Accessory';
-    charm.position.set(.35*width,1.46,.48);
+    // Chest/body placement: intentionally away from the face.
+    charm.position.set(.28*width,1.08,.30);
     charm.rotation.x=Math.PI/2;
     charm.castShadow=true;
     root.add(charm);
@@ -531,19 +605,24 @@ function buildAvatar() {{
     root,sphereGeo(.70*headWidth,.69,.67),surfaceMat,[0,1.72,0],'SpeciesHead'
   );
 
-  const limbs = {{arms:[],legs:[]}};
+  const limbs = {{arms:[],legs:[],feet:[]}};
   for (const s of [-1,1]) {{
+    const sideName=s<0?'L':'R';
     const arm = addMesh(
-      root,roundedBox(.22,.72,.22,.08),surfaceMat,[.52*width*s,1.05,0],'Arm'
+      root,roundedBox(.22,.72,.22,.08),surfaceMat,
+      [.52*width*s,1.05,0],'Arm'+sideName
     );
     limbs.arms.push(arm);
     const leg = addMesh(
-      root,roundedBox(.27,.68,.30,.08),mat('#BFDFF5',.82),[.22*s,.34,0],'Leg'
+      root,roundedBox(.27,.68,.30,.08),mat('#BFDFF5',.82),
+      [.22*s,.34,0],'Leg'+sideName
     );
     limbs.legs.push(leg);
-    addMesh(
-      root,roundedBox(.33,.22,.46,.08),shoeMat,[.22*s,.085,.07],'Foot'
+    const foot=addMesh(
+      root,roundedBox(.33,.22,.46,.08),shoeMat,
+      [.22*s,.085,.07],'Foot'+sideName
     );
+    limbs.feet.push(foot);
   }}
 
   const eyeScale = A.eye_style_id === 'eyes_sparkle_v1' ? 1.22
@@ -571,15 +650,22 @@ function buildAvatar() {{
     'Socket_Weapon_L':[-.67*width,.90,0],
     'Socket_Backpack':[0,1.12,-.32],
     'Socket_Wings':[0,1.34,-.33],
-    'Socket_Accessory':[0,1.75,0],
+    'Socket_Accessory':[.30*width,1.08,.26],
+    'Socket_Headwear':[0,2.38,0],
   }};
   for (const [name,p] of Object.entries(socketPositions)) {{
     const node = new THREE.Object3D();
     node.name=name; node.position.set(...p); sockets.add(node);
   }}
 
-  root.userData.parts={{body,head,...limbs}};
+  root.userData.parts={{
+    body,head,...limbs,
+    armL:limbs.arms[0], armR:limbs.arms[1],
+    legL:limbs.legs[0], legR:limbs.legs[1],
+    footL:limbs.feet[0], footR:limbs.feet[1],
+  }};
   root.userData.bodyWidth=width;
+  root.userData.headWidth=headWidth;
   root.userData.sockets=sockets;
   return root;
 }}

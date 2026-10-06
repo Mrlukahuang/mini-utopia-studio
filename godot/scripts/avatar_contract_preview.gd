@@ -185,7 +185,10 @@ func _position_preview_sockets(sockets: Node3D, width_scale: float) -> void:
     wings.position = Vector3(0.0, 1.34, -0.33)
 
     var accessory := sockets.get_node(MiniUtopiaAvatarContract.SOCKET_ACCESSORY)
-    accessory.position = Vector3(0.0, 1.75, 0.0)
+    accessory.position = Vector3(0.30 * width_scale, 1.08, 0.26)
+
+    var headwear := sockets.get_node(MiniUtopiaAvatarContract.SOCKET_HEADWEAR)
+    headwear.position = Vector3(0.0, 2.34, 0.0)
 
 
 func _build_animation_player(root: Node3D) -> AnimationPlayer:

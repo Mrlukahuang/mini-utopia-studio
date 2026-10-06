@@ -1,14 +1,21 @@
 class_name MiniUtopiaEquipmentRuntime
 extends RefCounted
 
-const SLOT_OUTFIT := "outfit"
+const SLOT_OUTFIT := "outfit" # legacy v1 compatibility
+const SLOT_TOP := "top"
+const SLOT_BOTTOM := "bottom"
+const SLOT_SHOES := "shoes"
+const SLOT_HEADWEAR := "headwear"
 const SLOT_WEAPON_MAIN := "weapon_main"
+const SLOT_WEAPON_OFFHAND := "weapon_offhand"
 const SLOT_BACKPACK := "backpack"
 const SLOT_WINGS := "wings"
 const SLOT_ACCESSORY := "accessory"
 
 const SOCKET_BY_SLOT := {
     SLOT_WEAPON_MAIN: MiniUtopiaAvatarContract.SOCKET_WEAPON_R,
+    SLOT_WEAPON_OFFHAND: MiniUtopiaAvatarContract.SOCKET_WEAPON_L,
+    SLOT_HEADWEAR: MiniUtopiaAvatarContract.SOCKET_HEADWEAR,
     SLOT_BACKPACK: MiniUtopiaAvatarContract.SOCKET_BACKPACK,
     SLOT_WINGS: MiniUtopiaAvatarContract.SOCKET_WINGS,
     SLOT_ACCESSORY: MiniUtopiaAvatarContract.SOCKET_ACCESSORY,
@@ -29,8 +36,8 @@ static func attach_loadout(
     for raw_slot in equipped.keys():
         var slot := String(raw_slot)
         var item: Dictionary = equipped.get(raw_slot, {})
-        if slot == SLOT_OUTFIT:
-            _apply_outfit(avatar_root, item)
+        if slot in [SLOT_OUTFIT, SLOT_TOP, SLOT_BOTTOM, SLOT_SHOES]:
+            _apply_clothing(avatar_root, slot, item)
             result[slot] = avatar_root.get_node_or_null("Visual/Body")
             continue
 
@@ -88,6 +95,10 @@ static func _procedural_fallback(
     match slot:
         SLOT_WEAPON_MAIN:
             _build_sword(root, color)
+        SLOT_WEAPON_OFFHAND:
+            _build_shield(root, color)
+        SLOT_HEADWEAR:
+            _build_headwear(root, color, String(item.get("display_name", "")))
         SLOT_BACKPACK:
             _build_backpack(root, color)
         SLOT_WINGS:
@@ -100,16 +111,23 @@ static func _procedural_fallback(
     return root
 
 
-static func _apply_outfit(
+static func _apply_clothing(
     avatar_root: Node3D,
+    slot: String,
     item: Dictionary
 ) -> void:
-    var body := avatar_root.get_node_or_null("Visual/Body") as MeshInstance3D
-    if body == null:
+    var color := _rarity_color(String(item.get("rarity", "green")))
+    if slot in [SLOT_OUTFIT, SLOT_TOP]:
+        var body := avatar_root.get_node_or_null("Visual/Body") as MeshInstance3D
+        if body != null:
+            body.material_override = _material(color)
         return
-    body.material_override = _material(
-        _rarity_color(String(item.get("rarity", "green")))
-    )
+
+    var pattern := "Leg*" if slot == SLOT_BOTTOM else "Foot*"
+    for node in avatar_root.find_children(pattern, "MeshInstance3D", true, false):
+        var mesh_node := node as MeshInstance3D
+        if mesh_node != null:
+            mesh_node.material_override = _material(color)
 
 
 static func _clear_equipment_children(socket: Node3D) -> void:
@@ -148,7 +166,55 @@ static func _build_sword(root: Node3D, color: Color) -> void:
     blade.material_override = _material(color)
     root.add_child(blade)
 
-    root.rotation_degrees = Vector3(0.0, 0.0, -9.0)
+    root.rotation_degrees = Vector3(0.0, 0.0, -45.0)
+
+
+static func _build_shield(root: Node3D, color: Color) -> void:
+    var shield := MeshInstance3D.new()
+    shield.name = "Shield"
+    var mesh := CylinderMesh.new()
+    mesh.top_radius = 0.30
+    mesh.bottom_radius = 0.30
+    mesh.height = 0.10
+    shield.mesh = mesh
+    shield.rotation_degrees = Vector3(90.0, 0.0, 0.0)
+    shield.material_override = _material(color)
+    root.add_child(shield)
+
+
+static func _build_headwear(
+    root: Node3D,
+    color: Color,
+    display_name: String
+) -> void:
+    if display_name.to_lower().contains("crown"):
+        var ring := MeshInstance3D.new()
+        ring.name = "CrownRing"
+        var ring_mesh := CylinderMesh.new()
+        ring_mesh.top_radius = 0.34
+        ring_mesh.bottom_radius = 0.34
+        ring_mesh.height = 0.10
+        ring.mesh = ring_mesh
+        ring.material_override = _material(Color("#F2C75C"))
+        root.add_child(ring)
+        for x in [-0.22, 0.0, 0.22]:
+            var point := MeshInstance3D.new()
+            point.name = "CrownPoint"
+            var point_mesh := PrismMesh.new()
+            point_mesh.size = Vector3(0.14, 0.28, 0.12)
+            point.mesh = point_mesh
+            point.position = Vector3(x, 0.18, 0.0)
+            point.material_override = _material(Color("#F2C75C"))
+            root.add_child(point)
+    else:
+        var cap := MeshInstance3D.new()
+        cap.name = "Cap"
+        var cap_mesh := SphereMesh.new()
+        cap_mesh.radius = 0.42
+        cap_mesh.height = 0.28
+        cap.mesh = cap_mesh
+        cap.material_override = _material(color)
+        root.add_child(cap)
 
 
 static func _build_backpack(root: Node3D, color: Color) -> void:
@@ -191,7 +257,7 @@ static func _build_accessory(root: Node3D, color: Color) -> void:
     mesh.radius = 0.10
     mesh.height = 0.20
     charm.mesh = mesh
-    charm.position = Vector3(0.0, -0.05, 0.34)
+    charm.position = Vector3(0.0, 0.0, 0.08)
     charm.material_override = _material(color)
     root.add_child(charm)
 
