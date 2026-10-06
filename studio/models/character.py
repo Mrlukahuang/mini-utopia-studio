@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from studio.models.avatar import AvatarAppearance
 
-CHARACTER_SCHEMA_VERSION = "1.2"
+
+CHARACTER_SCHEMA_VERSION = "1.3"
 
 # These fields are expected before a Character is considered creator-ready.
 # The parser may leave them blank when the source description does not specify them;
@@ -78,6 +80,9 @@ class CharacterProfile(BaseModel):
     speaking_tone: str = ""
     native_language: str = ""
     english_level: int | None = Field(default=None, ge=1, le=10)
+
+    # Playable Avatar / 可玩角色
+    avatar: AvatarAppearance = Field(default_factory=AvatarAppearance)
 
     # Detail / 细节
     story_role: str = ""
