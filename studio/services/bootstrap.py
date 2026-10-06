@@ -45,7 +45,6 @@ class StudioContext:
     registry: PluginRegistry
     assets: AssetService
     equipment: EquipmentService
-    babies: BabyService
     stories: StoryService
     styles: StyleService
     universes: UniverseService
@@ -65,6 +64,10 @@ class StudioContext:
     reusable_assets: ReusableAssetLibraryService
     reusable_asset_packs: ReusableAssetPackService
     world_concept_match: WorldConceptMatchService
+
+    @property
+    def babies(self) -> BabyService:
+        return BabyService(self.repository)
 
 
 def _build_storage(settings: Settings) -> ObjectStorage:
@@ -190,7 +193,6 @@ def build_context(settings: Settings) -> StudioContext:
         registry=registry,
         assets=AssetService(repository),
         equipment=EquipmentService(repository),
-        babies=BabyService(repository),
         stories=StoryService(repository),
         styles=StyleService(repository),
         universes=UniverseService(repository),
