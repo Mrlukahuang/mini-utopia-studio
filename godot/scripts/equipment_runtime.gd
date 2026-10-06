@@ -30,14 +30,14 @@ static func attach_loadout(
 
     var equipped: Dictionary = payload.get("equipped", {})
     for raw_slot in equipped.keys():
-        var slot := String(raw_slot)
+        var slot := _string_or_empty(raw_slot)
         var item: Dictionary = equipped.get(raw_slot, {})
         if slot in [SLOT_OUTFIT, SLOT_TOP, SLOT_BOTTOM, SLOT_SHOES]:
             _apply_clothing(avatar_root, slot, item)
             result[slot] = avatar_root.get_node_or_null("Visual/Body")
             continue
 
-        var socket_name := String(SOCKET_BY_SLOT.get(slot, ""))
+        var socket_name := _string_or_empty(SOCKET_BY_SLOT.get(slot, ""))
         if socket_name.is_empty():
             continue
         # Hand sockets may live under animated arm/bone nodes while body
@@ -64,7 +64,7 @@ static func _attach_item(
     slot: String,
     item: Dictionary
 ) -> Node3D:
-    var mesh_asset_id := String(item.get("mesh_asset_id", ""))
+    var mesh_asset_id := _string_or_empty(item.get("mesh_asset_id", ""))
     if not mesh_asset_id.is_empty() and AssetVaultRuntime.is_installed():
         var entry := AssetVaultRuntime.entry_by_id(mesh_asset_id)
         if not entry.is_empty():
@@ -92,7 +92,7 @@ static func _procedural_fallback(
     root.name = "Equipment_" + slot
     socket.add_child(root)
 
-    var color := _rarity_color(String(item.get("rarity", "green")))
+    var color := _rarity_color(_string_or_empty(item.get("rarity", "green")))
 
     match slot:
         SLOT_WEAPON_MAIN:
@@ -100,7 +100,7 @@ static func _procedural_fallback(
         SLOT_WEAPON_OFFHAND:
             _build_shield(root, color)
         SLOT_HEADWEAR:
-            _build_headwear(root, color, String(item.get("display_name", "")))
+            _build_headwear(root, color, _string_or_empty(item.get("display_name", "")))
         SLOT_BACKPACK:
             _build_backpack(root, color)
         SLOT_WINGS:
@@ -118,7 +118,7 @@ static func _apply_clothing(
     slot: String,
     item: Dictionary
 ) -> void:
-    var color := _rarity_color(String(item.get("rarity", "green")))
+    var color := _rarity_color(_string_or_empty(item.get("rarity", "green")))
     if slot in [SLOT_OUTFIT, SLOT_TOP]:
         var body := avatar_root.get_node_or_null("Visual/Body") as MeshInstance3D
         if body != null:
@@ -134,7 +134,7 @@ static func _apply_clothing(
 
 static func _clear_equipment_children(socket: Node3D) -> void:
     for child in socket.get_children():
-        if String(child.name).begins_with("Equipment_"):
+        if _string_or_empty(child.name).begins_with("Equipment_"):
             child.queue_free()
 
 
@@ -262,6 +262,12 @@ static func _build_accessory(root: Node3D, color: Color) -> void:
     charm.position = Vector3(0.0, 0.0, 0.08)
     charm.material_override = _material(color)
     root.add_child(charm)
+
+
+static func _string_or_empty(value: Variant) -> String:
+    if value == null:
+        return ""
+    return str(value)
 
 
 static func _rarity_color(rarity: String) -> Color:
