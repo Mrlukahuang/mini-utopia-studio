@@ -61,14 +61,21 @@ def test_character_factory_does_not_ask_duplicate_visual_questions():
     assert "legacy_visual_updates(draft, avatar)" in factory
 
 
-def test_factory_preview_is_larger_while_real_3d_preview_is_next_runtime_step():
+def test_factory_preview_is_large_real_3d_and_reusable():
     editor = (
         ROOT / "studio" / "ui" / "creator" / "avatar_editor.py"
     ).read_text(encoding="utf-8")
     preview = (
         ROOT / "studio" / "ui" / "creator" / "avatar_preview.py"
     ).read_text(encoding="utf-8")
+    runtime = (
+        ROOT / "studio" / "runtime" / "avatar_preview_3d.py"
+    ).read_text(encoding="utf-8")
 
-    assert 'st.columns([1, 1.35], gap="large")' in editor
-    assert "height:390px;" in preview
-    assert "The real Godot Avatar" in preview
+    assert 'st.columns([0.86, 1.74], gap="large")' in editor
+    assert "Live 3D Avatar / 实时 3D 预览" in preview
+    assert "components.html(" in preview
+    assert "height=620" in preview
+    assert "THREE.WebGLRenderer" in runtime
+    assert "OrbitControls" in runtime
+    assert "avatar-stage" not in preview

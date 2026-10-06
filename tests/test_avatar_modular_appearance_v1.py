@@ -78,4 +78,39 @@ def test_character_factory_contains_avatar_editor_and_live_preview():
     assert "Eyes / 眼型" in editor
     assert "Hair Style / 发型" in editor
     assert "render_avatar_preview(result)" in editor
-    assert "Live Avatar Preview / 实时预览" in preview
+    assert "Live 3D Avatar / 实时 3D 预览" in preview
+    assert "components.html(" in preview
+    assert "height=620" in preview
+    assert "avatar-stage" not in preview
+
+
+def test_webgl_avatar_preview_mirrors_godot_contract():
+    runtime = (
+        ROOT / "studio" / "runtime" / "avatar_preview_3d.py"
+    ).read_text(encoding="utf-8")
+    contract = (
+        ROOT / "godot" / "scripts" / "avatar_contract.gd"
+    ).read_text(encoding="utf-8")
+
+    assert "THREE.WebGLRenderer" in runtime
+    assert "OrbitControls" in runtime
+    assert "Idle" in runtime
+    assert "Walk" in runtime
+    assert "Run" in runtime
+    assert "Jump" in runtime
+
+    for socket_name in (
+        "Socket_Weapon_R",
+        "Socket_Weapon_L",
+        "Socket_Backpack",
+        "Socket_Wings",
+        "Socket_Accessory",
+    ):
+        assert socket_name in runtime
+        assert socket_name in contract
+
+    assert '"slim": 0.84' in runtime
+    assert '"standard": 1.0' in runtime
+    assert '"chubby": 1.16' in runtime
+    assert "return 0.84" in contract
+    assert "return 1.16" in contract
