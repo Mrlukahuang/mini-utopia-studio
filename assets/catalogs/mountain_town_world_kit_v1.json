@@ -598,6 +598,138 @@
       "category": "resource_prop",
       "source_member": "KayKit_ResourceBits_1.0_FREE/Assets/gltf/Textiles_Stack_Small.gltf",
       "scale_mode": "native"
+    },
+    {
+      "id": "forest_grass_1_a_singlesided_color1",
+      "pack": "kaykit_forest",
+      "category": "ground_dressing",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Grass_1_A_Singlesided_Color1.gltf"
+    },
+    {
+      "id": "forest_grass_1_c_singlesided_color1",
+      "pack": "kaykit_forest",
+      "category": "ground_dressing",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Grass_1_C_Singlesided_Color1.gltf"
+    },
+    {
+      "id": "forest_grass_2_a_singlesided_color1",
+      "pack": "kaykit_forest",
+      "category": "ground_dressing",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Grass_2_A_Singlesided_Color1.gltf"
+    },
+    {
+      "id": "forest_grass_2_c_singlesided_color1",
+      "pack": "kaykit_forest",
+      "category": "ground_dressing",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Grass_2_C_Singlesided_Color1.gltf"
+    },
+    {
+      "id": "forest_bush_1_d_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Bush_1_D_Color1.gltf"
+    },
+    {
+      "id": "forest_bush_2_b_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Bush_2_B_Color1.gltf"
+    },
+    {
+      "id": "forest_bush_3_c_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Bush_3_C_Color1.gltf"
+    },
+    {
+      "id": "forest_bush_4_a_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Bush_4_A_Color1.gltf"
+    },
+    {
+      "id": "forest_bush_4_c_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Bush_4_C_Color1.gltf"
+    },
+    {
+      "id": "forest_rock_1_g_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Rock_1_G_Color1.gltf"
+    },
+    {
+      "id": "forest_rock_1_m_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Rock_1_M_Color1.gltf"
+    },
+    {
+      "id": "forest_rock_2_b_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Rock_2_B_Color1.gltf"
+    },
+    {
+      "id": "forest_rock_2_h_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Rock_2_H_Color1.gltf"
+    },
+    {
+      "id": "forest_rock_3_d_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Rock_3_D_Color1.gltf"
+    },
+    {
+      "id": "forest_rock_3_n_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Rock_3_N_Color1.gltf"
+    },
+    {
+      "id": "forest_tree_1_a_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Tree_1_A_Color1.gltf"
+    },
+    {
+      "id": "forest_tree_2_a_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Tree_2_A_Color1.gltf"
+    },
+    {
+      "id": "forest_tree_2_c_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Tree_2_C_Color1.gltf"
+    },
+    {
+      "id": "forest_tree_2_e_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Tree_2_E_Color1.gltf"
+    },
+    {
+      "id": "forest_tree_3_b_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Tree_3_B_Color1.gltf"
+    },
+    {
+      "id": "forest_tree_4_a_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Tree_4_A_Color1.gltf"
+    },
+    {
+      "id": "forest_tree_4_c_color1",
+      "pack": "kaykit_forest",
+      "category": "nature",
+      "source_member": "KayKit_Forest_Nature_Pack_1.0_FREE/Assets/gltf/Tree_4_C_Color1.gltf"
     }
   ]
 }
