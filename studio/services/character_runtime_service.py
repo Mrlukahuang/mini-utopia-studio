@@ -4,6 +4,7 @@ import base64
 
 from studio.core.enums import AssetType
 from studio.models.asset import Asset, AssetFile
+from studio.models.avatar import AvatarSocket
 from studio.models.character import CharacterProfile
 from studio.models.runtime_character import CharacterRuntimeSpec, RuntimeAnimationSpec
 from studio.repositories.base import StudioRepository
@@ -138,10 +139,7 @@ class CharacterRuntimeService:
             model_data_uri=model_data_uri,
             rig_family=avatar.rig_family,
             body_type=avatar.body_type,
-            socket_names=tuple(socket.value for socket in __import__(
-                "studio.models.avatar",
-                fromlist=["AvatarSocket"],
-            ).AvatarSocket),
+            socket_names=tuple(socket.value for socket in AvatarSocket),
             species_head_id=avatar.species_head_id,
             surface_type=avatar.surface_type,
             surface_color_hex=body,
