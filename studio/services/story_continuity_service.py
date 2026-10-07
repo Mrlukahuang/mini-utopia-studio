@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from studio.core.enums import AssetType, ReviewStatus, StoryMode
 from studio.models.character import CharacterProfile
-from studio.models.equipment import PLAYABLE_EQUIPMENT_SLOTS
+from studio.models.equipment import (
+    CreatorCollection,
+    EquipmentDefinition,
+    EquipmentSlot,
+    PLAYABLE_EQUIPMENT_SLOTS,
+    StatBlock,
+)
 from studio.models.story_continuity import (
     ContinuityBabyState,
     ContinuityCharacterState,
@@ -13,8 +19,8 @@ from studio.models.story_continuity import (
     StoryContinuityContext,
 )
 from studio.repositories.base import StudioRepository
-from studio.services.baby_service import BabyService
-from studio.services.equipment_service import EquipmentService
+from studio.services.baby_service import DEFAULT_BABY_ROSTER_ID
+from studio.services.equipment_service import DEFAULT_COLLECTION_ID
 from studio.services.world_creative_layout_service import WorldCreativeLayoutService
 from studio.services.world_gameplay_layer_service import WorldGameplayLayerService
 
@@ -24,8 +30,6 @@ class StoryContinuityService:
 
     def __init__(self, repository: StudioRepository):
         self.repository = repository
-        self.equipment = EquipmentService(repository)
-        self.babies = BabyService(repository)
 
     def build(
         self,
@@ -35,8 +39,22 @@ class StoryContinuityService:
         universe_id: str | None = None,
     ) -> StoryContinuityContext:
         selected_ids = list(dict.fromkeys(character_asset_ids))
-        definitions = self.equipment.list_definitions()
-        collection = self.equipment.ensure_starter_collection()
+        definitions: dict[str, EquipmentDefinition] = {}
+        for equipment_asset in self.repository.list_assets(AssetType.EQUIPMENT):
+            raw_definition = equipment_asset.metadata.get("equipment_definition")
+            if not raw_definition:
+                continue
+            definition = EquipmentDefinition.model_validate(raw_definition)
+            if definition.slot == EquipmentSlot.OUTFIT:
+                definition = definition.model_copy(
+                    update={"slot": EquipmentSlot.TOP}
+                )
+            definitions[definition.definition_id] = definition
+
+        collection = (
+            self.repository.get_collection(DEFAULT_COLLECTION_ID)
+            or CreatorCollection(collection_id=DEFAULT_COLLECTION_ID)
+        )
 
         character_states: list[ContinuityCharacterState] = []
         equipped_item_ids: set[str] = set()
@@ -50,8 +68,13 @@ class StoryContinuityService:
             profile = CharacterProfile.model_validate(
                 asset.metadata.get("character_profile", {})
             )
-            final_stats = self.equipment.final_stats(character_id)
-            loadout = collection.loadout_for(character_id)
+            raw_base = asset.metadata.get("base_stats")
+            final_stats = (
+                StatBlock.model_validate(raw_base)
+                if raw_base
+                else StatBlock(hp=100, atk=10, defense=8)
+            )
+            loadout = collection.loadout_for(character_id).migrate_v2()
             equipped: list[ContinuityEquipmentItem] = []
             for slot in PLAYABLE_EQUIPMENT_SLOTS:
                 item_id = loadout.item_id_for_slot(slot)
@@ -66,6 +89,7 @@ class StoryContinuityService:
                 if item is None or definition is None:
                     continue
                 equipped_item_ids.add(item.item_instance_id)
+                final_stats = final_stats.plus(item.rolled_stats)
                 equipped.append(
                     ContinuityEquipmentItem(
                         item_instance_id=item.item_instance_id,
@@ -91,7 +115,8 @@ class StoryContinuityService:
                 )
             )
 
-        baby = self.babies.active_baby()
+        roster = self.repository.get_baby_roster(DEFAULT_BABY_ROSTER_ID)
+        baby = roster.active_baby() if roster is not None else None
         active_baby = (
             ContinuityBabyState(
                 baby_id=baby.baby_id,
