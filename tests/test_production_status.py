@@ -244,3 +244,9 @@ def test_production_progress_ui_is_child_visible():
     assert "Generate Next Frame / 生成下一张分镜" in ui
     assert "Storyboard Approved · Ready to Render" in ui
     assert "production_status_service.status(" in ui
+    loading = "Loading Production Progress / 正在读取制作进度…"
+    assert loading in ui
+    assert "production_progress_slot = st.empty()" in ui
+    assert ui.index(loading) < ui.index(
+        "production_status_service.status("
+    )
