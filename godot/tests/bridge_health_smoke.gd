@@ -4,6 +4,12 @@ var _request: HTTPRequest
 
 
 func _initialize() -> void:
+    # SceneTree._initialize runs before child Nodes are fully inside the tree.
+    # Defer one tick so HTTPRequest is configured after entering SceneTree.
+    call_deferred("_start_request")
+
+
+func _start_request() -> void:
     _request = HTTPRequest.new()
     _request.timeout = 5.0
     root.add_child(_request)
