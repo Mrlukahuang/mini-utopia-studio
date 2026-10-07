@@ -42,6 +42,7 @@ class CreatorPlaySessionService:
         *,
         character_asset_id: str,
         world_asset_id: str | None = None,
+        quest_id: str | None = None,
     ) -> PlaySessionRuntimeSpec:
         character_asset = self.repository.get_asset(character_asset_id)
         if (
@@ -49,6 +50,18 @@ class CreatorPlaySessionService:
             or character_asset.asset_type != AssetType.CHARACTER
         ):
             raise ValueError(f"Character not found: {character_asset_id}")
+
+        quest = None
+        if quest_id is not None:
+            quest = self.repository.get_quest(quest_id)
+            if quest is None:
+                raise ValueError(f"Quest not found: {quest_id}")
+            if world_asset_id is None:
+                world_asset_id = quest.world_asset_id
+            elif world_asset_id != quest.world_asset_id:
+                raise ValueError(
+                    "Quest World does not match requested PlaySession World."
+                )
 
         world_name: str | None = None
         if world_asset_id is not None:
@@ -63,6 +76,7 @@ class CreatorPlaySessionService:
             character=self.character_runtime.resolve(character_asset),
             equipment=self.equipment.runtime_spec(character_asset.asset_id),
             baby=self.babies.runtime_spec(),
+            quest=quest,
             world_asset_id=world_asset_id,
             world_name=world_name,
         )
@@ -72,10 +86,12 @@ class CreatorPlaySessionService:
         *,
         character_asset_id: str,
         world_asset_id: str | None = None,
+        quest_id: str | None = None,
     ) -> PlaySessionRuntimeSpec:
         spec = self.build(
             character_asset_id=character_asset_id,
             world_asset_id=world_asset_id,
+            quest_id=quest_id,
         )
         spec.save_json(self.export_path)
         return spec

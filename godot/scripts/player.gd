@@ -93,6 +93,9 @@ func _physics_process(delta: float) -> void:
     if Input.is_action_just_pressed("attack"):
         _attack_nearest_enemy()
 
+    if Input.is_action_just_pressed("interact"):
+        try_quest_interact()
+
     move_and_slide()
 
     if creator_play_runtime != null:
@@ -105,6 +108,26 @@ func _physics_process(delta: float) -> void:
 
     if global_position.y < -10.0:
         _respawn()
+
+
+func record_quest_event(
+    event_type: String,
+    target_id: String = "",
+    amount: int = 1
+) -> bool:
+    if creator_play_runtime == null:
+        return false
+    return creator_play_runtime.record_quest_event(
+        event_type,
+        target_id,
+        amount
+    )
+
+
+func try_quest_interact() -> bool:
+    if creator_play_runtime == null:
+        return false
+    return creator_play_runtime.try_quest_interact()
 
 
 func take_damage(raw_amount: int) -> void:

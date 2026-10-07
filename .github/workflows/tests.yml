@@ -65,3 +65,7 @@ jobs:
       - name: Smoke-test deferred Baby follow runtime
         run: |
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/baby_follow_spawn_smoke.gd
+
+      - name: Smoke-test generic Quest runtime
+        run: |
+          /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/quest_runtime_smoke.gd
