@@ -7,6 +7,7 @@ from studio.models.character import CharacterProfile
 from studio.models.runtime_character import CharacterRuntimeSpec
 from studio.models.render import WorldRenderSpec
 from studio.models.world import WorldBlueprint, WorldProfile
+from studio.models.world_creative import WorldCreativeLayout
 
 
 THREE_VERSION = "0.181.0"
@@ -27,6 +28,7 @@ def build_world_runtime_html(
     character_runtime: CharacterRuntimeSpec | None = None,
     render_spec: WorldRenderSpec | None = None,
     render_asset_payloads: dict[str, str] | None = None,
+    creative_layout: WorldCreativeLayout | None = None,
 ) -> str:
     """Build a self-contained Three.js playground for a saved WorldBlueprint.
 
@@ -54,6 +56,11 @@ def build_world_runtime_html(
             character_runtime.model_dump(mode="json")
             if character_runtime is not None
             else CharacterRuntimeSpec().model_dump(mode="json")
+        ),
+        "creativeLayout": (
+            creative_layout.model_dump(mode="json")
+            if creative_layout is not None
+            else None
         ),
     }
     data_json = _safe_json(runtime_data)
@@ -166,6 +173,7 @@ const layoutById = new Map(
 const gltfLoader = new GLTFLoader();
 const character = DATA.character || {{}};
 const characterRuntime = DATA.characterRuntime || {{}};
+const creativeLayout = DATA.creativeLayout || {{decorations:[]}};
 const visualAnchor = bp.visual_anchor || {{}};
 const anchorText = [
   ...(visualAnchor.must_preserve || []),
@@ -269,6 +277,57 @@ if (renderSpec?.environment?.lights?.length) {{
 
 const world = new THREE.Group();
 scene.add(world);
+
+function addCreativeDecoration(item) {{
+  const g = new THREE.Group();
+  const colorMap = {{
+    star_lamp:'#FFD968',
+    flower_pot:'#F59BC2',
+    toy_bench:'#CFA77E',
+    mini_flag:'#78D66C',
+    cloud_cushion:'#EAF4FF'
+  }};
+  const color = colorMap[item.prop_type] || '#FFD968';
+  const material = mat(color,.72);
+
+  if (item.prop_type === 'star_lamp') {{
+    const pole = new THREE.Mesh(new THREE.BoxGeometry(.18,1.5,.18), mat('#FFF4D7'));
+    pole.position.y=.75; g.add(pole);
+    const star = new THREE.Mesh(new THREE.OctahedronGeometry(.38,0), material);
+    star.position.y=1.75; g.add(star);
+  }} else if (item.prop_type === 'flower_pot') {{
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(.34,.42,.52,16), mat('#CFA77E'));
+    pot.position.y=.26; g.add(pot);
+    const bloom = new THREE.Mesh(new THREE.SphereGeometry(.34,16,10), material);
+    bloom.position.y=.72; g.add(bloom);
+  }} else if (item.prop_type === 'toy_bench') {{
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(1.5,.18,.48), material);
+    seat.position.y=.58; g.add(seat);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(1.5,.62,.16), material);
+    back.position.set(0,.9,-.18); g.add(back);
+    for (const x of [-.56,.56]) {{
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(.14,.58,.14), mat('#8B6A55'));
+      leg.position.set(x,.29,0); g.add(leg);
+    }}
+  }} else if (item.prop_type === 'mini_flag') {{
+    const pole = new THREE.Mesh(new THREE.BoxGeometry(.10,1.6,.10), mat('#FFF4D7'));
+    pole.position.y=.8; g.add(pole);
+    const flag = new THREE.Mesh(new THREE.BoxGeometry(.72,.42,.08), material);
+    flag.position.set(.36,1.35,0); g.add(flag);
+  }} else {{
+    const cushion = new THREE.Mesh(new THREE.SphereGeometry(.55,18,12), material);
+    cushion.scale.y=.45; cushion.position.y=.28; g.add(cushion);
+  }}
+
+  const p=item.position || [0,0,0];
+  g.position.set(p[0]||0,p[1]||0,p[2]||0);
+  g.rotation.y=THREE.MathUtils.degToRad(item.rotation_y||0);
+  g.scale.setScalar(item.scale||1);
+  g.name='Creative_'+(item.decoration_id||item.prop_type||'Decoration');
+  world.add(g);
+}}
+
+(creativeLayout.decorations || []).forEach(addCreativeDecoration);
 
 function mat(color, rough=.82) {{
   return new THREE.MeshStandardMaterial({{
