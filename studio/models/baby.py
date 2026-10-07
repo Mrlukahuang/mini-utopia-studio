@@ -82,6 +82,8 @@ class BabyRuntimeSpec(BaseModel):
     appearance_seed: str
     growth_stage: BabyGrowthStage
     level: int
+    xp: int = 0
+    bond: int = 0
     active: bool
     cosmetic_item_ids: list[str] = Field(default_factory=list)
     follow_enabled: bool = True
