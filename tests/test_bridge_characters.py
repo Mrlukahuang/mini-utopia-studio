@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from http import HTTPStatus
 
 from studio.bridge.characters import (
@@ -166,3 +167,192 @@ def test_bridge_character_routes_report_repository_unavailable():
         "error": "repository_unavailable",
         "message": "Canonical Creator repository is unavailable.",
     }
+
+
+
+def _put_payload(contract: dict, *, hair_style_id: str) -> dict:
+    profile = json.loads(json.dumps(contract["profile"]))
+    profile["avatar"]["customized"] = True
+    profile["avatar"]["hair_style_id"] = hair_style_id
+    return {
+        "schema_version": "1.0",
+        "revision": contract["revision"],
+        "display_name": contract["display_name"],
+        "description": contract["description"],
+        "profile": profile,
+    }
+
+
+def test_bridge_character_put_updates_same_id_and_survives_restart(tmp_path):
+    db_path = tmp_path / "studio.db"
+    custom, _legacy, _archived = _seed_characters(db_path)
+
+    repo = SQLiteStudioRepository(db_path)
+    asset = repo.get_asset(custom.asset_id)
+    assert asset is not None
+    asset.metadata["continuity_note"] = "preserve-me"
+    repo.save_asset(asset)
+
+    reader = CharacterBridgeReader(repo)
+    before = reader.get_character(custom.asset_id)
+    assert before is not None
+    payload = _put_payload(before, hair_style_id="hair_bob_v1")
+
+    app = BridgeApplication(character_reader_factory=lambda: reader)
+    response = app.handle(
+        method="PUT",
+        path=f"/characters/{custom.asset_id}",
+        body=json.dumps(payload).encode("utf-8"),
+    )
+
+    assert response.status == HTTPStatus.OK
+    assert response.payload["character_id"] == custom.asset_id
+    assert response.payload["revision"] != before["revision"]
+    assert (
+        response.payload["profile"]["avatar"]["hair_style_id"]
+        == "hair_bob_v1"
+    )
+
+    restarted = SQLiteStudioRepository(db_path)
+    persisted = CharacterBridgeReader(restarted).get_character(
+        custom.asset_id
+    )
+    assert persisted is not None
+    assert persisted["character_id"] == custom.asset_id
+    assert (
+        persisted["profile"]["avatar"]["hair_style_id"]
+        == "hair_bob_v1"
+    )
+
+    raw_asset = restarted.get_asset(custom.asset_id)
+    assert raw_asset is not None
+    assert raw_asset.metadata["continuity_note"] == "preserve-me"
+
+    matches = [
+        item
+        for item in restarted.list_assets(AssetType.CHARACTER)
+        if item.asset_id == custom.asset_id
+    ]
+    assert len(matches) == 1
+
+
+def test_bridge_character_put_identical_replay_is_idempotent(tmp_path):
+    db_path = tmp_path / "studio.db"
+    custom, _legacy, _archived = _seed_characters(db_path)
+    repo = SQLiteStudioRepository(db_path)
+    reader = CharacterBridgeReader(repo)
+    app = BridgeApplication(character_reader_factory=lambda: reader)
+
+    before = reader.get_character(custom.asset_id)
+    assert before is not None
+    payload = _put_payload(before, hair_style_id="hair_bob_v1")
+    body = json.dumps(payload).encode("utf-8")
+
+    first = app.handle(
+        method="PUT",
+        path=f"/characters/{custom.asset_id}",
+        body=body,
+    )
+    assert first.status == HTTPStatus.OK
+    first_revision = first.payload["revision"]
+
+    # Replay the exact same Save with the now-stale original revision.
+    second = app.handle(
+        method="PUT",
+        path=f"/characters/{custom.asset_id}",
+        body=body,
+    )
+    assert second.status == HTTPStatus.OK
+    assert second.payload["character_id"] == custom.asset_id
+    assert second.payload["revision"] == first_revision
+
+    matches = [
+        item
+        for item in repo.list_assets(AssetType.CHARACTER)
+        if item.asset_id == custom.asset_id
+    ]
+    assert len(matches) == 1
+
+
+def test_bridge_character_put_rejects_stale_conflicting_save(tmp_path):
+    db_path = tmp_path / "studio.db"
+    custom, _legacy, _archived = _seed_characters(db_path)
+    repo = SQLiteStudioRepository(db_path)
+    reader = CharacterBridgeReader(repo)
+    app = BridgeApplication(character_reader_factory=lambda: reader)
+
+    before = reader.get_character(custom.asset_id)
+    assert before is not None
+
+    first_payload = _put_payload(
+        before,
+        hair_style_id="hair_bob_v1",
+    )
+    first = app.handle(
+        method="PUT",
+        path=f"/characters/{custom.asset_id}",
+        body=json.dumps(first_payload).encode("utf-8"),
+    )
+    assert first.status == HTTPStatus.OK
+
+    stale_payload = _put_payload(
+        before,
+        hair_style_id="hair_short_v1",
+    )
+    stale = app.handle(
+        method="PUT",
+        path=f"/characters/{custom.asset_id}",
+        body=json.dumps(stale_payload).encode("utf-8"),
+    )
+
+    assert stale.status == HTTPStatus.CONFLICT
+    assert stale.payload["error"] == "revision_conflict"
+    assert stale.payload["character_id"] == custom.asset_id
+    assert stale.payload["current_revision"] == first.payload["revision"]
+
+    current = reader.get_character(custom.asset_id)
+    assert current is not None
+    assert (
+        current["profile"]["avatar"]["hair_style_id"]
+        == "hair_bob_v1"
+    )
+
+
+def test_bridge_character_put_validates_contract_and_path_owns_id(tmp_path):
+    db_path = tmp_path / "studio.db"
+    custom, _legacy, _archived = _seed_characters(db_path)
+    repo = SQLiteStudioRepository(db_path)
+    reader = CharacterBridgeReader(repo)
+    app = BridgeApplication(character_reader_factory=lambda: reader)
+
+    before = reader.get_character(custom.asset_id)
+    assert before is not None
+    payload = _put_payload(before, hair_style_id="hair_bob_v1")
+
+    bad_schema = dict(payload)
+    bad_schema["schema_version"] = "2.0"
+    response = app.handle(
+        method="PUT",
+        path=f"/characters/{custom.asset_id}",
+        body=json.dumps(bad_schema).encode("utf-8"),
+    )
+    assert response.status == HTTPStatus.BAD_REQUEST
+    assert response.payload["error"] == "invalid_character_update"
+
+    with_foreign_id = dict(payload)
+    with_foreign_id["character_id"] = "CHAR_SHOULD_NOT_BE_ACCEPTED"
+    response = app.handle(
+        method="PUT",
+        path=f"/characters/{custom.asset_id}",
+        body=json.dumps(with_foreign_id).encode("utf-8"),
+    )
+    assert response.status == HTTPStatus.BAD_REQUEST
+    assert response.payload["error"] == "invalid_character_update"
+
+    missing = app.handle(
+        method="PUT",
+        path="/characters/CHAR_DOES_NOT_EXIST",
+        body=json.dumps(payload).encode("utf-8"),
+    )
+    assert missing.status == HTTPStatus.NOT_FOUND
+    assert missing.payload["error"] == "character_not_found"
