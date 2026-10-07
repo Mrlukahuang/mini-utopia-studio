@@ -895,7 +895,7 @@ func _build_skeletons() -> void:
 
         if skeleton == null:
             _build_skeleton_fallback(
-                scatter_position,
+                skeleton_position,
                 "SkeletonFallback_%s" % str(index + 1)
             )
 
