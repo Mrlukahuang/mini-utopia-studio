@@ -1036,11 +1036,26 @@ elif page == "🎮 Explore World":
                     )
 
         godot_play_session = None
+        active_quest_id = st.session_state.get("active_quest_id")
+        active_quest = (
+            ctx.repository.get_quest(active_quest_id)
+            if active_quest_id
+            else None
+        )
+        quest_for_world = (
+            active_quest.quest_id
+            if (
+                active_quest is not None
+                and active_quest.world_asset_id == selected.asset_id
+            )
+            else None
+        )
         if selected_character is not None:
             try:
                 godot_play_session = play_session_service.export(
                     character_asset_id=selected_character.asset_id,
                     world_asset_id=selected.asset_id,
+                    quest_id=quest_for_world,
                 )
             except Exception as exc:
                 st.warning(f"Godot play-session sync failed: {exc}")
@@ -1075,6 +1090,11 @@ elif page == "🎮 Explore World":
                 + (
                     f" + 🐣 {godot_play_session.baby.display_name}"
                     if godot_play_session.baby is not None
+                    else ""
+                )
+                + (
+                    f" + 📜 {godot_play_session.quest.title}"
+                    if godot_play_session.quest is not None
                     else ""
                 )
             )
