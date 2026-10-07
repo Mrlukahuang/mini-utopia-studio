@@ -19,6 +19,7 @@ from studio.services.production_status_service import (
 from studio.services.scene_breakdown_service import SceneBreakdownService
 from studio.services.shot_plan_service import ShotPlanService
 from studio.services.storyboard_service import StoryboardService
+from studio.services.shot_render_service import ShotRenderService
 from studio.ui.creator.audio_timeline import render_audio_timeline
 from studio.ui.creator.subtitle_track import render_subtitle_track
 
@@ -43,9 +44,15 @@ def render_episode_library(ctx) -> None:
         ctx.repository,
         director_service,
     )
+    shot_render_service = ShotRenderService(
+        ctx.repository,
+        director_service,
+        storyboard_service,
+    )
     production_status_service = EpisodeProductionStatusService(
         ctx.repository,
         storyboard_service,
+        shot_renderer=shot_render_service,
     )
     episodes = episode_service.list_episodes()
     episodes = [
@@ -502,6 +509,91 @@ def render_episode_library(ctx) -> None:
                                             note=review_note,
                                         )
                                         st.rerun()
+
+                            render_record = (
+                                shot_render_service.status_for(
+                                    episode_id=episode.episode_id,
+                                    scene_id=storyboard_scene.scene_id,
+                                    shot_id=storyboard_shot.shot_id,
+                                )
+                            )
+                            render_badge = {
+                                "missing": "⬜ Not Rendered / 未渲染",
+                                "rendering": "⏳ Rendering / 渲染中",
+                                "rendered": "🎬 Rendered / 已渲染",
+                                "stale": "🟠 Render Stale / 视频已过期",
+                                "failed": "⚠️ Render Failed / 渲染失败",
+                            }.get(
+                                render_record.status,
+                                "⬜ Not Rendered / 未渲染",
+                            )
+                            st.caption(render_badge)
+
+                            video_bytes = shot_render_service.video_bytes(
+                                render_record
+                            )
+                            if (
+                                render_record.status == "rendered"
+                                and video_bytes is not None
+                            ):
+                                st.video(video_bytes)
+                                st.download_button(
+                                    "⬇️ Download Shot MP4 / 下载镜头",
+                                    data=video_bytes,
+                                    file_name=(
+                                        f"{storyboard_shot.shot_id}.mp4"
+                                    ),
+                                    mime="video/mp4",
+                                    key=(
+                                        f"download_shot_"
+                                        f"{episode.episode_id}_"
+                                        f"{storyboard_shot.shot_id}"
+                                    ),
+                                    use_container_width=True,
+                                )
+                            elif render_record.status == "failed":
+                                st.warning(
+                                    "这个镜头还没有成功渲染。"
+                                    "可以安全地只重试这一条 Shot。"
+                                )
+
+                            if frame.approved_current and (
+                                render_record.status
+                                in {"missing", "stale", "failed"}
+                            ):
+                                render_label = (
+                                    "🔄 Re-render Shot / 重渲镜头"
+                                    if render_record.status
+                                    in {"stale", "failed"}
+                                    else "🎬 Render Shot / 渲染镜头"
+                                )
+                                if st.button(
+                                    render_label,
+                                    key=(
+                                        f"render_shot_"
+                                        f"{episode.episode_id}_"
+                                        f"{storyboard_shot.shot_id}"
+                                    ),
+                                    type="primary",
+                                    use_container_width=True,
+                                ):
+                                    with st.spinner(
+                                        "🎬 Godot 正在渲染这个镜头…"
+                                    ):
+                                        rendered = (
+                                            shot_render_service.render_shot(
+                                                episode_id=episode.episode_id,
+                                                scene_id=storyboard_scene.scene_id,
+                                                shot_id=storyboard_shot.shot_id,
+                                            )
+                                        )
+                                    if rendered.status == "rendered":
+                                        st.rerun()
+                                    else:
+                                        st.warning(
+                                            "镜头渲染暂未完成。"
+                                            "请确认本机 Godot 与 ffmpeg 可用后重试。"
+                                        )
 
                             button_label = (
                                 "🔄 Refresh Frame / 更新分镜"
