@@ -31,6 +31,7 @@ from studio.ui.creator.story_builder import render_story_builder
 from studio.ui.creator.my_stuff import render_my_stuff
 from studio.ui.creator.my_baby import render_my_baby
 from studio.ui.creator.adventure_progress import render_first_adventure_progress
+from studio.ui.creator.adventure_hub import render_adventure_hub
 from studio.ui.creator.dressing_room import render_dressing_room
 from studio.ui.creator.creative_play import render_creative_play
 from studio.ui.theme import apply_mini_utopia_theme, render_brandbar, render_game_hero, render_quest
@@ -303,7 +304,10 @@ if page == "🏠 Home":
     )
 
     st.write("")
-    render_first_adventure_progress(ctx)
+    render_adventure_hub(ctx)
+
+    with st.expander("🏆 First Adventure Milestone / 第一次冒险里程碑", expanded=False):
+        render_first_adventure_progress(ctx)
 
     st.markdown(
         """
