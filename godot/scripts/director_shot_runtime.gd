@@ -517,7 +517,9 @@ func _execute_performance_cue(cue: Dictionary) -> void:
 
     match cue_type:
         "attack":
-            play_runtime.play_attack_swing()
+            play_runtime.play_attack_swing(
+                duration * maxf(0.35, intensity)
+            )
         "reaction":
             play_runtime.play_reaction_pose(
                 duration * maxf(0.35, intensity)
