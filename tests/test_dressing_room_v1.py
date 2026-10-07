@@ -145,4 +145,7 @@ def test_dressing_room_supports_all_nine_canonical_slots():
     assert "Equipment_Headwear" in runtime
     assert "armR.add(buildSword(weapon))" in runtime
     assert "armL.add(buildShield(offhand))" in runtime
-    assert "g.rotation.z=-Math.PI/4" in runtime
+    assert "g.rotation.x=Math.PI/4" in runtime
+    assert "g.rotation.y=-Math.PI*.30" in runtime
+    assert "arms[0].rotation.x=-.46" in runtime
+    assert "arms[1].rotation.x=-.62" in runtime
