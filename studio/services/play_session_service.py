@@ -8,6 +8,9 @@ from studio.repositories.base import StudioRepository
 from studio.services.baby_service import BabyService
 from studio.services.character_runtime_service import CharacterRuntimeService
 from studio.services.equipment_service import EquipmentService
+from studio.services.world_gameplay_layer_service import (
+    WorldGameplayLayerService,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -64,11 +67,15 @@ class CreatorPlaySessionService:
                 )
 
         world_name: str | None = None
+        world_gameplay = None
         if world_asset_id is not None:
             world_asset = self.repository.get_asset(world_asset_id)
             if world_asset is None or world_asset.asset_type != AssetType.LOCATION:
                 raise ValueError(f"World not found: {world_asset_id}")
             world_name = world_asset.display_name
+            world_gameplay = WorldGameplayLayerService(
+                self.repository
+            ).get_layer(world_asset_id)
 
         return PlaySessionRuntimeSpec(
             character_asset_id=character_asset.asset_id,
@@ -77,6 +84,7 @@ class CreatorPlaySessionService:
             equipment=self.equipment.runtime_spec(character_asset.asset_id),
             baby=self.babies.runtime_spec(),
             quest=quest,
+            world_gameplay=world_gameplay,
             world_asset_id=world_asset_id,
             world_name=world_name,
         )

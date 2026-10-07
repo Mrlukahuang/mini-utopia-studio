@@ -14,6 +14,7 @@ var _elapsed := 0.0
 var _attack_pose_remaining := 0.0
 var _baby: MiniUtopiaBabyFollowRuntime
 var _quest: MiniUtopiaQuestRuntime
+var _world_gameplay: MiniUtopiaWorldGameplayRuntime
 
 
 func apply_to_player(player: CharacterBody3D) -> Dictionary:
@@ -45,6 +46,15 @@ func apply_to_player(player: CharacterBody3D) -> Dictionary:
         String(payload.get("session_id", "NO_SESSION"))
     )
 
+    var raw_world_gameplay = payload.get("world_gameplay", {})
+    var world_gameplay: Dictionary = (
+        raw_world_gameplay
+        if typeof(raw_world_gameplay) == TYPE_DICTIONARY
+        else {}
+    )
+    if not world_gameplay.is_empty():
+        _spawn_world_gameplay(world_gameplay)
+
     var raw_baby = payload.get("baby", {})
     var baby: Dictionary = (
         raw_baby
@@ -71,7 +81,9 @@ func apply_to_player(player: CharacterBody3D) -> Dictionary:
         " · baby=",
         baby.get("display_name", "—"),
         " · quest=",
-        quest.get("title", "—")
+        quest.get("title", "—"),
+        " · world_modes=",
+        world_gameplay.get("modes", [])
     )
     return attached
 
@@ -386,6 +398,45 @@ func _finish_spawn_baby(
         "PLAY-02 Active Baby ready: ",
         baby.get("display_name", "Baby")
     )
+
+
+func _spawn_world_gameplay(gameplay: Dictionary) -> void:
+    if (
+        _world_gameplay != null
+        and is_instance_valid(_world_gameplay)
+    ):
+        _world_gameplay.queue_free()
+
+    _world_gameplay = MiniUtopiaWorldGameplayRuntime.new()
+    _world_gameplay.name = "WorldGameplayRuntime"
+    add_child.call_deferred(_world_gameplay)
+    _finish_spawn_world_gameplay.call_deferred(
+        _world_gameplay,
+        gameplay.duplicate(true),
+        3
+    )
+
+
+func _finish_spawn_world_gameplay(
+    gameplay_node: MiniUtopiaWorldGameplayRuntime,
+    gameplay: Dictionary,
+    retries_left: int
+) -> void:
+    if gameplay_node == null or not is_instance_valid(gameplay_node):
+        return
+    if not gameplay_node.is_inside_tree():
+        if retries_left > 0:
+            _finish_spawn_world_gameplay.call_deferred(
+                gameplay_node,
+                gameplay,
+                retries_left - 1
+            )
+        else:
+            push_error(
+                "WORLD-01: gameplay runtime could not enter SceneTree."
+            )
+        return
+    gameplay_node.configure(_player, gameplay)
 
 
 func _spawn_quest(quest: Dictionary) -> void:

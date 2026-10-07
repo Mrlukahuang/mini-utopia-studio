@@ -12,6 +12,9 @@ from studio.models.quest import (
 )
 from studio.repositories.base import StudioRepository
 from studio.services.quest_service import QuestService
+from studio.services.world_gameplay_layer_service import (
+    WorldGameplayLayerService,
+)
 
 
 class StoryPlayableQuestService:
@@ -26,6 +29,7 @@ class StoryPlayableQuestService:
     def __init__(self, repository: StudioRepository):
         self.repository = repository
         self.quests = QuestService(repository)
+        self.gameplay = WorldGameplayLayerService(repository)
 
     def world_for_story(self, story_id: str) -> str:
         story = self.repository.get_story(story_id)
@@ -47,6 +51,7 @@ class StoryPlayableQuestService:
     def make_playable(self, story_id: str) -> QuestDefinition:
         existing = self.existing_for_story(story_id)
         if existing is not None:
+            self.gameplay.register_quest(existing.quest_id)
             return existing
 
         story = self.repository.get_story(story_id)
@@ -58,7 +63,7 @@ class StoryPlayableQuestService:
             clean = text.strip()
             return clean if clean else fallback
 
-        return self.quests.create_quest(
+        quest = self.quests.create_quest(
             title=f"🎮 {story.title}",
             description=story.premise,
             world_asset_id=world_asset_id,
@@ -152,3 +157,5 @@ class StoryPlayableQuestService:
                 ),
             ],
         )
+        self.gameplay.register_quest(quest.quest_id)
+        return quest

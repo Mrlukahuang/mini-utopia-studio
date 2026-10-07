@@ -1099,6 +1099,22 @@ elif page == "🎮 Explore World":
                 )
             )
 
+            if godot_play_session.world_gameplay is not None:
+                mode_labels = {
+                    "explore": "🧭 Explore",
+                    "quest": "📜 Quest",
+                    "story_play": "🎭 Story Play",
+                }
+                st.info(
+                    "🌍 One World · Multiple Ways to Play / 同一个世界，多种玩法 · "
+                    + " · ".join(
+                        mode_labels.get(mode.value, mode.value)
+                        for mode in godot_play_session.world_gameplay.modes
+                    )
+                    + f" · {len(godot_play_session.world_gameplay.quest_ids)} Quest"
+                    + f" · {len(godot_play_session.world_gameplay.story_ids)} Story"
+                )
+
         components.html(
             build_world_runtime_html(
                 world_name=selected.display_name,
