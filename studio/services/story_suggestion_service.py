@@ -26,6 +26,7 @@ class StorySuggestionService:
         world_name: str,
         world_context: dict,
         prop_names: list[str],
+        continuity_context: dict | None = None,
     ) -> StoryBeatSuggestions:
         if self.structured_provider is None:
             raise RuntimeError("AI Story suggestions are not configured.")
@@ -52,7 +53,9 @@ Rules:
 - ADVENTURE should involve exploration, cooperation, puzzle-solving or light game action.
 - SURPRISE should reframe the situation without invalidating earlier beats.
 - PORTAL should resolve or point naturally toward a next World/story.
-- Canon mode should feel continuity-friendly. Playground may be sillier or stranger.
+- Canon mode should respect supplied continuity: current equipment, Baby, World state and prior Canon events.
+- Never rewrite or contradict prior Canon events merely to make the new Story more dramatic.
+- Playground may be sillier or stranger and should not inherit Canon continuity unless explicitly supplied.
 - Each beat should be 1-3 short sentences, not a screenplay.
 - Do not mention AI, prompts, models, JSON or production tooling."""
 
@@ -64,6 +67,7 @@ Rules:
             "world": world_name,
             "world_context": world_context,
             "props": prop_names,
+            "continuity": continuity_context or {},
         }
         user = (
             "CREATOR STORY CONTEXT\n"

@@ -1,6 +1,7 @@
 import streamlit as st
 
 from studio.core.enums import AssetType, ReviewStatus, StoryMode
+from studio.services.story_continuity_service import StoryContinuityService
 
 
 _BEAT_WIDGET_KEYS = {
@@ -124,6 +125,34 @@ def render_story_builder(ctx, *, universe) -> None:
                 key="story_props",
             )
 
+        continuity = None
+        if (
+            story_mode == StoryMode.CANON
+            and selected_characters
+            and selected_world is not None
+        ):
+            continuity = StoryContinuityService(ctx.repository).build(
+                character_asset_ids=[
+                    asset.asset_id for asset in selected_characters
+                ],
+                world_asset_id=selected_world.asset_id,
+                universe_id=universe.universe_id,
+            )
+            if continuity.has_context:
+                baby_text = (
+                    f" · 🐣 {continuity.active_baby.display_name} "
+                    f"Lv.{continuity.active_baby.level}"
+                    if continuity.active_baby is not None
+                    else ""
+                )
+                st.info(
+                    "🧠 Canon Continuity / 连续性已连接 · "
+                    f"{len(continuity.character_states)} Character"
+                    f"{baby_text} · "
+                    f"{len(continuity.prior_canon_stories)} prior Story · "
+                    f"{len(continuity.important_owned_items)} important items"
+                )
+
         st.divider()
         st.subheader("Story Beats / 故事节奏")
         if ctx.story_suggestions.available:
@@ -231,6 +260,14 @@ def render_story_builder(ctx, *, universe) -> None:
                     asset.display_name
                     for asset in selected_props
                 ],
+                continuity_context=(
+                    continuity.model_dump(mode="json")
+                    if (
+                        story_mode == StoryMode.CANON
+                        and continuity is not None
+                    )
+                    else None
+                ),
             )
             st.session_state["story_ai_suggestion_pending"] = (
                 suggestions.model_dump(mode="json")
