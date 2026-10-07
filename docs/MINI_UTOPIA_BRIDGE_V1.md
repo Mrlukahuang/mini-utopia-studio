@@ -66,3 +66,25 @@ independent canonical store.
 `godot/tests/bridge_health_smoke.gd` makes a real HTTP request from Godot to
 the running Python Bridge. CI starts the Bridge on loopback and fails if Godot
 cannot validate `/health`.
+
+
+## BRIDGE-02 Character read contract
+
+The Bridge now reads canonical Characters through the existing repository:
+
+- `GET /characters` — active Character list
+- `GET /characters/{CHAR_ID}` — one Character by stable ID
+
+Each payload contains the Asset identity/revision and full canonical
+`CharacterProfile`. `AvatarAppearance` remains nested at
+`profile.avatar`; it is not copied into a second editable top-level object.
+
+Archived Characters are omitted from the normal list but remain addressable by
+stable ID for continuity and diagnostics.
+
+The Godot contract fixture lives at:
+
+`res://config/runtime/bridge_character_example.json`
+
+and `bridge_character_contract_smoke.gd` verifies that Godot can parse Body,
+Species, Surface, Eye, Hair and color fields.

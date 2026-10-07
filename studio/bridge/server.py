@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Any
-from urllib.parse import urlsplit
+from typing import Any, Callable, Protocol
+from urllib.parse import unquote, urlsplit
 
 from studio.core.ids import new_id
 from studio.core.product_boundary import (
@@ -22,6 +22,34 @@ BRIDGE_SERVICE_NAME = "mini-utopia-bridge"
 DEFAULT_BRIDGE_HOST = "127.0.0.1"
 DEFAULT_BRIDGE_PORT = 8765
 MAX_REQUEST_BODY_BYTES = 64 * 1024
+BRIDGE_CHARACTER_SCHEMA_VERSION = "1.0"
+
+
+class CharacterReader(Protocol):
+    def list_characters(self) -> list[dict]: ...
+
+    def get_character(self, character_id: str) -> dict | None: ...
+
+
+_default_character_reader: CharacterReader | None = None
+
+
+def _default_character_reader_factory() -> CharacterReader:
+    """Lazily connect the Bridge to the existing Python Core repository.
+
+    Imports stay lazy so /health remains dependency-light and can be probed by
+    Godot CI before the Python application dependency set is installed there.
+    """
+
+    global _default_character_reader
+    if _default_character_reader is None:
+        from studio.bridge.characters import CharacterBridgeReader
+        from studio.core.config import get_settings
+        from studio.services.bootstrap import build_context
+
+        context = build_context(get_settings())
+        _default_character_reader = CharacterBridgeReader(context.repository)
+    return _default_character_reader
 
 
 @dataclass(frozen=True)
@@ -33,8 +61,15 @@ class BridgeResponse:
 class BridgeApplication:
     """Dependency-free request router for the local Godot ↔ Python Bridge."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        character_reader_factory: Callable[[], CharacterReader] | None = None,
+    ) -> None:
         self._sessions: dict[str, dict[str, Any]] = {}
+        self._character_reader_factory = (
+            character_reader_factory or _default_character_reader_factory
+        )
 
     def handle(
         self,
@@ -94,6 +129,49 @@ class BridgeApplication:
                 payload=session,
             )
 
+        if route == "/characters":
+            if method != "GET":
+                return self._method_not_allowed("GET")
+            reader = self._character_reader()
+            if isinstance(reader, BridgeResponse):
+                return reader
+            return BridgeResponse(
+                status=HTTPStatus.OK,
+                payload={
+                    "schema_version": BRIDGE_CHARACTER_SCHEMA_VERSION,
+                    "characters": reader.list_characters(),
+                },
+            )
+
+        if route.startswith("/characters/"):
+            if method != "GET":
+                return self._method_not_allowed("GET")
+            character_id = unquote(route[len("/characters/"):]).strip()
+            if not character_id or "/" in character_id:
+                return BridgeResponse(
+                    status=HTTPStatus.NOT_FOUND,
+                    payload={
+                        "error": "not_found",
+                        "message": "Character route not found.",
+                    },
+                )
+            reader = self._character_reader()
+            if isinstance(reader, BridgeResponse):
+                return reader
+            character = reader.get_character(character_id)
+            if character is None:
+                return BridgeResponse(
+                    status=HTTPStatus.NOT_FOUND,
+                    payload={
+                        "error": "character_not_found",
+                        "character_id": character_id,
+                    },
+                )
+            return BridgeResponse(
+                status=HTTPStatus.OK,
+                payload=character,
+            )
+
         return BridgeResponse(
             status=HTTPStatus.NOT_FOUND,
             payload={
@@ -101,6 +179,18 @@ class BridgeApplication:
                 "message": f"Unknown Bridge route: {route}",
             },
         )
+
+    def _character_reader(self) -> CharacterReader | BridgeResponse:
+        try:
+            return self._character_reader_factory()
+        except Exception:
+            return BridgeResponse(
+                status=HTTPStatus.SERVICE_UNAVAILABLE,
+                payload={
+                    "error": "repository_unavailable",
+                    "message": "Canonical Creator repository is unavailable.",
+                },
+            )
 
     @staticmethod
     def _parse_json_object(body: bytes) -> dict[str, Any] | BridgeResponse:
