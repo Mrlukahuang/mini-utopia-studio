@@ -93,3 +93,7 @@ jobs:
       - name: Smoke-test Director Shot blocking
         run: |
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/director_shot_blocking_smoke.gd
+
+      - name: Smoke-test Director Camera Motion
+        run: |
+          /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/director_camera_motion_smoke.gd
