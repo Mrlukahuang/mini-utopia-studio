@@ -338,6 +338,31 @@ class EquipmentService:
         self.repository.save_collection(collection)
         return collection
 
+    def set_favorite(
+        self,
+        *,
+        item_instance_id: str,
+        favorite: bool,
+    ) -> CreatorCollection:
+        collection = self.ensure_starter_collection()
+        if collection.item_by_id(item_instance_id) is None:
+            raise ValueError(f"Equipment item not owned: {item_instance_id}")
+
+        favorites = list(collection.favorite_item_ids)
+        if favorite and item_instance_id not in favorites:
+            favorites.append(item_instance_id)
+        elif not favorite:
+            favorites = [
+                item_id
+                for item_id in favorites
+                if item_id != item_instance_id
+            ]
+
+        collection.favorite_item_ids = favorites
+        collection.updated_at = now_utc()
+        self.repository.save_collection(collection)
+        return collection
+
     def unequip(
         self,
         *,
