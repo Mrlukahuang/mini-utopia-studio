@@ -13,6 +13,7 @@ var _leg_r: Node3D
 var _elapsed := 0.0
 var _attack_pose_remaining := 0.0
 var _baby: MiniUtopiaBabyFollowRuntime
+var _quest: MiniUtopiaQuestRuntime
 
 
 func apply_to_player(player: CharacterBody3D) -> Dictionary:
@@ -53,13 +54,24 @@ func apply_to_player(player: CharacterBody3D) -> Dictionary:
     if not baby.is_empty() and bool(baby.get("active", false)):
         _spawn_baby(baby)
 
+    var raw_quest = payload.get("quest", {})
+    var quest: Dictionary = (
+        raw_quest
+        if typeof(raw_quest) == TYPE_DICTIONARY
+        else {}
+    )
+    if not quest.is_empty():
+        _spawn_quest(quest)
+
     print(
         "PLAY-02 loaded: ",
         payload.get("character_name", "Mini Traveler"),
         " · slots=",
         ", ".join(attached.keys()),
         " · baby=",
-        baby.get("display_name", "—")
+        baby.get("display_name", "—"),
+        " · quest=",
+        quest.get("title", "—")
     )
     return attached
 
@@ -123,6 +135,28 @@ func update_motion(
 
 func play_attack_swing() -> void:
     _attack_pose_remaining = 0.22
+
+
+func record_quest_event(
+    event_type: String,
+    target_id: String = "",
+    amount: int = 1
+) -> bool:
+    if _quest == null or not is_instance_valid(_quest):
+        return false
+    return _quest.record_event(event_type, target_id, amount)
+
+
+func try_quest_interact() -> bool:
+    if _quest == null or not is_instance_valid(_quest):
+        return false
+    return _quest.try_interact()
+
+
+func active_quest_title() -> String:
+    if _quest == null or not is_instance_valid(_quest):
+        return ""
+    return String(_quest.quest.get("title", ""))
 
 
 func _load_session() -> Dictionary:
@@ -351,6 +385,45 @@ func _finish_spawn_baby(
     print(
         "PLAY-02 Active Baby ready: ",
         baby.get("display_name", "Baby")
+    )
+
+
+func _spawn_quest(quest: Dictionary) -> void:
+    if _quest != null and is_instance_valid(_quest):
+        _quest.queue_free()
+
+    _quest = MiniUtopiaQuestRuntime.new()
+    _quest.name = "QuestRuntime"
+    add_child.call_deferred(_quest)
+    _finish_spawn_quest.call_deferred(
+        _quest,
+        quest.duplicate(true),
+        3
+    )
+
+
+func _finish_spawn_quest(
+    quest_node: MiniUtopiaQuestRuntime,
+    quest: Dictionary,
+    retries_left: int
+) -> void:
+    if quest_node == null or not is_instance_valid(quest_node):
+        return
+    if not quest_node.is_inside_tree():
+        if retries_left > 0:
+            _finish_spawn_quest.call_deferred(
+                quest_node,
+                quest,
+                retries_left - 1
+            )
+        else:
+            push_error("GP-04: Quest runtime could not enter SceneTree.")
+        return
+
+    quest_node.configure(_player, quest)
+    print(
+        "GP-04 Quest ready: ",
+        quest.get("title", "Quest")
     )
 
 
