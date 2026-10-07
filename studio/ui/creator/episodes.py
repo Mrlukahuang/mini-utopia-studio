@@ -19,6 +19,7 @@ from studio.services.production_status_service import (
 from studio.services.scene_breakdown_service import SceneBreakdownService
 from studio.services.shot_plan_service import ShotPlanService
 from studio.services.storyboard_service import StoryboardService
+from studio.ui.creator.audio_timeline import render_audio_timeline
 
 
 def render_episode_library(ctx) -> None:
@@ -326,6 +327,11 @@ def render_episode_library(ctx) -> None:
                         st.success(next_label)
                     else:
                         st.success(next_label)
+
+                render_audio_timeline(
+                    ctx,
+                    episode=episode,
+                )
 
                 st.markdown("#### 🖼️ Storyboard / 分镜板")
                 storyboard_rows = [
