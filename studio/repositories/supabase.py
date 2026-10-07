@@ -10,6 +10,7 @@ from studio.models.job import Job
 from studio.models.equipment import CreatorCollection
 from studio.models.baby import BabyRoster
 from studio.models.story import Story
+from studio.models.quest import QuestDefinition
 from studio.models.universe import Universe
 from studio.repositories.base import StudioRepository
 
@@ -166,6 +167,25 @@ class SupabaseStudioRepository(StudioRepository):
 
     def list_stories(self) -> list[Story]:
         return [Story.model_validate(data) for data in self._list(kind="story")]
+
+    def save_quest(self, quest: QuestDefinition) -> None:
+        self._upsert(
+            record_id=quest.quest_id,
+            kind="quest",
+            name=quest.title,
+            data=quest.model_dump(mode="json"),
+            updated_at=quest.updated_at.isoformat(),
+        )
+
+    def get_quest(self, quest_id: str) -> QuestDefinition | None:
+        data = self._get_one(kind="quest", record_id=quest_id)
+        return QuestDefinition.model_validate(data) if data else None
+
+    def list_quests(self) -> list[QuestDefinition]:
+        return [
+            QuestDefinition.model_validate(data)
+            for data in self._list(kind="quest")
+        ]
 
     def save_collection(self, collection: CreatorCollection) -> None:
         self._upsert(
