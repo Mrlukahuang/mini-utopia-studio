@@ -4,13 +4,16 @@ from studio.models.avatar import AvatarAppearance
 from studio.models.character import CharacterProfile
 from studio.models.equipment import EquipmentSlot, PLAYABLE_EQUIPMENT_SLOTS
 from studio.repositories.sqlite import SQLiteStudioRepository
+from studio.services.asset_service import AssetService
 from studio.services.equipment_service import EquipmentService
+from studio.recipes.character_factory import CharacterFactoryRecipe
 from studio.ui.creator.character_factory import (
     _build_factory_equipment_preview,
     _default_factory_equipment_selection,
     _factory_equipment_state,
     _factory_slot_items,
     _persist_factory_equipment_selection,
+    resolve_character_save_target,
     english_level_label,
     relative_height_label,
 )
@@ -44,11 +47,13 @@ def test_relative_height_label_handles_large_character():
     assert "Much taller" in label
 
 
-def test_character_factory_returns_to_library_after_approval():
+def test_character_factory_returns_to_library_after_save():
     from pathlib import Path
 
     source = Path("studio/ui/creator/character_factory.py").read_text()
-    assert 'pending_app_page = "🎭 My Characters"' in source
+    assert 'st.session_state.app_page = "🎭 My Characters"' in source
+    assert "character_save_asset_id" in source
+    assert "pending_app_page = \"🎭 My Characters\"" not in source
 
 
 
@@ -67,7 +72,8 @@ def test_character_factory_is_child_first_and_saves_without_image_api():
     assert "More details / 更多角色设定（可选）" in source
     assert "Save My Hero / 保存我的角色" in source
     assert "profile_can_save = not missing and bool(name)" in source
-    assert 'pending_app_page = "🎭 My Characters"' in source
+    assert 'st.session_state.app_page = "🎭 My Characters"' in source
+    assert "character_save_asset_id" in source
     assert "上面的 Save My Hero 可以直接保存可玩角色" in source
 
     save_button = source.index("💖 Save My Hero / 保存我的角色")
@@ -151,3 +157,63 @@ def test_factory_equipment_defaults_preview_and_persist_all_slots(tmp_path):
         runtime.equipped[EquipmentSlot.HEADWEAR.value].item_instance_id
         == selection[EquipmentSlot.HEADWEAR.value]
     )
+
+
+
+def test_character_save_target_makes_repeat_save_idempotent(tmp_path):
+    assert resolve_character_save_target(None, None) is None
+    assert (
+        resolve_character_save_target(
+            None,
+            "CHAR_SAVED",
+        )
+        == "CHAR_SAVED"
+    )
+    assert (
+        resolve_character_save_target(
+            "CHAR_EDITING",
+            "CHAR_SAVED",
+        )
+        == "CHAR_EDITING"
+    )
+
+    repo = SQLiteStudioRepository(tmp_path / "studio.db")
+    recipe = CharacterFactoryRecipe(None, AssetService(repo))
+    profile = CharacterProfile(
+        character_type="人类 / Human",
+        age="8",
+        appearance="Mini hero",
+        personality_traits=["好奇 / Curious"],
+        speaking_tone="搞笑 / Funny",
+        native_language="中文 / Chinese",
+        english_level=5,
+        avatar=AvatarAppearance(customized=True),
+    )
+
+    first = recipe.save_character(
+        name="111",
+        description="",
+        profile=profile,
+        asset_id=None,
+    )
+    guard = first.asset_id
+
+    for _ in range(2):
+        saved = recipe.save_character(
+            name="111",
+            description="",
+            profile=profile,
+            asset_id=resolve_character_save_target(None, guard),
+        )
+        assert saved.asset_id == guard
+
+    characters = repo.list_assets(AssetType.CHARACTER)
+    assert [asset.asset_id for asset in characters] == [guard]
+
+
+def test_my_characters_shows_saved_confirmation():
+    from pathlib import Path
+
+    source = Path("app.py").read_text(encoding="utf-8")
+    assert 'st.session_state.pop(\n        "last_saved_character_id"' in source
+    assert "已保存！现在可以继续换装或带 TA 去冒险。" in source
