@@ -211,6 +211,10 @@ def render_dressing_room(ctx) -> None:
                     ),
                 )
                 st.session_state.play_character_id = selected_character.asset_id
+                if active_quest is not None:
+                    st.session_state.selected_world_id = (
+                        active_quest.world_asset_id
+                    )
                 st.session_state.pop("runtime_character_asset", None)
                 st.session_state.pending_app_page = "🎮 Explore World"
                 st.rerun()
