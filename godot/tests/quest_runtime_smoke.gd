@@ -1,12 +1,20 @@
 extends SceneTree
 
 func _initialize() -> void:
+    var reward_inbox_path := MiniUtopiaQuestRewardWriter.INBOX_PATH
+    if FileAccess.file_exists(reward_inbox_path):
+        DirAccess.remove_absolute(
+            ProjectSettings.globalize_path(reward_inbox_path)
+        )
+
     var world := Node3D.new()
     world.name = "QuestSmokeWorld"
     root.add_child(world)
 
     var player := Node3D.new()
     player.name = "QuestSmokePlayer"
+    player.set_meta("mini_utopia_session_id", "PLAY_SMOKE")
+    player.set_meta("mini_utopia_character_asset_id", "CHAR_SMOKE")
     world.add_child(player)
 
     var runtime := MiniUtopiaQuestRuntime.new()
@@ -122,7 +130,42 @@ func _initialize() -> void:
         return
 
     await process_frame
+
+    if not FileAccess.file_exists(reward_inbox_path):
+        push_error(
+            "quest_runtime_smoke: Quest completion receipt was not written"
+        )
+        quit(1)
+        return
+
+    var reward_file := FileAccess.open(
+        reward_inbox_path,
+        FileAccess.READ
+    )
+    var reward_payload = JSON.parse_string(
+        reward_file.get_as_text()
+    )
+    var completions: Array = reward_payload.get("completions", [])
+    if completions.size() != 1:
+        push_error(
+            "quest_runtime_smoke: expected exactly one completion receipt"
+        )
+        quit(1)
+        return
+    if String(completions[0].get("quest_id", "")) != "QUEST_SMOKE":
+        push_error(
+            "quest_runtime_smoke: completion receipt Quest mismatch"
+        )
+        quit(1)
+        return
+    if String(completions[0].get("session_id", "")) != "PLAY_SMOKE":
+        push_error(
+            "quest_runtime_smoke: completion receipt Session mismatch"
+        )
+        quit(1)
+        return
+
     print(
-        "quest_runtime_smoke: PASS · arrive → interact → enemy → item → portal"
+        "quest_runtime_smoke: PASS · generic Quest complete + reward receipt"
     )
     quit(0)
