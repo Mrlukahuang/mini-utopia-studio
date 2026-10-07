@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import streamlit as st
 
-from studio.models.episode import ShotBlockingPoint, ShotBlockingSpec
+from studio.models.episode import (
+    ShotBlockingPoint,
+    ShotBlockingSpec,
+    ShotCameraMotionSpec,
+)
 from studio.services.baby_service import BabyService
 from studio.services.director_shot_session_service import (
     DirectorShotSessionService,
@@ -33,6 +37,16 @@ def render_episode_library(ctx) -> None:
         shot_service.ensure_blocking(episode.episode_id)
         if any(
             shot.blocking is None
+            for scene in episode.scenes
+            for shot in scene.shots
+        )
+        else episode
+        for episode in episodes
+    ]
+    episodes = [
+        shot_service.ensure_camera_motion(episode.episode_id)
+        if any(
+            shot.camera_motion is None
             for scene in episode.scenes
             for shot in scene.shots
         )
@@ -360,6 +374,138 @@ def render_episode_library(ctx) -> None:
                                                 key=f"baby_z_{episode.episode_id}_{shot.shot_id}",
                                             )
 
+                                        camera_motion = shot.camera_motion
+                                        if camera_motion is not None:
+                                            st.markdown(
+                                                "**🎥 Camera Motion / 镜头运动**"
+                                            )
+                                            st.caption(
+                                                f"{camera_motion.source.title()} · "
+                                                f"{camera_motion.movement_mode.replace('_', ' ').title()} · "
+                                                f"confidence {camera_motion.confidence:.0%}"
+                                            )
+                                            motion_mode = st.selectbox(
+                                                "Motion Mode / 运动方式",
+                                                [
+                                                    "hold",
+                                                    "push_in",
+                                                    "pull_back",
+                                                    "pan",
+                                                    "follow",
+                                                    "reveal",
+                                                ],
+                                                index=[
+                                                    "hold",
+                                                    "push_in",
+                                                    "pull_back",
+                                                    "pan",
+                                                    "follow",
+                                                    "reveal",
+                                                ].index(camera_motion.movement_mode),
+                                                key=f"camera_mode_{episode.episode_id}_{shot.shot_id}",
+                                            )
+                                            easing = st.selectbox(
+                                                "Easing / 缓动",
+                                                ["smooth", "linear"],
+                                                index=["smooth", "linear"].index(
+                                                    camera_motion.easing
+                                                ),
+                                                key=f"camera_easing_{episode.episode_id}_{shot.shot_id}",
+                                            )
+                                            cam_start = st.columns(3)
+                                            cam_start_x = cam_start[0].number_input(
+                                                "Cam Start X",
+                                                value=float(camera_motion.start_position.x),
+                                                step=0.5,
+                                                key=f"cam_sx_{episode.episode_id}_{shot.shot_id}",
+                                            )
+                                            cam_start_y = cam_start[1].number_input(
+                                                "Cam Start Y",
+                                                value=float(camera_motion.start_position.y),
+                                                step=0.5,
+                                                key=f"cam_sy_{episode.episode_id}_{shot.shot_id}",
+                                            )
+                                            cam_start_z = cam_start[2].number_input(
+                                                "Cam Start Z",
+                                                value=float(camera_motion.start_position.z),
+                                                step=0.5,
+                                                key=f"cam_sz_{episode.episode_id}_{shot.shot_id}",
+                                            )
+                                            cam_end = st.columns(3)
+                                            cam_end_x = cam_end[0].number_input(
+                                                "Cam End X",
+                                                value=float(camera_motion.end_position.x),
+                                                step=0.5,
+                                                key=f"cam_ex_{episode.episode_id}_{shot.shot_id}",
+                                            )
+                                            cam_end_y = cam_end[1].number_input(
+                                                "Cam End Y",
+                                                value=float(camera_motion.end_position.y),
+                                                step=0.5,
+                                                key=f"cam_ey_{episode.episode_id}_{shot.shot_id}",
+                                            )
+                                            cam_end_z = cam_end[2].number_input(
+                                                "Cam End Z",
+                                                value=float(camera_motion.end_position.z),
+                                                step=0.5,
+                                                key=f"cam_ez_{episode.episode_id}_{shot.shot_id}",
+                                            )
+                                            look_start = st.columns(3)
+                                            look_start_x = look_start[0].number_input(
+                                                "Look Start X",
+                                                value=float(camera_motion.start_look_at.x),
+                                                step=0.5,
+                                                key=f"look_sx_{episode.episode_id}_{shot.shot_id}",
+                                            )
+                                            look_start_y = look_start[1].number_input(
+                                                "Look Start Y",
+                                                value=float(camera_motion.start_look_at.y),
+                                                step=0.5,
+                                                key=f"look_sy_{episode.episode_id}_{shot.shot_id}",
+                                            )
+                                            look_start_z = look_start[2].number_input(
+                                                "Look Start Z",
+                                                value=float(camera_motion.start_look_at.z),
+                                                step=0.5,
+                                                key=f"look_sz_{episode.episode_id}_{shot.shot_id}",
+                                            )
+                                            look_end = st.columns(3)
+                                            look_end_x = look_end[0].number_input(
+                                                "Look End X",
+                                                value=float(camera_motion.end_look_at.x),
+                                                step=0.5,
+                                                key=f"look_ex_{episode.episode_id}_{shot.shot_id}",
+                                            )
+                                            look_end_y = look_end[1].number_input(
+                                                "Look End Y",
+                                                value=float(camera_motion.end_look_at.y),
+                                                step=0.5,
+                                                key=f"look_ey_{episode.episode_id}_{shot.shot_id}",
+                                            )
+                                            look_end_z = look_end[2].number_input(
+                                                "Look End Z",
+                                                value=float(camera_motion.end_look_at.z),
+                                                step=0.5,
+                                                key=f"look_ez_{episode.episode_id}_{shot.shot_id}",
+                                            )
+                                            fov_cols = st.columns(2)
+                                            start_fov = fov_cols[0].number_input(
+                                                "Start FOV",
+                                                min_value=20.0,
+                                                max_value=100.0,
+                                                value=float(camera_motion.start_fov),
+                                                step=1.0,
+                                                key=f"fov_start_{episode.episode_id}_{shot.shot_id}",
+                                            )
+                                            end_fov = fov_cols[1].number_input(
+                                                "End FOV",
+                                                min_value=20.0,
+                                                max_value=100.0,
+                                                value=float(camera_motion.end_fov),
+                                                step=1.0,
+                                                key=f"fov_end_{episode.episode_id}_{shot.shot_id}",
+                                            )
+
                                         shot_continuity = st.text_area(
                                             "Shot Continuity / 镜头连续性",
                                             value="\n".join(
@@ -407,6 +553,38 @@ def render_episode_library(ctx) -> None:
                                                     confidence=1.0,
                                                 )
                                                 if blocking is not None
+                                                else None
+                                            ),
+                                            camera_motion=(
+                                                ShotCameraMotionSpec(
+                                                    start_position=ShotBlockingPoint(
+                                                        x=cam_start_x,
+                                                        y=cam_start_y,
+                                                        z=cam_start_z,
+                                                    ),
+                                                    end_position=ShotBlockingPoint(
+                                                        x=cam_end_x,
+                                                        y=cam_end_y,
+                                                        z=cam_end_z,
+                                                    ),
+                                                    start_look_at=ShotBlockingPoint(
+                                                        x=look_start_x,
+                                                        y=look_start_y,
+                                                        z=look_start_z,
+                                                    ),
+                                                    end_look_at=ShotBlockingPoint(
+                                                        x=look_end_x,
+                                                        y=look_end_y,
+                                                        z=look_end_z,
+                                                    ),
+                                                    start_fov=start_fov,
+                                                    end_fov=end_fov,
+                                                    movement_mode=motion_mode,
+                                                    easing=easing,
+                                                    source="creator",
+                                                    confidence=1.0,
+                                                )
+                                                if camera_motion is not None
                                                 else None
                                             ),
                                         )
