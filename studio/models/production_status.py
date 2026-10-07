@@ -12,6 +12,7 @@ ProductionNextAction = Literal[
     "review_storyboard",
     "render_shots",
     "assemble_episode",
+    "publish_package",
     "complete",
 ]
 
@@ -32,7 +33,10 @@ class EpisodeProductionStatus(BaseModel):
     storyboard_stale: int = 0
 
     rendered_shots: int = 0
+    assembly_ready: bool = False
+    assembly_status: str = "missing"
     final_package_ready: bool = False
+    publish_package_status: str = "missing"
 
     next_action: ProductionNextAction
     progress_percent: int = Field(ge=0, le=100)
