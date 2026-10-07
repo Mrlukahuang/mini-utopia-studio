@@ -9,6 +9,7 @@ from studio.models.asset import now_utc
 
 
 StoryboardFrameStatus = Literal["missing", "ready", "stale", "failed"]
+StoryboardReviewStatus = Literal["unreviewed", "approved", "needs_change"]
 
 
 class StoryboardFrameRecord(BaseModel):
@@ -25,7 +26,19 @@ class StoryboardFrameRecord(BaseModel):
     blocking_summary: str = ""
     generated_at: datetime | None = None
     error: str = ""
+    review_status: StoryboardReviewStatus = "unreviewed"
+    review_note: str = ""
+    review_source_fingerprint: str = ""
+    reviewed_at: datetime | None = None
 
     @property
     def current(self) -> bool:
         return self.status == "ready"
+
+    @property
+    def approved_current(self) -> bool:
+        return bool(
+            self.status == "ready"
+            and self.review_status == "approved"
+            and self.review_source_fingerprint == self.source_fingerprint
+        )

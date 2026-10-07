@@ -176,6 +176,10 @@ class StoryboardService:
                     "status": "ready",
                     "generated_at": now_utc(),
                     "error": "",
+                    "review_status": "unreviewed",
+                    "review_note": "",
+                    "review_source_fingerprint": "",
+                    "reviewed_at": None,
                 }
             )
         except Exception as exc:
@@ -192,6 +196,46 @@ class StoryboardService:
         episode.storyboard_frames[shot_id] = record
         self.repository.save_episode(episode)
         return record
+
+    def review_frame(
+        self,
+        *,
+        episode_id: str,
+        scene_id: str,
+        shot_id: str,
+        review_status: str,
+        note: str = "",
+    ) -> StoryboardFrameRecord:
+        if review_status not in {"approved", "needs_change"}:
+            raise ValueError(
+                "review_status must be approved or needs_change."
+            )
+
+        frame = self.status_for(
+            episode_id=episode_id,
+            scene_id=scene_id,
+            shot_id=shot_id,
+        )
+        if frame.status != "ready":
+            raise ValueError(
+                "Storyboard frame must be current and Ready before review."
+            )
+
+        episode = self.repository.get_episode(episode_id)
+        if episode is None:
+            raise ValueError(f"Episode not found: {episode_id}")
+
+        reviewed = frame.model_copy(
+            update={
+                "review_status": review_status,
+                "review_note": note.strip(),
+                "review_source_fingerprint": frame.source_fingerprint,
+                "reviewed_at": now_utc(),
+            }
+        )
+        episode.storyboard_frames[shot_id] = reviewed
+        self.repository.save_episode(episode)
+        return reviewed
 
     def frame_bytes(self, record: StoryboardFrameRecord) -> bytes | None:
         path = self.project_root / record.frame_path

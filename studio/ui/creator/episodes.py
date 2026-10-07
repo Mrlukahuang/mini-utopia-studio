@@ -238,25 +238,35 @@ def render_episode_library(ctx) -> None:
                     frame.status == "ready"
                     for frame in frame_states
                 )
+                approved_count = sum(
+                    frame.approved_current
+                    for frame in frame_states
+                )
+                needs_change_count = sum(
+                    frame.status == "ready"
+                    and frame.review_status == "needs_change"
+                    and frame.review_source_fingerprint
+                    == frame.source_fingerprint
+                    for frame in frame_states
+                )
                 stale_count = sum(
                     frame.status == "stale"
                     for frame in frame_states
                 )
-                summary_cols = st.columns(3)
+                summary_cols = st.columns(4)
                 summary_cols[0].metric(
                     "Storyboard",
                     f"{ready_count}/{len(storyboard_rows)}",
                 )
-                summary_cols[1].metric("Stale", stale_count)
-                summary_cols[2].metric(
-                    "Missing",
-                    max(
-                        0,
-                        len(storyboard_rows)
-                        - ready_count
-                        - stale_count,
-                    ),
+                summary_cols[1].metric(
+                    "Approved",
+                    f"{approved_count}/{len(storyboard_rows)}",
                 )
+                summary_cols[2].metric(
+                    "Needs Change",
+                    needs_change_count,
+                )
+                summary_cols[3].metric("Stale", stale_count)
 
                 status_icon = {
                     "ready": "✅",
@@ -303,9 +313,76 @@ def render_episode_library(ctx) -> None:
                                     "分镜画面还没生成"
                                 )
 
+                            review_badge = {
+                                "approved": "✅ Approved / 已批准",
+                                "needs_change": "📝 Needs Change / 需修改",
+                                "unreviewed": "👀 Unreviewed / 待审核",
+                            }.get(
+                                frame.review_status,
+                                "👀 Unreviewed / 待审核",
+                            )
+                            if frame.status == "stale":
+                                review_badge += " · ⚠️ Stale"
+                            st.caption(review_badge)
+
+                            if frame.review_note:
+                                st.caption(
+                                    "💬 " + frame.review_note
+                                )
+
+                            if frame.status == "ready":
+                                review_note = st.text_input(
+                                    "Review Note / 审核备注",
+                                    value=frame.review_note,
+                                    key=(
+                                        f"storyboard_review_note_"
+                                        f"{episode.episode_id}_"
+                                        f"{storyboard_shot.shot_id}"
+                                    ),
+                                    placeholder="可选：需要调整什么？",
+                                )
+                                approve_col, change_col = st.columns(2)
+                                with approve_col:
+                                    if st.button(
+                                        "✅ Approve / 批准",
+                                        key=(
+                                            f"approve_storyboard_"
+                                            f"{episode.episode_id}_"
+                                            f"{storyboard_shot.shot_id}"
+                                        ),
+                                        use_container_width=True,
+                                    ):
+                                        storyboard_service.review_frame(
+                                            episode_id=episode.episode_id,
+                                            scene_id=storyboard_scene.scene_id,
+                                            shot_id=storyboard_shot.shot_id,
+                                            review_status="approved",
+                                            note=review_note,
+                                        )
+                                        st.rerun()
+                                with change_col:
+                                    if st.button(
+                                        "📝 Needs Change / 需修改",
+                                        key=(
+                                            f"reject_storyboard_"
+                                            f"{episode.episode_id}_"
+                                            f"{storyboard_shot.shot_id}"
+                                        ),
+                                        use_container_width=True,
+                                    ):
+                                        storyboard_service.review_frame(
+                                            episode_id=episode.episode_id,
+                                            scene_id=storyboard_scene.scene_id,
+                                            shot_id=storyboard_shot.shot_id,
+                                            review_status="needs_change",
+                                            note=review_note,
+                                        )
+                                        st.rerun()
+
                             button_label = (
                                 "🔄 Refresh Frame / 更新分镜"
                                 if frame.status in {"stale", "failed"}
+                                or frame.review_status == "needs_change"
                                 else "🖼️ Generate Frame / 生成分镜"
                             )
                             if st.button(
