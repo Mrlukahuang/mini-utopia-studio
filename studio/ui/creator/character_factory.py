@@ -306,23 +306,18 @@ def _persist_factory_equipment_selection(
     character_asset_id: str,
     selection: dict[str, str | None],
 ) -> None:
-    current = equipment_service.loadout_for(character_asset_id)
-    for slot in PLAYABLE_EQUIPMENT_SLOTS:
-        wanted = selection.get(slot.value)
-        existing = current.item_id_for_slot(slot)
-        if wanted == existing:
-            continue
-        if wanted is None:
-            equipment_service.unequip(
-                character_asset_id=character_asset_id,
-                slot=slot,
-            )
-        else:
-            equipment_service.equip(
-                character_asset_id=character_asset_id,
-                item_instance_id=wanted,
-            )
-        current = equipment_service.loadout_for(character_asset_id)
+    equipment_service.apply_loadout(
+        character_asset_id=character_asset_id,
+        slot_items={
+            slot: selection.get(slot.value)
+            for slot in PLAYABLE_EQUIPMENT_SLOTS
+        },
+    )
+
+
+def _request_character_save() -> None:
+    """Mark Save requested so the next rerun can take the fast path."""
+    st.session_state.character_save_requested = True
 
 
 def render_reference_settings(ctx) -> None:
@@ -389,6 +384,7 @@ def reset_character_creation_state() -> None:
         "character_master_character_id",
         "char_equipment_selection",
         "character_save_asset_id",
+        "character_save_requested",
     ):
         st.session_state.pop(key, None)
 
