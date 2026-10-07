@@ -371,7 +371,7 @@ func _ensure_socket(
 func _ensure_box(
     parent: Node3D,
     node_name: String,
-    position: Vector3,
+    local_position: Vector3,
     size: Vector3,
     color: Color
 ) -> MeshInstance3D:
@@ -393,7 +393,7 @@ func _ensure_box(
 func _ensure_sphere(
     parent: Node3D,
     node_name: String,
-    position: Vector3,
+    local_position: Vector3,
     scale_value: Vector3,
     color: Color
 ) -> MeshInstance3D:
@@ -403,7 +403,7 @@ func _ensure_sphere(
 
     var node := MeshInstance3D.new()
     node.name = node_name
-    node.position = position
+    node.position = local_position
     node.scale = scale_value
     var mesh := SphereMesh.new()
     mesh.radius = 0.5
