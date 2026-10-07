@@ -187,11 +187,18 @@ def render_my_stuff(ctx) -> None:
     st.divider()
 
     rarity_counts = Counter(item.rarity for item in collection.items)
-    a, b, c, d = st.columns(4)
+    covered_slots = {
+        definitions[item.definition_id].slot
+        for item in collection.items
+        if item.definition_id in definitions
+        and definitions[item.definition_id].slot in PLAYABLE_EQUIPMENT_SLOTS
+    }
+    a, b, c, d, e = st.columns(5)
     a.metric("🎒 Owned", len(collection.items))
-    b.metric("🟢 Green", rarity_counts[EquipmentRarity.GREEN])
-    c.metric("🔵 Blue", rarity_counts[EquipmentRarity.BLUE])
-    d.metric("🟣 Purple+", sum(
+    b.metric("⭐ Favorites", len(collection.favorite_item_ids))
+    c.metric("🧩 Slots", f"{len(covered_slots)}/{len(PLAYABLE_EQUIPMENT_SLOTS)}")
+    d.metric("🔵 Blue", rarity_counts[EquipmentRarity.BLUE])
+    e.metric("🟣 Purple+", sum(
         rarity_counts[rarity]
         for rarity in (
             EquipmentRarity.PURPLE,
@@ -200,6 +207,27 @@ def render_my_stuff(ctx) -> None:
             EquipmentRarity.RAINBOW,
         )
     ))
+
+    newest = sorted(
+        collection.items,
+        key=lambda item: item.created_at,
+        reverse=True,
+    )[:3]
+    if newest:
+        st.markdown("### 🆕 Newest / 最近获得")
+        newest_cols = st.columns(len(newest))
+        for index, item in enumerate(newest):
+            definition = definitions.get(item.definition_id)
+            if definition is None:
+                continue
+            emoji, rarity_name = RARITY_META[item.rarity]
+            with newest_cols[index]:
+                with st.container(border=True):
+                    st.markdown(f"**{emoji} {definition.display_name}**")
+                    st.caption(
+                        f"{rarity_name} · {SLOT_LABELS.get(definition.slot, definition.slot.value)}"
+                    )
+                    st.write(_stat_line(item.rolled_stats))
 
     st.markdown("### Collection / 我的收藏")
     filter_a, filter_b = st.columns(2)
@@ -271,6 +299,18 @@ def render_my_stuff(ctx) -> None:
                         + _stat_delta(current_stats, item.rolled_stats)
                     )
             with action_col:
+                is_favorite = item.item_instance_id in collection.favorite_item_ids
+                if st.button(
+                    "★ Favorite" if is_favorite else "☆ Favorite",
+                    key=f"favorite_{item.item_instance_id}",
+                    use_container_width=True,
+                ):
+                    ctx.equipment.set_favorite(
+                        item_instance_id=item.item_instance_id,
+                        favorite=not is_favorite,
+                    )
+                    st.rerun()
+
                 if equipped_id == item.item_instance_id:
                     if st.button(
                         "Unequip / 卸下",

@@ -147,6 +147,7 @@ class CreatorCollection(BaseModel):
     loadouts: dict[str, CharacterLoadout] = Field(default_factory=dict)
     claimed_drop_ids: list[str] = Field(default_factory=list)
     claimed_quest_reward_ids: list[str] = Field(default_factory=list)
+    favorite_item_ids: list[str] = Field(default_factory=list)
     updated_at: datetime = Field(default_factory=now_utc)
 
     @model_validator(mode="after")
@@ -154,6 +155,11 @@ class CreatorCollection(BaseModel):
         ids = [item.item_instance_id for item in self.items]
         if len(ids) != len(set(ids)):
             raise ValueError("Duplicate equipment item_instance_id in collection.")
+        self.favorite_item_ids = list(dict.fromkeys(self.favorite_item_ids))
+        owned = set(ids)
+        self.favorite_item_ids = [
+            item_id for item_id in self.favorite_item_ids if item_id in owned
+        ]
         return self
 
     def item_by_id(self, item_instance_id: str) -> EquipmentInstance | None:
