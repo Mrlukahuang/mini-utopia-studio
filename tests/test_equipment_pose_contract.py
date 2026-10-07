@@ -17,6 +17,6 @@ def test_godot_jump_pose_keeps_hand_equipment_clear_of_torso():
     assert "_arm_r.rotation.x = -0.62" in runtime
     assert "_arm_r.rotation.z = -0.28" in runtime
 
-    assert "Vector3(45.0, 0.0, -8.0)" in equipment
-    assert "Vector3(0.0, -55.0, 6.0)" in equipment
-    assert "Vector3(-0.14, 0.0, 0.02)" in equipment
+    assert "Vector3(68.0, 0.0, -4.0)" in equipment
+    assert "Vector3(0.0, -82.0, 4.0)" in equipment
+    assert "Vector3(-0.24, 0.0, 0.02)" in equipment

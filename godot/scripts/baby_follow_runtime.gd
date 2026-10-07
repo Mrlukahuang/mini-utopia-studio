@@ -1,8 +1,8 @@
 class_name MiniUtopiaBabyFollowRuntime
 extends Node3D
 
-@export var follow_distance := 1.35
-@export var side_offset := 0.82
+@export var follow_distance := 0.90
+@export var side_offset := 1.05
 @export var follow_speed := 6.5
 @export var recovery_distance := 7.0
 
@@ -64,6 +64,7 @@ func _build_visual() -> void:
 
     _visual = Node3D.new()
     _visual.name = "Visual"
+    _visual.scale = Vector3.ONE * 1.22
     add_child(_visual)
 
     var species := String(baby_payload.get("species_id", "star_baby"))
@@ -112,6 +113,18 @@ func _build_visual() -> void:
         Vector3(0.05, 0.065, 0.04),
         Color("#4C4058")
     )
+
+    var name_label := Label3D.new()
+    name_label.name = "BabyName"
+    name_label.position = Vector3(0.0, 0.92, 0.0)
+    name_label.text = "🐣 " + String(
+        baby_payload.get("display_name", "Baby")
+    )
+    name_label.font_size = 28
+    name_label.outline_size = 7
+    name_label.modulate = Color("#FFF7D7")
+    name_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+    _visual.add_child(name_label)
 
     match species:
         "star_baby":
@@ -175,13 +188,13 @@ func _build_visual() -> void:
 func _add_box(
     parent: Node3D,
     node_name: String,
-    position: Vector3,
+    local_position: Vector3,
     size: Vector3,
     color: Color
 ) -> MeshInstance3D:
     var node := MeshInstance3D.new()
     node.name = node_name
-    node.position = position
+    node.position = local_position
     var mesh := BoxMesh.new()
     mesh.size = size
     node.mesh = mesh
@@ -193,13 +206,13 @@ func _add_box(
 func _add_sphere(
     parent: Node3D,
     node_name: String,
-    position: Vector3,
+    local_position: Vector3,
     scale_value: Vector3,
     color: Color
 ) -> MeshInstance3D:
     var node := MeshInstance3D.new()
     node.name = node_name
-    node.position = position
+    node.position = local_position
     node.scale = scale_value
     var mesh := SphereMesh.new()
     mesh.radius = 0.5

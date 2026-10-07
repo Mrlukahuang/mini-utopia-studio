@@ -58,7 +58,7 @@ func _initialize() -> void:
         quit(1)
         return
 
-    if absf(weapon.rotation_degrees.x - 45.0) > 0.01:
+    if absf(weapon.rotation_degrees.x - 68.0) > 0.01:
         push_error(
             "equipment_runtime_null_smoke: sword is not pitched forward"
         )
@@ -80,7 +80,7 @@ func _initialize() -> void:
         quit(1)
         return
 
-    if shield.rotation_degrees.y > -40.0:
+    if shield.rotation_degrees.y > -75.0:
         push_error(
             "equipment_runtime_null_smoke: shield is not yawed outward"
         )

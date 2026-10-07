@@ -120,7 +120,7 @@ func _defeat() -> void:
         + "_"
         + enemy_id.to_upper()
     )
-    MiniUtopiaRuntimeDropWriter.write_drop(
+    var drop_written := MiniUtopiaRuntimeDropWriter.write_drop(
         {
             "drop_id": drop_id,
             "source_enemy": enemy_id,
@@ -134,6 +134,14 @@ func _defeat() -> void:
     )
 
     print("PLAY-03 Skeleton defeated · Bone Buckler dropped.")
+    if (
+        drop_written
+        and target != null
+        and target.has_method("show_reward_feedback")
+    ):
+        target.show_reward_feedback(
+            "🏆 Skeleton defeated!   🎁 Bone Buckler dropped → My Stuff"
+        )
     queue_free()
 
 
