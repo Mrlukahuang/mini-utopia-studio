@@ -1,18 +1,26 @@
 from __future__ import annotations
 
 from html import escape
-from typing import Any
-
 import streamlit as st
 
 from studio.core.enums import AssetType
-from studio.models.character import CharacterProfile, WearableLoadout
+from studio.models.character import CharacterProfile
+from studio.models.equipment import (
+    EquipmentSlot,
+    PLAYABLE_EQUIPMENT_SLOTS,
+    StatBlock,
+)
+from studio.models.equipment_runtime import (
+    EquipmentRuntimeItemSpec,
+    EquipmentRuntimeSpec,
+)
 from studio.models.reference import ReferenceCharacterConfig
 from studio.ui.creator.avatar_editor import (
     render_avatar_appearance_editor,
     reset_avatar_editor_state,
 )
 from studio.ui.creator.avatar_legacy_bridge import legacy_visual_updates
+from studio.ui.creator.avatar_preview import render_avatar_preview
 from studio.ui.creator.character_presets import (
     CUSTOM,
     AGE_OPTIONS,
@@ -33,6 +41,39 @@ from studio.ui.theme import render_game_hero, render_quest
 
 DEFAULT_FAVORITE_COLOR_HEXES = ["#F7B7D2", "#B9E7D0", "#D7C2F3"]
 MAX_GENERATIONS_PER_SESSION = 20
+
+FACTORY_CLOTHING_SLOTS = (
+    EquipmentSlot.TOP,
+    EquipmentSlot.BOTTOM,
+    EquipmentSlot.SHOES,
+    EquipmentSlot.HEADWEAR,
+)
+FACTORY_GEAR_SLOTS = (
+    EquipmentSlot.WEAPON_MAIN,
+    EquipmentSlot.WEAPON_OFFHAND,
+    EquipmentSlot.BACKPACK,
+    EquipmentSlot.WINGS,
+    EquipmentSlot.ACCESSORY,
+)
+FACTORY_SLOT_LABELS = {
+    EquipmentSlot.TOP: "👕 Top / 上衣",
+    EquipmentSlot.BOTTOM: "👖 Bottom / 下装",
+    EquipmentSlot.SHOES: "👟 Shoes / 鞋子",
+    EquipmentSlot.HEADWEAR: "👑 Headwear / 帽子·皇冠",
+    EquipmentSlot.WEAPON_MAIN: "⚔️ Main Hand / 主手",
+    EquipmentSlot.WEAPON_OFFHAND: "🛡️ Offhand / 副手",
+    EquipmentSlot.BACKPACK: "🎒 Backpack / 背包",
+    EquipmentSlot.WINGS: "🪽 Wings / 翅膀",
+    EquipmentSlot.ACCESSORY: "✨ Accessory / 饰品",
+}
+FACTORY_RARITY_EMOJI = {
+    "green": "🟢",
+    "blue": "🔵",
+    "purple": "🟣",
+    "gold": "🟡",
+    "red": "🔴",
+    "rainbow": "🌈",
+}
 
 ENGLISH_LEVELS = {
     1: "几乎不会英语 / Almost no English",
@@ -145,29 +186,130 @@ def _choice(selected: str, previous: str, options: list[str]) -> str:
     return CUSTOM
 
 
-def _wearables_for_slot(assets: list[Any], slot: str) -> list[Any]:
+def _factory_equipment_state(equipment_service):
+    collection = equipment_service.ensure_starter_collection()
+    definitions = equipment_service.list_definitions()
+    return collection, definitions
+
+
+def _factory_slot_items(collection, definitions, slot: EquipmentSlot):
     return [
-        asset
-        for asset in assets
-        if not asset.metadata.get("wearable_type")
-        or asset.metadata.get("wearable_type") == slot
+        item
+        for item in collection.items
+        if (
+            definitions.get(item.definition_id) is not None
+            and definitions[item.definition_id].slot == slot
+        )
     ]
 
 
-def _asset_selector(label: str, assets: list[Any], current_id: str | None, key: str):
-    options = [None, *assets]
-    index = 0
-    for idx, asset in enumerate(options):
-        if asset is not None and asset.asset_id == current_id:
-            index = idx
-            break
-    return st.selectbox(
-        label,
-        options,
-        index=index,
-        format_func=lambda item: "— 未选择 / None —" if item is None else item.display_name,
-        key=key,
+def _factory_item_label(item_id, collection, definitions) -> str:
+    if item_id is None:
+        return "— None / 不装备 —"
+    item = collection.item_by_id(item_id)
+    if item is None:
+        return "Unknown"
+    definition = definitions.get(item.definition_id)
+    if definition is None:
+        return "Unknown"
+    rarity = FACTORY_RARITY_EMOJI.get(item.rarity.value, "✨")
+    stats = item.rolled_stats
+    return (
+        f"{rarity} {definition.display_name} · "
+        f"HP+{stats.hp} ATK+{stats.atk} DEF+{stats.defense}"
     )
+
+
+def _default_factory_equipment_selection(
+    equipment_service,
+    *,
+    character_asset_id: str | None = None,
+) -> dict[str, str | None]:
+    collection, definitions = _factory_equipment_state(equipment_service)
+    loadout = (
+        collection.loadout_for(character_asset_id)
+        if character_asset_id
+        else None
+    )
+    selection: dict[str, str | None] = {}
+    for slot in PLAYABLE_EQUIPMENT_SLOTS:
+        persisted = loadout.item_id_for_slot(slot) if loadout else None
+        if persisted is not None:
+            selection[slot.value] = persisted
+            continue
+        items = _factory_slot_items(collection, definitions, slot)
+        selection[slot.value] = (
+            items[0].item_instance_id
+            if slot in FACTORY_CLOTHING_SLOTS and items
+            else None
+        )
+    return selection
+
+
+def _build_factory_equipment_preview(
+    equipment_service,
+    appearance,
+    selection: dict[str, str | None],
+    *,
+    character_asset_id: str = "CHAR_DRAFT",
+) -> EquipmentRuntimeSpec:
+    collection, definitions = _factory_equipment_state(equipment_service)
+    total = StatBlock(hp=100, atk=10, defense=8)
+    equipped: dict[str, EquipmentRuntimeItemSpec] = {}
+
+    for slot in PLAYABLE_EQUIPMENT_SLOTS:
+        item_id = selection.get(slot.value)
+        if not item_id:
+            continue
+        item = collection.item_by_id(item_id)
+        if item is None:
+            continue
+        definition = definitions.get(item.definition_id)
+        if definition is None or definition.slot != slot:
+            continue
+        total = total.plus(item.rolled_stats)
+        equipped[slot.value] = EquipmentRuntimeItemSpec(
+            item_instance_id=item.item_instance_id,
+            definition_id=definition.definition_id,
+            display_name=definition.display_name,
+            slot=definition.slot,
+            rarity=item.rarity,
+            mesh_asset_id=definition.mesh_asset_id,
+            animation_class=definition.animation_class,
+            rolled_stats=item.rolled_stats,
+        )
+
+    return EquipmentRuntimeSpec(
+        character_asset_id=character_asset_id,
+        body_type=appearance.body_type,
+        final_stats=total,
+        equipped=equipped,
+    )
+
+
+def _persist_factory_equipment_selection(
+    equipment_service,
+    *,
+    character_asset_id: str,
+    selection: dict[str, str | None],
+) -> None:
+    current = equipment_service.loadout_for(character_asset_id)
+    for slot in PLAYABLE_EQUIPMENT_SLOTS:
+        wanted = selection.get(slot.value)
+        existing = current.item_id_for_slot(slot)
+        if wanted == existing:
+            continue
+        if wanted is None:
+            equipment_service.unequip(
+                character_asset_id=character_asset_id,
+                slot=slot,
+            )
+        else:
+            equipment_service.equip(
+                character_asset_id=character_asset_id,
+                item_instance_id=wanted,
+            )
+        current = equipment_service.loadout_for(character_asset_id)
 
 
 def render_reference_settings(ctx) -> None:
@@ -232,8 +374,12 @@ def reset_character_creation_state() -> None:
         "editing_character_id",
         "character_master_candidate_path",
         "character_master_character_id",
+        "char_equipment_selection",
     ):
         st.session_state.pop(key, None)
+
+    for slot in PLAYABLE_EQUIPMENT_SLOTS:
+        st.session_state.pop(f"factory_eq_{slot.value}", None)
 
 
 def _start_over() -> None:
@@ -460,74 +606,103 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
 
     if stage == 2:
         st.markdown("### 💬 What is your hero like? / TA 是什么性格？")
-        personality = st.multiselect(
-            "🌈 Pick up to 3 / 选最多 3 个性格",
-            PERSONALITY_OPTIONS,
-            default=[
-                value for value in draft.personality_traits
-                if value in PERSONALITY_OPTIONS
-            ][:3],
-            max_selections=3,
-        )
-        tone = st.selectbox(
-            "🗣️ Speaking Style / 说话感觉",
-            SPEAKING_TONE_OPTIONS,
-            index=_preset_index(
-                SPEAKING_TONE_OPTIONS,
-                draft.speaking_tone,
-                default=0,
-            ),
+        personality_col, preview_col = st.columns(
+            [1.0, 1.25],
+            gap="large",
         )
 
-        with st.expander("✨ More personality details / 更多性格设定（可选）"):
-            strength = st.selectbox(
-                "Strength / 擅长",
-                STRENGTH_OPTIONS,
-                index=_preset_index(
-                    STRENGTH_OPTIONS,
-                    draft.strengths[0] if draft.strengths else "",
-                ),
+        with personality_col:
+            personality = st.multiselect(
+                "🌈 Pick up to 3 / 选最多 3 个性格",
+                PERSONALITY_OPTIONS,
+                default=[
+                    value for value in draft.personality_traits
+                    if value in PERSONALITY_OPTIONS
+                ][:3],
+                max_selections=3,
             )
-            weakness = st.selectbox(
-                "Little Weakness / 小弱点",
-                WEAKNESS_OPTIONS,
+            tone = st.selectbox(
+                "🗣️ Speaking Style / 说话感觉",
+                SPEAKING_TONE_OPTIONS,
                 index=_preset_index(
-                    WEAKNESS_OPTIONS,
-                    draft.weaknesses[0] if draft.weaknesses else "",
-                ),
-            )
-            language = st.selectbox(
-                "Native Language / 母语",
-                LANGUAGE_OPTIONS,
-                index=_preset_index(
-                    LANGUAGE_OPTIONS,
-                    draft.native_language,
+                    SPEAKING_TONE_OPTIONS,
+                    draft.speaking_tone,
                     default=0,
                 ),
             )
-            english = st.selectbox(
-                "English Level / 英语水平",
-                list(range(1, 11)),
-                index=max(0, min((draft.english_level or 5) - 1, 9)),
-                format_func=lambda level: f"{level} · {english_level_label(level)}",
+
+            with st.expander(
+                "✨ More personality details / 更多性格设定（可选）"
+            ):
+                strength = st.selectbox(
+                    "Strength / 擅长",
+                    STRENGTH_OPTIONS,
+                    index=_preset_index(
+                        STRENGTH_OPTIONS,
+                        draft.strengths[0] if draft.strengths else "",
+                    ),
+                )
+                weakness = st.selectbox(
+                    "Little Weakness / 小弱点",
+                    WEAKNESS_OPTIONS,
+                    index=_preset_index(
+                        WEAKNESS_OPTIONS,
+                        draft.weaknesses[0] if draft.weaknesses else "",
+                    ),
+                )
+                language = st.selectbox(
+                    "Native Language / 母语",
+                    LANGUAGE_OPTIONS,
+                    index=_preset_index(
+                        LANGUAGE_OPTIONS,
+                        draft.native_language,
+                        default=0,
+                    ),
+                )
+                english = st.selectbox(
+                    "English Level / 英语水平",
+                    list(range(1, 11)),
+                    index=max(0, min((draft.english_level or 5) - 1, 9)),
+                    format_func=lambda level: (
+                        f"{level} · {english_level_label(level)}"
+                    ),
+                )
+
+        with preview_col:
+            render_avatar_preview(
+                draft.avatar,
+                title="Your Hero / 你的角色",
+                height=540,
             )
 
         back, nxt = st.columns([1, 2])
         with back:
-            if st.button("← Back", key="personality_back", use_container_width=True):
+            if st.button(
+                "← Back",
+                key="personality_back",
+                use_container_width=True,
+            ):
                 go(1)
         with nxt:
-            if st.button("Next → Outfit", type="primary", use_container_width=True):
+            if st.button(
+                "Next → Outfit",
+                type="primary",
+                use_container_width=True,
+            ):
                 st.session_state.char_draft = draft.model_copy(
                     update={
                         "personality_traits": personality,
                         "strengths": [] if not strength else [strength],
                         "weaknesses": [] if not weakness else [weakness],
                         "speaking_tone": _choice(
-                            tone, draft.speaking_tone, SPEAKING_TONE_OPTIONS
+                            tone,
+                            draft.speaking_tone,
+                            SPEAKING_TONE_OPTIONS,
                         ),
                         "native_language": _choice(
-                            language, draft.native_language, LANGUAGE_OPTIONS
+                            language,
+                            draft.native_language,
+                            LANGUAGE_OPTIONS,
                         ),
                         "english_level": english,
                     }
@@ -536,44 +711,118 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
         return
 
     if stage == 3:
-        st.markdown("### 👕 Pick a first outfit / 选第一套穿搭")
-        st.caption("先选一套喜欢的衣服。身高、道具和额外设定都可以以后再改。")
+        st.markdown("### 👕 Outfit & Gear / 穿搭和装备")
+        st.caption(
+            "衣服和装备现在使用同一套 Equipment v2。右边会实时显示真正进入游戏的样子。"
+        )
 
-        defaults = ctx.assets.ensure_default_character_wearables()
-        wear_assets = ctx.repository.list_assets(AssetType.WEARABLE)
-        c1, c2 = st.columns(2)
-        with c1:
-            top = _asset_selector(
-                "👕 Top / 上衣",
-                _wearables_for_slot(wear_assets, "top"),
-                draft.wearables.top_id or defaults["top"].asset_id,
-                "wear_top",
-            )
-            bottom = _asset_selector(
-                "🩳 Bottom / 下装",
-                _wearables_for_slot(wear_assets, "bottom"),
-                draft.wearables.bottom_id or defaults["bottom"].asset_id,
-                "wear_bottom",
-            )
-        with c2:
-            shoes = _asset_selector(
-                "👟 Shoes / 鞋子",
-                _wearables_for_slot(wear_assets, "shoes"),
-                draft.wearables.shoes_id,
-                "wear_shoes",
-            )
-            hat = _asset_selector(
-                "🎩 Hat / 帽子",
-                _wearables_for_slot(wear_assets, "hat"),
-                draft.wearables.hat_id,
-                "wear_hat",
+        collection, definitions = _factory_equipment_state(ctx.equipment)
+        editing_id = st.session_state.get("editing_character_id")
+        seed_selection = st.session_state.get("char_equipment_selection")
+        if not isinstance(seed_selection, dict):
+            seed_selection = _default_factory_equipment_selection(
+                ctx.equipment,
+                character_asset_id=editing_id,
             )
 
-        with st.expander("✨ More details / 更多设定（可选）", expanded=False):
+        selection = dict(seed_selection)
+        controls_col, preview_col = st.columns(
+            [1.0, 1.28],
+            gap="large",
+        )
+
+        with controls_col:
+            st.markdown("#### 👚 Clothes / 基础穿搭")
+            for slot in FACTORY_CLOTHING_SLOTS:
+                items = _factory_slot_items(
+                    collection,
+                    definitions,
+                    slot,
+                )
+                option_ids = [None] + [
+                    item.item_instance_id for item in items
+                ]
+                wanted = selection.get(slot.value)
+                if wanted not in option_ids:
+                    wanted = (
+                        items[0].item_instance_id
+                        if items
+                        else None
+                    )
+                widget_key = f"factory_eq_{slot.value}"
+                if widget_key not in st.session_state:
+                    st.session_state[widget_key] = wanted
+                selected_id = st.selectbox(
+                    FACTORY_SLOT_LABELS[slot],
+                    option_ids,
+                    format_func=lambda item_id, _c=collection, _d=definitions: (
+                        _factory_item_label(item_id, _c, _d)
+                    ),
+                    key=widget_key,
+                )
+                selection[slot.value] = selected_id
+
+            with st.expander(
+                "⚔️ Adventure Gear / 冒险装备（可选）",
+                expanded=False,
+            ):
+                for slot in FACTORY_GEAR_SLOTS:
+                    items = _factory_slot_items(
+                        collection,
+                        definitions,
+                        slot,
+                    )
+                    option_ids = [None] + [
+                        item.item_instance_id for item in items
+                    ]
+                    wanted = selection.get(slot.value)
+                    if wanted not in option_ids:
+                        wanted = None
+                    widget_key = f"factory_eq_{slot.value}"
+                    if widget_key not in st.session_state:
+                        st.session_state[widget_key] = wanted
+                    selected_id = st.selectbox(
+                        FACTORY_SLOT_LABELS[slot],
+                        option_ids,
+                        format_func=lambda item_id, _c=collection, _d=definitions: (
+                            _factory_item_label(item_id, _c, _d)
+                        ),
+                        key=widget_key,
+                    )
+                    selection[slot.value] = selected_id
+
+        preview_spec = _build_factory_equipment_preview(
+            ctx.equipment,
+            draft.avatar,
+            selection,
+            character_asset_id=editing_id or "CHAR_DRAFT",
+        )
+
+        with preview_col:
+            render_avatar_preview(
+                draft.avatar,
+                title="Outfit Preview / 穿搭实时预览",
+                equipment=preview_spec,
+                height=620,
+            )
+            stats = preview_spec.final_stats
+            stat_cols = st.columns(3)
+            stat_cols[0].metric("❤️ HP", stats.hp)
+            stat_cols[1].metric("⚔️ ATK", stats.atk)
+            stat_cols[2].metric("🛡️ DEF", stats.defense)
+
+        with st.expander(
+            "✨ More details / 更多角色设定（可选）",
+            expanded=False,
+        ):
             height = st.selectbox(
                 "Height Category / 身高感觉",
                 HEIGHT_OPTIONS,
-                index=_preset_index(HEIGHT_OPTIONS, draft.height, default=2),
+                index=_preset_index(
+                    HEIGHT_OPTIONS,
+                    draft.height,
+                    default=2,
+                ),
             )
 
             resolved = ctx.references.resolved_anchors()
@@ -644,6 +893,7 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
                 type="primary",
                 use_container_width=True,
             ):
+                st.session_state.char_equipment_selection = selection
                 st.session_state.char_draft = draft.model_copy(
                     update={
                         "height": _choice(
@@ -653,13 +903,6 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
                         ),
                         "height_cm": height_cm,
                         "creator_extra_details": extra,
-                        "wearables": WearableLoadout(
-                            top_id=top.asset_id if top else None,
-                            bottom_id=bottom.asset_id if bottom else None,
-                            shoes_id=shoes.asset_id if shoes else None,
-                            hat_id=hat.asset_id if hat else None,
-                            accessory_ids=draft.wearables.accessory_ids,
-                        ),
                         "starting_prop_ids": [
                             prop.asset_id for prop in selected_props
                         ],
@@ -672,9 +915,26 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
     name = st.session_state.get("char_name", "").strip()
     missing = final_profile.missing_core_fields()
 
+    equipment_selection = st.session_state.get("char_equipment_selection")
+    if not isinstance(equipment_selection, dict):
+        equipment_selection = _default_factory_equipment_selection(
+            ctx.equipment,
+            character_asset_id=st.session_state.get("editing_character_id"),
+        )
+    final_preview_spec = _build_factory_equipment_preview(
+        ctx.equipment,
+        final_profile.avatar,
+        equipment_selection,
+        character_asset_id=(
+            st.session_state.get("editing_character_id") or "CHAR_DRAFT"
+        ),
+    )
+    collection, definitions = _factory_equipment_state(ctx.equipment)
+
     st.markdown("### 🎉 Your Hero Is Ready! / 你的角色准备好啦")
-    info, palette_col = st.columns([1.4, 1])
-    with info:
+    summary_col, preview_col = st.columns([0.92, 1.38], gap="large")
+
+    with summary_col:
         st.markdown(f"#### {escape(name) if name else 'New Character'}")
         st.write(f"**Type** · {final_profile.character_type or '—'}")
         st.write(f"**Role** · {final_profile.story_role or '—'}")
@@ -685,9 +945,12 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
         )
         if final_profile.creator_extra_details:
             st.caption("Extra · " + final_profile.creator_extra_details)
-    with palette_col:
+
         st.markdown("#### 🎨 Canon Colors")
-        colors = final_profile.favorite_color_hexes or DEFAULT_FAVORITE_COLOR_HEXES
+        colors = (
+            final_profile.favorite_color_hexes
+            or DEFAULT_FAVORITE_COLOR_HEXES
+        )
         swatches = "".join(
             (
                 '<span style="display:inline-block;width:34px;height:34px;'
@@ -697,11 +960,29 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
             for color in colors[:3]
         )
         st.markdown(swatches, unsafe_allow_html=True)
-        st.caption(
-            f"Hair/Fur {final_profile.hair_or_fur_color_hex} · "
-            f"Eyes {final_profile.eyes.color_hex}"
+
+        st.markdown("#### 🎒 Starting Loadout / 初始装备")
+        for slot in PLAYABLE_EQUIPMENT_SLOTS:
+            item_id = equipment_selection.get(slot.value)
+            if not item_id:
+                continue
+            st.caption(
+                f"{FACTORY_SLOT_LABELS[slot]} · "
+                f"{_factory_item_label(item_id, collection, definitions)}"
+            )
+
+    with preview_col:
+        render_avatar_preview(
+            final_profile.avatar,
+            title="Ready to Play / 准备进入 Mini Utopia",
+            equipment=final_preview_spec,
+            height=620,
         )
-        st.caption("🔒 Mini Playable Avatar · 2.8–3.0 heads tall")
+        stats = final_preview_spec.final_stats
+        stat_cols = st.columns(3)
+        stat_cols[0].metric("❤️ HP", stats.hp)
+        stat_cols[1].metric("⚔️ ATK", stats.atk)
+        stat_cols[2].metric("🛡️ DEF", stats.defense)
 
     if missing:
         st.warning("还差这些核心设定：" + ", ".join(missing))
@@ -729,6 +1010,11 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
                     asset_id=editing_id,
                 )
                 saved_character_id = asset.asset_id
+                _persist_factory_equipment_selection(
+                    ctx.equipment,
+                    character_asset_id=saved_character_id,
+                    selection=equipment_selection,
+                )
                 reset_character_creation_state()
                 st.session_state.pending_app_page = "🎭 My Characters"
                 st.session_state.last_saved_character_id = saved_character_id
@@ -773,6 +1059,11 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
                         description=st.session_state.get("char_source", ""),
                         profile=final_profile,
                         asset_id=editing_id,
+                    )
+                    _persist_factory_equipment_selection(
+                        ctx.equipment,
+                        character_asset_id=asset.asset_id,
+                        selection=equipment_selection,
                     )
                     st.session_state.editing_character_id = asset.asset_id
                     style_asset = ctx.styles.ensure_mini_utopia_base()
