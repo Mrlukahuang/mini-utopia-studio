@@ -197,7 +197,7 @@ class StoryboardService:
                 "--path",
                 str(GODOT_ROOT),
                 "--script",
-                "res://tests/storyboard_capture.gd",
+                "res://scripts/storyboard_capture.gd",
             ],
             cwd=PROJECT_ROOT,
             capture_output=True,
