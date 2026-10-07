@@ -4,6 +4,10 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
+from studio.bridge.errors import (
+    CharacterRevisionConflict,
+    CharacterWriteValidationError,
+)
 from studio.core.enums import AssetType, ReviewStatus
 from studio.models.asset import now_utc
 from studio.models.character import CharacterProfile
@@ -48,16 +52,6 @@ class BridgeCharacterUpdate(BaseModel):
         if not stripped:
             raise ValueError("display_name must contain visible text")
         return stripped
-
-
-class CharacterWriteValidationError(ValueError):
-    pass
-
-
-class CharacterRevisionConflict(RuntimeError):
-    def __init__(self, *, current_revision: str):
-        super().__init__("Character revision conflict")
-        self.current_revision = current_revision
 
 
 class CharacterBridgeReader:
