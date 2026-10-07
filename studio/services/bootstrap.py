@@ -9,6 +9,7 @@ from studio.services.asset_service import AssetService
 from studio.services.equipment_service import EquipmentService
 from studio.services.baby_service import BabyService
 from studio.services.story_service import StoryService
+from studio.services.story_suggestion_service import StorySuggestionService
 from studio.services.style_service import StyleService
 from studio.services.universe_service import UniverseService
 from studio.services.job_service import JobService
@@ -46,6 +47,7 @@ class StudioContext:
     assets: AssetService
     equipment: EquipmentService
     stories: StoryService
+    story_suggestions: StorySuggestionService
     styles: StyleService
     universes: UniverseService
     jobs: JobService
@@ -194,6 +196,9 @@ def build_context(settings: Settings) -> StudioContext:
         assets=AssetService(repository),
         equipment=EquipmentService(repository),
         stories=StoryService(repository),
+        story_suggestions=StorySuggestionService(
+            structured_provider=text_provider,
+        ),
         styles=StyleService(repository),
         universes=UniverseService(repository),
         jobs=JobService(repository),
