@@ -7,6 +7,7 @@ from studio.models.story import Story
 from studio.models.job import Job
 from studio.models.equipment import CreatorCollection
 from studio.models.baby import BabyRoster
+from studio.models.quest import QuestDefinition
 
 
 class StudioRepository(ABC):
@@ -37,6 +38,16 @@ class StudioRepository(ABC):
 
     def get_baby_roster(self, roster_id: str) -> BabyRoster | None:
         raise NotImplementedError
+
+    def save_quest(self, quest: QuestDefinition) -> None:
+        raise NotImplementedError
+
+    def get_quest(self, quest_id: str) -> QuestDefinition | None:
+        raise NotImplementedError
+
+    def list_quests(self) -> list[QuestDefinition]:
+        raise NotImplementedError
+
     @abstractmethod
     def save_job(self, job: Job) -> None: ...
     @abstractmethod
