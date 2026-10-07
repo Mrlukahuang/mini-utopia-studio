@@ -105,6 +105,11 @@ class DirectorShotSessionService:
         animation_intent = self._animation_intent(
             shot_type=shot.shot_type,
             action=shot.action,
+            blocking_movement=(
+                shot.blocking.movement_style
+                if shot.blocking is not None
+                else None
+            ),
         )
 
         stable_source = {
@@ -190,7 +195,19 @@ class DirectorShotSessionService:
         return value
 
     @staticmethod
-    def _animation_intent(*, shot_type: str, action: str) -> str:
+    def _animation_intent(
+        *,
+        shot_type: str,
+        action: str,
+        blocking_movement: str | None = None,
+    ) -> str:
+        if blocking_movement == "run":
+            return "run"
+        if blocking_movement == "walk":
+            return "walk"
+        if blocking_movement == "hold":
+            return "idle"
+
         text = f"{shot_type} {action}".lower()
         if any(word in text for word in ("attack", "battle", "fight", "strike")):
             return "attack"
