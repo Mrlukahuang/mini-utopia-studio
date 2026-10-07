@@ -9,6 +9,7 @@ from studio.models.job import Job
 from studio.models.equipment import CreatorCollection
 from studio.models.baby import BabyRoster
 from studio.models.quest import QuestDefinition
+from studio.models.universe_memory import UniverseMemoryRecord
 from studio.repositories.base import StudioRepository
 
 SCHEMA = """
@@ -42,6 +43,18 @@ CREATE TABLE IF NOT EXISTS quests (
   data TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS universe_memories (
+  id TEXT PRIMARY KEY,
+  universe_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  source_key TEXT NOT NULL,
+  data TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_universe_memories_universe
+  ON universe_memories(universe_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_universe_memories_source
+  ON universe_memories(universe_id, source_key);
 CREATE TABLE IF NOT EXISTS collections (
   id TEXT PRIMARY KEY,
   owner_key TEXT NOT NULL,
@@ -163,6 +176,52 @@ class SQLiteStudioRepository(StudioRepository):
                 "SELECT data FROM quests ORDER BY updated_at DESC"
             ).fetchall()
         return [QuestDefinition.model_validate_json(row[0]) for row in rows]
+
+    def save_universe_memory(self, memory: UniverseMemoryRecord) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO universe_memories VALUES (?,?,?,?,?,?)",
+                (
+                    memory.memory_id,
+                    memory.universe_id,
+                    memory.kind.value,
+                    memory.source_key,
+                    self._json(memory),
+                    memory.updated_at.isoformat(),
+                ),
+            )
+
+    def get_universe_memory(
+        self,
+        memory_id: str,
+    ) -> UniverseMemoryRecord | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT data FROM universe_memories WHERE id=?",
+                (memory_id,),
+            ).fetchone()
+        return (
+            UniverseMemoryRecord.model_validate_json(row[0])
+            if row
+            else None
+        )
+
+    def list_universe_memories(
+        self,
+        universe_id: str | None = None,
+    ) -> list[UniverseMemoryRecord]:
+        query = "SELECT data FROM universe_memories"
+        args: tuple = ()
+        if universe_id is not None:
+            query += " WHERE universe_id=?"
+            args = (universe_id,)
+        query += " ORDER BY updated_at DESC"
+        with self._connect() as conn:
+            rows = conn.execute(query, args).fetchall()
+        return [
+            UniverseMemoryRecord.model_validate_json(row[0])
+            for row in rows
+        ]
 
     def save_collection(self, collection: CreatorCollection) -> None:
         with self._connect() as conn:
