@@ -3,6 +3,7 @@ from __future__ import annotations
 import streamlit as st
 
 from studio.models.episode import (
+    PerformanceCue,
     ShotBlockingPoint,
     ShotBlockingSpec,
     ShotCameraMotionSpec,
@@ -47,6 +48,16 @@ def render_episode_library(ctx) -> None:
         shot_service.ensure_camera_motion(episode.episode_id)
         if any(
             shot.camera_motion is None
+            for scene in episode.scenes
+            for shot in scene.shots
+        )
+        else episode
+        for episode in episodes
+    ]
+    episodes = [
+        shot_service.ensure_performance_cues(episode.episode_id)
+        if any(
+            shot.performance_cues is None
             for scene in episode.scenes
             for shot in scene.shots
         )
@@ -506,6 +517,92 @@ def render_episode_library(ctx) -> None:
                                                 key=f"fov_end_{episode.episode_id}_{shot.shot_id}",
                                             )
 
+                                        performance_cues = shot.performance_cues
+                                        edited_cues = []
+                                        if performance_cues is not None:
+                                            st.markdown(
+                                                "**🎭 Performance Cues / 表演提示**"
+                                            )
+                                            cue_types = [
+                                                "idle",
+                                                "walk",
+                                                "run",
+                                                "attack",
+                                                "look_at",
+                                                "reaction",
+                                                "celebrate",
+                                            ]
+                                            for cue_index, cue in enumerate(
+                                                performance_cues
+                                            ):
+                                                st.caption(
+                                                    f"{cue.cue_id} · "
+                                                    f"{cue.source.title()}"
+                                                )
+                                                cue_cols = st.columns(4)
+                                                cue_type = cue_cols[0].selectbox(
+                                                    "Cue Type",
+                                                    cue_types,
+                                                    index=cue_types.index(
+                                                        cue.cue_type
+                                                    ),
+                                                    key=(
+                                                        f"cue_type_{episode.episode_id}_"
+                                                        f"{shot.shot_id}_{cue_index}"
+                                                    ),
+                                                )
+                                                cue_start = cue_cols[1].number_input(
+                                                    "Start (s)",
+                                                    min_value=0.0,
+                                                    max_value=float(duration),
+                                                    value=min(
+                                                        float(cue.start_seconds),
+                                                        float(duration),
+                                                    ),
+                                                    step=0.1,
+                                                    key=(
+                                                        f"cue_start_{episode.episode_id}_"
+                                                        f"{shot.shot_id}_{cue_index}"
+                                                    ),
+                                                )
+                                                cue_duration = cue_cols[2].number_input(
+                                                    "Cue Duration",
+                                                    min_value=0.05,
+                                                    max_value=30.0,
+                                                    value=float(
+                                                        cue.duration_seconds
+                                                    ),
+                                                    step=0.1,
+                                                    key=(
+                                                        f"cue_duration_{episode.episode_id}_"
+                                                        f"{shot.shot_id}_{cue_index}"
+                                                    ),
+                                                )
+                                                cue_intensity = cue_cols[3].number_input(
+                                                    "Intensity",
+                                                    min_value=0.0,
+                                                    max_value=1.0,
+                                                    value=float(cue.intensity),
+                                                    step=0.05,
+                                                    key=(
+                                                        f"cue_intensity_{episode.episode_id}_"
+                                                        f"{shot.shot_id}_{cue_index}"
+                                                    ),
+                                                )
+                                                edited_cues.append(
+                                                    PerformanceCue(
+                                                        cue_id=cue.cue_id,
+                                                        cue_type=cue_type,
+                                                        start_seconds=cue_start,
+                                                        duration_seconds=cue_duration,
+                                                        intensity=cue_intensity,
+                                                        target=cue.target,
+                                                        direction_degrees=cue.direction_degrees,
+                                                        source="creator",
+                                                        confidence=1.0,
+                                                    )
+                                                )
+
                                         shot_continuity = st.text_area(
                                             "Shot Continuity / 镜头连续性",
                                             value="\n".join(
@@ -585,6 +682,11 @@ def render_episode_library(ctx) -> None:
                                                     confidence=1.0,
                                                 )
                                                 if camera_motion is not None
+                                                else None
+                                            ),
+                                            performance_cues=(
+                                                edited_cues
+                                                if performance_cues is not None
                                                 else None
                                             ),
                                         )
