@@ -10,6 +10,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable, Protocol
 from urllib.parse import unquote, urlsplit
 
+from studio.bridge.errors import (
+    CharacterRevisionConflict,
+    CharacterWriteValidationError,
+)
 from studio.core.ids import new_id
 from studio.core.product_boundary import (
     CANONICAL_METADATA_OWNER,
@@ -183,13 +187,6 @@ class BridgeApplication:
             parsed = self._parse_json_object(body)
             if isinstance(parsed, BridgeResponse):
                 return parsed
-
-            # Character-specific exceptions are imported lazily so Bridge
-            # /health stays dependency-light for Godot bootstrap probes.
-            from studio.bridge.characters import (
-                CharacterRevisionConflict,
-                CharacterWriteValidationError,
-            )
 
             try:
                 character = reader.update_character(
