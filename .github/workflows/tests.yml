@@ -171,7 +171,7 @@ jobs:
           target.parent.mkdir(parents=True, exist_ok=True)
           target.write_text(json.dumps(request, indent=2), encoding="utf-8")
           PY
-          /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://scripts/storyboard_capture.gd
+          xvfb-run -a /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --path godot --rendering-method gl_compatibility --resolution 960x540 --script res://scripts/storyboard_capture.gd
           python3 - <<'PY'
           from pathlib import Path
           path = Path("godot/runtime_state/storyboards/EP_SMOKE/SHOT_01_01.png")
