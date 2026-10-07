@@ -77,6 +77,27 @@ def render_episode_library(ctx) -> None:
         publish_package_service=publish_package_service,
     )
     episodes = episode_service.list_episodes()
+    selected_episode_id = st.session_state.get("selected_episode_id")
+    if selected_episode_id:
+        selected_episode = next(
+            (
+                episode
+                for episode in episodes
+                if episode.episode_id == selected_episode_id
+            ),
+            None,
+        )
+        if selected_episode is None:
+            st.session_state.pop("selected_episode_id", None)
+        else:
+            if st.button(
+                "← All Episodes / 返回全部剧集",
+                key="show_all_episodes",
+            ):
+                st.session_state.pop("selected_episode_id", None)
+                st.rerun()
+            episodes = [selected_episode]
+
     episodes = [
         shot_service.ensure_blocking(episode.episode_id)
         if any(
