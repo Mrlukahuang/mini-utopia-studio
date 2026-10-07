@@ -75,6 +75,8 @@ func _initialize() -> void:
         }
     )
 
+    await process_frame
+
     if runtime.current_objective_id() != "discover":
         push_error(
             "quest_runtime_smoke: ARRIVE did not auto-advance"
