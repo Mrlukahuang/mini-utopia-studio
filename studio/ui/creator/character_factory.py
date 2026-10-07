@@ -242,12 +242,12 @@ def _start_over() -> None:
 
 
 def render_character_factory(ctx, character_factory, *, studio_mode: bool = False) -> None:
-    """Character Factory v1 final: two entry modes, preset-first Custom Build."""
+    """Child-first Character Factory with an optional assisted prompt path."""
 
     render_game_hero(
-        "Create Your Mini Hero ✨",
-        "两种方式开始，同一套 Mini Utopia 规则完成。选项负责稳定，想象力留在最后的 Extra Details。",
-        kicker="CHARACTER FACTORY · FINAL V1",
+        "Make Your Mini Hero ✨",
+        "给 TA 取名字、捏外形、选性格，再穿上第一套衣服。完成后就会加入你的角色收藏。",
+        kicker="CHARACTER FACTORY · MAKE A HERO",
     )
 
     if studio_mode:
@@ -257,39 +257,38 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
     mode = st.session_state.get("char_creation_mode")
 
     if draft is None and mode is None:
-        render_quest("你想怎么开始？ / How do you want to start?")
-        left, right = st.columns(2)
+        render_quest("先做一个属于你的 Mini Hero！ / Make a hero of your own!")
+        st.markdown(
+            '<div class="mu-world-card"><div class="emoji">🌟🧸</div>'
+            '<h3>Start My Hero / 开始创造我的角色</h3>'
+            '<p>名字 → 外形 → 性格 → 穿搭。一步一步选，随时都可以返回修改。</p></div>',
+            unsafe_allow_html=True,
+        )
+        if st.button(
+            "🌟 Start My Hero / 开始创造我的角色",
+            key="start_my_hero",
+            type="primary",
+            use_container_width=True,
+        ):
+            st.session_state.char_creation_mode = "custom"
+            st.session_state.char_draft = CharacterProfile()
+            st.session_state.char_stage = 0
+            st.rerun()
 
-        with left:
-            st.markdown(
-                '<div class="mu-world-card"><div class="emoji">✨📝</div>'
-                '<h3>Prompt Generate</h3>'
-                '<p>描述生成 · 用一句话说出脑海里的角色，系统先整理，再让你确认。</p></div>',
-                unsafe_allow_html=True,
+        with st.expander(
+            "✨ I already have an idea / 我想用一句话描述",
+            expanded=False,
+        ):
+            st.caption(
+                "如果你脑海里已经有角色，可以先描述一句，"
+                "系统会帮你放进同一套可编辑选项里。"
             )
             if st.button(
-                "✨ Prompt Generate / 描述生成",
+                "✨ Describe My Hero / 用一句话开始",
                 key="start_prompt_generate",
                 use_container_width=True,
             ):
                 st.session_state.char_creation_mode = "prompt"
-                st.rerun()
-
-        with right:
-            st.markdown(
-                '<div class="mu-world-card"><div class="emoji">🎨🧩</div>'
-                '<h3>Custom Build</h3>'
-                '<p>自定义搭建 · 像游戏捏人一样，从预设选项一步步搭出来。</p></div>',
-                unsafe_allow_html=True,
-            )
-            if st.button(
-                "🎨 Custom Build / 自定义搭建",
-                key="start_custom_build",
-                use_container_width=True,
-            ):
-                st.session_state.char_creation_mode = "custom"
-                st.session_state.char_draft = CharacterProfile()
-                st.session_state.char_stage = 0
                 st.rerun()
         return
 
@@ -329,56 +328,72 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
         return
 
     stages = [
-        "1 · Identity / 身份",
-        "2 · Look / 外形",
-        "3 · Personality / 性格",
-        "4 · Outfit & Details / 装备",
-        "5 · Create / 生成",
+        "1 · Name & Age / 名字和年龄",
+        "2 · Look / 捏外形",
+        "3 · Personality / 选性格",
+        "4 · Outfit / 穿衣服",
+        "5 · Ready / 完成",
     ]
     stage = max(0, min(int(st.session_state.get("char_stage", 0)), 4))
     st.progress((stage + 1) / 5, text=f"{stages[stage]} · {stage + 1}/5")
-    st.caption("Custom Build 以选择题为主。只有最后的 Extra Details 是自由描述。")
+    st.caption("不用一次想完所有设定。先把你的英雄做出来，以后还可以继续换装和编辑。")
 
     def go(value: int) -> None:
         st.session_state.char_stage = max(0, min(value, 4))
         st.rerun()
 
     if stage == 0:
-        st.markdown("### 👤 Identity / TA 是谁？")
-        a, b = st.columns(2)
-        with a:
-            name = st.text_input(
-                "名字 / Name",
-                value=st.session_state.get("char_name", ""),
-                placeholder="给 TA 取一个名字",
-                key="character_name_input",
-            )
-            age = st.selectbox(
-                "Age / 年龄",
-                AGE_OPTIONS,
-                index=_preset_index(AGE_OPTIONS, draft.age, default=4),
-            )
-        with b:
+        st.markdown("### 👋 First, who are we making? / 先认识一下 TA")
+        name = st.text_input(
+            "🌟 Hero Name / 角色名字",
+            value=st.session_state.get("char_name", ""),
+            placeholder="给 TA 取一个名字",
+            key="character_name_input",
+        )
+        age = st.selectbox(
+            "🎂 Age / 年龄",
+            AGE_OPTIONS,
+            index=_preset_index(AGE_OPTIONS, draft.age, default=4),
+        )
+
+        with st.expander("✨ More choices / 更多设定（可选）", expanded=False):
             role = st.selectbox(
                 "Story Role / 故事角色",
                 STORY_ROLE_OPTIONS,
-                index=_preset_index(STORY_ROLE_OPTIONS, draft.story_role),
+                index=_preset_index(
+                    STORY_ROLE_OPTIONS,
+                    draft.story_role,
+                    default=0,
+                ),
             )
             face = st.selectbox(
                 "Face Style / 脸部感觉",
                 FACE_STYLE_OPTIONS,
-                index=_preset_index(FACE_STYLE_OPTIONS, draft.face),
+                index=_preset_index(
+                    FACE_STYLE_OPTIONS,
+                    draft.face,
+                    default=0,
+                ),
             )
 
         if draft.source_description:
-            st.info("✨ Prompt 已整理成选项。你可以继续修改；原始描述会保留在 Profile。")
+            st.info("✨ 描述已经变成可编辑选项，你可以继续改成自己喜欢的样子。")
 
-        if st.button("Next → Look", type="primary", use_container_width=True):
+        if st.button(
+            "Next → Make the Look / 下一步：捏外形",
+            type="primary",
+            disabled=not name.strip(),
+            use_container_width=True,
+        ):
             st.session_state.char_name = name
             st.session_state.char_draft = draft.model_copy(
                 update={
                     "age": _choice(age, draft.age, AGE_OPTIONS),
-                    "story_role": _choice(role, draft.story_role, STORY_ROLE_OPTIONS),
+                    "story_role": _choice(
+                        role,
+                        draft.story_role,
+                        STORY_ROLE_OPTIONS,
+                    ),
                     "face": _choice(face, draft.face, FACE_STYLE_OPTIONS),
                 }
             )
@@ -444,18 +459,27 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
         return
 
     if stage == 2:
-        st.markdown("### 💬 Personality / TA 是什么性格？")
-        a, b = st.columns(2)
-        with a:
-            personality = st.multiselect(
-                "Personality / 性格（最多 3 个）",
-                PERSONALITY_OPTIONS,
-                default=[
-                    value for value in draft.personality_traits
-                    if value in PERSONALITY_OPTIONS
-                ][:3],
-                max_selections=3,
-            )
+        st.markdown("### 💬 What is your hero like? / TA 是什么性格？")
+        personality = st.multiselect(
+            "🌈 Pick up to 3 / 选最多 3 个性格",
+            PERSONALITY_OPTIONS,
+            default=[
+                value for value in draft.personality_traits
+                if value in PERSONALITY_OPTIONS
+            ][:3],
+            max_selections=3,
+        )
+        tone = st.selectbox(
+            "🗣️ Speaking Style / 说话感觉",
+            SPEAKING_TONE_OPTIONS,
+            index=_preset_index(
+                SPEAKING_TONE_OPTIONS,
+                draft.speaking_tone,
+                default=0,
+            ),
+        )
+
+        with st.expander("✨ More personality details / 更多性格设定（可选）"):
             strength = st.selectbox(
                 "Strength / 擅长",
                 STRENGTH_OPTIONS,
@@ -472,16 +496,14 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
                     draft.weaknesses[0] if draft.weaknesses else "",
                 ),
             )
-        with b:
-            tone = st.selectbox(
-                "Speaking Tone / 说话语气",
-                SPEAKING_TONE_OPTIONS,
-                index=_preset_index(SPEAKING_TONE_OPTIONS, draft.speaking_tone),
-            )
             language = st.selectbox(
                 "Native Language / 母语",
                 LANGUAGE_OPTIONS,
-                index=_preset_index(LANGUAGE_OPTIONS, draft.native_language),
+                index=_preset_index(
+                    LANGUAGE_OPTIONS,
+                    draft.native_language,
+                    default=0,
+                ),
             )
             english = st.selectbox(
                 "English Level / 英语水平",
@@ -514,7 +536,7 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
         return
 
     if stage == 3:
-        st.markdown("### 👕📏 Outfit & Details / 穿什么、有多高？")
+        st.markdown("### 👕 Pick a first outfit / 选第一套穿搭")
         height = st.selectbox(
             "Height Category / 身高感觉",
             HEIGHT_OPTIONS,
@@ -610,7 +632,7 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
             if st.button("← Back", key="outfit_back", use_container_width=True):
                 go(2)
         with nxt:
-            if st.button("Next → Create", type="primary", use_container_width=True):
+            if st.button("Next → Ready / 下一步：完成", type="primary", use_container_width=True):
                 st.session_state.char_draft = draft.model_copy(
                     update={
                         "height": _choice(height, draft.height, HEIGHT_OPTIONS),
@@ -635,7 +657,7 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
     name = st.session_state.get("char_name", "").strip()
     missing = final_profile.missing_core_fields()
 
-    st.markdown("### ✨ Create / 生成角色设定图")
+    st.markdown("### 🎉 Your Hero Is Ready! / 你的角色准备好啦")
     info, palette_col = st.columns([1.4, 1])
     with info:
         st.markdown(f"#### {escape(name) if name else 'New Character'}")
@@ -671,29 +693,16 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
     if not name:
         st.warning("请返回 Identity 给 TA 取一个名字。")
 
-    count = int(st.session_state.get("creator_generation_count", 0))
-    remaining = max(0, MAX_GENERATIONS_PER_SESSION - count)
-    st.caption(f"🎟️ 本次会话剩余生成次数：{remaining}/{MAX_GENERATIONS_PER_SESSION}")
-
-    candidate_path = st.session_state.get("character_master_candidate_path")
-    back, generate = st.columns([1, 2])
+    profile_can_save = not missing and bool(name)
+    back, save = st.columns([1, 2])
     with back:
-        if st.button("← Back to Edit", use_container_width=True):
+        if st.button("← Back to Edit / 返回修改", use_container_width=True):
             go(3)
-    with generate:
+    with save:
         if st.button(
-            (
-                "✨ Generate Master Sheet / 生成角色设定图"
-                if not candidate_path
-                else "🎲 Regenerate / 再生成"
-            ),
+            "💖 Save My Hero / 保存我的角色",
             type="primary",
-            disabled=(
-                bool(missing)
-                or not name
-                or not ctx.character_masters.is_available
-                or remaining <= 0
-            ),
+            disabled=not profile_can_save,
             use_container_width=True,
         ):
             try:
@@ -704,19 +713,65 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
                     profile=final_profile,
                     asset_id=editing_id,
                 )
-                st.session_state.editing_character_id = asset.asset_id
-                style_asset = ctx.styles.ensure_mini_utopia_base()
-                with st.spinner("✨ 正在生成 Hero + Turnaround + Expressions…"):
-                    candidate = ctx.character_masters.generate_candidate(
-                        character_asset_id=asset.asset_id,
-                        style_asset_id=style_asset.asset_id,
-                    )
-                st.session_state.character_master_candidate_path = candidate.path
-                st.session_state.character_master_character_id = asset.asset_id
-                st.session_state.creator_generation_count = count + 1
+                saved_character_id = asset.asset_id
+                reset_character_creation_state()
+                st.session_state.pending_app_page = "🎭 My Characters"
+                st.session_state.last_saved_character_id = saved_character_id
+                st.success("🌟 保存成功！你的角色已经加入 My Characters。")
+                st.balloons()
                 st.rerun()
             except Exception as exc:
-                st.error(f"生成失败 / Generation failed: {exc}")
+                st.error(f"保存失败 / Save failed: {exc}")
+
+    count = int(st.session_state.get("creator_generation_count", 0))
+    remaining = max(0, MAX_GENERATIONS_PER_SESSION - count)
+    candidate_path = st.session_state.get("character_master_candidate_path")
+
+    with st.expander(
+        "🎨 Optional Character Art / 可选：生成角色设定图",
+        expanded=bool(candidate_path),
+    ):
+        if not ctx.character_masters.is_available:
+            st.caption(
+                "没有连接 Image API 也没关系。上面的 Save My Hero 可以直接保存可玩角色。"
+            )
+        else:
+            st.caption(
+                f"🎟️ 本次会话剩余生成次数：{remaining}/{MAX_GENERATIONS_PER_SESSION}"
+            )
+            if st.button(
+                (
+                    "✨ Generate Master Sheet / 生成角色设定图"
+                    if not candidate_path
+                    else "🎲 Regenerate / 再生成"
+                ),
+                disabled=(
+                    not profile_can_save
+                    or remaining <= 0
+                ),
+                use_container_width=True,
+            ):
+                try:
+                    editing_id = st.session_state.get("editing_character_id")
+                    asset = character_factory.save_character(
+                        name=name,
+                        description=st.session_state.get("char_source", ""),
+                        profile=final_profile,
+                        asset_id=editing_id,
+                    )
+                    st.session_state.editing_character_id = asset.asset_id
+                    style_asset = ctx.styles.ensure_mini_utopia_base()
+                    with st.spinner("✨ 正在生成 Hero + Turnaround + Expressions…"):
+                        candidate = ctx.character_masters.generate_candidate(
+                            character_asset_id=asset.asset_id,
+                            style_asset_id=style_asset.asset_id,
+                        )
+                    st.session_state.character_master_candidate_path = candidate.path
+                    st.session_state.character_master_character_id = asset.asset_id
+                    st.session_state.creator_generation_count = count + 1
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"生成失败 / Generation failed: {exc}")
 
     candidate_path = st.session_state.get("character_master_candidate_path")
     candidate_character_id = st.session_state.get("character_master_character_id")
@@ -773,5 +828,3 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
             if st.button("🆕 New Character / 新角色", use_container_width=True):
                 _start_over()
 
-    if not ctx.character_masters.is_available:
-        st.info("Image API 尚未连接；当前只能保存 Character Profile。")
