@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import streamlit as st
 
+from studio.services.baby_service import BabyService
+from studio.services.director_shot_session_service import (
+    DirectorShotSessionService,
+)
 from studio.services.episode_service import EpisodeService
 from studio.services.scene_breakdown_service import SceneBreakdownService
 from studio.services.shot_plan_service import ShotPlanService
@@ -17,6 +21,12 @@ def render_episode_library(ctx) -> None:
     episode_service = EpisodeService(ctx.repository)
     scene_service = SceneBreakdownService(ctx.repository)
     shot_service = ShotPlanService(ctx.repository)
+    director_service = DirectorShotSessionService(
+        ctx.repository,
+        ctx.character_runtime,
+        equipment=ctx.equipment,
+        babies=BabyService(ctx.repository),
+    )
     episodes = episode_service.list_episodes()
     if not episodes:
         st.info("还没有 Episode。去 Stories 选择一个故事，点击 Create Episode。")
@@ -288,6 +298,55 @@ def render_episode_library(ctx) -> None:
                                             ),
                                         )
                                         st.rerun()
+
+                                    if st.button(
+                                        "🎬 Stage Shot / 导演模式",
+                                        key=(
+                                            f"stage_director_{episode.episode_id}_"
+                                            f"{scene.scene_id}_{shot.shot_id}"
+                                        ),
+                                        type="primary",
+                                        use_container_width=True,
+                                    ):
+                                        try:
+                                            session = director_service.export(
+                                                episode_id=episode.episode_id,
+                                                scene_id=scene.scene_id,
+                                                shot_id=shot.shot_id,
+                                            )
+                                            st.session_state[
+                                                "director_last_session"
+                                            ] = session.model_dump(
+                                                mode="json"
+                                            )
+                                            st.success(
+                                                "🎬 Director Shot ready / "
+                                                "导演镜头已准备 · "
+                                                f"{session.director_session_id} · "
+                                                f"{session.animation_intent.title()} · "
+                                                f"{session.duration_seconds:.1f}s"
+                                            )
+                                        except ValueError as exc:
+                                            st.error(str(exc))
+
+                                    last_director = st.session_state.get(
+                                        "director_last_session"
+                                    )
+                                    if (
+                                        isinstance(last_director, dict)
+                                        and last_director.get("episode_id")
+                                        == episode.episode_id
+                                        and last_director.get("scene_id")
+                                        == scene.scene_id
+                                        and last_director.get("shot_id")
+                                        == shot.shot_id
+                                    ):
+                                        st.info(
+                                            "🎥 Godot Director payload ready · "
+                                            f"Camera {last_director.get('camera', {}).get('movement', '')} · "
+                                            f"Actor {last_director.get('character_asset_id', '')} · "
+                                            f"World {last_director.get('world_asset_id', '—')}"
+                                        )
             else:
                 st.info(
                     "下一步：Script & Scene Breakdown / 剧本与场景拆解。"
