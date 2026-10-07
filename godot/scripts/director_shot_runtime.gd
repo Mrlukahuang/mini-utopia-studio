@@ -25,6 +25,9 @@ var camera_end_fov := 48.0
 var camera_movement_mode := "hold"
 var camera_easing := "smooth"
 var camera_has_motion := false
+var performance_cues: Array = []
+var fired_performance_cues: Dictionary = {}
+var performance_last_cue := ""
 var elapsed_seconds := 0.0
 var duration_seconds := 0.0
 var animation_intent := "idle"
@@ -47,6 +50,7 @@ func configure(runtime_payload: Dictionary) -> void:
     _build_actor()
     _apply_shot_blocking()
     _build_camera()
+    _load_performance_cues()
 
     var raw_play = payload.get("play_session", {})
     var play_payload: Dictionary = (
@@ -59,7 +63,7 @@ func configure(runtime_payload: Dictionary) -> void:
     add_child(play_runtime)
     play_runtime.apply_payload_to_player(actor, play_payload)
 
-    if animation_intent == "attack":
+    if animation_intent == "attack" and performance_cues.is_empty():
         play_runtime.play_attack_swing()
 
     set_meta(
@@ -109,6 +113,7 @@ func advance_shot(delta: float) -> void:
     if not playing or actor == null or play_runtime == null:
         return
 
+    var previous_elapsed := elapsed_seconds
     elapsed_seconds = minf(duration_seconds, elapsed_seconds + delta)
     var velocity := Vector3.ZERO
     var running := false
@@ -153,6 +158,10 @@ func advance_shot(delta: float) -> void:
         if velocity.length() > 0.0 and not blocking_has_path:
             actor.position += velocity * delta
 
+    _apply_performance_cues(
+        previous_elapsed,
+        elapsed_seconds
+    )
     play_runtime.update_motion(
         delta,
         velocity,
@@ -173,6 +182,10 @@ func advance_shot(delta: float) -> void:
 func reset_shot() -> void:
     elapsed_seconds = 0.0
     playing = duration_seconds > 0.0
+    fired_performance_cues.clear()
+    performance_last_cue = ""
+    if actor != null:
+        actor.set_meta("director_last_cue", "")
     if actor != null and blocking_has_path:
         actor.position = blocking_start
         var raw_shot = payload.get("shot", {})
@@ -183,6 +196,7 @@ func reset_shot() -> void:
                     raw_blocking.get("facing_degrees", 0.0)
                 )
     if play_runtime != null:
+        play_runtime.reset_director_pose()
         play_runtime.update_motion(
             0.0,
             Vector3.ZERO,
@@ -222,6 +236,9 @@ func _clear_stage() -> void:
     camera_movement_mode = "hold"
     camera_easing = "smooth"
     camera_has_motion = false
+    performance_cues = []
+    fired_performance_cues.clear()
+    performance_last_cue = ""
 
 
 func _build_world_context() -> void:
@@ -435,6 +452,90 @@ func _point_from_dict(value: Variant, fallback: Vector3) -> Vector3:
         float(value.get("y", fallback.y)),
         float(value.get("z", fallback.z))
     )
+
+
+func _load_performance_cues() -> void:
+    performance_cues = []
+    fired_performance_cues.clear()
+    performance_last_cue = ""
+
+    var raw_shot = payload.get("shot", {})
+    if typeof(raw_shot) != TYPE_DICTIONARY:
+        return
+    var raw_cues = raw_shot.get("performance_cues", [])
+    if typeof(raw_cues) != TYPE_ARRAY:
+        return
+
+    for cue in raw_cues:
+        if typeof(cue) == TYPE_DICTIONARY:
+            performance_cues.append(cue.duplicate(true))
+
+    performance_cues.sort_custom(
+        func(a, b):
+            return float(a.get("start_seconds", 0.0)) < float(
+                b.get("start_seconds", 0.0)
+            )
+    )
+
+
+func _apply_performance_cues(
+    previous_seconds: float,
+    current_seconds: float
+) -> void:
+    if play_runtime == null:
+        return
+
+    for cue in performance_cues:
+        var cue_id := String(cue.get("cue_id", ""))
+        if cue_id.is_empty() or fired_performance_cues.has(cue_id):
+            continue
+
+        var start_seconds := float(cue.get("start_seconds", 0.0))
+        if (
+            start_seconds < previous_seconds - 0.0001
+            or start_seconds > current_seconds + 0.0001
+        ):
+            continue
+
+        fired_performance_cues[cue_id] = true
+        performance_last_cue = String(cue.get("cue_type", ""))
+        actor.set_meta("director_last_cue", performance_last_cue)
+        _execute_performance_cue(cue)
+
+
+func _execute_performance_cue(cue: Dictionary) -> void:
+    var cue_type := String(cue.get("cue_type", ""))
+    var duration := maxf(
+        0.05,
+        float(cue.get("duration_seconds", 0.5))
+    )
+    var intensity := clampf(
+        float(cue.get("intensity", 1.0)),
+        0.0,
+        1.0
+    )
+
+    match cue_type:
+        "attack":
+            play_runtime.play_attack_swing()
+        "reaction":
+            play_runtime.play_reaction_pose(
+                duration * maxf(0.35, intensity)
+            )
+        "celebrate":
+            play_runtime.play_celebrate_pose(
+                duration * maxf(0.35, intensity)
+            )
+        "look_at":
+            var raw_direction = cue.get("direction_degrees", null)
+            if raw_direction != null:
+                actor.rotation_degrees.y = float(raw_direction)
+        "idle", "walk", "run":
+            pass
+        _:
+            push_warning(
+                "DIR-08 ignored unknown performance cue: " + cue_type
+            )
 
 
 func _build_camera() -> void:
