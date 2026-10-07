@@ -101,6 +101,7 @@ class DirectorShotSessionService:
         camera = self._camera_for_shot(
             shot_type=shot.shot_type,
             camera_text=shot.camera,
+            camera_motion=shot.camera_motion,
         )
         animation_intent = self._animation_intent(
             shot_type=shot.shot_type,
@@ -225,7 +226,24 @@ class DirectorShotSessionService:
         *,
         shot_type: str,
         camera_text: str,
+        camera_motion=None,
     ) -> DirectorCameraSpec:
+        if camera_motion is not None:
+            start = camera_motion.start_position
+            end = camera_motion.end_position
+            start_look = camera_motion.start_look_at
+            end_look = camera_motion.end_look_at
+            return DirectorCameraSpec(
+                position=(start.x, start.y, start.z),
+                look_at=(start_look.x, start_look.y, start_look.z),
+                fov=camera_motion.start_fov,
+                movement=camera_text.strip(),
+                end_position=(end.x, end.y, end.z),
+                end_look_at=(end_look.x, end_look.y, end_look.z),
+                end_fov=camera_motion.end_fov,
+                movement_mode=camera_motion.movement_mode,
+                easing=camera_motion.easing,
+            )
         text = f"{shot_type} {camera_text}".lower()
         if any(word in text for word in ("detail", "close", "reaction")):
             position = (0.8, 2.3, 3.8)
