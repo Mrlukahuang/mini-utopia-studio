@@ -19,6 +19,8 @@ var attack_power := 10
 var defense := 8
 var _attack_timer := 0.0
 var _combat_label: Label3D
+var _reward_banner: Label
+var _reward_timer: Timer
 var _spawn_position := Vector3.ZERO
 
 
@@ -33,6 +35,7 @@ func _ready() -> void:
 
     _read_creator_stats()
     _build_combat_label()
+    _build_reward_banner()
     _update_combat_label()
 
 
@@ -186,6 +189,54 @@ func _respawn() -> void:
     current_hp = max_hp
     _update_combat_label()
     print("PLAY-03 Player respawned with full HP.")
+
+
+func show_reward_feedback(message: String) -> void:
+    if _reward_banner == null:
+        return
+    _reward_banner.text = message
+    _reward_banner.visible = true
+    if _reward_timer != null:
+        _reward_timer.start()
+
+
+func _build_reward_banner() -> void:
+    var layer := CanvasLayer.new()
+    layer.name = "RewardFeedbackLayer"
+    layer.layer = 25
+    add_child(layer)
+
+    _reward_banner = Label.new()
+    _reward_banner.name = "RewardBanner"
+    _reward_banner.set_anchors_preset(Control.PRESET_CENTER_TOP)
+    _reward_banner.position = Vector2(-300.0, 26.0)
+    _reward_banner.size = Vector2(600.0, 74.0)
+    _reward_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    _reward_banner.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+    _reward_banner.add_theme_font_size_override("font_size", 24)
+    _reward_banner.add_theme_color_override(
+        "font_color",
+        Color("#FFF8D6")
+    )
+    _reward_banner.add_theme_color_override(
+        "font_shadow_color",
+        Color(0.05, 0.04, 0.08, 0.92)
+    )
+    _reward_banner.add_theme_constant_override("shadow_offset_x", 3)
+    _reward_banner.add_theme_constant_override("shadow_offset_y", 3)
+    _reward_banner.visible = false
+    layer.add_child(_reward_banner)
+
+    _reward_timer = Timer.new()
+    _reward_timer.name = "RewardBannerTimer"
+    _reward_timer.one_shot = true
+    _reward_timer.wait_time = 5.0
+    _reward_timer.timeout.connect(
+        func() -> void:
+            if _reward_banner != null:
+                _reward_banner.visible = false
+    )
+    add_child(_reward_timer)
 
 
 func _build_combat_label() -> void:
