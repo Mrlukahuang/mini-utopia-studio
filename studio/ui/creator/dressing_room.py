@@ -60,6 +60,15 @@ def render_dressing_room(ctx) -> None:
     collection = equipment.ensure_starter_collection()
     definitions = equipment.list_definitions()
 
+    active_quest_id = st.session_state.get("active_quest_id")
+    active_quest = (
+        ctx.repository.get_quest(active_quest_id)
+        if active_quest_id
+        else None
+    )
+    if active_quest_id and active_quest is None:
+        st.session_state.pop("active_quest_id", None)
+
     selected_character = st.selectbox(
         "Choose Character / 选择角色",
         characters,
@@ -110,6 +119,12 @@ def render_dressing_room(ctx) -> None:
             )
         else:
             st.caption("🐣 No Active Baby yet · visit My Baby to meet one.")
+
+        if active_quest is not None:
+            st.info(
+                f"📜 Active Quest · {active_quest.title} · "
+                f"{len(active_quest.objectives)} objectives"
+            )
 
         st.markdown("#### Quick Equip / 快速换装")
         loadout = collection.loadout_for(selected_character.asset_id)
@@ -189,6 +204,11 @@ def render_dressing_room(ctx) -> None:
             try:
                 play_sessions.export(
                     character_asset_id=selected_character.asset_id,
+                    quest_id=(
+                        active_quest.quest_id
+                        if active_quest is not None
+                        else None
+                    ),
                 )
                 st.session_state.play_character_id = selected_character.asset_id
                 st.session_state.pop("runtime_character_asset", None)
