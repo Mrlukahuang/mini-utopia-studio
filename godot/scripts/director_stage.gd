@@ -69,6 +69,7 @@ func _build_overlay() -> void:
     layer.add_child(panel)
 
     var margin := MarginContainer.new()
+    margin.name = "StatusMargin"
     margin.add_theme_constant_override("margin_left", 18)
     margin.add_theme_constant_override("margin_right", 18)
     margin.add_theme_constant_override("margin_top", 14)
