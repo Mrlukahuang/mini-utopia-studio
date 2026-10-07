@@ -160,6 +160,27 @@ func advance_shot(delta: float) -> void:
         playing = false
 
 
+func reset_shot() -> void:
+    elapsed_seconds = 0.0
+    playing = duration_seconds > 0.0
+    if actor != null and blocking_has_path:
+        actor.position = blocking_start
+        var raw_shot = payload.get("shot", {})
+        if typeof(raw_shot) == TYPE_DICTIONARY:
+            var raw_blocking = raw_shot.get("blocking", {})
+            if typeof(raw_blocking) == TYPE_DICTIONARY:
+                actor.rotation_degrees.y = float(
+                    raw_blocking.get("facing_degrees", 0.0)
+                )
+    if play_runtime != null:
+        play_runtime.update_motion(
+            0.0,
+            Vector3.ZERO,
+            true,
+            false
+        )
+
+
 func progress_ratio() -> float:
     if duration_seconds <= 0.0:
         return 0.0
