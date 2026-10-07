@@ -97,8 +97,12 @@ func update_motion(
         return
 
     if not on_floor:
-        _arm_l.rotation.z = 0.62
-        _arm_r.rotation.z = -0.62
+        # Compact jump-ready pose. Bring both hands slightly forward/outward
+        # so hand-attached sword/shield stay readable and clear of the torso.
+        _arm_l.rotation.x = -0.46
+        _arm_l.rotation.z = 0.28
+        _arm_r.rotation.x = -0.62
+        _arm_r.rotation.z = -0.28
         return
 
     if horizontal_speed > 0.15:
