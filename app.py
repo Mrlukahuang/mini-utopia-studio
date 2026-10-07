@@ -130,6 +130,7 @@ def edit_world(asset) -> None:
 def edit_character(asset) -> None:
     """Load an existing Character Asset back into the Creator flow."""
     reset_avatar_editor_state()
+    st.session_state.pop("character_save_asset_id", None)
     profile = CharacterProfile.model_validate(
         asset.metadata.get("character_profile", {})
     )
@@ -358,6 +359,21 @@ elif page == "🎭 My Characters":
         "这些都是你创造过的伙伴。随时回来换衣服、改设定，再带 TA 去新的世界。",
         kicker="CHARACTER LIBRARY",
     )
+
+    saved_character_id = st.session_state.pop(
+        "last_saved_character_id",
+        None,
+    )
+    if saved_character_id:
+        saved_character = ctx.repository.get_asset(saved_character_id)
+        saved_name = (
+            saved_character.display_name
+            if saved_character is not None
+            else "Mini Hero"
+        )
+        st.success(
+            f"🌟 {saved_name} 已保存！现在可以继续换装或带 TA 去冒险。"
+        )
 
     active_baby = baby_service.active_baby()
     if active_baby is not None:
