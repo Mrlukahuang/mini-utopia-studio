@@ -112,7 +112,7 @@ class WorldRuntimeBindingService:
             ),
             # Match the actual Player start in the bound Godot scene so
             # Director blocking and gameplay share one physical frame.
-            spawn=SpawnPoint(x=0.0, y=1.0, z=34.0, facing_degrees=180.0),
+            spawn=SpawnPoint(x=0.0, y=1.0, z=34.0, facing_degrees=0.0),
         )
         binding = GodotWorldSceneBinding(
             world_asset_id=NEWBIE_WORLD_ASSET_ID,
