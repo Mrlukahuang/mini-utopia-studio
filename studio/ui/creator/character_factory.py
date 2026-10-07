@@ -915,9 +915,26 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
     name = st.session_state.get("char_name", "").strip()
     missing = final_profile.missing_core_fields()
 
+    equipment_selection = st.session_state.get("char_equipment_selection")
+    if not isinstance(equipment_selection, dict):
+        equipment_selection = _default_factory_equipment_selection(
+            ctx.equipment,
+            character_asset_id=st.session_state.get("editing_character_id"),
+        )
+    final_preview_spec = _build_factory_equipment_preview(
+        ctx.equipment,
+        final_profile.avatar,
+        equipment_selection,
+        character_asset_id=(
+            st.session_state.get("editing_character_id") or "CHAR_DRAFT"
+        ),
+    )
+    collection, definitions = _factory_equipment_state(ctx.equipment)
+
     st.markdown("### 🎉 Your Hero Is Ready! / 你的角色准备好啦")
-    info, palette_col = st.columns([1.4, 1])
-    with info:
+    summary_col, preview_col = st.columns([0.92, 1.38], gap="large")
+
+    with summary_col:
         st.markdown(f"#### {escape(name) if name else 'New Character'}")
         st.write(f"**Type** · {final_profile.character_type or '—'}")
         st.write(f"**Role** · {final_profile.story_role or '—'}")
@@ -928,9 +945,12 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
         )
         if final_profile.creator_extra_details:
             st.caption("Extra · " + final_profile.creator_extra_details)
-    with palette_col:
+
         st.markdown("#### 🎨 Canon Colors")
-        colors = final_profile.favorite_color_hexes or DEFAULT_FAVORITE_COLOR_HEXES
+        colors = (
+            final_profile.favorite_color_hexes
+            or DEFAULT_FAVORITE_COLOR_HEXES
+        )
         swatches = "".join(
             (
                 '<span style="display:inline-block;width:34px;height:34px;'
@@ -940,11 +960,29 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
             for color in colors[:3]
         )
         st.markdown(swatches, unsafe_allow_html=True)
-        st.caption(
-            f"Hair/Fur {final_profile.hair_or_fur_color_hex} · "
-            f"Eyes {final_profile.eyes.color_hex}"
+
+        st.markdown("#### 🎒 Starting Loadout / 初始装备")
+        for slot in PLAYABLE_EQUIPMENT_SLOTS:
+            item_id = equipment_selection.get(slot.value)
+            if not item_id:
+                continue
+            st.caption(
+                f"{FACTORY_SLOT_LABELS[slot]} · "
+                f"{_factory_item_label(item_id, collection, definitions)}"
+            )
+
+    with preview_col:
+        render_avatar_preview(
+            final_profile.avatar,
+            title="Ready to Play / 准备进入 Mini Utopia",
+            equipment=final_preview_spec,
+            height=620,
         )
-        st.caption("🔒 Mini Playable Avatar · 2.8–3.0 heads tall")
+        stats = final_preview_spec.final_stats
+        stat_cols = st.columns(3)
+        stat_cols[0].metric("❤️ HP", stats.hp)
+        stat_cols[1].metric("⚔️ ATK", stats.atk)
+        stat_cols[2].metric("🛡️ DEF", stats.defense)
 
     if missing:
         st.warning("还差这些核心设定：" + ", ".join(missing))
@@ -972,6 +1010,11 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
                     asset_id=editing_id,
                 )
                 saved_character_id = asset.asset_id
+                _persist_factory_equipment_selection(
+                    ctx.equipment,
+                    character_asset_id=saved_character_id,
+                    selection=equipment_selection,
+                )
                 reset_character_creation_state()
                 st.session_state.pending_app_page = "🎭 My Characters"
                 st.session_state.last_saved_character_id = saved_character_id
@@ -1016,6 +1059,11 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
                         description=st.session_state.get("char_source", ""),
                         profile=final_profile,
                         asset_id=editing_id,
+                    )
+                    _persist_factory_equipment_selection(
+                        ctx.equipment,
+                        character_asset_id=asset.asset_id,
+                        selection=equipment_selection,
                     )
                     st.session_state.editing_character_id = asset.asset_id
                     style_asset = ctx.styles.ensure_mini_utopia_base()
