@@ -67,7 +67,7 @@ def test_bridge_application_has_structured_errors():
     assert malformed.status == HTTPStatus.BAD_REQUEST
     assert malformed.payload["error"] == "invalid_json"
 
-    missing = app.handle(method="GET", path="/characters")
+    missing = app.handle(method="GET", path="/does-not-exist")
     assert missing.status == HTTPStatus.NOT_FOUND
     assert missing.payload["error"] == "not_found"
 
