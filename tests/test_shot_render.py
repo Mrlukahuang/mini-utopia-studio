@@ -148,6 +148,54 @@ def test_old_episode_payload_defaults_to_empty_shot_renders():
     assert episode.shot_renders == {}
 
 
+class _ExplodingDirector:
+    def build(self, **_kwargs):
+        raise AssertionError(
+            "missing render status must not build the full Director runtime"
+        )
+
+
+def test_missing_render_status_skips_director_runtime_build(tmp_path):
+    (
+        repo,
+        _director_service,
+        _storyboard_service,
+        episode,
+        scene,
+        shot,
+        project_root,
+    ) = _setup(tmp_path)
+
+    current = repo.get_episode(episode.episode_id)
+    current.storyboard_frames = {}
+    current.shot_renders = {}
+    repo.save_episode(current)
+
+    director = _ExplodingDirector()
+    storyboard = StoryboardService(
+        repo,
+        director,
+        project_root=project_root,
+    )
+    renderer = ShotRenderService(
+        repo,
+        director,
+        storyboard,
+        project_root=project_root,
+    )
+
+    missing = renderer.status_for(
+        episode_id=episode.episode_id,
+        scene_id=scene.scene_id,
+        shot_id=shot.shot_id,
+    )
+
+    assert missing.status == "missing"
+    assert missing.source_fingerprint == ""
+    assert missing.duration_seconds == shot.duration_seconds
+    assert missing.frame_count == round(shot.duration_seconds * 24)
+
+
 def test_approved_shot_renders_and_receipt_survives_restart(tmp_path):
     (
         repo,
