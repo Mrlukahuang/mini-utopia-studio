@@ -313,22 +313,58 @@ func _spawn_baby(baby: Dictionary) -> void:
     var world_parent := _player.get_parent()
     if world_parent == null:
         return
-    world_parent.add_child(_baby)
-    _baby.global_position = _player.global_position + Vector3(-1.0, 0.2, 0.8)
-    _baby.configure(_player, baby)
+
+    # Player _ready can run while the World is still adding its children.
+    # Adding the Baby synchronously here causes "Parent node is busy" and the
+    # companion never enters the SceneTree. Queue both steps in deferred order.
+    world_parent.add_child.call_deferred(_baby)
+    _finish_spawn_baby.call_deferred(
+        _baby,
+        baby.duplicate(true),
+        3
+    )
+
+
+func _finish_spawn_baby(
+    baby_node: MiniUtopiaBabyFollowRuntime,
+    baby: Dictionary,
+    retries_left: int
+) -> void:
+    if baby_node == null or not is_instance_valid(baby_node):
+        return
+    if not baby_node.is_inside_tree():
+        if retries_left > 0:
+            _finish_spawn_baby.call_deferred(
+                baby_node,
+                baby,
+                retries_left - 1
+            )
+        else:
+            push_error("PLAY-02: Active Baby could not enter SceneTree.")
+        return
+
+    baby_node.global_position = (
+        _player.global_position
+        + Vector3(-1.05, 0.18, 0.55)
+    )
+    baby_node.configure(_player, baby)
+    print(
+        "PLAY-02 Active Baby ready: ",
+        baby.get("display_name", "Baby")
+    )
 
 
 func _ensure_socket(
     parent: Node3D,
     socket_name: String,
-    position: Vector3
+    local_position: Vector3
 ) -> Node3D:
     var socket := parent.get_node_or_null(NodePath(socket_name)) as Node3D
     if socket == null:
         socket = Node3D.new()
         socket.name = socket_name
         parent.add_child(socket)
-    socket.position = position
+    socket.position = local_position
     return socket
 
 
@@ -345,7 +381,7 @@ func _ensure_box(
 
     var node := MeshInstance3D.new()
     node.name = node_name
-    node.position = position
+    node.position = local_position
     var mesh := BoxMesh.new()
     mesh.size = size
     node.mesh = mesh
