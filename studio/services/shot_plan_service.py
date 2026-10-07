@@ -9,6 +9,7 @@ from studio.models.episode import (
     ShotBlockingPoint,
     ShotBlockingSpec,
     ShotCameraMotionSpec,
+    PerformanceCue,
 )
 from studio.models.world import WorldBlueprint
 from studio.repositories.base import StudioRepository
@@ -104,6 +105,18 @@ class ShotPlanService:
                     shot_type=shot_type,
                     camera_text=camera,
                 )
+                performance_cues = self._performance_cues_for(
+                    shot_id=f"SHOT_{scene_index:02d}_{shot_index:02d}",
+                    duration_seconds=duration,
+                    blocking=blocking,
+                    shot_type=shot_type,
+                    action=action,
+                    expression=self._expression_for_beat(
+                        scene.story_beat,
+                        shot_index,
+                    ),
+                    story_beat=scene.story_beat,
+                )
                 shots.append(
                     Shot(
                         shot_id=f"SHOT_{scene_index:02d}_{shot_index:02d}",
@@ -123,6 +136,7 @@ class ShotPlanService:
                         ],
                         blocking=blocking,
                         camera_motion=camera_motion,
+                        performance_cues=performance_cues,
                     )
                 )
 
@@ -147,6 +161,7 @@ class ShotPlanService:
         continuity_notes: list[str],
         blocking: ShotBlockingSpec | None = None,
         camera_motion: ShotCameraMotionSpec | None = None,
+        performance_cues: list[PerformanceCue] | None = None,
     ) -> Episode:
         episode = self.episodes.get_episode(episode_id)
         if episode is None:
@@ -185,6 +200,11 @@ class ShotPlanService:
                     updates["camera_motion"] = camera_motion.model_copy(
                         update={"source": "creator"}
                     )
+                if performance_cues is not None:
+                    updates["performance_cues"] = [
+                        cue.model_copy(update={"source": "creator"})
+                        for cue in performance_cues
+                    ]
                 updated_shots.append(
                     shot.model_copy(update=updates)
                 )
@@ -278,6 +298,60 @@ class ShotPlanService:
                                 blocking=blocking,
                                 shot_type=shot.shot_type,
                                 camera_text=shot.camera,
+                            ),
+                        }
+                    )
+                )
+            new_scenes.append(scene.model_copy(update={"shots": new_shots}))
+
+        if not changed:
+            return episode
+
+        episode.scenes = new_scenes
+        episode.updated_at = now_utc()
+        self.repository.save_episode(episode)
+        return episode
+
+    def ensure_performance_cues(self, episode_id: str) -> Episode:
+        episode = self.episodes.get_episode(episode_id)
+        if episode is None:
+            raise ValueError(f"Episode not found: {episode_id}")
+
+        changed = False
+        new_scenes = []
+        for scene in episode.scenes:
+            new_shots = []
+            for index, shot in enumerate(scene.shots, start=1):
+                blocking = shot.blocking
+                if blocking is None:
+                    blocking = self._blocking_for(
+                        episode=episode,
+                        scene=scene,
+                        shot_index=index,
+                        shot_type=shot.shot_type,
+                        action=shot.action,
+                    )
+                    changed = True
+
+                if shot.performance_cues is not None:
+                    new_shots.append(
+                        shot.model_copy(update={"blocking": blocking})
+                    )
+                    continue
+
+                changed = True
+                new_shots.append(
+                    shot.model_copy(
+                        update={
+                            "blocking": blocking,
+                            "performance_cues": self._performance_cues_for(
+                                shot_id=shot.shot_id,
+                                duration_seconds=shot.duration_seconds,
+                                blocking=blocking,
+                                shot_type=shot.shot_type,
+                                action=shot.action,
+                                expression=shot.expression,
+                                story_beat=scene.story_beat,
                             ),
                         }
                     )
@@ -438,6 +512,119 @@ class ShotPlanService:
         return (
             x_value * cos_value - z_value * sin_value,
             x_value * sin_value + z_value * cos_value,
+        )
+
+    def _performance_cues_for(
+        self,
+        *,
+        shot_id: str,
+        duration_seconds: float,
+        blocking: ShotBlockingSpec,
+        shot_type: str,
+        action: str,
+        expression: str,
+        story_beat: str,
+    ) -> list[PerformanceCue]:
+        cues: list[PerformanceCue] = []
+        duration = max(0.5, float(duration_seconds))
+        movement = blocking.movement_style
+
+        if movement in {"walk", "run"}:
+            cues.append(
+                PerformanceCue(
+                    cue_id=f"{shot_id}_MOVE",
+                    cue_type=movement,
+                    start_seconds=0.0,
+                    duration_seconds=duration,
+                    intensity=0.72 if movement == "walk" else 0.95,
+                    source="generated",
+                    confidence=0.95,
+                )
+            )
+
+        combined = f"{shot_type} {action} {expression} {story_beat}".lower()
+        if any(
+            word in combined
+            for word in ("attack", "battle", "fight", "strike", "sword")
+        ):
+            cues.append(
+                PerformanceCue(
+                    cue_id=f"{shot_id}_ATTACK",
+                    cue_type="attack",
+                    start_seconds=min(duration * 0.30, max(0.05, duration - 0.30)),
+                    duration_seconds=min(0.35, duration),
+                    intensity=1.0,
+                    source="generated",
+                    confidence=0.90,
+                )
+            )
+
+        if any(
+            word in combined
+            for word in ("surprise", "surprised", "wonder", "reaction", "problem")
+        ):
+            cues.append(
+                PerformanceCue(
+                    cue_id=f"{shot_id}_REACTION",
+                    cue_type="reaction",
+                    start_seconds=min(duration * 0.12, max(0.0, duration - 0.40)),
+                    duration_seconds=min(0.70, duration),
+                    intensity=0.78,
+                    source="generated",
+                    confidence=0.88,
+                )
+            )
+
+        if any(
+            word in combined
+            for word in ("discover", "reveal", "portal", "look", "clue")
+        ):
+            cues.append(
+                PerformanceCue(
+                    cue_id=f"{shot_id}_LOOK",
+                    cue_type="look_at",
+                    start_seconds=min(duration * 0.20, max(0.0, duration - 0.45)),
+                    duration_seconds=min(1.0, duration),
+                    intensity=0.70,
+                    target="story_focus",
+                    direction_degrees=blocking.facing_degrees,
+                    source="generated",
+                    confidence=0.84,
+                )
+            )
+
+        if any(
+            word in combined
+            for word in ("celebrate", "victory", "cheer", "hooray")
+        ):
+            cues.append(
+                PerformanceCue(
+                    cue_id=f"{shot_id}_CELEBRATE",
+                    cue_type="celebrate",
+                    start_seconds=min(duration * 0.65, max(0.0, duration - 0.60)),
+                    duration_seconds=min(0.90, duration),
+                    intensity=0.90,
+                    source="generated",
+                    confidence=0.86,
+                )
+            )
+
+        if not cues:
+            cues.append(
+                PerformanceCue(
+                    cue_id=f"{shot_id}_IDLE",
+                    cue_type="idle",
+                    start_seconds=0.0,
+                    duration_seconds=duration,
+                    intensity=0.40,
+                    source="generated",
+                    confidence=1.0,
+                )
+            )
+
+        return sorted(
+            cues,
+            key=lambda cue: (cue.start_seconds, cue.cue_id),
         )
 
     def _camera_motion_for(
