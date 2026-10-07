@@ -69,3 +69,7 @@ jobs:
       - name: Smoke-test generic Quest runtime
         run: |
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/quest_runtime_smoke.gd
+
+      - name: Smoke-test reusable World gameplay runtime
+        run: |
+          /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/world_gameplay_runtime_smoke.gd
