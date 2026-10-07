@@ -19,12 +19,19 @@ var _world_creative: MiniUtopiaWorldCreativeRuntime
 
 
 func apply_to_player(player: CharacterBody3D) -> Dictionary:
-    _player = player
-    payload = _load_session()
-    if payload.is_empty():
+    var loaded := _load_session()
+    if loaded.is_empty():
         print("PLAY-02: no Creator play-session payload; using scene defaults.")
         return {}
+    return apply_payload_to_player(player, loaded)
 
+
+func apply_payload_to_player(
+    player: CharacterBody3D,
+    runtime_payload: Dictionary
+) -> Dictionary:
+    _player = player
+    payload = runtime_payload.duplicate(true)
     _ensure_visual_nodes()
     var character: Dictionary = payload.get("character", {})
     _apply_character(character)
