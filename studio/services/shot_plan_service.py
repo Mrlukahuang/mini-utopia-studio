@@ -8,6 +8,7 @@ from studio.models.episode import (
     Shot,
     ShotBlockingPoint,
     ShotBlockingSpec,
+    ShotCameraMotionSpec,
 )
 from studio.models.world import WorldBlueprint
 from studio.repositories.base import StudioRepository
@@ -98,6 +99,11 @@ class ShotPlanService:
                     shot_type=shot_type,
                     action=action,
                 )
+                camera_motion = self._camera_motion_for(
+                    blocking=blocking,
+                    shot_type=shot_type,
+                    camera_text=camera,
+                )
                 shots.append(
                     Shot(
                         shot_id=f"SHOT_{scene_index:02d}_{shot_index:02d}",
@@ -116,6 +122,7 @@ class ShotPlanService:
                             f"Story beat: {scene.story_beat or 'SCENE'}",
                         ],
                         blocking=blocking,
+                        camera_motion=camera_motion,
                     )
                 )
 
@@ -139,6 +146,7 @@ class ShotPlanService:
         expression: str,
         continuity_notes: list[str],
         blocking: ShotBlockingSpec | None = None,
+        camera_motion: ShotCameraMotionSpec | None = None,
     ) -> Episode:
         episode = self.episodes.get_episode(episode_id)
         if episode is None:
@@ -171,6 +179,10 @@ class ShotPlanService:
                 }
                 if blocking is not None:
                     updates["blocking"] = blocking.model_copy(
+                        update={"source": "creator"}
+                    )
+                if camera_motion is not None:
+                    updates["camera_motion"] = camera_motion.model_copy(
                         update={"source": "creator"}
                     )
                 updated_shots.append(
@@ -219,6 +231,54 @@ class ShotPlanService:
                                 shot_type=shot.shot_type,
                                 action=shot.action,
                             )
+                        }
+                    )
+                )
+            new_scenes.append(scene.model_copy(update={"shots": new_shots}))
+
+        if not changed:
+            return episode
+
+        episode.scenes = new_scenes
+        episode.updated_at = now_utc()
+        self.repository.save_episode(episode)
+        return episode
+
+    def ensure_camera_motion(self, episode_id: str) -> Episode:
+        episode = self.episodes.get_episode(episode_id)
+        if episode is None:
+            raise ValueError(f"Episode not found: {episode_id}")
+
+        changed = False
+        new_scenes = []
+        for scene in episode.scenes:
+            new_shots = []
+            for index, shot in enumerate(scene.shots, start=1):
+                blocking = shot.blocking
+                if blocking is None:
+                    blocking = self._blocking_for(
+                        episode=episode,
+                        scene=scene,
+                        shot_index=index,
+                        shot_type=shot.shot_type,
+                        action=shot.action,
+                    )
+                    changed = True
+                if shot.camera_motion is not None:
+                    new_shots.append(
+                        shot.model_copy(update={"blocking": blocking})
+                    )
+                    continue
+                changed = True
+                new_shots.append(
+                    shot.model_copy(
+                        update={
+                            "blocking": blocking,
+                            "camera_motion": self._camera_motion_for(
+                                blocking=blocking,
+                                shot_type=shot.shot_type,
+                                camera_text=shot.camera,
+                            ),
                         }
                     )
                 )
@@ -378,6 +438,147 @@ class ShotPlanService:
         return (
             x_value * cos_value - z_value * sin_value,
             x_value * sin_value + z_value * cos_value,
+        )
+
+    def _camera_motion_for(
+        self,
+        *,
+        blocking: ShotBlockingSpec,
+        shot_type: str,
+        camera_text: str,
+    ) -> ShotCameraMotionSpec:
+        text = f"{shot_type} {camera_text}".lower()
+        if "follow" in text:
+            mode = "follow"
+            offset = (2.2, 2.9, 5.5)
+            start_fov = end_fov = 48.0
+        elif "pull-back" in text or "pull back" in text:
+            mode = "pull_back"
+            offset = (0.0, 3.7, 5.4)
+            start_fov, end_fov = 48.0, 54.0
+        elif "pan" in text:
+            mode = "pan"
+            offset = (1.8, 3.0, 5.2)
+            start_fov = end_fov = 47.0
+        elif "reveal" in text:
+            mode = "reveal"
+            offset = (2.8, 3.5, 6.4)
+            start_fov, end_fov = 50.0, 46.0
+        elif (
+            "push-in" in text
+            or "push in" in text
+            or "gentle push" in text
+            or "slow push" in text
+        ):
+            mode = "push_in"
+            offset = (0.0, 4.2, 7.8) if "wide" in text else (0.8, 2.5, 4.4)
+            start_fov, end_fov = 52.0, 44.0
+        else:
+            mode = "hold"
+            if any(word in text for word in ("detail", "close", "reaction")):
+                offset = (0.8, 2.3, 3.8)
+                start_fov = end_fov = 42.0
+            elif any(word in text for word in ("wide", "establish", "portal", "hero")):
+                offset = (0.0, 4.2, 7.8)
+                start_fov = end_fov = 52.0
+            else:
+                offset = (1.4, 3.0, 5.2)
+                start_fov = end_fov = 48.0
+
+        start_anchor = blocking.actor_start
+        end_anchor = blocking.actor_end
+        start_position = self._camera_point_from_anchor(
+            start_anchor,
+            offset,
+            blocking.facing_degrees,
+        )
+        end_position = self._camera_point_from_anchor(
+            end_anchor,
+            offset,
+            blocking.facing_degrees,
+        )
+        start_look = ShotBlockingPoint(
+            x=start_anchor.x,
+            y=start_anchor.y + 1.15,
+            z=start_anchor.z,
+        )
+        end_look = ShotBlockingPoint(
+            x=end_anchor.x,
+            y=end_anchor.y + 1.15,
+            z=end_anchor.z,
+        )
+
+        if mode == "push_in":
+            end_position = self._camera_point_from_anchor(
+                end_anchor,
+                (
+                    offset[0] * 0.72,
+                    max(1.8, offset[1] * 0.88),
+                    offset[2] * 0.66,
+                ),
+                blocking.facing_degrees,
+            )
+        elif mode == "pull_back":
+            end_position = self._camera_point_from_anchor(
+                end_anchor,
+                (
+                    offset[0],
+                    offset[1] * 1.16,
+                    offset[2] * 1.48,
+                ),
+                blocking.facing_degrees,
+            )
+        elif mode == "pan":
+            pan_x, pan_z = self._rotate_offset(
+                2.4,
+                0.0,
+                blocking.facing_degrees,
+            )
+            end_look = ShotBlockingPoint(
+                x=end_look.x + pan_x,
+                y=end_look.y,
+                z=end_look.z + pan_z,
+            )
+        elif mode == "reveal":
+            reveal_x, reveal_z = self._rotate_offset(
+                -2.8,
+                -1.0,
+                blocking.facing_degrees,
+            )
+            end_position = ShotBlockingPoint(
+                x=end_position.x + reveal_x,
+                y=end_position.y,
+                z=end_position.z + reveal_z,
+            )
+
+        return ShotCameraMotionSpec(
+            start_position=start_position,
+            end_position=end_position,
+            start_look_at=start_look,
+            end_look_at=end_look,
+            start_fov=start_fov,
+            end_fov=end_fov,
+            movement_mode=mode,
+            easing="smooth",
+            source="generated",
+            confidence=min(1.0, blocking.confidence + 0.05),
+        )
+
+    def _camera_point_from_anchor(
+        self,
+        anchor: ShotBlockingPoint,
+        offset: tuple[float, float, float],
+        facing_degrees: float,
+    ) -> ShotBlockingPoint:
+        offset_x, offset_z = self._rotate_offset(
+            offset[0],
+            offset[2],
+            facing_degrees,
+        )
+        return ShotBlockingPoint(
+            x=anchor.x + offset_x,
+            y=anchor.y + offset[1],
+            z=anchor.z + offset_z,
         )
 
     @staticmethod
