@@ -12,6 +12,8 @@ var _leg_l: Node3D
 var _leg_r: Node3D
 var _elapsed := 0.0
 var _attack_pose_remaining := 0.0
+var _reaction_pose_remaining := 0.0
+var _celebrate_pose_remaining := 0.0
 var _baby: MiniUtopiaBabyFollowRuntime
 var _quest: MiniUtopiaQuestRuntime
 var _world_gameplay: MiniUtopiaWorldGameplayRuntime
@@ -119,6 +121,14 @@ func update_motion(
         0.0,
         _attack_pose_remaining - delta
     )
+    _reaction_pose_remaining = maxf(
+        0.0,
+        _reaction_pose_remaining - delta
+    )
+    _celebrate_pose_remaining = maxf(
+        0.0,
+        _celebrate_pose_remaining - delta
+    )
     var horizontal_speed := Vector2(
         player_velocity.x,
         player_velocity.z
@@ -135,6 +145,20 @@ func update_motion(
         _arm_l.rotation.z = 0.18
         _arm_r.rotation.x = -1.12
         _arm_r.rotation.z = -0.72
+        return
+
+    if _celebrate_pose_remaining > 0.0:
+        _arm_l.rotation.x = -1.05
+        _arm_l.rotation.z = 0.42
+        _arm_r.rotation.x = -1.05
+        _arm_r.rotation.z = -0.42
+        return
+
+    if _reaction_pose_remaining > 0.0:
+        _arm_l.rotation.x = -0.38
+        _arm_l.rotation.z = 0.34
+        _arm_r.rotation.x = -0.38
+        _arm_r.rotation.z = -0.34
         return
 
     if not on_floor:
@@ -164,6 +188,30 @@ func update_motion(
 
 func play_attack_swing() -> void:
     _attack_pose_remaining = 0.22
+
+
+func play_reaction_pose(duration: float = 0.55) -> void:
+    _reaction_pose_remaining = maxf(
+        _reaction_pose_remaining,
+        maxf(0.05, duration)
+    )
+
+
+func play_celebrate_pose(duration: float = 0.80) -> void:
+    _celebrate_pose_remaining = maxf(
+        _celebrate_pose_remaining,
+        maxf(0.05, duration)
+    )
+
+
+func reset_director_pose() -> void:
+    _attack_pose_remaining = 0.0
+    _reaction_pose_remaining = 0.0
+    _celebrate_pose_remaining = 0.0
+    if _arm_l != null:
+        _arm_l.rotation = Vector3.ZERO
+    if _arm_r != null:
+        _arm_r.rotation = Vector3.ZERO
 
 
 func record_quest_event(
