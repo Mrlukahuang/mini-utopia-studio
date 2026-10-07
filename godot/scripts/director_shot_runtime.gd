@@ -206,11 +206,19 @@ func _build_camera() -> void:
         "look_at",
         [0.0, 1.1, 0.0]
     )
-    camera.position = _vector3(position_values, Vector3(0.0, 4.2, 7.8))
+    var camera_position := _vector3(
+        position_values,
+        Vector3(0.0, 4.2, 7.8)
+    )
+    var look_target := _vector3(
+        look_values,
+        Vector3(0.0, 1.1, 0.0)
+    )
     camera.fov = float(camera_payload.get("fov", 48.0))
     camera.current = true
-    camera.look_at(
-        _vector3(look_values, Vector3(0.0, 1.1, 0.0)),
+    camera.look_at_from_position(
+        camera_position,
+        look_target,
         Vector3.UP
     )
     camera.set_meta(
