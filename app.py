@@ -1392,6 +1392,9 @@ elif page == "📖 Stories":
                     key=f"open_episode_{story.story_id}",
                     use_container_width=True,
                 ):
+                    st.session_state.selected_episode_id = (
+                        existing_episode.episode_id
+                    )
                     st.session_state.pending_app_page = "🎬 Episodes"
                     st.rerun()
             else:
@@ -1401,7 +1404,12 @@ elif page == "📖 Stories":
                     use_container_width=True,
                 ):
                     try:
-                        episode_service.create_from_story(story.story_id)
+                        created_episode = episode_service.create_from_story(
+                            story.story_id
+                        )
+                        st.session_state.selected_episode_id = (
+                            created_episode.episode_id
+                        )
                         st.session_state.pending_app_page = "🎬 Episodes"
                         st.rerun()
                     except (ValueError, RuntimeError) as exc:
