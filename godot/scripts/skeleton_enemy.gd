@@ -114,6 +114,13 @@ func _defeat() -> void:
             )
         )
 
+    if target != null and target.has_method("record_quest_event"):
+        target.record_quest_event(
+            "defeat_enemy",
+            enemy_id,
+            1
+        )
+
     var drop_id := (
         "DROP_"
         + session_id
@@ -132,6 +139,17 @@ func _defeat() -> void:
             "created_at": str(Time.get_unix_time_from_system()),
         }
     )
+
+    if (
+        drop_written
+        and target != null
+        and target.has_method("record_quest_event")
+    ):
+        target.record_quest_event(
+            "collect_item",
+            "reward_bone_buckler",
+            1
+        )
 
     print("PLAY-03 Skeleton defeated · Bone Buckler dropped.")
     if (
