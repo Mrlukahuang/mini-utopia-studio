@@ -132,7 +132,12 @@ def test_episode_creator_flow_is_visible_and_both_backends_persist_episode():
     assert '"🎬 Episodes"' in app
     assert "Create Episode / 制作剧集" in app
     assert "render_episode_library(ctx)" in app
+    assert "selected_episode_id" in app
+    assert "created_episode.episode_id" in app
     assert "Episodes / 剧集" in ui
+    assert "selected_episode_id" in ui
+    assert "All Episodes / 返回全部剧集" in ui
+    assert "episodes = [selected_episode]" in ui
     assert "episodes" in sqlite
     assert "save_episode" in sqlite
     assert 'kind="episode"' in supabase
