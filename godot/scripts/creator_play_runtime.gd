@@ -15,6 +15,7 @@ var _attack_pose_remaining := 0.0
 var _baby: MiniUtopiaBabyFollowRuntime
 var _quest: MiniUtopiaQuestRuntime
 var _world_gameplay: MiniUtopiaWorldGameplayRuntime
+var _world_creative: MiniUtopiaWorldCreativeRuntime
 
 
 func apply_to_player(player: CharacterBody3D) -> Dictionary:
@@ -54,6 +55,15 @@ func apply_to_player(player: CharacterBody3D) -> Dictionary:
     )
     if not world_gameplay.is_empty():
         _spawn_world_gameplay(world_gameplay)
+
+    var raw_creative = payload.get("creative_layout", {})
+    var creative: Dictionary = (
+        raw_creative
+        if typeof(raw_creative) == TYPE_DICTIONARY
+        else {}
+    )
+    if not creative.is_empty():
+        _spawn_world_creative(creative)
 
     var raw_baby = payload.get("baby", {})
     var baby: Dictionary = (
@@ -437,6 +447,43 @@ func _finish_spawn_world_gameplay(
             )
         return
     gameplay_node.configure(_player, gameplay)
+
+
+func _spawn_world_creative(creative: Dictionary) -> void:
+    if _world_creative != null and is_instance_valid(_world_creative):
+        _world_creative.queue_free()
+
+    _world_creative = MiniUtopiaWorldCreativeRuntime.new()
+    _world_creative.name = "WorldCreativeRuntime"
+    var world_parent := _player.get_parent()
+    if world_parent == null:
+        return
+    world_parent.add_child.call_deferred(_world_creative)
+    _finish_spawn_world_creative.call_deferred(
+        _world_creative,
+        creative.duplicate(true),
+        3
+    )
+
+
+func _finish_spawn_world_creative(
+    creative_node: MiniUtopiaWorldCreativeRuntime,
+    creative: Dictionary,
+    retries_left: int
+) -> void:
+    if creative_node == null or not is_instance_valid(creative_node):
+        return
+    if not creative_node.is_inside_tree():
+        if retries_left > 0:
+            _finish_spawn_world_creative.call_deferred(
+                creative_node,
+                creative,
+                retries_left - 1
+            )
+        else:
+            push_error("WORLD-02: Creative runtime could not enter SceneTree.")
+        return
+    creative_node.configure(creative)
 
 
 func _spawn_quest(quest: Dictionary) -> void:
