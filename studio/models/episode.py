@@ -25,8 +25,14 @@ class Shot(BaseModel):
 
 class Scene(BaseModel):
     scene_id: str
+    title: str = ""
+    story_beat: str = ""
     location_asset_id: str | None = None
+    asset_ids: list[str] = Field(default_factory=list)
     description: str = ""
+    action_summary: str = ""
+    dialogue_notes: str = ""
+    continuity_notes: list[str] = Field(default_factory=list)
     shots: list[Shot] = Field(default_factory=list)
 
 
