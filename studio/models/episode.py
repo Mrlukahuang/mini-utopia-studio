@@ -13,7 +13,7 @@ class DialogueLine(BaseModel):
 class Shot(BaseModel):
     shot_id: str
     scene_id: str
-    duration_seconds: float = 3.0
+    duration_seconds: float = Field(default=3.0, ge=0.5, le=30.0)
     asset_ids: list[str] = Field(default_factory=list)
     shot_type: str = ""
     camera: str = ""
