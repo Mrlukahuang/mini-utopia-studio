@@ -12,6 +12,7 @@ from studio.models.equipment_runtime import EquipmentRuntimeSpec
 from studio.models.runtime_character import CharacterRuntimeSpec
 from studio.models.quest import QuestDefinition
 from studio.models.world_gameplay import WorldGameplayLayer
+from studio.models.world_creative import WorldCreativeLayout
 
 
 PLAY_SESSION_SCHEMA_VERSION = "1.0"
@@ -35,6 +36,7 @@ class PlaySessionRuntimeSpec(BaseModel):
     baby: BabyRuntimeSpec | None = None
     quest: QuestDefinition | None = None
     world_gameplay: WorldGameplayLayer | None = None
+    creative_layout: WorldCreativeLayout | None = None
 
     world_asset_id: str | None = None
     world_name: str | None = None

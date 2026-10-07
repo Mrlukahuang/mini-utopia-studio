@@ -16,6 +16,7 @@ class WorldExperienceMode(str, Enum):
     EXPLORE = "explore"
     QUEST = "quest"
     STORY_PLAY = "story_play"
+    CREATIVE = "creative"
 
 
 class WorldGameplayTarget(BaseModel):

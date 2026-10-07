@@ -32,6 +32,7 @@ from studio.ui.creator.my_stuff import render_my_stuff
 from studio.ui.creator.my_baby import render_my_baby
 from studio.ui.creator.adventure_progress import render_first_adventure_progress
 from studio.ui.creator.dressing_room import render_dressing_room
+from studio.ui.creator.creative_play import render_creative_play
 from studio.ui.theme import apply_mini_utopia_theme, render_brandbar, render_game_hero, render_quest
 
 
@@ -1035,6 +1036,11 @@ elif page == "🎮 Explore World":
                         + base64.b64encode(payload).decode("ascii")
                     )
 
+        creative_layout = render_creative_play(
+            ctx,
+            world_asset_id=selected.asset_id,
+        )
+
         godot_play_session = None
         active_quest_id = st.session_state.get("active_quest_id")
         active_quest = (
@@ -1104,6 +1110,7 @@ elif page == "🎮 Explore World":
                     "explore": "🧭 Explore",
                     "quest": "📜 Quest",
                     "story_play": "🎭 Story Play",
+                    "creative": "🎨 Creative Play",
                 }
                 st.info(
                     "🌍 One World · Multiple Ways to Play / 同一个世界，多种玩法 · "
@@ -1129,6 +1136,7 @@ elif page == "🎮 Explore World":
                 character_runtime=character_runtime,
                 render_spec=render_spec,
                 render_asset_payloads=render_asset_payloads,
+                creative_layout=creative_layout,
             ),
             height=760,
             scrolling=False,
