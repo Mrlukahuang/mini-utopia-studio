@@ -9,6 +9,7 @@ from studio.models.director_shot import (
     DirectorCameraSpec,
     DirectorShotSession,
 )
+from studio.models.play_session import PlaySessionRuntimeSpec
 from studio.repositories.base import StudioRepository
 from studio.services.baby_service import BabyService
 from studio.services.character_runtime_service import CharacterRuntimeService
@@ -87,6 +88,16 @@ class DirectorShotSessionService:
             world_asset_id=world_asset_id,
         )
 
+        # Runtime services may synthesize harmless timestamps (for example an
+        # empty Creative Layout). Normalize all runtime timestamps to the
+        # persisted Episode timestamp so unchanged source state is byte-stable.
+        play_payload = play.model_dump(mode="json")
+        self._normalize_timestamps(
+            play_payload,
+            episode.updated_at.isoformat(),
+        )
+        play_payload["source"] = "director"
+
         camera = self._camera_for_shot(
             shot_type=shot.shot_type,
             camera_text=shot.camera,
@@ -101,10 +112,11 @@ class DirectorShotSessionService:
             "story_id": episode.story_id,
             "scene": scene.model_dump(mode="json"),
             "shot": shot.model_dump(mode="json"),
-            "play_session": play.model_dump(
-                mode="json",
-                exclude={"session_id", "created_at"},
-            ),
+            "play_session": {
+                key: value
+                for key, value in play_payload.items()
+                if key != "session_id"
+            },
             "camera": camera.model_dump(mode="json"),
             "animation_intent": animation_intent,
         }
@@ -117,15 +129,8 @@ class DirectorShotSessionService:
             ).encode("utf-8")
         ).hexdigest().upper()
 
-        # Normalize volatile PlaySession fields so unchanged Creator state
-        # exports byte-stable Director payloads across process restarts.
-        play = play.model_copy(
-            update={
-                "session_id": f"DIRECTOR_PLAY_{digest[:16]}",
-                "source": "director",
-                "created_at": episode.updated_at,
-            }
-        )
+        play_payload["session_id"] = f"DIRECTOR_PLAY_{digest[:16]}"
+        play = PlaySessionRuntimeSpec.model_validate(play_payload)
 
         return DirectorShotSession(
             director_session_id=f"DIR_{digest[:20]}",
@@ -166,6 +171,23 @@ class DirectorShotSessionService:
             if asset is not None and asset.asset_type == AssetType.CHARACTER:
                 return asset.asset_id
         raise ValueError("Shot has no reusable Character asset.")
+
+    @classmethod
+    def _normalize_timestamps(
+        cls,
+        value,
+        normalized_iso: str,
+    ):
+        if isinstance(value, dict):
+            for key, item in list(value.items()):
+                if key in {"created_at", "updated_at"}:
+                    value[key] = normalized_iso
+                else:
+                    cls._normalize_timestamps(item, normalized_iso)
+        elif isinstance(value, list):
+            for item in value:
+                cls._normalize_timestamps(item, normalized_iso)
+        return value
 
     @staticmethod
     def _animation_intent(*, shot_type: str, action: str) -> str:
