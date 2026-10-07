@@ -127,7 +127,7 @@ func _verify(stage: Node) -> void:
         return
 
     var label = stage.get_node_or_null(
-        "DirectorStageOverlay/StatusPanel/MarginContainer/StatusLabel"
+        "DirectorStageOverlay/StatusPanel/StatusMargin/StatusLabel"
     ) as Label
     if label == null or "SHOT_01_01" not in label.text:
         push_error("director_stage_scene_smoke: ready overlay missing shot")
