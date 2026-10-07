@@ -38,7 +38,7 @@ func configure(
         if String(first.get("objective_type", "")) == "go_to_location":
             record_event(
                 "go_to_location",
-                String(first.get("target_id", "")),
+                _string_or_empty(first.get("target_id", "")),
                 1
             )
 
@@ -147,7 +147,7 @@ func try_interact() -> bool:
 
     return record_event(
         objective_type,
-        String(objective.get("target_id", "")),
+        _string_or_empty(objective.get("target_id", "")),
         1
     )
 
@@ -289,16 +289,24 @@ func _spawn_marker(
     var label := Label3D.new()
     label.name = "Prompt"
     label.position = Vector3(0.0, 0.72, 0.0)
-    label.text = String(
-        metadata.get(
-            "prompt",
-            "✨ " + String(objective.get("label", "Interact")) + " · E"
+    var prompt := _string_or_empty(metadata.get("prompt", ""))
+    if prompt.is_empty():
+        prompt = (
+            "✨ "
+            + _string_or_empty(objective.get("label", "Interact"))
+            + " · E"
         )
-    )
+    label.text = prompt
     label.font_size = 34
     label.outline_size = 8
     label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
     _marker.add_child(label)
+
+
+func _string_or_empty(value: Variant) -> String:
+    if value == null:
+        return ""
+    return str(value)
 
 
 func _clear_marker() -> void:
