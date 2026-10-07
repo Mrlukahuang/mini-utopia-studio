@@ -15,6 +15,7 @@ from studio.services.bootstrap import build_context
 from studio.services.style_service import StyleService
 from studio.services.baby_service import BabyService
 from studio.services.play_session_service import CreatorPlaySessionService
+from studio.services.story_playable_quest_service import StoryPlayableQuestService
 from studio.ui.auth import (
     lock_creator,
     lock_studio,
@@ -1226,6 +1227,7 @@ elif page == "📖 Stories":
             st.rerun()
 
     stories = ctx.repository.list_stories()
+    playable_quests = StoryPlayableQuestService(ctx.repository)
 
     if not stories:
         st.info(
@@ -1261,6 +1263,46 @@ elif page == "📖 Stories":
                     or "none"
                 )
             )
+
+            existing_quest = playable_quests.existing_for_story(
+                story.story_id
+            )
+            if existing_quest is not None:
+                st.success(
+                    f"🎮 Playable Quest ready · {existing_quest.title}"
+                )
+                action_col, clear_col = st.columns([2, 1])
+                with action_col:
+                    if st.button(
+                        "🪞 Gear Up & Play / 换装备出发",
+                        key=f"play_story_quest_{story.story_id}",
+                        type="primary",
+                        use_container_width=True,
+                    ):
+                        st.session_state.active_quest_id = (
+                            existing_quest.quest_id
+                        )
+                        st.session_state.pending_app_page = "🪞 Dressing Room"
+                        st.rerun()
+                with clear_col:
+                    st.caption(
+                        f"{len(existing_quest.objectives)} objectives"
+                    )
+            else:
+                if st.button(
+                    "🎮 Make Playable Quest / 变成可玩任务",
+                    key=f"make_story_quest_{story.story_id}",
+                    use_container_width=True,
+                ):
+                    try:
+                        quest = playable_quests.make_playable(
+                            story.story_id
+                        )
+                        st.session_state.active_quest_id = quest.quest_id
+                        st.session_state.pending_app_page = "🪞 Dressing Room"
+                        st.rerun()
+                    except ValueError as exc:
+                        st.error(str(exc))
 
 
 # ---------------------------------------------------------------------------
