@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import streamlit as st
 
+from studio.models.episode import ShotBlockingPoint, ShotBlockingSpec
 from studio.services.baby_service import BabyService
 from studio.services.director_shot_session_service import (
     DirectorShotSessionService,
@@ -28,6 +29,16 @@ def render_episode_library(ctx) -> None:
         babies=BabyService(ctx.repository),
     )
     episodes = episode_service.list_episodes()
+    episodes = [
+        shot_service.ensure_blocking(episode.episode_id)
+        if any(
+            shot.blocking is None
+            for scene in episode.scenes
+            for shot in scene.shots
+        )
+        else episode
+        for episode in episodes
+    ]
     if not episodes:
         st.info("还没有 Episode。去 Stories 选择一个故事，点击 Create Episode。")
         return
@@ -272,6 +283,83 @@ def render_episode_library(ctx) -> None:
                                             "Expression / 表情",
                                             value=shot.expression,
                                         )
+
+                                        blocking = shot.blocking
+                                        if blocking is not None:
+                                            st.markdown(
+                                                "**🎭 Blocking / 角色走位**"
+                                            )
+                                            st.caption(
+                                                f"{blocking.source.title()} · "
+                                                f"{blocking.movement_style.title()} · "
+                                                f"confidence {blocking.confidence:.0%}"
+                                            )
+                                            start_cols = st.columns(3)
+                                            start_x = start_cols[0].number_input(
+                                                "Start X",
+                                                value=float(blocking.actor_start.x),
+                                                step=0.5,
+                                                key=f"start_x_{episode.episode_id}_{shot.shot_id}",
+                                            )
+                                            start_y = start_cols[1].number_input(
+                                                "Start Y",
+                                                value=float(blocking.actor_start.y),
+                                                step=0.5,
+                                                key=f"start_y_{episode.episode_id}_{shot.shot_id}",
+                                            )
+                                            start_z = start_cols[2].number_input(
+                                                "Start Z",
+                                                value=float(blocking.actor_start.z),
+                                                step=0.5,
+                                                key=f"start_z_{episode.episode_id}_{shot.shot_id}",
+                                            )
+                                            end_cols = st.columns(3)
+                                            end_x = end_cols[0].number_input(
+                                                "End X",
+                                                value=float(blocking.actor_end.x),
+                                                step=0.5,
+                                                key=f"end_x_{episode.episode_id}_{shot.shot_id}",
+                                            )
+                                            end_y = end_cols[1].number_input(
+                                                "End Y",
+                                                value=float(blocking.actor_end.y),
+                                                step=0.5,
+                                                key=f"end_y_{episode.episode_id}_{shot.shot_id}",
+                                            )
+                                            end_z = end_cols[2].number_input(
+                                                "End Z",
+                                                value=float(blocking.actor_end.z),
+                                                step=0.5,
+                                                key=f"end_z_{episode.episode_id}_{shot.shot_id}",
+                                            )
+                                            facing_degrees = st.number_input(
+                                                "Facing / 朝向（°）",
+                                                value=float(blocking.facing_degrees),
+                                                step=5.0,
+                                                key=f"facing_{episode.episode_id}_{shot.shot_id}",
+                                            )
+                                            movement_style = st.selectbox(
+                                                "Movement / 走位方式",
+                                                ["hold", "walk", "run"],
+                                                index=["hold", "walk", "run"].index(
+                                                    blocking.movement_style
+                                                ),
+                                                key=f"movement_{episode.episode_id}_{shot.shot_id}",
+                                            )
+                                            baby_cols = st.columns(2)
+                                            baby_x = baby_cols[0].number_input(
+                                                "Baby Offset X",
+                                                value=float(blocking.baby_offset.x),
+                                                step=0.25,
+                                                key=f"baby_x_{episode.episode_id}_{shot.shot_id}",
+                                            )
+                                            baby_z = baby_cols[1].number_input(
+                                                "Baby Offset Z",
+                                                value=float(blocking.baby_offset.z),
+                                                step=0.25,
+                                                key=f"baby_z_{episode.episode_id}_{shot.shot_id}",
+                                            )
+
                                         shot_continuity = st.text_area(
                                             "Shot Continuity / 镜头连续性",
                                             value="\n".join(
@@ -295,6 +383,31 @@ def render_episode_library(ctx) -> None:
                                             expression=expression,
                                             continuity_notes=(
                                                 shot_continuity.splitlines()
+                                            ),
+                                            blocking=(
+                                                ShotBlockingSpec(
+                                                    actor_start=ShotBlockingPoint(
+                                                        x=start_x,
+                                                        y=start_y,
+                                                        z=start_z,
+                                                    ),
+                                                    actor_end=ShotBlockingPoint(
+                                                        x=end_x,
+                                                        y=end_y,
+                                                        z=end_z,
+                                                    ),
+                                                    facing_degrees=facing_degrees,
+                                                    baby_offset=ShotBlockingPoint(
+                                                        x=baby_x,
+                                                        y=0.0,
+                                                        z=baby_z,
+                                                    ),
+                                                    movement_style=movement_style,
+                                                    source="creator",
+                                                    confidence=1.0,
+                                                )
+                                                if blocking is not None
+                                                else None
                                             ),
                                         )
                                         st.rerun()

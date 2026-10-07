@@ -1,7 +1,15 @@
 from __future__ import annotations
 
+import math
+
 from studio.models.asset import now_utc
-from studio.models.episode import Episode, Shot
+from studio.models.episode import (
+    Episode,
+    Shot,
+    ShotBlockingPoint,
+    ShotBlockingSpec,
+)
+from studio.models.world import WorldBlueprint
 from studio.repositories.base import StudioRepository
 from studio.services.episode_service import EpisodeService
 
@@ -83,6 +91,13 @@ class ShotPlanService:
                 )
                 if shot_index == 1:
                     action = f"{purpose} {action}".strip()
+                blocking = self._blocking_for(
+                    episode=episode,
+                    scene=scene,
+                    shot_index=shot_index,
+                    shot_type=shot_type,
+                    action=action,
+                )
                 shots.append(
                     Shot(
                         shot_id=f"SHOT_{scene_index:02d}_{shot_index:02d}",
@@ -100,6 +115,7 @@ class ShotPlanService:
                             *scene.continuity_notes,
                             f"Story beat: {scene.story_beat or 'SCENE'}",
                         ],
+                        blocking=blocking,
                     )
                 )
 
@@ -122,6 +138,7 @@ class ShotPlanService:
         action: str,
         expression: str,
         continuity_notes: list[str],
+        blocking: ShotBlockingSpec | None = None,
     ) -> Episode:
         episode = self.episodes.get_episode(episode_id)
         if episode is None:
@@ -140,21 +157,24 @@ class ShotPlanService:
                     updated_shots.append(shot)
                     continue
                 found = True
-                updated_shots.append(
-                    shot.model_copy(
-                        update={
-                            "duration_seconds": float(duration_seconds),
-                            "shot_type": shot_type.strip(),
-                            "camera": camera.strip(),
-                            "action": action.strip(),
-                            "expression": expression.strip(),
-                            "continuity_notes": [
-                                note.strip()
-                                for note in continuity_notes
-                                if note.strip()
-                            ],
-                        }
+                updates = {
+                    "duration_seconds": float(duration_seconds),
+                    "shot_type": shot_type.strip(),
+                    "camera": camera.strip(),
+                    "action": action.strip(),
+                    "expression": expression.strip(),
+                    "continuity_notes": [
+                        note.strip()
+                        for note in continuity_notes
+                        if note.strip()
+                    ],
+                }
+                if blocking is not None:
+                    updates["blocking"] = blocking.model_copy(
+                        update={"source": "creator"}
                     )
+                updated_shots.append(
+                    shot.model_copy(update=updates)
                 )
             updated_scenes.append(
                 scene.model_copy(update={"shots": updated_shots})
@@ -174,6 +194,191 @@ class ShotPlanService:
         )
         self.repository.save_episode(episode)
         return episode
+
+    def ensure_blocking(self, episode_id: str) -> Episode:
+        episode = self.episodes.get_episode(episode_id)
+        if episode is None:
+            raise ValueError(f"Episode not found: {episode_id}")
+
+        changed = False
+        new_scenes = []
+        for scene in episode.scenes:
+            new_shots = []
+            for index, shot in enumerate(scene.shots, start=1):
+                if shot.blocking is not None:
+                    new_shots.append(shot)
+                    continue
+                changed = True
+                new_shots.append(
+                    shot.model_copy(
+                        update={
+                            "blocking": self._blocking_for(
+                                episode=episode,
+                                scene=scene,
+                                shot_index=index,
+                                shot_type=shot.shot_type,
+                                action=shot.action,
+                            )
+                        }
+                    )
+                )
+            new_scenes.append(scene.model_copy(update={"shots": new_shots}))
+
+        if not changed:
+            return episode
+
+        episode.scenes = new_scenes
+        episode.updated_at = now_utc()
+        self.repository.save_episode(episode)
+        return episode
+
+    def _blocking_for(
+        self,
+        *,
+        episode: Episode,
+        scene,
+        shot_index: int,
+        shot_type: str,
+        action: str,
+    ) -> ShotBlockingSpec:
+        blueprint = self._blueprint_for(
+            scene.location_asset_id or episode.world_asset_id
+        )
+        spawn_x = 0.0
+        spawn_z = 0.0
+        spawn_facing = 0.0
+        confidence = 0.55
+        if blueprint is not None:
+            spawn_x = float(blueprint.spawn.x)
+            spawn_z = float(blueprint.spawn.z)
+            spawn_facing = float(blueprint.spawn.facing_degrees)
+            confidence = 0.82
+
+        beat = scene.story_beat or "SCENE"
+        local_pairs = {
+            "ARRIVE": [
+                ((0.0, 0.0), (0.0, -5.0)),
+                ((0.0, -5.0), (0.0, -8.0)),
+            ],
+            "DISCOVER": [
+                ((0.0, -8.0), (2.5, -10.0)),
+                ((2.5, -10.0), (2.5, -10.0)),
+            ],
+            "PROBLEM": [
+                ((2.5, -10.0), (2.5, -12.0)),
+                ((2.5, -12.0), (2.5, -12.0)),
+            ],
+            "ADVENTURE": [
+                ((-2.0, -12.0), (3.5, -17.0)),
+                ((3.5, -17.0), (5.0, -19.0)),
+            ],
+            "SURPRISE": [
+                ((4.0, -18.0), (4.0, -18.0)),
+                ((4.0, -18.0), (1.5, -20.0)),
+            ],
+            "PORTAL": [
+                ((1.5, -20.0), (0.0, -24.0)),
+                ((0.0, -24.0), (0.0, -24.0)),
+            ],
+        }
+        pairs = local_pairs.get(
+            beat,
+            [
+                ((0.0, 0.0), (0.0, -3.0)),
+                ((0.0, -3.0), (0.0, -3.0)),
+            ],
+        )
+        pair = pairs[min(max(shot_index - 1, 0), len(pairs) - 1)]
+
+        start_x, start_z = self._rotate_offset(
+            pair[0][0],
+            pair[0][1],
+            spawn_facing,
+        )
+        end_x, end_z = self._rotate_offset(
+            pair[1][0],
+            pair[1][1],
+            spawn_facing,
+        )
+        start = ShotBlockingPoint(
+            x=spawn_x + start_x,
+            y=0.0,
+            z=spawn_z + start_z,
+        )
+        end = ShotBlockingPoint(
+            x=spawn_x + end_x,
+            y=0.0,
+            z=spawn_z + end_z,
+        )
+
+        if beat == "PORTAL" and blueprint is not None and blueprint.portal is not None:
+            target = blueprint.portal.position
+            end = ShotBlockingPoint(
+                x=float(target.x),
+                y=0.0,
+                z=float(target.z),
+            )
+            if shot_index == 1:
+                start = ShotBlockingPoint(
+                    x=end.x,
+                    y=end.y,
+                    z=end.z + 5.0,
+                )
+
+        delta_x = end.x - start.x
+        delta_z = end.z - start.z
+        distance = math.hypot(delta_x, delta_z)
+        text = f"{shot_type} {action}".lower()
+        if distance <= 0.15 or any(
+            word in text
+            for word in ("reaction", "detail", "ending", "hold")
+        ):
+            movement_style = "hold"
+            facing = spawn_facing
+        else:
+            movement_style = (
+                "run"
+                if any(word in text for word in ("run", "chase", "sprint"))
+                else "walk"
+            )
+            facing = math.degrees(math.atan2(delta_x, -delta_z))
+
+        return ShotBlockingSpec(
+            actor_start=start,
+            actor_end=end,
+            facing_degrees=facing,
+            movement_style=movement_style,
+            source="generated",
+            confidence=confidence,
+        )
+
+    def _blueprint_for(
+        self,
+        world_asset_id: str | None,
+    ) -> WorldBlueprint | None:
+        if not world_asset_id:
+            return None
+        asset = self.repository.get_asset(world_asset_id)
+        if asset is None:
+            return None
+        raw = asset.metadata.get("world_blueprint")
+        if not raw:
+            return None
+        return WorldBlueprint.model_validate(raw)
+
+    @staticmethod
+    def _rotate_offset(
+        x_value: float,
+        z_value: float,
+        facing_degrees: float,
+    ) -> tuple[float, float]:
+        angle = math.radians(facing_degrees)
+        cos_value = math.cos(angle)
+        sin_value = math.sin(angle)
+        return (
+            x_value * cos_value - z_value * sin_value,
+            x_value * sin_value + z_value * cos_value,
+        )
 
     @staticmethod
     def total_duration(episode: Episode) -> float:

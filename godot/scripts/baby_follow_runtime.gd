@@ -18,6 +18,15 @@ func configure(
 ) -> void:
     target = target_node
     baby_payload = payload.duplicate(true)
+    if target != null:
+        if target.has_meta("director_baby_follow_distance"):
+            follow_distance = float(
+                target.get_meta("director_baby_follow_distance")
+            )
+        if target.has_meta("director_baby_side_offset"):
+            side_offset = float(
+                target.get_meta("director_baby_side_offset")
+            )
     name = "ActiveBaby_" + String(
         baby_payload.get("baby_id", "UNKNOWN")
     )

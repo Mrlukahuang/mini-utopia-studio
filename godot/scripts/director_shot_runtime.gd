@@ -12,6 +12,10 @@ var bound_world_instance: Node3D
 var bound_world_loaded := false
 var bound_scene_path := ""
 var world_load_error := ""
+var blocking_start := Vector3.ZERO
+var blocking_end := Vector3.ZERO
+var blocking_movement_style := ""
+var blocking_has_path := false
 var elapsed_seconds := 0.0
 var duration_seconds := 0.0
 var animation_intent := "idle"
@@ -32,6 +36,7 @@ func configure(runtime_payload: Dictionary) -> void:
     _clear_stage()
     _build_world_context()
     _build_actor()
+    _apply_shot_blocking()
     _build_camera()
 
     var raw_play = payload.get("play_session", {})
@@ -98,21 +103,46 @@ func advance_shot(delta: float) -> void:
     elapsed_seconds = minf(duration_seconds, elapsed_seconds + delta)
     var velocity := Vector3.ZERO
     var running := false
+    var movement_mode := (
+        blocking_movement_style
+        if blocking_has_path and not blocking_movement_style.is_empty()
+        else animation_intent
+    )
 
-    match animation_intent:
-        "walk":
-            velocity = Vector3(0.0, 0.0, -1.6)
-        "run":
-            velocity = Vector3(0.0, 0.0, -3.2)
-            running = true
-        "attack":
-            if elapsed_seconds <= delta + 0.001:
-                play_runtime.play_attack_swing()
-        _:
-            pass
+    if (
+        blocking_has_path
+        and movement_mode in ["walk", "run"]
+    ):
+        var remaining := blocking_end - actor.position
+        var remaining_distance := remaining.length()
+        var total_distance := (
+            blocking_end - blocking_start
+        ).length()
+        var speed := total_distance / maxf(duration_seconds, 0.001)
+        if remaining_distance > 0.001 and speed > 0.0:
+            var direction := remaining / remaining_distance
+            var step_distance := minf(
+                remaining_distance,
+                speed * delta
+            )
+            actor.position += direction * step_distance
+            velocity = direction * speed
+        running = movement_mode == "run"
+    else:
+        match movement_mode:
+            "walk":
+                velocity = Vector3(0.0, 0.0, -1.6)
+            "run":
+                velocity = Vector3(0.0, 0.0, -3.2)
+                running = true
+            "attack":
+                if elapsed_seconds <= delta + 0.001:
+                    play_runtime.play_attack_swing()
+            _:
+                pass
 
-    if velocity.length() > 0.0:
-        actor.position += velocity * delta
+        if velocity.length() > 0.0 and not blocking_has_path:
+            actor.position += velocity * delta
 
     play_runtime.update_motion(
         delta,
@@ -122,7 +152,33 @@ func advance_shot(delta: float) -> void:
     )
 
     if elapsed_seconds >= duration_seconds:
+        if (
+            blocking_has_path
+            and movement_mode in ["walk", "run"]
+        ):
+            actor.position = blocking_end
         playing = false
+
+
+func reset_shot() -> void:
+    elapsed_seconds = 0.0
+    playing = duration_seconds > 0.0
+    if actor != null and blocking_has_path:
+        actor.position = blocking_start
+        var raw_shot = payload.get("shot", {})
+        if typeof(raw_shot) == TYPE_DICTIONARY:
+            var raw_blocking = raw_shot.get("blocking", {})
+            if typeof(raw_blocking) == TYPE_DICTIONARY:
+                actor.rotation_degrees.y = float(
+                    raw_blocking.get("facing_degrees", 0.0)
+                )
+    if play_runtime != null:
+        play_runtime.update_motion(
+            0.0,
+            Vector3.ZERO,
+            true,
+            false
+        )
 
 
 func progress_ratio() -> float:
@@ -142,6 +198,10 @@ func _clear_stage() -> void:
     bound_world_loaded = false
     bound_scene_path = ""
     world_load_error = ""
+    blocking_start = Vector3.ZERO
+    blocking_end = Vector3.ZERO
+    blocking_movement_style = ""
+    blocking_has_path = false
 
 
 func _build_world_context() -> void:
@@ -289,6 +349,71 @@ func _build_actor() -> void:
         Vector3(0.0, 1.91, -0.01),
         Vector3(0.74, 0.31, 0.69),
         Color("#5B4036")
+    )
+
+
+func _apply_shot_blocking() -> void:
+    var raw_shot = payload.get("shot", {})
+    var shot_payload: Dictionary = (
+        raw_shot
+        if typeof(raw_shot) == TYPE_DICTIONARY
+        else {}
+    )
+    var raw_blocking = shot_payload.get("blocking", {})
+    var blocking: Dictionary = (
+        raw_blocking
+        if typeof(raw_blocking) == TYPE_DICTIONARY
+        else {}
+    )
+    if blocking.is_empty():
+        return
+
+    blocking_start = _point_from_dict(
+        blocking.get("actor_start", {}),
+        actor.position
+    )
+    blocking_end = _point_from_dict(
+        blocking.get("actor_end", {}),
+        blocking_start
+    )
+    blocking_movement_style = String(
+        blocking.get("movement_style", "hold")
+    )
+    blocking_has_path = true
+
+    actor.position = blocking_start
+    actor.rotation_degrees.y = float(
+        blocking.get("facing_degrees", 0.0)
+    )
+
+    var raw_baby_offset = blocking.get("baby_offset", {})
+    print(
+        "DIR-06 blocking: start=",
+        blocking_start,
+        " end=",
+        blocking_end,
+        " movement=",
+        blocking_movement_style
+    )
+
+    if typeof(raw_baby_offset) == TYPE_DICTIONARY:
+        actor.set_meta(
+            "director_baby_side_offset",
+            -float(raw_baby_offset.get("x", -0.8))
+        )
+        actor.set_meta(
+            "director_baby_follow_distance",
+            absf(float(raw_baby_offset.get("z", 1.0)))
+        )
+
+
+func _point_from_dict(value: Variant, fallback: Vector3) -> Vector3:
+    if typeof(value) != TYPE_DICTIONARY:
+        return fallback
+    return Vector3(
+        float(value.get("x", fallback.x)),
+        float(value.get("y", fallback.y)),
+        float(value.get("z", fallback.z))
     )
 
 
