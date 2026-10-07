@@ -1044,9 +1044,12 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
                 st.session_state.character_save_asset_id = saved_character_id
                 st.session_state.last_saved_character_id = saved_character_id
                 st.session_state.app_page = "🎭 My Characters"
-                st.rerun()
             except Exception as exc:
                 st.error(f"保存失败 / Save failed: {exc}")
+            else:
+                # Keep Streamlit control-flow outside the persistence
+                # exception handler so navigation can never be swallowed.
+                st.rerun()
 
     count = int(st.session_state.get("creator_generation_count", 0))
     remaining = max(0, MAX_GENERATIONS_PER_SESSION - count)
@@ -1103,9 +1106,10 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
                     st.session_state.character_master_candidate_path = candidate.path
                     st.session_state.character_master_character_id = asset.asset_id
                     st.session_state.creator_generation_count = count + 1
-                    st.rerun()
                 except Exception as exc:
                     st.error(f"生成失败 / Generation failed: {exc}")
+                else:
+                    st.rerun()
 
     candidate_path = st.session_state.get("character_master_candidate_path")
     candidate_character_id = st.session_state.get("character_master_character_id")
