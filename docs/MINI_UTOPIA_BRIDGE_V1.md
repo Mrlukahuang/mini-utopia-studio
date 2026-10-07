@@ -88,3 +88,37 @@ The Godot contract fixture lives at:
 
 and `bridge_character_contract_smoke.gd` verifies that Godot can parse Body,
 Species, Surface, Eye, Hair and color fields.
+
+
+## BRIDGE-03 Character write contract
+
+Godot can update an existing canonical Character with:
+
+- `PUT /characters/{CHAR_ID}`
+
+The request contains:
+
+- `schema_version: "1.0"`
+- the `revision` returned by the last read
+- `display_name`
+- `description`
+- full canonical `CharacterProfile`
+
+The Character ID is owned by the URL path and is never accepted from the
+request body.
+
+Write safety:
+
+- the existing Character ID is preserved;
+- payloads validate through `CharacterProfile`;
+- unrelated Asset metadata/files/status are preserved;
+- a real mutation advances the Asset revision;
+- replaying an identical Save is idempotent even if its original revision is
+  now stale;
+- a stale revision that would change current state returns HTTP 409 with the
+  current revision instead of overwriting newer work;
+- this milestone does not create Characters.
+
+`bridge_character_write_smoke.gd` performs a real Godot HTTP PUT in CI and
+verifies that the stable Character ID and updated Hair round-trip through the
+Bridge transport.
