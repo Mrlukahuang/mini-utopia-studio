@@ -771,6 +771,16 @@ elif page == "🗺️ My Worlds":
                 )
                 if blueprint:
                     st.success("🎮 Ready to Explore / 可以进入世界")
+                    runtime_binding = ctx.world_runtime_bindings.binding_for(
+                        asset.asset_id
+                    )
+                    if runtime_binding is not None:
+                        st.caption(
+                            "🎬 Godot Scene · "
+                            + runtime_binding.scene_label
+                            + " · "
+                            + runtime_binding.scene_path
+                        )
                     st.caption("50×50 Mini World · Blueprint + Portal + Landmarks + Director Tour ready")
                     if (
                         pipeline == "blueprint_first_v1"
@@ -911,6 +921,9 @@ elif page == "🎮 Explore World":
         if ctx.assets.is_world_library_visible(asset)
         and asset.metadata.get("world_blueprint")
     ]
+    playable_world_labels = ctx.world_runtime_bindings.choice_labels(
+        playable_worlds
+    )
 
     if not playable_worlds:
         st.info("还没有可以进入的 Mini World。先去 World Factory 创造并选择一个世界吧！")
@@ -937,7 +950,10 @@ elif page == "🎮 Explore World":
                 "World",
                 playable_worlds,
                 index=selected_index,
-                format_func=lambda asset: asset.display_name,
+                format_func=lambda asset: playable_world_labels.get(
+                    asset.asset_id,
+                    asset.display_name,
+                ),
                 label_visibility="collapsed",
             )
             st.session_state.selected_world_id = selected.asset_id
