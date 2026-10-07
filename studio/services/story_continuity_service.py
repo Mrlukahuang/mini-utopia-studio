@@ -12,6 +12,7 @@ from studio.models.equipment import (
 from studio.models.story_continuity import (
     ContinuityBabyState,
     ContinuityCharacterState,
+    ContinuityMemoryState,
     ContinuityEquipmentItem,
     ContinuityOwnedItem,
     ContinuityStoryState,
@@ -21,6 +22,9 @@ from studio.models.story_continuity import (
 from studio.repositories.base import StudioRepository
 from studio.services.baby_service import DEFAULT_BABY_ROSTER_ID
 from studio.services.equipment_service import DEFAULT_COLLECTION_ID
+from studio.services.living_universe_memory_service import (
+    LivingUniverseMemoryService,
+)
 from studio.services.world_creative_layout_service import WorldCreativeLayoutService
 from studio.services.world_gameplay_layer_service import WorldGameplayLayerService
 
@@ -232,10 +236,34 @@ class StoryContinuityService:
                     )
                 )
 
+        living_memory: list[ContinuityMemoryState] = []
+        if universe_id:
+            try:
+                memory_records = LivingUniverseMemoryService(
+                    self.repository
+                ).query(
+                    universe_id=universe_id,
+                    asset_ids=selected_ids,
+                    world_asset_id=world_asset_id,
+                    limit=10,
+                )
+            except NotImplementedError:
+                memory_records = []
+            living_memory = [
+                ContinuityMemoryState(
+                    memory_id=memory.memory_id,
+                    kind=memory.kind.value,
+                    summary=memory.summary,
+                    source_key=memory.source_key,
+                )
+                for memory in memory_records
+            ]
+
         return StoryContinuityContext(
             character_states=character_states,
             active_baby=active_baby,
             important_owned_items=important_owned_items,
             world=world_state,
             prior_canon_stories=prior,
+            living_memory=living_memory,
         )
