@@ -63,7 +63,7 @@ def test_character_factory_is_child_first_and_saves_without_image_api():
     assert "Make a hero of your own!" in source
     assert "More choices / 更多设定（可选）" in source
     assert "More personality details / 更多性格设定（可选）" in source
-    assert "Pick a first outfit / 选第一套穿搭" in source
+    assert "Outfit & Gear / 穿搭和装备" in source
     assert "More details / 更多设定（可选）" in source
     assert "Save My Hero / 保存我的角色" in source
     assert "profile_can_save = not missing and bool(name)" in source
