@@ -15,6 +15,7 @@ from studio.models.equipment import (
 from studio.services.baby_service import BabyService
 from studio.services.combat_drop_service import CombatDropService
 from studio.services.quest_reward_service import QuestRewardService
+from studio.ui.creator.migration_notice import render_legacy_creator_notice
 from studio.ui.theme import render_game_hero
 
 
@@ -66,6 +67,8 @@ def render_my_stuff(ctx) -> None:
         "这是你的收藏柜。装备属于你的 Collection，可以换给不同角色使用。",
         kicker="COLLECT · EQUIP · GROW",
     )
+
+    render_legacy_creator_notice(surface="My Stuff equipment editing")
 
     claimed_rewards = CombatDropService(
         ctx.repository,
