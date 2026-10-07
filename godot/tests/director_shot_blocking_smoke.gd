@@ -116,14 +116,6 @@ func _initialize() -> void:
             "created_at": "2026-10-07T00:00:00Z"
         }
     })
-    runtime.set_process(false)
-    _verify.call_deferred(runtime)
-
-
-func _verify(runtime: MiniUtopiaDirectorShotRuntime) -> void:
-    await process_frame
-    await process_frame
-    await process_frame
 
     if runtime.actor == null:
         push_error("director_shot_blocking_smoke: actor missing")
@@ -139,6 +131,22 @@ func _verify(runtime: MiniUtopiaDirectorShotRuntime) -> void:
         )
         quit(1)
         return
+    if not runtime.blocking_has_path:
+        push_error("director_shot_blocking_smoke: blocking not loaded")
+        quit(1)
+        return
+
+    # Freeze automatic playback only after proving the exact configured frame.
+    # Baby spawn is deferred, so wait for it without advancing the shot.
+    runtime.set_process(false)
+    _verify_deferred.call_deferred(runtime)
+
+
+func _verify_deferred(runtime: MiniUtopiaDirectorShotRuntime) -> void:
+    await process_frame
+    await process_frame
+    await process_frame
+
     if not runtime.blocking_has_path:
         push_error("director_shot_blocking_smoke: blocking not loaded")
         quit(1)
