@@ -1154,14 +1154,17 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
                         candidate_path=candidate_path,
                     )
                     reset_character_creation_state()
-                    st.session_state.pending_app_page = "🎭 My Characters"
-                    st.success(
-                        f"角色正式加入 Mini Utopia！ · {candidate_character_id}"
+                    st.session_state.character_save_asset_id = (
+                        candidate_character_id
                     )
-                    st.balloons()
-                    st.rerun()
+                    st.session_state.last_saved_character_id = (
+                        candidate_character_id
+                    )
+                    st.session_state.app_page = "🎭 My Characters"
                 except Exception as exc:
                     st.error(f"保存失败 / Approval failed: {exc}")
+                else:
+                    st.rerun()
         with new:
             if st.button("🆕 New Character / 新角色", use_container_width=True):
                 _start_over()
