@@ -1,0 +1,79 @@
+{
+  "schema_version": "1.0",
+  "quest_id": "QUEST_NEWBIE_TRAINING_EXAMPLE",
+  "title": "First Skeleton Adventure / 第一次骷髅冒险",
+  "description": "Enter Newbie Village, defeat the Training Skeleton, claim its reward, then open the Portal.",
+  "world_asset_id": "LOC_NEWBIE_VILLAGE",
+  "story_id": null,
+  "universe_id": "UNIV_MINI_UTOPIA",
+  "start_triggers": [
+    {
+      "trigger_type": "enter_location",
+      "target_id": "LOC_NEWBIE_VILLAGE",
+      "required_value": null,
+      "metadata": {}
+    }
+  ],
+  "objectives": [
+    {
+      "objective_id": "arrive_newbie_village",
+      "objective_type": "go_to_location",
+      "label": "Arrive in Newbie Village",
+      "target_id": "LOC_NEWBIE_VILLAGE",
+      "target_count": 1,
+      "order": 0,
+      "optional": false,
+      "metadata": {}
+    },
+    {
+      "objective_id": "defeat_training_skeleton",
+      "objective_type": "defeat_enemy",
+      "label": "Defeat the Training Skeleton",
+      "target_id": "training_skeleton_01",
+      "target_count": 1,
+      "order": 1,
+      "optional": false,
+      "metadata": {}
+    },
+    {
+      "objective_id": "claim_bone_buckler",
+      "objective_type": "collect_item",
+      "label": "Claim Bone Buckler",
+      "target_id": "reward_bone_buckler",
+      "target_count": 1,
+      "order": 2,
+      "optional": false,
+      "metadata": {}
+    },
+    {
+      "objective_id": "open_newbie_portal",
+      "objective_type": "open_portal",
+      "label": "Open the Portal",
+      "target_id": "newbie_village_portal",
+      "target_count": 1,
+      "order": 3,
+      "optional": false,
+      "metadata": {}
+    }
+  ],
+  "rewards": [
+    {
+      "reward_id": "first_adventure_baby_bond",
+      "reward_type": "baby_bond",
+      "target_id": null,
+      "amount": 5,
+      "metadata": {}
+    },
+    {
+      "reward_id": "unlock_next_portal",
+      "reward_type": "unlock",
+      "target_id": "next_world_portal",
+      "amount": 1,
+      "metadata": {}
+    }
+  ],
+  "repeatable": false,
+  "status": "draft",
+  "created_at": "2026-10-07T00:00:00Z",
+  "updated_at": "2026-10-07T00:00:00Z"
+}
