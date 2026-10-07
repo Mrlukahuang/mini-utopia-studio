@@ -42,6 +42,13 @@ class PublishPackageService:
             raise ValueError(f"Episode not found: {episode_id}")
 
         existing = episode.publish_package
+        assembly_state = self.assembly.status_for(episode_id)
+        if (
+            existing is not None
+            and assembly_state.status != "ready"
+        ):
+            return existing.model_copy(update={"status": "stale"})
+
         expected = self._expected_record(
             episode_id,
             title=(existing.title if existing is not None else None),
