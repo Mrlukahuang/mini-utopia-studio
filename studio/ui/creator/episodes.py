@@ -15,6 +15,9 @@ from studio.services.director_shot_session_service import (
 from studio.services.episode_batch_render_service import (
     EpisodeBatchRenderService,
 )
+from studio.services.episode_assembly_service import (
+    EpisodeAssemblyService,
+)
 from studio.services.episode_service import EpisodeService
 from studio.services.production_status_service import (
     EpisodeProductionStatusService,
@@ -55,6 +58,10 @@ def render_episode_library(ctx) -> None:
     batch_render_service = EpisodeBatchRenderService(
         ctx.repository,
         storyboard_service,
+        shot_render_service,
+    )
+    episode_assembly_service = EpisodeAssemblyService(
+        ctx.repository,
         shot_render_service,
     )
     production_status_service = EpisodeProductionStatusService(
@@ -374,8 +381,74 @@ def render_episode_library(ctx) -> None:
                             st.rerun()
                     elif production.next_action == "assemble_episode":
                         st.success(next_label)
+                        assembly_status = episode_assembly_service.status_for(
+                            episode.episode_id
+                        )
+                        if assembly_status.status in {
+                            "missing",
+                            "stale",
+                            "failed",
+                        }:
+                            if st.button(
+                                "✂️ Assemble Episode / 拼接剧集",
+                                key=f"assemble_episode_{episode.episode_id}",
+                                type="primary",
+                                use_container_width=True,
+                            ):
+                                with st.spinner(
+                                    "✂️ 正在按 Shot 顺序拼接 Episode…"
+                                ):
+                                    assembled = episode_assembly_service.assemble(
+                                        episode.episode_id
+                                    )
+                                if assembled.status == "ready":
+                                    st.rerun()
+                                else:
+                                    st.warning(
+                                        "Episode 拼接暂未完成："
+                                        + assembled.error
+                                    )
                     else:
                         st.success(next_label)
+
+                assembly_status = episode_assembly_service.status_for(
+                    episode.episode_id
+                )
+                if assembly_status.status in {"ready", "stale", "failed"}:
+                    with st.container(border=True):
+                        st.markdown("#### ✂️ Episode Assembly / 剧集成片")
+                        badge = {
+                            "ready": "✅ Ready / 已拼接",
+                            "stale": "🟠 Stale / 需要重新拼接",
+                            "failed": "⚠️ Failed / 拼接失败",
+                        }.get(
+                            assembly_status.status,
+                            assembly_status.status,
+                        )
+                        st.caption(
+                            f"{badge} · {assembly_status.clip_count} clips · "
+                            f"{assembly_status.total_duration_seconds:.1f}s"
+                        )
+                        assembled_video = (
+                            episode_assembly_service.video_bytes(
+                                assembly_status
+                            )
+                        )
+                        if assembled_video is not None:
+                            st.video(assembled_video)
+                            st.download_button(
+                                "⬇️ Download Episode MP4 / 下载剧集",
+                                data=assembled_video,
+                                file_name=f"{episode.episode_id}.mp4",
+                                mime="video/mp4",
+                                key=f"download_episode_{episode.episode_id}",
+                                use_container_width=True,
+                            )
+                        if assembly_status.status == "stale":
+                            st.info(
+                                "Shot 或批准状态有变化；原视频保留，"
+                                "重新拼接后才会成为当前版本。"
+                            )
 
                 render_audio_timeline(
                     ctx,
