@@ -170,6 +170,14 @@ func _verify_deferred(runtime: MiniUtopiaDirectorShotRuntime) -> void:
         quit(1)
         return
 
+    runtime.reset_shot()
+    if runtime.actor.position.distance_to(
+        Vector3(2.0, 0.0, 8.0)
+    ) > 0.01:
+        push_error("director_shot_blocking_smoke: reset did not restore start")
+        quit(1)
+        return
+
     runtime.advance_shot(1.0)
     if absf(runtime.actor.position.z - 5.0) > 0.05:
         push_error("director_shot_blocking_smoke: halfway position mismatch")
