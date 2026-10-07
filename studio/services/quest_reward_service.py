@@ -96,52 +96,64 @@ class QuestRewardService:
                     # BB-02 and later systems execute the other generic reward
                     # types from this same durable completion receipt.
                     continue
-
-                claim_id = self._claim_id(
-                    quest_id=quest.quest_id,
-                    reward_id=reward.reward_id,
-                    completion_id=completion.completion_id,
-                    repeatable=quest.repeatable,
-                )
-                if claim_id in claimed:
-                    continue
-
                 if not reward.target_id:
                     continue
+
                 asset = assets_by_slug.get(reward.target_id)
                 if asset is None:
                     continue
-
                 definition = self.equipment.get_definition(asset.asset_id)
-                rarity = EquipmentRarity(
-                    str(reward.metadata.get("rarity", "green"))
-                )
-                item_level = max(
-                    1,
-                    int(reward.metadata.get("item_level", 1)),
-                )
-                seed = f"QUEST_REWARD::{claim_id}"
-                item = create_equipment_instance(
-                    definition=definition,
-                    rarity=rarity,
-                    item_level=item_level,
-                    generation_seed=seed,
-                )
-                collection.items.append(item)
-                collection.claimed_quest_reward_ids.append(claim_id)
-                claimed.add(claim_id)
-                results.append(
-                    QuestRewardClaim(
-                        claim_id=claim_id,
-                        completion_id=completion.completion_id,
-                        quest_id=quest.quest_id,
-                        reward_id=reward.reward_id,
-                        item_instance_id=item.item_instance_id,
-                        display_name=definition.display_name,
-                        rarity=item.rarity,
-                        slot=definition.slot,
+
+                try:
+                    rarity = EquipmentRarity(
+                        str(reward.metadata.get("rarity", "green"))
                     )
-                )
+                    item_level = max(
+                        1,
+                        int(reward.metadata.get("item_level", 1)),
+                    )
+                except (TypeError, ValueError):
+                    # Invalid authored reward metadata must not break My Stuff.
+                    # Leave it unclaimed so corrected Quest data can recover.
+                    continue
+
+                for unit_index in range(reward.amount):
+                    reward_unit_id = (
+                        reward.reward_id
+                        if reward.amount == 1
+                        else f"{reward.reward_id}:{unit_index + 1}"
+                    )
+                    claim_id = self._claim_id(
+                        quest_id=quest.quest_id,
+                        reward_id=reward_unit_id,
+                        completion_id=completion.completion_id,
+                        repeatable=quest.repeatable,
+                    )
+                    if claim_id in claimed:
+                        continue
+
+                    seed = f"QUEST_REWARD::{claim_id}"
+                    item = create_equipment_instance(
+                        definition=definition,
+                        rarity=rarity,
+                        item_level=item_level,
+                        generation_seed=seed,
+                    )
+                    collection.items.append(item)
+                    collection.claimed_quest_reward_ids.append(claim_id)
+                    claimed.add(claim_id)
+                    results.append(
+                        QuestRewardClaim(
+                            claim_id=claim_id,
+                            completion_id=completion.completion_id,
+                            quest_id=quest.quest_id,
+                            reward_id=reward.reward_id,
+                            item_instance_id=item.item_instance_id,
+                            display_name=definition.display_name,
+                            rarity=item.rarity,
+                            slot=definition.slot,
+                        )
+                    )
 
         if results:
             collection.updated_at = now_utc()
