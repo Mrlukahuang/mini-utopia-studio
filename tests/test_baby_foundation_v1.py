@@ -115,9 +115,12 @@ def test_creator_ui_exposes_my_baby_and_context():
     assert "render_my_baby(ctx)" in app
     assert "Meet My Baby / 领取宝宝" in my_baby
     assert "Rename Baby / 改名字" in my_baby
-    assert "+25 XP" in my_baby
-    assert "+5 Bond" in my_baby
+    assert "How Baby Grows / 怎么长大" in my_baby
+    assert "Quest Growth" in my_baby
+    assert "+25 XP" not in my_baby
+    assert "+5 Bond" not in my_baby
     assert "Active Baby" in my_stuff
+    assert "Baby Growth / 宝宝成长" in my_stuff
 
 
 def test_baby_v1_archetypes_are_child_visible():
