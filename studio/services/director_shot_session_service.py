@@ -89,12 +89,13 @@ class DirectorShotSessionService:
         )
 
         # Runtime services may synthesize harmless timestamps (for example an
-        # empty Creative Layout). Normalize all runtime timestamps to the
-        # persisted Episode timestamp so unchanged source state is byte-stable.
+        # empty Creative Layout). Timestamps are not Director source content,
+        # so normalize them to a fixed sentinel. Derived production receipts
+        # must never invalidate an otherwise unchanged Shot fingerprint.
         play_payload = play.model_dump(mode="json")
         self._normalize_timestamps(
             play_payload,
-            episode.updated_at.isoformat(),
+            "2000-01-01T00:00:00+00:00",
         )
         play_payload["source"] = "director"
 

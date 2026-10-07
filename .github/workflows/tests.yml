@@ -179,3 +179,40 @@ jobs:
           assert path.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
           print("storyboard_capture_smoke: PASS · PNG created")
           PY
+
+      - name: Smoke-test approved Shot MP4 capture
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          command -v ffmpeg
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          storyboard = json.loads(
+              Path("godot/runtime_state/storyboard_capture_request.json")
+              .read_text(encoding="utf-8")
+          )
+          request = {
+              "schema_version": "1.0",
+              "output_dir": "res://runtime_state/shot_frames/EP_SMOKE/SHOT_01_01",
+              "fps": 6,
+              "frame_count": 6,
+              "width": 480,
+              "height": 270,
+              "director_session": storyboard["director_session"],
+          }
+          target = Path("godot/runtime_state/shot_capture_request.json")
+          target.write_text(json.dumps(request, indent=2), encoding="utf-8")
+          PY
+          xvfb-run -a /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --path godot --rendering-method gl_compatibility --resolution 480x270 --script res://scripts/shot_frame_capture.gd
+          test "$(find godot/runtime_state/shot_frames/EP_SMOKE/SHOT_01_01 -name 'frame_*.png' | wc -l)" -eq 6
+          mkdir -p godot/runtime_state/renders/EP_SMOKE
+          ffmpeg -hide_banner -loglevel error -y -framerate 6 -i godot/runtime_state/shot_frames/EP_SMOKE/SHOT_01_01/frame_%05d.png -c:v libx264 -pix_fmt yuv420p -movflags +faststart godot/runtime_state/renders/EP_SMOKE/SHOT_01_01.mp4
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("godot/runtime_state/renders/EP_SMOKE/SHOT_01_01.mp4")
+          assert path.exists() and path.stat().st_size > 32
+          assert b"ftyp" in path.read_bytes()[:32]
+          print("shot_video_capture_smoke: PASS · MP4 created")
+          PY

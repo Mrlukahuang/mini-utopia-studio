@@ -29,3 +29,5 @@ godot/assets/external/heroes/*.import
 godot/runtime_state/*.json
 godot/runtime_state/storyboards/
 godot/runtime_state/subtitles/
+godot/runtime_state/shot_frames/
+godot/runtime_state/renders/
