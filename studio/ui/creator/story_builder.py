@@ -25,7 +25,7 @@ def _apply_pending_ai_suggestion() -> None:
 
 
 def render_story_builder(ctx, *, universe) -> None:
-    """Creator-facing structured Story Builder with optional AI beat proposals."""
+    """Creator-facing Story Builder v1 with optional AI beat proposals."""
 
     _apply_pending_ai_suggestion()
 
