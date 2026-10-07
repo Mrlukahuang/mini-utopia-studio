@@ -6,6 +6,7 @@ from studio.core.enums import ReviewStatus, StoryMode
 from studio.models.asset import now_utc
 from studio.models.storyboard import StoryboardFrameRecord
 from studio.models.audio_timeline import EpisodeAudioLine
+from studio.models.subtitle_track import SubtitleCue
 
 
 class DialogueLine(BaseModel):
@@ -117,5 +118,6 @@ class Episode(BaseModel):
         default_factory=dict
     )
     audio_timeline: list[EpisodeAudioLine] = Field(default_factory=list)
+    subtitle_track: list[SubtitleCue] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=now_utc)
     updated_at: datetime = Field(default_factory=now_utc)
