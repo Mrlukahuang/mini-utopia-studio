@@ -17,6 +17,18 @@ class DirectorCameraSpec(BaseModel):
     look_at: tuple[float, float, float]
     fov: float = Field(default=48.0, ge=20.0, le=100.0)
     movement: str = ""
+    end_position: tuple[float, float, float] | None = None
+    end_look_at: tuple[float, float, float] | None = None
+    end_fov: float | None = Field(default=None, ge=20.0, le=100.0)
+    movement_mode: Literal[
+        "hold",
+        "push_in",
+        "pull_back",
+        "pan",
+        "follow",
+        "reveal",
+    ] = "hold"
+    easing: Literal["linear", "smooth"] = "smooth"
 
 
 class DirectorShotSession(BaseModel):
