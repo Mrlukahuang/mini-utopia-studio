@@ -3,6 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from studio.models.equipment import EquipmentRarity, EquipmentSlot
+from studio.models.quest import QuestRewardType
 
 
 class QuestCompletionReceipt(BaseModel):
@@ -27,3 +28,17 @@ class QuestRewardClaim(BaseModel):
     display_name: str
     rarity: EquipmentRarity
     slot: EquipmentSlot
+
+
+class QuestBabyRewardClaim(BaseModel):
+    claim_id: str
+    completion_id: str
+    quest_id: str
+    reward_id: str
+    reward_type: QuestRewardType
+    baby_id: str
+    baby_name: str
+    amount: int
+    level: int
+    xp: int
+    bond: int
