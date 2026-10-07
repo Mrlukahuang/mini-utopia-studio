@@ -43,7 +43,12 @@ class StoryService:
         )
         self.repository.save_story(story)
         if story.mode == StoryMode.CANON:
-            LivingUniverseMemoryService(
-                self.repository
-            ).ingest_story(story)
+            try:
+                LivingUniverseMemoryService(
+                    self.repository
+                ).ingest_story(story)
+            except NotImplementedError:
+                # Transitional/custom repositories may not expose Living
+                # Memory yet; Story persistence must remain backward compatible.
+                pass
         return story
