@@ -23,6 +23,7 @@ from studio.services.world_blueprint_service import WorldBlueprintService
 from studio.services.world_concept_match_service import WorldConceptMatchService
 from studio.services.world_visual_anchor_service import WorldVisualAnchorService
 from studio.services.world_scene_plan_service import WorldScenePlanService
+from studio.services.world_runtime_binding_service import WorldRuntimeBindingService
 from studio.services.world_appearance_service import WorldAppearanceService
 from studio.services.world_geometry_compiler_service import WorldGeometryCompilerService
 from studio.services.world_hero_asset_service import WorldHeroAssetService
@@ -59,6 +60,7 @@ class StudioContext:
     world_blueprints: WorldBlueprintService
     world_concepts: WorldConceptService
     world_scene_plans: WorldScenePlanService
+    world_runtime_bindings: WorldRuntimeBindingService
     world_appearances: WorldAppearanceService
     world_geometry_compiler: WorldGeometryCompilerService
     world_hero_assets: WorldHeroAssetService
@@ -158,6 +160,9 @@ def build_context(settings: Settings) -> StudioContext:
     world_hero_compositions = WorldHeroCompositionService(
         structured_provider=text_provider,
     )
+    world_runtime_bindings = WorldRuntimeBindingService(repository)
+    world_runtime_bindings.ensure_builtin_worlds()
+
     reusable_assets = ReusableAssetLibraryService(repository, storage)
     reusable_asset_packs = ReusableAssetPackService(reusable_assets)
 
@@ -227,6 +232,7 @@ def build_context(settings: Settings) -> StudioContext:
         world_scene_plans=WorldScenePlanService(
             structured_provider=text_provider,
         ),
+        world_runtime_bindings=world_runtime_bindings,
         world_appearances=world_appearances,
         world_geometry_compiler=world_geometry_compiler,
         world_hero_assets=world_hero_assets,
