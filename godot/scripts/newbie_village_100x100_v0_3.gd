@@ -808,7 +808,7 @@ func _scatter_forest_cluster(
     grass_files: Array
 ) -> void:
     for index in range(count):
-        var position := center + Vector3(
+        var scatter_position := center + Vector3(
             rng.randf_range(-radius, radius),
             0.0,
             rng.randf_range(-radius, radius)
@@ -820,7 +820,7 @@ func _scatter_forest_cluster(
         AssetVaultRuntime.instantiate_first_filename(
             self,
             tree_file,
-            position,
+            scatter_position,
             rng.randf_range(0.0, 360.0),
             rng.randf_range(1.10, 1.70)
         )
@@ -832,7 +832,7 @@ func _scatter_forest_cluster(
             AssetVaultRuntime.instantiate_first_filename(
                 self,
                 rock_file,
-                position + Vector3(
+                scatter_position + Vector3(
                     rng.randf_range(-2.0, 2.0),
                     0.0,
                     rng.randf_range(-2.0, 2.0)
@@ -848,7 +848,7 @@ func _scatter_forest_cluster(
             AssetVaultRuntime.instantiate_first_filename(
                 self,
                 bush_file,
-                position + Vector3(
+                scatter_position + Vector3(
                     rng.randf_range(-1.8, 1.8),
                     0.0,
                     rng.randf_range(-1.8, 1.8)
@@ -864,7 +864,7 @@ func _scatter_forest_cluster(
             AssetVaultRuntime.instantiate_first_filename(
                 self,
                 grass_file,
-                position + Vector3(
+                scatter_position + Vector3(
                     rng.randf_range(-1.7, 1.7),
                     0.03,
                     rng.randf_range(-1.7, 1.7)
@@ -881,13 +881,13 @@ func _build_skeletons() -> void:
     ]
 
     for index in range(SKELETON_COUNT):
-        var position: Vector3 = positions[index]
+        var skeleton_position: Vector3 = positions[index]
         var skeleton: Node3D = null
         if not skeleton_asset_id.is_empty():
             skeleton = AssetVaultRuntime.instantiate_by_id(
                 self,
                 skeleton_asset_id,
-                position,
+                skeleton_position,
                 180.0 if index == 0 else 20.0,
                 1.0,
                 1.8
@@ -895,13 +895,13 @@ func _build_skeletons() -> void:
 
         if skeleton == null:
             _build_skeleton_fallback(
-                position,
+                scatter_position,
                 "SkeletonFallback_%s" % str(index + 1)
             )
 
         _add_collision_cylinder(
             "SkeletonCollision_%s" % str(index + 1),
-            position + Vector3(0.0, 0.85, 0.0),
+            skeleton_position + Vector3(0.0, 0.85, 0.0),
             0.45,
             1.7
         )
@@ -927,10 +927,10 @@ func _build_training_skeleton() -> void:
     )
 
 
-func _build_skeleton_fallback(position: Vector3, node_name: String) -> void:
+func _build_skeleton_fallback(spawn_position: Vector3, node_name: String) -> void:
     var root := Node3D.new()
     root.name = node_name
-    root.position = position
+    root.position = spawn_position
     add_child(root)
 
     var bone_color := Color("#EFE8D6")
