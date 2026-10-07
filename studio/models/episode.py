@@ -9,6 +9,7 @@ from studio.models.audio_timeline import EpisodeAudioLine
 from studio.models.subtitle_track import SubtitleCue
 from studio.models.shot_render import ShotRenderRecord
 from studio.models.episode_assembly import EpisodeAssemblyRecord
+from studio.models.publish_package import PublishPackageRecord
 
 
 class DialogueLine(BaseModel):
@@ -123,5 +124,7 @@ class Episode(BaseModel):
     subtitle_track: list[SubtitleCue] = Field(default_factory=list)
     shot_renders: dict[str, ShotRenderRecord] = Field(default_factory=dict)
     episode_assembly: EpisodeAssemblyRecord | None = None
+    publish_package: PublishPackageRecord | None = None
+    final_package_ready: bool = False
     created_at: datetime = Field(default_factory=now_utc)
     updated_at: datetime = Field(default_factory=now_utc)
