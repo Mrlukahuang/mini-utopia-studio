@@ -15,6 +15,7 @@ from studio.services.director_shot_session_service import (
 from studio.services.episode_service import EpisodeService
 from studio.services.scene_breakdown_service import SceneBreakdownService
 from studio.services.shot_plan_service import ShotPlanService
+from studio.services.storyboard_service import StoryboardService
 
 
 def render_episode_library(ctx) -> None:
@@ -32,6 +33,10 @@ def render_episode_library(ctx) -> None:
         ctx.character_runtime,
         equipment=ctx.equipment,
         babies=BabyService(ctx.repository),
+    )
+    storyboard_service = StoryboardService(
+        ctx.repository,
+        director_service,
     )
     episodes = episode_service.list_episodes()
     episodes = [
@@ -209,6 +214,126 @@ def render_episode_library(ctx) -> None:
                                     None,
                                 )
                                 st.rerun()
+
+                st.markdown("#### 🖼️ Storyboard / 分镜板")
+                storyboard_rows = [
+                    (scene, shot)
+                    for scene in episode.scenes
+                    for shot in scene.shots
+                ]
+                frame_states = []
+                for storyboard_scene, storyboard_shot in storyboard_rows:
+                    try:
+                        frame_states.append(
+                            storyboard_service.status_for(
+                                episode_id=episode.episode_id,
+                                scene_id=storyboard_scene.scene_id,
+                                shot_id=storyboard_shot.shot_id,
+                            )
+                        )
+                    except ValueError:
+                        continue
+
+                ready_count = sum(
+                    frame.status == "ready"
+                    for frame in frame_states
+                )
+                stale_count = sum(
+                    frame.status == "stale"
+                    for frame in frame_states
+                )
+                summary_cols = st.columns(3)
+                summary_cols[0].metric(
+                    "Storyboard",
+                    f"{ready_count}/{len(storyboard_rows)}",
+                )
+                summary_cols[1].metric("Stale", stale_count)
+                summary_cols[2].metric(
+                    "Missing",
+                    max(
+                        0,
+                        len(storyboard_rows)
+                        - ready_count
+                        - stale_count,
+                    ),
+                )
+
+                status_icon = {
+                    "ready": "✅",
+                    "missing": "⬜",
+                    "stale": "🟠",
+                    "failed": "⚠️",
+                }
+                storyboard_cols = st.columns(3)
+                for frame_index, (
+                    storyboard_scene,
+                    storyboard_shot,
+                ) in enumerate(storyboard_rows):
+                    frame = storyboard_service.status_for(
+                        episode_id=episode.episode_id,
+                        scene_id=storyboard_scene.scene_id,
+                        shot_id=storyboard_shot.shot_id,
+                    )
+                    with storyboard_cols[frame_index % 3]:
+                        with st.container(border=True):
+                            st.markdown(
+                                f"**{status_icon.get(frame.status, '⬜')} "
+                                f"{storyboard_shot.shot_id}**"
+                            )
+                            st.caption(
+                                f"{storyboard_scene.story_beat or 'SCENE'} · "
+                                f"{frame.capture_time_seconds:.1f}s · "
+                                f"{frame.camera_summary}"
+                            )
+                            image_bytes = storyboard_service.frame_bytes(
+                                frame
+                            )
+                            if image_bytes is not None:
+                                st.image(
+                                    image_bytes,
+                                    caption=(
+                                        f"{frame.blocking_summary} · "
+                                        f"{frame.status.title()}"
+                                    ),
+                                    use_container_width=True,
+                                )
+                            else:
+                                st.caption(
+                                    "Planning frame not generated yet / "
+                                    "分镜画面还没生成"
+                                )
+
+                            button_label = (
+                                "🔄 Refresh Frame / 更新分镜"
+                                if frame.status in {"stale", "failed"}
+                                else "🖼️ Generate Frame / 生成分镜"
+                            )
+                            if st.button(
+                                button_label,
+                                key=(
+                                    f"storyboard_{episode.episode_id}_"
+                                    f"{storyboard_scene.scene_id}_"
+                                    f"{storyboard_shot.shot_id}"
+                                ),
+                                use_container_width=True,
+                            ):
+                                with st.spinner(
+                                    "🎬 正在用 Godot Director 拍摄规划画面…"
+                                ):
+                                    generated = (
+                                        storyboard_service.generate_frame(
+                                            episode_id=episode.episode_id,
+                                            scene_id=storyboard_scene.scene_id,
+                                            shot_id=storyboard_shot.shot_id,
+                                        )
+                                    )
+                                if generated.status == "ready":
+                                    st.rerun()
+                                else:
+                                    st.warning(
+                                        "Storyboard capture 暂未完成。"
+                                        "请确认本机 Godot 可用后重试。"
+                                    )
 
                 st.markdown("#### 🎞️ Script & Scene Breakdown / 剧本场景")
                 for scene in episode.scenes:
