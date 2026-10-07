@@ -64,11 +64,19 @@ class ShotRenderService:
         if episode is None:
             raise ValueError(f"Episode not found: {episode_id}")
 
-        session = self.director.build(
-            episode_id=episode_id,
-            scene_id=scene_id,
-            shot_id=shot_id,
+        scene = next(
+            (value for value in episode.scenes if value.scene_id == scene_id),
+            None,
         )
+        if scene is None:
+            raise ValueError(f"Scene not found: {scene_id}")
+        shot = next(
+            (value for value in scene.shots if value.shot_id == shot_id),
+            None,
+        )
+        if shot is None:
+            raise ValueError(f"Shot not found: {shot_id}")
+
         frame = self.storyboard.status_for(
             episode_id=episode_id,
             scene_id=scene_id,
@@ -80,27 +88,35 @@ class ShotRenderService:
             shot_id=shot_id,
         )
 
+        # No durable render receipt means there is nothing to compare against.
+        # Avoid building the full Director runtime merely to display
+        # "Not Rendered" in Creator UI.
         if existing is None:
             return ShotRenderRecord(
                 episode_id=episode_id,
                 scene_id=scene_id,
                 shot_id=shot_id,
-                source_fingerprint=session.source_fingerprint,
+                source_fingerprint="",
                 storyboard_approval_fingerprint=(
                     frame.review_source_fingerprint
                 ),
                 status="missing",
                 video_path=expected_path,
-                duration_seconds=session.duration_seconds,
+                duration_seconds=shot.duration_seconds,
                 fps=self.fps,
                 width=self.width,
                 height=self.height,
                 frame_count=max(
                     1,
-                    round(session.duration_seconds * self.fps),
+                    round(shot.duration_seconds * self.fps),
                 ),
             )
 
+        session = self.director.build(
+            episode_id=episode_id,
+            scene_id=scene_id,
+            shot_id=shot_id,
+        )
         if (
             existing.source_fingerprint != session.source_fingerprint
             or not frame.approved_current

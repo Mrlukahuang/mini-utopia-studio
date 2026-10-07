@@ -102,6 +102,38 @@ def test_old_episode_payload_defaults_to_empty_storyboard():
     assert episode.storyboard_frames == {}
 
 
+class _ExplodingDirector:
+    def build(self, **_kwargs):
+        raise AssertionError(
+            "missing status must not build the full Director runtime"
+        )
+
+
+def test_missing_storyboard_status_skips_director_runtime_build(tmp_path):
+    project_root = tmp_path / "project"
+    repo = SQLiteStudioRepository(tmp_path / "studio.db")
+    _character, _world, episode = _setup(repo)
+    scene = episode.scenes[0]
+    shot = scene.shots[0]
+
+    storyboard = StoryboardService(
+        repo,
+        _ExplodingDirector(),
+        project_root=project_root,
+    )
+    missing = storyboard.status_for(
+        episode_id=episode.episode_id,
+        scene_id=scene.scene_id,
+        shot_id=shot.shot_id,
+    )
+
+    assert missing.status == "missing"
+    assert missing.source_fingerprint == ""
+    assert missing.capture_time_seconds == shot.duration_seconds * 0.5
+    assert missing.camera_summary
+    assert missing.blocking_summary
+
+
 def test_storyboard_frame_is_deterministic_ready_and_persistent(tmp_path):
     project_root = tmp_path / "project"
     (project_root / "godot" / "runtime_state").mkdir(parents=True)

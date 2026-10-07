@@ -630,15 +630,16 @@ def render_episode_library(ctx) -> None:
                     for shot in scene.shots
                 ]
                 frame_states = []
+                frame_states_by_shot = {}
                 for storyboard_scene, storyboard_shot in storyboard_rows:
                     try:
-                        frame_states.append(
-                            storyboard_service.status_for(
-                                episode_id=episode.episode_id,
-                                scene_id=storyboard_scene.scene_id,
-                                shot_id=storyboard_shot.shot_id,
-                            )
+                        frame = storyboard_service.status_for(
+                            episode_id=episode.episode_id,
+                            scene_id=storyboard_scene.scene_id,
+                            shot_id=storyboard_shot.shot_id,
                         )
+                        frame_states.append(frame)
+                        frame_states_by_shot[storyboard_shot.shot_id] = frame
                     except ValueError:
                         continue
 
@@ -687,11 +688,11 @@ def render_episode_library(ctx) -> None:
                     storyboard_scene,
                     storyboard_shot,
                 ) in enumerate(storyboard_rows):
-                    frame = storyboard_service.status_for(
-                        episode_id=episode.episode_id,
-                        scene_id=storyboard_scene.scene_id,
-                        shot_id=storyboard_shot.shot_id,
+                    frame = frame_states_by_shot.get(
+                        storyboard_shot.shot_id
                     )
+                    if frame is None:
+                        continue
                     with storyboard_cols[frame_index % 3]:
                         with st.container(border=True):
                             st.markdown(
