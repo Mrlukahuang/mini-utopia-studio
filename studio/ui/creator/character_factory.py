@@ -537,105 +537,120 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
 
     if stage == 3:
         st.markdown("### 👕 Pick a first outfit / 选第一套穿搭")
-        height = st.selectbox(
-            "Height Category / 身高感觉",
-            HEIGHT_OPTIONS,
-            index=_preset_index(HEIGHT_OPTIONS, draft.height, default=2),
-        )
-
-        resolved = ctx.references.resolved_anchors()
-        if resolved:
-            config, anchor_assets, anchor_heights = resolved
-            minimum, maximum = config.height_bounds(anchor_heights)
-            initial = float(draft.height_cm or sum(anchor_heights) / len(anchor_heights))
-            initial = min(max(initial, minimum), maximum)
-            height_cm = st.slider(
-                "Exact Height / 精确身高",
-                min_value=float(round(minimum, 1)),
-                max_value=float(round(maximum, 1)),
-                value=float(round(initial, 1)),
-                step=1.0,
-                format="%.0f cm",
-            )
-            render_height_ruler(
-                minimum=minimum,
-                maximum=maximum,
-                height_cm=height_cm,
-                anchor_names=[asset.display_name for asset in anchor_assets],
-                anchor_heights=anchor_heights,
-            )
-        else:
-            height_cm = st.number_input(
-                "Exact Height / 精确身高 (cm)",
-                min_value=1.0,
-                max_value=1000.0,
-                value=float(draft.height_cm or 120.0),
-                step=1.0,
-            )
+        st.caption("先选一套喜欢的衣服。身高、道具和额外设定都可以以后再改。")
 
         defaults = ctx.assets.ensure_default_character_wearables()
         wear_assets = ctx.repository.list_assets(AssetType.WEARABLE)
         c1, c2 = st.columns(2)
         with c1:
             top = _asset_selector(
-                "Top / 上衣",
+                "👕 Top / 上衣",
                 _wearables_for_slot(wear_assets, "top"),
                 draft.wearables.top_id or defaults["top"].asset_id,
                 "wear_top",
             )
             bottom = _asset_selector(
-                "Bottom / 下装",
+                "🩳 Bottom / 下装",
                 _wearables_for_slot(wear_assets, "bottom"),
                 draft.wearables.bottom_id or defaults["bottom"].asset_id,
                 "wear_bottom",
             )
         with c2:
             shoes = _asset_selector(
-                "Shoes / 鞋子",
+                "👟 Shoes / 鞋子",
                 _wearables_for_slot(wear_assets, "shoes"),
                 draft.wearables.shoes_id,
                 "wear_shoes",
             )
             hat = _asset_selector(
-                "Hat / 帽子",
+                "🎩 Hat / 帽子",
                 _wearables_for_slot(wear_assets, "hat"),
                 draft.wearables.hat_id,
                 "wear_hat",
             )
 
-        prop_assets = ctx.repository.list_assets(AssetType.PROP)
-        selected_props = st.multiselect(
-            "Starting Props / 初始道具（最多 2 个）",
-            prop_assets,
-            default=[
-                prop for prop in prop_assets
-                if prop.asset_id in draft.starting_prop_ids
-            ],
-            format_func=lambda asset: asset.display_name,
-            max_selections=2,
-        )
+        with st.expander("✨ More details / 更多设定（可选）", expanded=False):
+            height = st.selectbox(
+                "Height Category / 身高感觉",
+                HEIGHT_OPTIONS,
+                index=_preset_index(HEIGHT_OPTIONS, draft.height, default=2),
+            )
 
-        st.divider()
-        extra = st.text_area(
-            "✨ Extra Details / 额外补充",
-            value=draft.creator_extra_details,
-            placeholder=(
-                "只有这里自由发挥：TA 来自哪里？有什么特殊能力？"
-                "如果上面某项选了 Custom，也在这里说明。"
-            ),
-            height=120,
-            help="Custom Build 唯一的自由描述区。",
-        )
+            resolved = ctx.references.resolved_anchors()
+            if resolved:
+                config, anchor_assets, anchor_heights = resolved
+                minimum, maximum = config.height_bounds(anchor_heights)
+                initial = float(
+                    draft.height_cm
+                    or sum(anchor_heights) / len(anchor_heights)
+                )
+                initial = min(max(initial, minimum), maximum)
+                height_cm = st.slider(
+                    "Exact Height / 精确身高",
+                    min_value=float(round(minimum, 1)),
+                    max_value=float(round(maximum, 1)),
+                    value=float(round(initial, 1)),
+                    step=1.0,
+                    format="%.0f cm",
+                )
+                render_height_ruler(
+                    minimum=minimum,
+                    maximum=maximum,
+                    height_cm=height_cm,
+                    anchor_names=[
+                        asset.display_name for asset in anchor_assets
+                    ],
+                    anchor_heights=anchor_heights,
+                )
+            else:
+                height_cm = st.number_input(
+                    "Exact Height / 精确身高 (cm)",
+                    min_value=1.0,
+                    max_value=1000.0,
+                    value=float(draft.height_cm or 120.0),
+                    step=1.0,
+                )
+
+            prop_assets = ctx.repository.list_assets(AssetType.PROP)
+            selected_props = st.multiselect(
+                "Starting Props / 初始道具（最多 2 个）",
+                prop_assets,
+                default=[
+                    prop
+                    for prop in prop_assets
+                    if prop.asset_id in draft.starting_prop_ids
+                ],
+                format_func=lambda asset: asset.display_name,
+                max_selections=2,
+            )
+            extra = st.text_area(
+                "✨ Extra Details / 额外补充",
+                value=draft.creator_extra_details,
+                placeholder="TA 来自哪里？有什么特别的小秘密或能力？",
+                height=100,
+            )
 
         back, nxt = st.columns([1, 2])
         with back:
-            if st.button("← Back", key="outfit_back", use_container_width=True):
+            if st.button(
+                "← Back",
+                key="outfit_back",
+                use_container_width=True,
+            ):
                 go(2)
         with nxt:
-            if st.button("Next → Ready / 下一步：完成", type="primary", use_container_width=True):
+            if st.button(
+                "Next → Ready / 下一步：完成",
+                type="primary",
+                use_container_width=True,
+            ):
                 st.session_state.char_draft = draft.model_copy(
                     update={
-                        "height": _choice(height, draft.height, HEIGHT_OPTIONS),
+                        "height": _choice(
+                            height,
+                            draft.height,
+                            HEIGHT_OPTIONS,
+                        ),
                         "height_cm": height_cm,
                         "creator_extra_details": extra,
                         "wearables": WearableLoadout(
