@@ -60,31 +60,47 @@ class StoryboardService:
         if episode is None:
             raise ValueError(f"Episode not found: {episode_id}")
 
-        session = self.director.build(
-            episode_id=episode_id,
-            scene_id=scene_id,
-            shot_id=shot_id,
+        scene = next(
+            (value for value in episode.scenes if value.scene_id == scene_id),
+            None,
         )
+        if scene is None:
+            raise ValueError(f"Scene not found: {scene_id}")
+        shot = next(
+            (value for value in scene.shots if value.shot_id == shot_id),
+            None,
+        )
+        if shot is None:
+            raise ValueError(f"Shot not found: {shot_id}")
+
         existing = episode.storyboard_frames.get(shot_id)
         expected_path = self._frame_relative_path(
             episode_id=episode_id,
             shot_id=shot_id,
         )
-        capture_time = round(session.duration_seconds * 0.5, 3)
 
+        # A not-yet-generated planning frame has no durable source artifact to
+        # invalidate. Keep this read-only status path lightweight: Episodes can
+        # show progress without materializing the full Character/World runtime
+        # (including GLB bytes) once per Shot.
         if existing is None:
             return StoryboardFrameRecord(
                 episode_id=episode_id,
                 scene_id=scene_id,
                 shot_id=shot_id,
-                source_fingerprint=session.source_fingerprint,
+                source_fingerprint="",
                 status="missing",
                 frame_path=expected_path,
-                capture_time_seconds=capture_time,
-                camera_summary=self._camera_summary(session),
-                blocking_summary=self._blocking_summary(session),
+                capture_time_seconds=round(shot.duration_seconds * 0.5, 3),
+                camera_summary=self._camera_summary_from_shot(shot),
+                blocking_summary=self._blocking_summary_from_shot(shot),
             )
 
+        session = self.director.build(
+            episode_id=episode_id,
+            scene_id=scene_id,
+            shot_id=shot_id,
+        )
         frame_exists = self._valid_png(self.project_root / existing.frame_path)
         if existing.source_fingerprint != session.source_fingerprint:
             return existing.model_copy(
@@ -324,8 +340,27 @@ class StoryboardService:
         )
 
     @staticmethod
+    def _camera_summary_from_shot(shot) -> str:
+        motion = shot.camera_motion
+        if motion is None:
+            return shot.camera.strip() or shot.shot_type or "Planned camera"
+        return (
+            f"{motion.movement_mode} · "
+            f"FOV {motion.start_fov:.0f}"
+            + (
+                f" → {motion.end_fov:.0f}"
+                if motion.end_fov != motion.start_fov
+                else ""
+            )
+        )
+
+    @staticmethod
     def _blocking_summary(session) -> str:
-        blocking = session.shot.blocking
+        return StoryboardService._blocking_summary_from_shot(session.shot)
+
+    @staticmethod
+    def _blocking_summary_from_shot(shot) -> str:
+        blocking = shot.blocking
         if blocking is None:
             return "No blocking"
         start = blocking.actor_start
