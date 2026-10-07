@@ -13,10 +13,14 @@ class EpisodeProductionStatusService:
         repository: StudioRepository,
         storyboard: StoryboardService,
         shot_renderer=None,
+        assembly_service=None,
+        publish_package_service=None,
     ):
         self.repository = repository
         self.storyboard = storyboard
         self.shot_renderer = shot_renderer
+        self.assembly_service = assembly_service
+        self.publish_package_service = publish_package_service
 
     def status(self, episode_id: str) -> EpisodeProductionStatus:
         episode = self.repository.get_episode(episode_id)
@@ -86,9 +90,46 @@ class EpisodeProductionStatusService:
                 and record.shot_id in shot_ids
                 for record in episode.shot_renders.values()
             )
-        final_package_ready = bool(
-            getattr(episode, "final_package_ready", False)
-        )
+        if self.assembly_service is not None:
+            assembly_record = self.assembly_service.status_for(
+                episode.episode_id
+            )
+            assembly_status = assembly_record.status
+            assembly_ready = assembly_status == "ready"
+        else:
+            assembly_record = getattr(
+                episode,
+                "episode_assembly",
+                None,
+            )
+            assembly_status = (
+                assembly_record.status
+                if assembly_record is not None
+                else "missing"
+            )
+            assembly_ready = assembly_status == "ready"
+
+        if self.publish_package_service is not None:
+            package_record = self.publish_package_service.status_for(
+                episode.episode_id
+            )
+            publish_package_status = package_record.status
+            final_package_ready = publish_package_status == "ready"
+        else:
+            package_record = getattr(
+                episode,
+                "publish_package",
+                None,
+            )
+            publish_package_status = (
+                package_record.status
+                if package_record is not None
+                else "missing"
+            )
+            final_package_ready = bool(
+                getattr(episode, "final_package_ready", False)
+                and publish_package_status == "ready"
+            )
 
         next_action = self._next_action(
             scenes_total=scenes_total,
@@ -97,6 +138,7 @@ class EpisodeProductionStatusService:
             storyboard_ready=storyboard_ready,
             storyboard_approved=storyboard_approved,
             rendered_shots=rendered_shots,
+            assembly_ready=assembly_ready,
             final_package_ready=final_package_ready,
         )
 
@@ -109,6 +151,7 @@ class EpisodeProductionStatusService:
             storyboard_ready=storyboard_ready,
             storyboard_approved=storyboard_approved,
             rendered_shots=rendered_shots,
+            assembly_ready=assembly_ready,
             final_package_ready=final_package_ready,
         )
 
@@ -124,7 +167,10 @@ class EpisodeProductionStatusService:
             storyboard_needs_change=storyboard_needs_change,
             storyboard_stale=storyboard_stale,
             rendered_shots=rendered_shots,
+            assembly_ready=assembly_ready,
+            assembly_status=assembly_status,
             final_package_ready=final_package_ready,
+            publish_package_status=publish_package_status,
             next_action=next_action,
             progress_percent=progress_percent,
         )
@@ -138,6 +184,7 @@ class EpisodeProductionStatusService:
         storyboard_ready: int,
         storyboard_approved: int,
         rendered_shots: int,
+        assembly_ready: bool,
         final_package_ready: bool,
     ) -> str:
         if scenes_total == 0:
@@ -150,8 +197,10 @@ class EpisodeProductionStatusService:
             return "review_storyboard"
         if rendered_shots < shots_total:
             return "render_shots"
-        if not final_package_ready:
+        if not assembly_ready:
             return "assemble_episode"
+        if not final_package_ready:
+            return "publish_package"
         return "complete"
 
     @staticmethod
@@ -165,6 +214,7 @@ class EpisodeProductionStatusService:
         storyboard_ready: int,
         storyboard_approved: int,
         rendered_shots: int,
+        assembly_ready: bool,
         final_package_ready: bool,
     ) -> int:
         stages = [
@@ -194,6 +244,7 @@ class EpisodeProductionStatusService:
                 if shots_total
                 else 0.0
             ),
+            1.0 if assembly_ready else 0.0,
             1.0 if final_package_ready else 0.0,
         ]
         return round(sum(stages) / len(stages) * 100)
