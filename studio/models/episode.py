@@ -50,6 +50,26 @@ class ShotCameraMotionSpec(BaseModel):
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
 
 
+class PerformanceCue(BaseModel):
+    cue_id: str = Field(min_length=1)
+    cue_type: Literal[
+        "idle",
+        "walk",
+        "run",
+        "attack",
+        "look_at",
+        "reaction",
+        "celebrate",
+    ]
+    start_seconds: float = Field(default=0.0, ge=0.0)
+    duration_seconds: float = Field(default=0.5, ge=0.05, le=30.0)
+    intensity: float = Field(default=1.0, ge=0.0, le=1.0)
+    target: str = ""
+    direction_degrees: float | None = None
+    source: Literal["generated", "creator"] = "generated"
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+
+
 class Shot(BaseModel):
     shot_id: str
     scene_id: str
@@ -63,6 +83,7 @@ class Shot(BaseModel):
     continuity_notes: list[str] = Field(default_factory=list)
     blocking: ShotBlockingSpec | None = None
     camera_motion: ShotCameraMotionSpec | None = None
+    performance_cues: list[PerformanceCue] | None = None
 
 
 class Scene(BaseModel):
