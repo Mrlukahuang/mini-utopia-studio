@@ -97,3 +97,7 @@ jobs:
       - name: Smoke-test Director Camera Motion
         run: |
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/director_camera_motion_smoke.gd
+
+      - name: Smoke-test Director Performance Cues
+        run: |
+          /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/director_performance_cue_smoke.gd
