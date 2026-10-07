@@ -9,6 +9,7 @@ from studio.models.avatar import (
 )
 from studio.models.character import CharacterProfile, EyeProfile
 from studio.models.runtime_character import CharacterRuntimeSpec
+from studio.services.asset_service import AssetService
 from studio.services.character_runtime_service import CharacterRuntimeService
 from studio.core.enums import AssetType
 from studio.models.asset import Asset
@@ -165,3 +166,63 @@ def test_avatar_contract_documentation_exists():
     assert "Chubby" in doc
     assert "KayKit Character Animations" in doc
     assert "Issue should stay open" not in doc
+
+
+
+def test_custom_avatar_survives_sqlite_restart_and_matches_runtime(tmp_path):
+    db_path = tmp_path / "studio.db"
+    storage_path = tmp_path / "storage"
+    repo = SQLiteStudioRepository(db_path)
+    appearance = AvatarAppearance(
+        customized=True,
+        body_type=BodyType.CHUBBY,
+        species_head_id="species_head_cat_v1",
+        surface_type="fur",
+        surface_color_hex="#F7B7D2",
+        eye_style_id="eyes_cat_v1",
+        eye_color_hex="#BDE3F5",
+        hair_style_id="hair_ponytail_v1",
+        hair_color_hex="#5B4036",
+        compatible_tags=["humanoid", "species_head_cat_v1", "fur"],
+    )
+    profile = CharacterProfile(
+        character_type="动物 / Animal",
+        age="8",
+        appearance="Cat hero",
+        personality_traits=["勇敢 / Brave"],
+        speaking_tone="轻快 / Bright",
+        native_language="中文 / Chinese",
+        english_level=5,
+        avatar=appearance,
+    )
+
+    saved = AssetService(repo).create_character(
+        name="Mimi",
+        description="A brave cat hero.",
+        profile=profile,
+    )
+
+    restarted = SQLiteStudioRepository(db_path)
+    loaded = restarted.get_asset(saved.asset_id)
+    assert loaded is not None
+
+    restored_profile = CharacterProfile.model_validate(
+        loaded.metadata["character_profile"]
+    )
+    assert restored_profile.avatar == appearance
+
+    runtime = CharacterRuntimeService(
+        restarted,
+        LocalObjectStorage(storage_path),
+    ).resolve(loaded)
+
+    assert runtime.rig_family == appearance.rig_family
+    assert runtime.body_type == BodyType.CHUBBY
+    assert runtime.species_head_id == "species_head_cat_v1"
+    assert runtime.surface_type == "fur"
+    assert runtime.surface_color_hex == "#F7B7D2"
+    assert runtime.eye_style_id == "eyes_cat_v1"
+    assert runtime.eye_color_hex == "#BDE3F5"
+    assert runtime.hair_style_id == "hair_ponytail_v1"
+    assert runtime.hair_color_hex == "#5B4036"
+    assert runtime.socket_names == avatar_socket_names()
