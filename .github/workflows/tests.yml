@@ -161,7 +161,7 @@ jobs:
                           "source": "generated",
                           "confidence": 1.0
                       },
-                      "camera_motion": null,
+                      "camera_motion": None,
                       "performance_cues": []
                   },
                   "play_session": play
