@@ -16,6 +16,15 @@ var blocking_start := Vector3.ZERO
 var blocking_end := Vector3.ZERO
 var blocking_movement_style := ""
 var blocking_has_path := false
+var camera_start_position := Vector3.ZERO
+var camera_end_position := Vector3.ZERO
+var camera_start_look_at := Vector3.ZERO
+var camera_end_look_at := Vector3.ZERO
+var camera_start_fov := 48.0
+var camera_end_fov := 48.0
+var camera_movement_mode := "hold"
+var camera_easing := "smooth"
+var camera_has_motion := false
 var elapsed_seconds := 0.0
 var duration_seconds := 0.0
 var animation_intent := "idle"
@@ -150,6 +159,7 @@ func advance_shot(delta: float) -> void:
         true,
         running
     )
+    _apply_camera_at_ratio(progress_ratio())
 
     if elapsed_seconds >= duration_seconds:
         if (
@@ -179,6 +189,7 @@ func reset_shot() -> void:
             true,
             false
         )
+    _apply_camera_at_ratio(0.0)
 
 
 func progress_ratio() -> float:
@@ -202,6 +213,15 @@ func _clear_stage() -> void:
     blocking_end = Vector3.ZERO
     blocking_movement_style = ""
     blocking_has_path = false
+    camera_start_position = Vector3.ZERO
+    camera_end_position = Vector3.ZERO
+    camera_start_look_at = Vector3.ZERO
+    camera_end_look_at = Vector3.ZERO
+    camera_start_fov = 48.0
+    camera_end_fov = 48.0
+    camera_movement_mode = "hold"
+    camera_easing = "smooth"
+    camera_has_motion = false
 
 
 func _build_world_context() -> void:
@@ -422,33 +442,88 @@ func _build_camera() -> void:
     camera.name = "DirectorCamera"
     add_child(camera)
 
-    var camera_payload = payload.get("camera", {})
-    var position_values = camera_payload.get(
-        "position",
-        [0.0, 4.2, 7.8]
+    var raw_camera = payload.get("camera", {})
+    var camera_payload: Dictionary = (
+        raw_camera
+        if typeof(raw_camera) == TYPE_DICTIONARY
+        else {}
     )
-    var look_values = camera_payload.get(
-        "look_at",
-        [0.0, 1.1, 0.0]
-    )
-    var camera_position := _vector3(
-        position_values,
+    camera_start_position = _vector3(
+        camera_payload.get("position", [0.0, 4.2, 7.8]),
         Vector3(0.0, 4.2, 7.8)
     )
-    var look_target := _vector3(
-        look_values,
+    camera_start_look_at = _vector3(
+        camera_payload.get("look_at", [0.0, 1.1, 0.0]),
         Vector3(0.0, 1.1, 0.0)
     )
-    camera.fov = float(camera_payload.get("fov", 48.0))
-    camera.current = true
-    camera.look_at_from_position(
-        camera_position,
-        look_target,
-        Vector3.UP
+    camera_start_fov = float(camera_payload.get("fov", 48.0))
+
+    camera_end_position = _vector3(
+        camera_payload.get("end_position", null),
+        camera_start_position
     )
+    camera_end_look_at = _vector3(
+        camera_payload.get("end_look_at", null),
+        camera_start_look_at
+    )
+    var raw_end_fov = camera_payload.get("end_fov", null)
+    camera_end_fov = (
+        camera_start_fov
+        if raw_end_fov == null
+        else float(raw_end_fov)
+    )
+    camera_movement_mode = String(
+        camera_payload.get("movement_mode", "hold")
+    )
+    camera_easing = String(
+        camera_payload.get("easing", "smooth")
+    )
+    camera_has_motion = (
+        camera_end_position != camera_start_position
+        or camera_end_look_at != camera_start_look_at
+        or absf(camera_end_fov - camera_start_fov) > 0.001
+    )
+
+    camera.current = true
     camera.set_meta(
         "movement",
         String(camera_payload.get("movement", ""))
+    )
+    camera.set_meta("movement_mode", camera_movement_mode)
+    camera.set_meta("easing", camera_easing)
+    _apply_camera_at_ratio(0.0)
+
+
+func _apply_camera_at_ratio(raw_ratio: float) -> void:
+    if camera == null:
+        return
+
+    var ratio := clampf(raw_ratio, 0.0, 1.0)
+    var eased := ratio
+    if camera_easing == "smooth":
+        eased = ratio * ratio * (3.0 - 2.0 * ratio)
+
+    var next_position := camera_start_position.lerp(
+        camera_end_position,
+        eased
+    )
+    var next_look_at := camera_start_look_at.lerp(
+        camera_end_look_at,
+        eased
+    )
+    var next_fov := lerpf(
+        camera_start_fov,
+        camera_end_fov,
+        eased
+    )
+
+    camera.fov = next_fov
+    if next_position.distance_to(next_look_at) < 0.001:
+        next_look_at += Vector3(0.0, 0.0, -1.0)
+    camera.look_at_from_position(
+        next_position,
+        next_look_at,
+        Vector3.UP
     )
 
 
