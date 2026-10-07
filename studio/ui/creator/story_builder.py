@@ -14,6 +14,26 @@ _BEAT_WIDGET_KEYS = {
 }
 
 
+def _missing_required_fields(
+    *,
+    title: str,
+    premise: str,
+    selected_characters: list,
+    selected_world,
+    require_title: bool,
+) -> list[str]:
+    missing: list[str] = []
+    if require_title and not title.strip():
+        missing.append("Story Title / 故事名字")
+    if not premise.strip():
+        missing.append("Premise / 一句话发生什么")
+    if not selected_characters:
+        missing.append("Characters / 角色")
+    if selected_world is None:
+        missing.append("World / 世界")
+    return missing
+
+
 def _apply_pending_ai_suggestion() -> None:
     pending = st.session_state.pop("story_ai_suggestion_pending", None)
     if not pending:
@@ -203,34 +223,33 @@ def render_story_builder(ctx, *, universe) -> None:
             key="story_ending",
         )
 
-        can_suggest = bool(
-            ctx.story_suggestions.available
-            and premise.strip()
-            and selected_characters
-            and selected_world is not None
-        )
-        can_save = bool(
-            title.strip()
-            and premise.strip()
-            and selected_characters
-            and selected_world is not None
-        )
         suggest_col, save_col = st.columns(2)
         with suggest_col:
             suggest_submitted = st.form_submit_button(
                 "✨ Suggest Story Beats / AI 提案",
                 use_container_width=True,
-                disabled=not can_suggest,
+                disabled=not ctx.story_suggestions.available,
             )
         with save_col:
             submitted = st.form_submit_button(
                 "💾 Save Structured Story / 保存故事",
                 type="primary",
                 use_container_width=True,
-                disabled=not can_save,
             )
 
     if suggest_submitted:
+        missing = _missing_required_fields(
+            title=title,
+            premise=premise,
+            selected_characters=selected_characters,
+            selected_world=selected_world,
+            require_title=False,
+        )
+        if missing:
+            st.error(
+                "AI 提案还缺少 / Missing: " + " · ".join(missing)
+            )
+            return
         try:
             world_profile = (
                 selected_world.metadata.get("world_profile", {})
@@ -278,6 +297,20 @@ def render_story_builder(ctx, *, universe) -> None:
         return
 
     if not submitted:
+        return
+
+    missing = _missing_required_fields(
+        title=title,
+        premise=premise,
+        selected_characters=selected_characters,
+        selected_world=selected_world,
+        require_title=True,
+    )
+    if missing:
+        st.error(
+            "保存前还缺少 / Missing before Save: "
+            + " · ".join(missing)
+        )
         return
 
     asset_ids = [
