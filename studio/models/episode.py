@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 from studio.core.enums import ReviewStatus, StoryMode
 from studio.models.asset import now_utc
+from studio.models.storyboard import StoryboardFrameRecord
 
 
 class DialogueLine(BaseModel):
@@ -111,5 +112,8 @@ class Episode(BaseModel):
     continuity_memory_ids: list[str] = Field(default_factory=list)
     status: ReviewStatus = ReviewStatus.DRAFT
     scenes: list[Scene] = Field(default_factory=list)
+    storyboard_frames: dict[str, StoryboardFrameRecord] = Field(
+        default_factory=dict
+    )
     created_at: datetime = Field(default_factory=now_utc)
     updated_at: datetime = Field(default_factory=now_utc)
