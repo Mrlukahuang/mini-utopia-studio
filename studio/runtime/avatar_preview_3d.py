@@ -274,10 +274,12 @@ function buildSword(item) {{
   addMesh(g, roundedBox(.10,.35,.10,.035), mat('#74513B',.76), [0,-.26,0], 'Handle');
   const gem = addMesh(g,new THREE.SphereGeometry(.10,16,10),mat(rarity,.34,.14),[0,-.48,0],'Pommel');
   gem.castShadow=true;
-  // Local hand pose: blade points upward/outward ~45°. Because this group is
-  // parented to ArmR it follows Idle/Walk/Run/Jump arm motion.
-  g.position.set(.04,-.39,.06);
-  g.rotation.z=-Math.PI/4;
+  // Local hand pose: blade leans forward + upward from the right hand.
+  // Front for this Avatar contract is +Z, so X rotation gives a readable
+  // combat-ready 45° pitch without laying the sword across the torso.
+  g.position.set(.04,-.39,.10);
+  g.rotation.x=Math.PI/4;
+  g.rotation.z=-Math.PI/22.5;
   return g;
 }}
 
@@ -294,8 +296,11 @@ function buildShield(item) {{
     g,new THREE.SphereGeometry(.09,14,10),
     mat('#FFF4D7',.46,.15),[0,0,.09],'ShieldBoss'
   );
-  g.position.set(-.03,-.22,.18);
-  g.rotation.z=Math.PI/12;
+  // Keep the shield on the outside of the left hand and yaw its face away
+  // from the torso while retaining enough forward angle to stay readable.
+  g.position.set(-.18,-.22,.10);
+  g.rotation.y=-Math.PI*.30;
+  g.rotation.z=Math.PI/30;
   return g;
 }}
 
@@ -716,7 +721,16 @@ function animateAvatar(t) {{
   }} else if (state==='Jump') {{
     const phase=(elapsed%1.25)/1.25;
     avatar.position.y=Math.sin(Math.PI*phase)*.62;
-    arms.forEach((x,i)=>{{x.rotation.z=(i===0?1:-1)*.62;}});
+    // Compact jump-ready pose: arms come slightly forward and outward instead
+    // of forming a horizontal T-pose that makes sword/shield cross the body.
+    if (arms[0]) {{
+      arms[0].rotation.x=-.46;
+      arms[0].rotation.z=.28;
+    }}
+    if (arms[1]) {{
+      arms[1].rotation.x=-.62;
+      arms[1].rotation.z=-.28;
+    }}
   }} else {{
     avatar.position.y=Math.sin(t*2.1)*.012;
     arms.forEach((x,i)=>{{x.rotation.z=(i===0?1:-1)*.035*Math.sin(t*1.7);}});
