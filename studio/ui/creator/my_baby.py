@@ -3,6 +3,7 @@ from __future__ import annotations
 import streamlit as st
 
 from studio.services.baby_service import BABY_ARCHETYPES, BABY_XP_PER_LEVEL, BabyService
+from studio.services.quest_reward_service import QuestRewardService
 from studio.ui.theme import render_game_hero
 
 
@@ -47,6 +48,22 @@ def render_my_baby(ctx) -> None:
     )
 
     babies = BabyService(ctx.repository)
+    growth_rewards = QuestRewardService(
+        ctx.repository,
+        equipment=ctx.equipment,
+        babies=babies,
+    ).claim_baby_growth()
+    for reward in growth_rewards:
+        reward_label = (
+            "✨ XP"
+            if reward.reward_type.value == "baby_xp"
+            else "💞 Bond"
+        )
+        st.success(
+            f"🌱 Quest Growth · {reward.baby_name} · "
+            f"{reward_label} +{reward.amount} · Lv.{reward.level}"
+        )
+
     roster = babies.get_roster()
 
     if not roster.babies:
@@ -145,24 +162,11 @@ def render_my_baby(ctx) -> None:
                 use_container_width=True,
             )
 
-        st.markdown("#### Growth Smoke Controls / 成长测试")
-        xp_col, bond_col = st.columns(2)
-        with xp_col:
-            if st.button(
-                "✨ +25 XP",
-                key=f"baby_xp_{active.baby_id}",
-                use_container_width=True,
-            ):
-                babies.add_xp(baby_id=active.baby_id, amount=25)
-                st.rerun()
-        with bond_col:
-            if st.button(
-                "💞 +5 Bond",
-                key=f"baby_bond_{active.baby_id}",
-                use_container_width=True,
-            ):
-                babies.add_bond(baby_id=active.baby_id, amount=5)
-                st.rerun()
+        st.markdown("#### How Baby Grows / 怎么长大")
+        st.info(
+            "一起完成 Quest、探索世界，会获得 XP 和 Bond。"
+            " 成长会自动保存，不需要手动加点。"
+        )
 
         with st.expander("Baby Identity / 永久身份", expanded=False):
             st.code(
