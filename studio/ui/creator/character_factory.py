@@ -1,18 +1,26 @@
 from __future__ import annotations
 
 from html import escape
-from typing import Any
-
 import streamlit as st
 
 from studio.core.enums import AssetType
-from studio.models.character import CharacterProfile, WearableLoadout
+from studio.models.character import CharacterProfile
+from studio.models.equipment import (
+    EquipmentSlot,
+    PLAYABLE_EQUIPMENT_SLOTS,
+    StatBlock,
+)
+from studio.models.equipment_runtime import (
+    EquipmentRuntimeItemSpec,
+    EquipmentRuntimeSpec,
+)
 from studio.models.reference import ReferenceCharacterConfig
 from studio.ui.creator.avatar_editor import (
     render_avatar_appearance_editor,
     reset_avatar_editor_state,
 )
 from studio.ui.creator.avatar_legacy_bridge import legacy_visual_updates
+from studio.ui.creator.avatar_preview import render_avatar_preview
 from studio.ui.creator.character_presets import (
     CUSTOM,
     AGE_OPTIONS,
@@ -33,6 +41,39 @@ from studio.ui.theme import render_game_hero, render_quest
 
 DEFAULT_FAVORITE_COLOR_HEXES = ["#F7B7D2", "#B9E7D0", "#D7C2F3"]
 MAX_GENERATIONS_PER_SESSION = 20
+
+FACTORY_CLOTHING_SLOTS = (
+    EquipmentSlot.TOP,
+    EquipmentSlot.BOTTOM,
+    EquipmentSlot.SHOES,
+    EquipmentSlot.HEADWEAR,
+)
+FACTORY_GEAR_SLOTS = (
+    EquipmentSlot.WEAPON_MAIN,
+    EquipmentSlot.WEAPON_OFFHAND,
+    EquipmentSlot.BACKPACK,
+    EquipmentSlot.WINGS,
+    EquipmentSlot.ACCESSORY,
+)
+FACTORY_SLOT_LABELS = {
+    EquipmentSlot.TOP: "👕 Top / 上衣",
+    EquipmentSlot.BOTTOM: "👖 Bottom / 下装",
+    EquipmentSlot.SHOES: "👟 Shoes / 鞋子",
+    EquipmentSlot.HEADWEAR: "👑 Headwear / 帽子·皇冠",
+    EquipmentSlot.WEAPON_MAIN: "⚔️ Main Hand / 主手",
+    EquipmentSlot.WEAPON_OFFHAND: "🛡️ Offhand / 副手",
+    EquipmentSlot.BACKPACK: "🎒 Backpack / 背包",
+    EquipmentSlot.WINGS: "🪽 Wings / 翅膀",
+    EquipmentSlot.ACCESSORY: "✨ Accessory / 饰品",
+}
+FACTORY_RARITY_EMOJI = {
+    "green": "🟢",
+    "blue": "🔵",
+    "purple": "🟣",
+    "gold": "🟡",
+    "red": "🔴",
+    "rainbow": "🌈",
+}
 
 ENGLISH_LEVELS = {
     1: "几乎不会英语 / Almost no English",
@@ -145,29 +186,130 @@ def _choice(selected: str, previous: str, options: list[str]) -> str:
     return CUSTOM
 
 
-def _wearables_for_slot(assets: list[Any], slot: str) -> list[Any]:
+def _factory_equipment_state(equipment_service):
+    collection = equipment_service.ensure_starter_collection()
+    definitions = equipment_service.list_definitions()
+    return collection, definitions
+
+
+def _factory_slot_items(collection, definitions, slot: EquipmentSlot):
     return [
-        asset
-        for asset in assets
-        if not asset.metadata.get("wearable_type")
-        or asset.metadata.get("wearable_type") == slot
+        item
+        for item in collection.items
+        if (
+            definitions.get(item.definition_id) is not None
+            and definitions[item.definition_id].slot == slot
+        )
     ]
 
 
-def _asset_selector(label: str, assets: list[Any], current_id: str | None, key: str):
-    options = [None, *assets]
-    index = 0
-    for idx, asset in enumerate(options):
-        if asset is not None and asset.asset_id == current_id:
-            index = idx
-            break
-    return st.selectbox(
-        label,
-        options,
-        index=index,
-        format_func=lambda item: "— 未选择 / None —" if item is None else item.display_name,
-        key=key,
+def _factory_item_label(item_id, collection, definitions) -> str:
+    if item_id is None:
+        return "— None / 不装备 —"
+    item = collection.item_by_id(item_id)
+    if item is None:
+        return "Unknown"
+    definition = definitions.get(item.definition_id)
+    if definition is None:
+        return "Unknown"
+    rarity = FACTORY_RARITY_EMOJI.get(item.rarity.value, "✨")
+    stats = item.rolled_stats
+    return (
+        f"{rarity} {definition.display_name} · "
+        f"HP+{stats.hp} ATK+{stats.atk} DEF+{stats.defense}"
     )
+
+
+def _default_factory_equipment_selection(
+    equipment_service,
+    *,
+    character_asset_id: str | None = None,
+) -> dict[str, str | None]:
+    collection, definitions = _factory_equipment_state(equipment_service)
+    loadout = (
+        collection.loadout_for(character_asset_id)
+        if character_asset_id
+        else None
+    )
+    selection: dict[str, str | None] = {}
+    for slot in PLAYABLE_EQUIPMENT_SLOTS:
+        persisted = loadout.item_id_for_slot(slot) if loadout else None
+        if persisted is not None:
+            selection[slot.value] = persisted
+            continue
+        items = _factory_slot_items(collection, definitions, slot)
+        selection[slot.value] = (
+            items[0].item_instance_id
+            if slot in FACTORY_CLOTHING_SLOTS and items
+            else None
+        )
+    return selection
+
+
+def _build_factory_equipment_preview(
+    equipment_service,
+    appearance,
+    selection: dict[str, str | None],
+    *,
+    character_asset_id: str = "CHAR_DRAFT",
+) -> EquipmentRuntimeSpec:
+    collection, definitions = _factory_equipment_state(equipment_service)
+    total = StatBlock(hp=100, atk=10, defense=8)
+    equipped: dict[str, EquipmentRuntimeItemSpec] = {}
+
+    for slot in PLAYABLE_EQUIPMENT_SLOTS:
+        item_id = selection.get(slot.value)
+        if not item_id:
+            continue
+        item = collection.item_by_id(item_id)
+        if item is None:
+            continue
+        definition = definitions.get(item.definition_id)
+        if definition is None or definition.slot != slot:
+            continue
+        total = total.plus(item.rolled_stats)
+        equipped[slot.value] = EquipmentRuntimeItemSpec(
+            item_instance_id=item.item_instance_id,
+            definition_id=definition.definition_id,
+            display_name=definition.display_name,
+            slot=definition.slot,
+            rarity=item.rarity,
+            mesh_asset_id=definition.mesh_asset_id,
+            animation_class=definition.animation_class,
+            rolled_stats=item.rolled_stats,
+        )
+
+    return EquipmentRuntimeSpec(
+        character_asset_id=character_asset_id,
+        body_type=appearance.body_type,
+        final_stats=total,
+        equipped=equipped,
+    )
+
+
+def _persist_factory_equipment_selection(
+    equipment_service,
+    *,
+    character_asset_id: str,
+    selection: dict[str, str | None],
+) -> None:
+    current = equipment_service.loadout_for(character_asset_id)
+    for slot in PLAYABLE_EQUIPMENT_SLOTS:
+        wanted = selection.get(slot.value)
+        existing = current.item_id_for_slot(slot)
+        if wanted == existing:
+            continue
+        if wanted is None:
+            equipment_service.unequip(
+                character_asset_id=character_asset_id,
+                slot=slot,
+            )
+        else:
+            equipment_service.equip(
+                character_asset_id=character_asset_id,
+                item_instance_id=wanted,
+            )
+        current = equipment_service.loadout_for(character_asset_id)
 
 
 def render_reference_settings(ctx) -> None:
@@ -232,8 +374,12 @@ def reset_character_creation_state() -> None:
         "editing_character_id",
         "character_master_candidate_path",
         "character_master_character_id",
+        "char_equipment_selection",
     ):
         st.session_state.pop(key, None)
+
+    for slot in PLAYABLE_EQUIPMENT_SLOTS:
+        st.session_state.pop(f"factory_eq_{slot.value}", None)
 
 
 def _start_over() -> None:
