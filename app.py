@@ -49,6 +49,7 @@ st.set_page_config(
 )
 
 ctx = build_context(get_settings(ROOT))
+ctx.world_runtime_bindings.ensure_builtin_worlds()
 universe = ctx.universes.ensure_mini_utopia()
 # Construct the style service from the repository at the app boundary.
 # This stays safe during Streamlit hot-reload when an older StudioContext
