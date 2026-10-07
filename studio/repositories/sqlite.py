@@ -10,6 +10,7 @@ from studio.models.equipment import CreatorCollection
 from studio.models.baby import BabyRoster
 from studio.models.quest import QuestDefinition
 from studio.models.universe_memory import UniverseMemoryRecord
+from studio.models.episode import Episode
 from studio.repositories.base import StudioRepository
 
 SCHEMA = """
@@ -43,6 +44,15 @@ CREATE TABLE IF NOT EXISTS quests (
   data TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS episodes (
+  id TEXT PRIMARY KEY,
+  story_id TEXT NOT NULL,
+  universe_id TEXT,
+  title TEXT NOT NULL,
+  data TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_episodes_story ON episodes(story_id);
 CREATE TABLE IF NOT EXISTS universe_memories (
   id TEXT PRIMARY KEY,
   universe_id TEXT NOT NULL,
@@ -176,6 +186,35 @@ class SQLiteStudioRepository(StudioRepository):
                 "SELECT data FROM quests ORDER BY updated_at DESC"
             ).fetchall()
         return [QuestDefinition.model_validate_json(row[0]) for row in rows]
+
+    def save_episode(self, episode: Episode) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO episodes VALUES (?,?,?,?,?,?)",
+                (
+                    episode.episode_id,
+                    episode.story_id,
+                    episode.universe_id,
+                    episode.title,
+                    self._json(episode),
+                    episode.updated_at.isoformat(),
+                ),
+            )
+
+    def get_episode(self, episode_id: str) -> Episode | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT data FROM episodes WHERE id=?",
+                (episode_id,),
+            ).fetchone()
+        return Episode.model_validate_json(row[0]) if row else None
+
+    def list_episodes(self) -> list[Episode]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT data FROM episodes ORDER BY updated_at DESC"
+            ).fetchall()
+        return [Episode.model_validate_json(row[0]) for row in rows]
 
     def save_universe_memory(self, memory: UniverseMemoryRecord) -> None:
         with self._connect() as conn:

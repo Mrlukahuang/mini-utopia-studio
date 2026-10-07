@@ -9,6 +9,7 @@ from studio.models.equipment import CreatorCollection
 from studio.models.baby import BabyRoster
 from studio.models.quest import QuestDefinition
 from studio.models.universe_memory import UniverseMemoryRecord
+from studio.models.episode import Episode
 
 
 class StudioRepository(ABC):
@@ -47,6 +48,15 @@ class StudioRepository(ABC):
         raise NotImplementedError
 
     def list_quests(self) -> list[QuestDefinition]:
+        raise NotImplementedError
+
+    def save_episode(self, episode: Episode) -> None:
+        raise NotImplementedError
+
+    def get_episode(self, episode_id: str) -> Episode | None:
+        raise NotImplementedError
+
+    def list_episodes(self) -> list[Episode]:
         raise NotImplementedError
 
     def save_universe_memory(self, memory: UniverseMemoryRecord) -> None:

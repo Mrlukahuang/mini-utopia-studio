@@ -16,6 +16,7 @@ from studio.services.style_service import StyleService
 from studio.services.baby_service import BabyService
 from studio.services.play_session_service import CreatorPlaySessionService
 from studio.services.story_playable_quest_service import StoryPlayableQuestService
+from studio.services.episode_service import EpisodeService
 from studio.ui.auth import (
     lock_creator,
     lock_studio,
@@ -33,6 +34,7 @@ from studio.ui.creator.my_baby import render_my_baby
 from studio.ui.creator.adventure_progress import render_first_adventure_progress
 from studio.ui.creator.adventure_hub import render_adventure_hub
 from studio.ui.creator.universe_memory import render_universe_memory
+from studio.ui.creator.episodes import render_episode_library
 from studio.ui.creator.dressing_room import render_dressing_room
 from studio.ui.creator.creative_play import render_creative_play
 from studio.ui.theme import apply_mini_utopia_theme, render_brandbar, render_game_hero, render_quest
@@ -208,7 +210,7 @@ NAV_GROUPS = [
     ),
     (
         "🌎 Universe / 宇宙",
-        ["🌎 Mini Utopia", "✍️ Story Builder", "📖 Stories"],
+        ["🌎 Mini Utopia", "✍️ Story Builder", "📖 Stories", "🎬 Episodes"],
     ),
     (
         "🧪 Sandbox / 实验",
@@ -263,6 +265,7 @@ creator_protected_pages = {
     "🎮 Explore World",
     "✍️ Story Builder",
     "📖 Stories",
+    "🎬 Episodes",
 }
 if mode == "🧒 Creator" and page in creator_protected_pages:
     if not require_creator_pin():
@@ -1283,6 +1286,7 @@ elif page == "📖 Stories":
 
     stories = ctx.repository.list_stories()
     playable_quests = StoryPlayableQuestService(ctx.repository)
+    episode_service = EpisodeService(ctx.repository)
 
     if not stories:
         st.info(
@@ -1358,6 +1362,37 @@ elif page == "📖 Stories":
                         st.rerun()
                     except ValueError as exc:
                         st.error(str(exc))
+
+            existing_episode = episode_service.existing_for_story(
+                story.story_id
+            )
+            if existing_episode is not None:
+                st.success(
+                    f"🎬 Episode ready · {existing_episode.episode_id}"
+                )
+                if st.button(
+                    "🎬 Open Episode / 打开剧集",
+                    key=f"open_episode_{story.story_id}",
+                    use_container_width=True,
+                ):
+                    st.session_state.pending_app_page = "🎬 Episodes"
+                    st.rerun()
+            else:
+                if st.button(
+                    "🎬 Create Episode / 制作剧集",
+                    key=f"create_episode_{story.story_id}",
+                    use_container_width=True,
+                ):
+                    try:
+                        episode_service.create_from_story(story.story_id)
+                        st.session_state.pending_app_page = "🎬 Episodes"
+                        st.rerun()
+                    except (ValueError, RuntimeError) as exc:
+                        st.error(str(exc))
+
+
+elif page == "🎬 Episodes":
+    render_episode_library(ctx)
 
 
 # ---------------------------------------------------------------------------

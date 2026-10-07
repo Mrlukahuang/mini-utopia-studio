@@ -13,6 +13,7 @@ from studio.models.story import Story
 from studio.models.quest import QuestDefinition
 from studio.models.universe import Universe
 from studio.models.universe_memory import UniverseMemoryRecord
+from studio.models.episode import Episode
 from studio.repositories.base import StudioRepository
 
 
@@ -186,6 +187,25 @@ class SupabaseStudioRepository(StudioRepository):
         return [
             QuestDefinition.model_validate(data)
             for data in self._list(kind="quest")
+        ]
+
+    def save_episode(self, episode: Episode) -> None:
+        self._upsert(
+            record_id=episode.episode_id,
+            kind="episode",
+            name=episode.title,
+            data=episode.model_dump(mode="json"),
+            updated_at=episode.updated_at.isoformat(),
+        )
+
+    def get_episode(self, episode_id: str) -> Episode | None:
+        data = self._get_one(kind="episode", record_id=episode_id)
+        return Episode.model_validate(data) if data else None
+
+    def list_episodes(self) -> list[Episode]:
+        return [
+            Episode.model_validate(data)
+            for data in self._list(kind="episode")
         ]
 
     def save_universe_memory(self, memory: UniverseMemoryRecord) -> None:
