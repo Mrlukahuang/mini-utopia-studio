@@ -93,8 +93,9 @@ def render_story_builder(ctx, *, universe) -> None:
     worlds = [
         asset
         for asset in ctx.repository.list_assets(AssetType.LOCATION)
-        if asset.status != ReviewStatus.ARCHIVED
+        if ctx.assets.is_world_library_visible(asset)
     ]
+    world_labels = ctx.world_runtime_bindings.choice_labels(worlds)
     props = [
         asset
         for asset in ctx.repository.list_assets(AssetType.PROP)
@@ -133,7 +134,7 @@ def render_story_builder(ctx, *, universe) -> None:
                 format_func=lambda asset: (
                     "选择一个世界…"
                     if asset is None
-                    else asset.display_name
+                    else world_labels.get(asset.asset_id, asset.display_name)
                 ),
                 key="story_world",
             )
