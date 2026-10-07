@@ -7,6 +7,11 @@ var payload: Dictionary = {}
 var actor: CharacterBody3D
 var camera: Camera3D
 var play_runtime: MiniUtopiaCreatorPlayRuntime
+var world_context: Node3D
+var bound_world_instance: Node3D
+var bound_world_loaded := false
+var bound_scene_path := ""
+var world_load_error := ""
 var elapsed_seconds := 0.0
 var duration_seconds := 0.0
 var animation_intent := "idle"
@@ -132,31 +137,126 @@ func _clear_stage() -> void:
     actor = null
     camera = null
     play_runtime = null
+    world_context = null
+    bound_world_instance = null
+    bound_world_loaded = false
+    bound_scene_path = ""
+    world_load_error = ""
 
 
 func _build_world_context() -> void:
-    var stage := Node3D.new()
-    stage.name = "DirectorWorldContext"
-    add_child(stage)
+    world_context = Node3D.new()
+    world_context.name = "DirectorWorldContext"
+    add_child(world_context)
 
+    world_context.set_meta(
+        "world_asset_id",
+        String(payload.get("world_asset_id", ""))
+    )
+
+    var raw_play = payload.get("play_session", {})
+    var play_payload: Dictionary = (
+        raw_play
+        if typeof(raw_play) == TYPE_DICTIONARY
+        else {}
+    )
+    world_context.set_meta(
+        "world_name",
+        String(play_payload.get("world_name", ""))
+    )
+
+    var raw_binding = play_payload.get("world_runtime", {})
+    var binding: Dictionary = (
+        raw_binding
+        if typeof(raw_binding) == TYPE_DICTIONARY
+        else {}
+    )
+    var scene_path := String(binding.get("scene_path", "")).strip_edges()
+
+    if not scene_path.is_empty() and _load_bound_world(
+        world_context,
+        scene_path
+    ):
+        world_context.set_meta("runtime_mode", "bound_scene")
+        world_context.set_meta("scene_path", scene_path)
+        return
+
+    _build_fallback_world(world_context)
+    world_context.set_meta("runtime_mode", "fallback_stage")
+
+
+func _load_bound_world(parent: Node3D, scene_path: String) -> bool:
+    bound_scene_path = scene_path
+    if not ResourceLoader.exists(scene_path, "PackedScene"):
+        world_load_error = "Bound World scene does not exist: " + scene_path
+        push_error("DIR-05: " + world_load_error)
+        return false
+
+    var packed = load(scene_path) as PackedScene
+    if packed == null:
+        world_load_error = "Bound World scene could not load: " + scene_path
+        push_error("DIR-05: " + world_load_error)
+        return false
+
+    var instance = packed.instantiate()
+    if not (instance is Node3D):
+        world_load_error = "Bound World scene root must be Node3D: " + scene_path
+        push_error("DIR-05: " + world_load_error)
+        instance.queue_free()
+        return false
+
+    bound_world_instance = instance as Node3D
+    _prepare_bound_world(bound_world_instance)
+    parent.add_child(bound_world_instance)
+    _sanitize_bound_world(bound_world_instance)
+
+    bound_world_loaded = true
+    print("DIR-05 bound World loaded: ", scene_path)
+    return true
+
+
+func _prepare_bound_world(node: Node) -> void:
+    if node is Camera3D:
+        (node as Camera3D).current = false
+
+    if node.name == "Player" or node.name == "CameraRig":
+        node.process_mode = Node.PROCESS_MODE_DISABLED
+        node.set_script(null)
+        if node is Node3D:
+            (node as Node3D).visible = false
+
+    for child in node.get_children():
+        _prepare_bound_world(child)
+
+
+func _sanitize_bound_world(node: Node) -> void:
+    if node is Camera3D:
+        (node as Camera3D).current = false
+    if node is CanvasLayer:
+        (node as CanvasLayer).visible = false
+
+    if node.name == "Player" or node.name == "CameraRig":
+        node.process_mode = Node.PROCESS_MODE_DISABLED
+        if node is Node3D:
+            (node as Node3D).visible = false
+
+    for child in node.get_children():
+        _sanitize_bound_world(child)
+
+    if node == bound_world_instance:
+        # The scene's _ready() has already built its static visual world.
+        # Freeze its gameplay processing so Director owns camera/action timing.
+        node.process_mode = Node.PROCESS_MODE_DISABLED
+
+
+func _build_fallback_world(parent: Node3D) -> void:
     var floor := MeshInstance3D.new()
     floor.name = "StageFloor"
     var floor_mesh := PlaneMesh.new()
     floor_mesh.size = Vector2(18.0, 18.0)
     floor.mesh = floor_mesh
     floor.material_override = _material(Color("#B9E7D0"))
-    stage.add_child(floor)
-
-    stage.set_meta(
-        "world_asset_id",
-        String(payload.get("world_asset_id", ""))
-    )
-    var raw_play = payload.get("play_session", {})
-    if typeof(raw_play) == TYPE_DICTIONARY:
-        stage.set_meta(
-            "world_name",
-            String(raw_play.get("world_name", ""))
-        )
+    parent.add_child(floor)
 
 
 func _build_actor() -> void:
