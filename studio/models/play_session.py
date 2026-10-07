@@ -10,6 +10,7 @@ from studio.models.asset import now_utc
 from studio.models.baby import BabyRuntimeSpec
 from studio.models.equipment_runtime import EquipmentRuntimeSpec
 from studio.models.runtime_character import CharacterRuntimeSpec
+from studio.models.quest import QuestDefinition
 
 
 PLAY_SESSION_SCHEMA_VERSION = "1.0"
@@ -31,6 +32,7 @@ class PlaySessionRuntimeSpec(BaseModel):
     character: CharacterRuntimeSpec
     equipment: EquipmentRuntimeSpec
     baby: BabyRuntimeSpec | None = None
+    quest: QuestDefinition | None = None
 
     world_asset_id: str | None = None
     world_name: str | None = None
