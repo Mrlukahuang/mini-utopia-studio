@@ -135,6 +135,11 @@ class StoryPlayableQuestService:
                     },
                 ),
                 QuestReward(
+                    reward_id="story_baby_xp",
+                    reward_type=QuestRewardType.BABY_XP,
+                    amount=60,
+                ),
+                QuestReward(
                     reward_id="story_baby_bond",
                     reward_type=QuestRewardType.BABY_BOND,
                     amount=5,

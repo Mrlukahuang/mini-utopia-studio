@@ -78,15 +78,30 @@ def render_my_stuff(ctx) -> None:
             "已放入 My Stuff"
         )
 
-    quest_rewards = QuestRewardService(
+    babies = BabyService(ctx.repository)
+    quest_reward_service = QuestRewardService(
         ctx.repository,
         equipment=ctx.equipment,
-    ).claim_available()
+        babies=babies,
+    )
+    quest_rewards = quest_reward_service.claim_available()
     for reward in quest_rewards:
         st.success(
             "🏆 Quest Reward / 任务奖励 · "
             f"{reward.display_name} · {reward.rarity.value.title()} · "
             "已放入 My Stuff"
+        )
+
+    baby_rewards = quest_reward_service.claim_baby_growth()
+    for reward in baby_rewards:
+        reward_label = (
+            "✨ XP"
+            if reward.reward_type.value == "baby_xp"
+            else "💞 Bond"
+        )
+        st.success(
+            f"🐣 Baby Growth / 宝宝成长 · {reward.baby_name} · "
+            f"{reward_label} +{reward.amount} · Lv.{reward.level}"
         )
 
     characters = [
@@ -112,7 +127,7 @@ def render_my_stuff(ctx) -> None:
     profile = CharacterProfile.model_validate(
         selected_character.metadata.get("character_profile", {})
     )
-    active_baby = BabyService(ctx.repository).active_baby()
+    active_baby = babies.active_baby()
     loadout = collection.loadout_for(selected_character.asset_id)
     base_stats = ctx.equipment.base_stats(selected_character.asset_id)
     final_stats = ctx.equipment.final_stats(selected_character.asset_id)

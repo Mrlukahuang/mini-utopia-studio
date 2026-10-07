@@ -133,6 +133,8 @@ class BabyService:
             appearance_seed=baby.appearance_seed,
             growth_stage=baby.growth_stage,
             level=baby.level,
+            xp=baby.xp,
+            bond=baby.bond,
             active=baby.active,
             cosmetic_item_ids=list(baby.cosmetic_item_ids),
         )

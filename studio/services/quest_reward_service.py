@@ -10,10 +10,12 @@ from studio.models.equipment import (
 )
 from studio.models.quest import QuestRewardType
 from studio.models.quest_reward import (
+    QuestBabyRewardClaim,
     QuestRewardClaim,
     QuestRewardInbox,
 )
 from studio.repositories.base import StudioRepository
+from studio.services.baby_service import BabyService
 from studio.services.equipment_service import EquipmentService
 
 
@@ -40,6 +42,7 @@ class QuestRewardService:
         *,
         inbox_path: str | Path | None = None,
         equipment: EquipmentService | None = None,
+        babies: BabyService | None = None,
     ):
         self.repository = repository
         self.inbox_path = (
@@ -48,6 +51,7 @@ class QuestRewardService:
             else DEFAULT_QUEST_REWARD_INBOX_PATH
         )
         self.equipment = equipment or EquipmentService(repository)
+        self.babies = babies or BabyService(repository)
 
     def read_inbox(self) -> QuestRewardInbox:
         if not self.inbox_path.exists():
@@ -68,6 +72,90 @@ class QuestRewardService:
         if repeatable:
             return f"{completion_id}:{reward_id}"
         return f"{quest_id}:{reward_id}"
+
+    def claim_baby_growth(self) -> list[QuestBabyRewardClaim]:
+        """Apply BABY_XP/BABY_BOND rewards to the current Active Baby.
+
+        If no Active Baby exists, rewards remain unclaimed so they can recover
+        after the creator chooses an Initial Baby.
+        """
+
+        inbox = self.read_inbox()
+        if not inbox.completions:
+            return []
+
+        active = self.babies.active_baby()
+        if active is None:
+            return []
+
+        collection = self.equipment.ensure_starter_collection()
+        claimed = set(collection.claimed_quest_reward_ids)
+        results: list[QuestBabyRewardClaim] = []
+
+        for completion in inbox.completions:
+            quest = self.repository.get_quest(completion.quest_id)
+            if quest is None:
+                continue
+
+            for reward in quest.rewards:
+                if reward.reward_type not in {
+                    QuestRewardType.BABY_XP,
+                    QuestRewardType.BABY_BOND,
+                }:
+                    continue
+
+                claim_id = self._claim_id(
+                    quest_id=quest.quest_id,
+                    reward_id=reward.reward_id,
+                    completion_id=completion.completion_id,
+                    repeatable=quest.repeatable,
+                )
+                if claim_id in claimed:
+                    continue
+
+                current = self.babies.active_baby()
+                if current is None:
+                    continue
+
+                if reward.reward_type == QuestRewardType.BABY_XP:
+                    self.babies.add_xp(
+                        baby_id=current.baby_id,
+                        amount=reward.amount,
+                    )
+                else:
+                    self.babies.add_bond(
+                        baby_id=current.baby_id,
+                        amount=reward.amount,
+                    )
+
+                updated = self.babies.active_baby()
+                if updated is None:
+                    continue
+
+                collection.claimed_quest_reward_ids.append(claim_id)
+                claimed.add(claim_id)
+                results.append(
+                    QuestBabyRewardClaim(
+                        claim_id=claim_id,
+                        completion_id=completion.completion_id,
+                        quest_id=quest.quest_id,
+                        reward_id=reward.reward_id,
+                        reward_type=reward.reward_type,
+                        baby_id=updated.baby_id,
+                        baby_name=updated.display_name,
+                        amount=reward.amount,
+                        level=updated.level,
+                        xp=updated.xp,
+                        bond=updated.bond,
+                    )
+                )
+
+        if results:
+            collection.updated_at = now_utc()
+            self.repository.save_collection(collection)
+
+        return results
+
 
     def claim_available(self) -> list[QuestRewardClaim]:
         inbox = self.read_inbox()
