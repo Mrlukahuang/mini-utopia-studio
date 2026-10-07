@@ -12,9 +12,11 @@ class EpisodeProductionStatusService:
         self,
         repository: StudioRepository,
         storyboard: StoryboardService,
+        shot_renderer=None,
     ):
         self.repository = repository
         self.storyboard = storyboard
+        self.shot_renderer = shot_renderer
 
     def status(self, episode_id: str) -> EpisodeProductionStatus:
         episode = self.repository.get_episode(episode_id)
@@ -68,11 +70,22 @@ class EpisodeProductionStatusService:
             elif frame.status == "stale":
                 storyboard_stale += 1
 
-        rendered_ids = set(
-            getattr(episode, "rendered_shot_ids", []) or []
-        )
-        shot_ids = {shot.shot_id for _scene, shot in shots}
-        rendered_shots = len(rendered_ids.intersection(shot_ids))
+        if self.shot_renderer is not None:
+            rendered_shots = sum(
+                self.shot_renderer.status_for(
+                    episode_id=episode.episode_id,
+                    scene_id=scene.scene_id,
+                    shot_id=shot.shot_id,
+                ).status == "rendered"
+                for scene, shot in shots
+            )
+        else:
+            shot_ids = {shot.shot_id for _scene, shot in shots}
+            rendered_shots = sum(
+                record.status == "rendered"
+                and record.shot_id in shot_ids
+                for record in episode.shot_renders.values()
+            )
         final_package_ready = bool(
             getattr(episode, "final_package_ready", False)
         )
