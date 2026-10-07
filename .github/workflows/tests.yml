@@ -101,3 +101,81 @@ jobs:
       - name: Smoke-test Director Performance Cues
         run: |
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/director_performance_cue_smoke.gd
+
+      - name: Smoke-test Storyboard PNG capture
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          play = json.loads(
+              Path("godot/config/runtime/creator_play_session_example.json")
+              .read_text(encoding="utf-8")
+          )
+          request = {
+              "schema_version": "1.0",
+              "output_path": "res://runtime_state/storyboards/EP_SMOKE/SHOT_01_01.png",
+              "capture_time_seconds": 1.0,
+              "director_session": {
+                  "schema_version": "1.0",
+                  "director_session_id": "DIR_STORYBOARD_SMOKE",
+                  "source_fingerprint": "SMOKE_FINGERPRINT",
+                  "episode_id": "EP_SMOKE",
+                  "scene_id": "SCENE_01",
+                  "shot_id": "SHOT_01_01",
+                  "story_id": "STORY_SMOKE",
+                  "world_asset_id": play.get("world_asset_id"),
+                  "character_asset_id": play["character_asset_id"],
+                  "scene_title": "Storyboard Smoke",
+                  "story_beat": "ARRIVE",
+                  "duration_seconds": 2.0,
+                  "animation_intent": "walk",
+                  "camera": {
+                      "position": [0.0, 4.2, 7.8],
+                      "look_at": [0.0, 1.1, 0.0],
+                      "fov": 52.0,
+                      "movement": "Wide establishing · gentle push-in",
+                      "end_position": [0.0, 3.8, 6.2],
+                      "end_look_at": [0.0, 1.1, -0.5],
+                      "end_fov": 48.0,
+                      "movement_mode": "push_in",
+                      "easing": "smooth"
+                  },
+                  "shot": {
+                      "shot_id": "SHOT_01_01",
+                      "scene_id": "SCENE_01",
+                      "duration_seconds": 2.0,
+                      "asset_ids": [play["character_asset_id"]],
+                      "shot_type": "Establishing",
+                      "camera": "Wide establishing",
+                      "action": "Walk into frame.",
+                      "expression": "curious",
+                      "dialogue": [],
+                      "continuity_notes": [],
+                      "blocking": {
+                          "actor_start": {"x": 0.0, "y": 0.0, "z": 2.0},
+                          "actor_end": {"x": 0.0, "y": 0.0, "z": 0.0},
+                          "facing_degrees": 180.0,
+                          "baby_offset": {"x": -0.8, "y": 0.0, "z": 1.0},
+                          "movement_style": "walk",
+                          "source": "generated",
+                          "confidence": 1.0
+                      },
+                      "camera_motion": null,
+                      "performance_cues": []
+                  },
+                  "play_session": play
+              }
+          }
+          target = Path("godot/runtime_state/storyboard_capture_request.json")
+          target.parent.mkdir(parents=True, exist_ok=True)
+          target.write_text(json.dumps(request, indent=2), encoding="utf-8")
+          PY
+          /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://scripts/storyboard_capture.gd
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("godot/runtime_state/storyboards/EP_SMOKE/SHOT_01_01.png")
+          assert path.exists() and path.stat().st_size > 8
+          assert path.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+          print("storyboard_capture_smoke: PASS · PNG created")
+          PY
