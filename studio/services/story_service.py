@@ -2,6 +2,9 @@ from studio.core.enums import StoryMode, ReviewStatus
 from studio.core.ids import new_id
 from studio.models.story import Story
 from studio.repositories.base import StudioRepository
+from studio.services.living_universe_memory_service import (
+    LivingUniverseMemoryService,
+)
 
 
 class StoryService:
@@ -39,4 +42,8 @@ class StoryService:
             status=ReviewStatus.DRAFT,
         )
         self.repository.save_story(story)
+        if story.mode == StoryMode.CANON:
+            LivingUniverseMemoryService(
+                self.repository
+            ).ingest_story(story)
         return story
