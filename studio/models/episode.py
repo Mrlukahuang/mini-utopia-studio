@@ -30,6 +30,26 @@ class ShotBlockingSpec(BaseModel):
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
 
 
+class ShotCameraMotionSpec(BaseModel):
+    start_position: ShotBlockingPoint
+    end_position: ShotBlockingPoint
+    start_look_at: ShotBlockingPoint
+    end_look_at: ShotBlockingPoint
+    start_fov: float = Field(default=48.0, ge=20.0, le=100.0)
+    end_fov: float = Field(default=48.0, ge=20.0, le=100.0)
+    movement_mode: Literal[
+        "hold",
+        "push_in",
+        "pull_back",
+        "pan",
+        "follow",
+        "reveal",
+    ] = "hold"
+    easing: Literal["linear", "smooth"] = "smooth"
+    source: Literal["generated", "creator"] = "generated"
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+
+
 class Shot(BaseModel):
     shot_id: str
     scene_id: str
@@ -42,6 +62,7 @@ class Shot(BaseModel):
     dialogue: list[DialogueLine] = Field(default_factory=list)
     continuity_notes: list[str] = Field(default_factory=list)
     blocking: ShotBlockingSpec | None = None
+    camera_motion: ShotCameraMotionSpec | None = None
 
 
 class Scene(BaseModel):
