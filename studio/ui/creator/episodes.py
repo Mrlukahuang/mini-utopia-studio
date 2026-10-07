@@ -73,6 +73,8 @@ def render_episode_library(ctx) -> None:
         ctx.repository,
         storyboard_service,
         shot_renderer=shot_render_service,
+        assembly_service=episode_assembly_service,
+        publish_package_service=publish_package_service,
     )
     episodes = episode_service.list_episodes()
     episodes = [
@@ -286,6 +288,7 @@ def render_episode_library(ctx) -> None:
                         "review_storyboard": "👀 Review Storyboard Below / 审核下方分镜",
                         "render_shots": "🎬 Storyboard Approved · Ready to Render",
                         "assemble_episode": "✂️ Shots Rendered · Ready to Assemble",
+                        "publish_package": "📦 Assembly Ready · Build Publish Package",
                         "complete": "✅ Episode Complete / 剧集完成",
                     }
                     next_label = next_labels[production.next_action]
@@ -413,8 +416,34 @@ def render_episode_library(ctx) -> None:
                                         "Episode 拼接暂未完成："
                                         + assembled.error
                                     )
+                    elif production.next_action == "publish_package":
+                        st.info(
+                            next_label
+                            + " · 使用下方 Publish Package 完成最后一步。"
+                        )
                     else:
                         st.success(next_label)
+                        if production.progress_percent == 100:
+                            with st.container(border=True):
+                                st.markdown(
+                                    "### 🎉 First Production Loop Complete / "
+                                    "第一次完整制作闭环完成"
+                                )
+                                st.success(
+                                    "Story → Episode → Scene → Shot → "
+                                    "Storyboard → Render → Assembly → "
+                                    "Publish Package · 100%"
+                                )
+                                st.caption(
+                                    f"Story {episode.story_id} · "
+                                    f"World {episode.world_asset_id or '—'} · "
+                                    f"Episode {episode.episode_id} · "
+                                    f"Baby {episode.active_baby_id or '—'}"
+                                )
+                                st.caption(
+                                    "同一套 reusable Character / World / "
+                                    "Equipment / Baby 状态贯穿制作链。"
+                                )
 
                 assembly_status = episode_assembly_service.status_for(
                     episode.episode_id
