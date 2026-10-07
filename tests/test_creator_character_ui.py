@@ -37,3 +37,27 @@ def test_character_factory_returns_to_library_after_approval():
 
     source = Path("studio/ui/creator/character_factory.py").read_text()
     assert 'pending_app_page = "🎭 My Characters"' in source
+
+
+
+def test_character_factory_is_child_first_and_saves_without_image_api():
+    from pathlib import Path
+
+    source = Path("studio/ui/creator/character_factory.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "Start My Hero / 开始创造我的角色" in source
+    assert "Make a hero of your own!" in source
+    assert "More choices / 更多设定（可选）" in source
+    assert "More personality details / 更多性格设定（可选）" in source
+    assert "Pick a first outfit / 选第一套穿搭" in source
+    assert "More details / 更多设定（可选）" in source
+    assert "Save My Hero / 保存我的角色" in source
+    assert "profile_can_save = not missing and bool(name)" in source
+    assert 'pending_app_page = "🎭 My Characters"' in source
+    assert "上面的 Save My Hero 可以直接保存可玩角色" in source
+
+    save_button = source.index("💖 Save My Hero / 保存我的角色")
+    image_gate = source.index("ctx.character_masters.is_available")
+    assert save_button < image_gate
