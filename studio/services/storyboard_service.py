@@ -208,9 +208,12 @@ class StoryboardService:
         completed = subprocess.run(
             [
                 binary,
-                "--headless",
                 "--path",
                 str(self.godot_root),
+                "--rendering-method",
+                "gl_compatibility",
+                "--resolution",
+                "960x540",
                 "--script",
                 "res://scripts/storyboard_capture.gd",
             ],
