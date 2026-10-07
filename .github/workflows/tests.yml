@@ -85,3 +85,7 @@ jobs:
       - name: Smoke-test launchable Director Stage scene
         run: |
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/director_stage_scene_smoke.gd
+
+      - name: Smoke-test Director bound World loading
+        run: |
+          /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/director_bound_world_smoke.gd
