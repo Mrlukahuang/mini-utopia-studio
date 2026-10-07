@@ -81,3 +81,7 @@ jobs:
       - name: Smoke-test Godot Director Shot runtime
         run: |
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/director_shot_runtime_smoke.gd
+
+      - name: Smoke-test launchable Director Stage scene
+        run: |
+          /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/director_stage_scene_smoke.gd
