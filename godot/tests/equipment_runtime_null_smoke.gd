@@ -9,6 +9,10 @@ func _initialize() -> void:
     socket.name = MiniUtopiaAvatarContract.SOCKET_WEAPON_R
     avatar.add_child(socket)
 
+    var offhand_socket := Node3D.new()
+    offhand_socket.name = MiniUtopiaAvatarContract.SOCKET_WEAPON_L
+    avatar.add_child(offhand_socket)
+
     var payload := {
         "equipped": {
             "weapon_main": {
@@ -20,6 +24,16 @@ func _initialize() -> void:
                 "mesh_asset_id": null,
                 "animation_class": "one_handed",
                 "rolled_stats": {"hp": 0, "atk": 1, "defense": 0},
+            },
+            "weapon_offhand": {
+                "item_instance_id": "ITEM_SHIELD_SMOKE",
+                "definition_id": "EQ_SHIELD_SMOKE",
+                "display_name": "Procedural Smoke Shield",
+                "slot": "weapon_offhand",
+                "rarity": "blue",
+                "mesh_asset_id": null,
+                "animation_class": "shield",
+                "rolled_stats": {"hp": 0, "atk": 0, "defense": 1},
             }
         }
     }
@@ -44,8 +58,37 @@ func _initialize() -> void:
         quit(1)
         return
 
+    if absf(weapon.rotation_degrees.x - 45.0) > 0.01:
+        push_error(
+            "equipment_runtime_null_smoke: sword is not pitched forward"
+        )
+        quit(1)
+        return
+
+    var shield = attached.get("weapon_offhand")
+    if shield == null:
+        push_error(
+            "equipment_runtime_null_smoke: procedural shield did not attach"
+        )
+        quit(1)
+        return
+
+    if shield.position.x >= 0.0:
+        push_error(
+            "equipment_runtime_null_smoke: shield is not outside left hand"
+        )
+        quit(1)
+        return
+
+    if shield.rotation_degrees.y > -40.0:
+        push_error(
+            "equipment_runtime_null_smoke: shield is not yawed outward"
+        )
+        quit(1)
+        return
+
     print(
-        "equipment_runtime_null_smoke: PASS · null mesh_asset_id "
-        + "uses procedural fallback"
+        "equipment_runtime_null_smoke: PASS · null mesh fallback + "
+        + "forward sword + outward shield"
     )
     quit(0)
