@@ -76,7 +76,7 @@ func record_event(
     if objective_type != event_type:
         return false
 
-    var expected_target := String(
+    var expected_target := _string_or_empty(
         objective.get("target_id", "")
     )
     if (
@@ -104,9 +104,10 @@ func record_event(
     current_index += 1
     if current_index >= objectives.size():
         completed = true
+        _write_completion_receipt()
         _refresh_objective()
         quest_completed.emit(
-            String(quest.get("quest_id", "QUEST"))
+            _string_or_empty(quest.get("quest_id", "QUEST"))
         )
         return true
 
@@ -159,7 +160,8 @@ func _refresh_objective() -> void:
     if completed:
         if player != null and player.has_method("show_reward_feedback"):
             player.show_reward_feedback(
-                "🏆 Quest Complete! / 任务完成"
+                "🏆 Quest Complete! / 任务完成 · "
+                + "Rewards → My Stuff"
             )
         return
 
@@ -301,6 +303,43 @@ func _spawn_marker(
     label.outline_size = 8
     label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
     _marker.add_child(label)
+
+
+func _write_completion_receipt() -> void:
+    var quest_id := _string_or_empty(
+        quest.get("quest_id", "QUEST")
+    )
+    var session_id := "NO_SESSION"
+    var character_asset_id := ""
+    if player != null:
+        session_id = _string_or_empty(
+            player.get_meta(
+                "mini_utopia_session_id",
+                "NO_SESSION"
+            )
+        )
+        character_asset_id = _string_or_empty(
+            player.get_meta(
+                "mini_utopia_character_asset_id",
+                ""
+            )
+        )
+
+    var completion_id := (
+        "QUEST_DONE_"
+        + session_id
+        + "_"
+        + quest_id
+    )
+    MiniUtopiaQuestRewardWriter.write_completion(
+        {
+            "completion_id": completion_id,
+            "quest_id": quest_id,
+            "session_id": session_id,
+            "character_asset_id": character_asset_id,
+            "created_at": str(Time.get_unix_time_from_system()),
+        }
+    )
 
 
 func _string_or_empty(value: Variant) -> String:

@@ -110,6 +110,14 @@ STARTER_DEFINITIONS = (
         base_stats=StatBlock(hp=2, atk=1, defense=2),
     ),
     EquipmentDefinition(
+        definition_id="reward_portal_medal",
+        display_name="Portal Medal / 传送门勋章",
+        slot=EquipmentSlot.ACCESSORY,
+        description="A Purple medal earned by completing a playable Story Quest.",
+        compatible_tags=["humanoid"],
+        base_stats=StatBlock(hp=4, atk=5, defense=3),
+    ),
+    EquipmentDefinition(
         definition_id="reward_bone_buckler",
         display_name="Bone Buckler / 骨盾",
         slot=EquipmentSlot.WEAPON_OFFHAND,

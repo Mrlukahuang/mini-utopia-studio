@@ -14,6 +14,7 @@ from studio.models.equipment import (
 )
 from studio.services.baby_service import BabyService
 from studio.services.combat_drop_service import CombatDropService
+from studio.services.quest_reward_service import QuestRewardService
 from studio.ui.theme import render_game_hero
 
 
@@ -73,6 +74,17 @@ def render_my_stuff(ctx) -> None:
     for reward in claimed_rewards:
         st.success(
             "🎁 Battle Reward / 战斗奖励 · "
+            f"{reward.display_name} · {reward.rarity.value.title()} · "
+            "已放入 My Stuff"
+        )
+
+    quest_rewards = QuestRewardService(
+        ctx.repository,
+        equipment=ctx.equipment,
+    ).claim_available()
+    for reward in quest_rewards:
+        st.success(
+            "🏆 Quest Reward / 任务奖励 · "
             f"{reward.display_name} · {reward.rarity.value.title()} · "
             "已放入 My Stuff"
         )
