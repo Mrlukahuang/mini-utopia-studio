@@ -64,12 +64,20 @@ class ContinuityStoryState(BaseModel):
     ending: str = ""
 
 
+class ContinuityMemoryState(BaseModel):
+    memory_id: str
+    kind: str
+    summary: str
+    source_key: str
+
+
 class StoryContinuityContext(BaseModel):
     character_states: list[ContinuityCharacterState] = Field(default_factory=list)
     active_baby: ContinuityBabyState | None = None
     important_owned_items: list[ContinuityOwnedItem] = Field(default_factory=list)
     world: ContinuityWorldState | None = None
     prior_canon_stories: list[ContinuityStoryState] = Field(default_factory=list)
+    living_memory: list[ContinuityMemoryState] = Field(default_factory=list)
 
     @property
     def has_context(self) -> bool:
@@ -79,4 +87,5 @@ class StoryContinuityContext(BaseModel):
             or self.important_owned_items
             or self.world
             or self.prior_canon_stories
+            or self.living_memory
         )
