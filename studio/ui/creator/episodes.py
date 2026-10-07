@@ -253,10 +253,17 @@ def render_episode_library(ctx) -> None:
                                 )
                                 st.rerun()
 
+                production_progress_slot = st.empty()
+                with production_progress_slot.container(border=True):
+                    st.markdown("#### 🎬 Production Progress / 制作进度")
+                    st.info(
+                        "⏳ Loading Production Progress / 正在读取制作进度…"
+                    )
+
                 production = production_status_service.status(
                     episode.episode_id
                 )
-                with st.container(border=True):
+                with production_progress_slot.container(border=True):
                     st.markdown("#### 🎬 Production Progress / 制作进度")
                     st.progress(
                         production.progress_percent / 100,
