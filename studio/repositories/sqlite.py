@@ -8,6 +8,7 @@ from studio.models.story import Story
 from studio.models.job import Job
 from studio.models.equipment import CreatorCollection
 from studio.models.baby import BabyRoster
+from studio.models.quest import QuestDefinition
 from studio.repositories.base import StudioRepository
 
 SCHEMA = """
@@ -30,6 +31,14 @@ CREATE TABLE IF NOT EXISTS stories (
   title TEXT NOT NULL,
   mode TEXT NOT NULL,
   universe_id TEXT,
+  data TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS quests (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  world_asset_id TEXT NOT NULL,
+  story_id TEXT,
   data TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -125,6 +134,35 @@ class SQLiteStudioRepository(StudioRepository):
         with self._connect() as conn:
             rows = conn.execute("SELECT data FROM stories ORDER BY updated_at DESC").fetchall()
         return [Story.model_validate_json(row[0]) for row in rows]
+
+    def save_quest(self, quest: QuestDefinition) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO quests VALUES (?,?,?,?,?,?)",
+                (
+                    quest.quest_id,
+                    quest.title,
+                    quest.world_asset_id,
+                    quest.story_id,
+                    self._json(quest),
+                    quest.updated_at.isoformat(),
+                ),
+            )
+
+    def get_quest(self, quest_id: str) -> QuestDefinition | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT data FROM quests WHERE id=?",
+                (quest_id,),
+            ).fetchone()
+        return QuestDefinition.model_validate_json(row[0]) if row else None
+
+    def list_quests(self) -> list[QuestDefinition]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT data FROM quests ORDER BY updated_at DESC"
+            ).fetchall()
+        return [QuestDefinition.model_validate_json(row[0]) for row in rows]
 
     def save_collection(self, collection: CreatorCollection) -> None:
         with self._connect() as conn:
