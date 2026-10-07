@@ -12,6 +12,9 @@ from studio.services.baby_service import BabyService
 from studio.services.director_shot_session_service import (
     DirectorShotSessionService,
 )
+from studio.services.episode_batch_render_service import (
+    EpisodeBatchRenderService,
+)
 from studio.services.episode_service import EpisodeService
 from studio.services.production_status_service import (
     EpisodeProductionStatusService,
@@ -48,6 +51,11 @@ def render_episode_library(ctx) -> None:
         ctx.repository,
         director_service,
         storyboard_service,
+    )
+    batch_render_service = EpisodeBatchRenderService(
+        ctx.repository,
+        storyboard_service,
+        shot_render_service,
     )
     production_status_service = EpisodeProductionStatusService(
         ctx.repository,
@@ -328,10 +336,43 @@ def render_episode_library(ctx) -> None:
                             + f"{production.storyboard_needs_change} 需修改 · "
                             + f"{production.storyboard_stale} 已过期"
                         )
-                    elif production.next_action in {
-                        "render_shots",
-                        "assemble_episode",
-                    }:
+                    elif production.next_action == "render_shots":
+                        st.success(next_label)
+                        if st.button(
+                            "🎬 Render Approved Episode / 批量渲染已批准镜头",
+                            key=f"batch_render_{episode.episode_id}",
+                            type="primary",
+                            use_container_width=True,
+                        ):
+                            with st.spinner(
+                                "🎬 正在逐镜头渲染；已完成镜头不会重复渲染…"
+                            ):
+                                batch_result = (
+                                    batch_render_service.render_episode(
+                                        episode.episode_id
+                                    )
+                                )
+                            if batch_result.failed_shots:
+                                st.warning(
+                                    "部分镜头失败，可单独或再次批量重试："
+                                    + ", ".join(batch_result.failed_shots)
+                                )
+                            if batch_result.blocked_shots:
+                                st.info(
+                                    "这些镜头尚未批准 Storyboard，已安全跳过："
+                                    + ", ".join(batch_result.blocked_shots)
+                                )
+                            if (
+                                batch_result.rendered_now
+                                or batch_result.already_rendered
+                            ):
+                                st.success(
+                                    "Episode render · "
+                                    f"新渲染 {batch_result.rendered_now} · "
+                                    f"已存在 {batch_result.already_rendered}"
+                                )
+                            st.rerun()
+                    elif production.next_action == "assemble_episode":
                         st.success(next_label)
                     else:
                         st.success(next_label)
