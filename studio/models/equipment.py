@@ -146,6 +146,7 @@ class CreatorCollection(BaseModel):
     items: list[EquipmentInstance] = Field(default_factory=list)
     loadouts: dict[str, CharacterLoadout] = Field(default_factory=dict)
     claimed_drop_ids: list[str] = Field(default_factory=list)
+    claimed_quest_reward_ids: list[str] = Field(default_factory=list)
     updated_at: datetime = Field(default_factory=now_utc)
 
     @model_validator(mode="after")
