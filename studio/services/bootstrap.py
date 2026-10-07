@@ -161,7 +161,6 @@ def build_context(settings: Settings) -> StudioContext:
         structured_provider=text_provider,
     )
     world_runtime_bindings = WorldRuntimeBindingService(repository)
-    world_runtime_bindings.ensure_builtin_worlds()
 
     reusable_assets = ReusableAssetLibraryService(repository, storage)
     reusable_asset_packs = ReusableAssetPackService(reusable_assets)
