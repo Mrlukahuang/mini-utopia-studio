@@ -117,8 +117,11 @@ func _build_visual() -> void:
     var name_label := Label3D.new()
     name_label.name = "BabyName"
     name_label.position = Vector3(0.0, 0.92, 0.0)
-    name_label.text = "🐣 " + String(
-        baby_payload.get("display_name", "Baby")
+    name_label.text = (
+        "🐣 "
+        + String(baby_payload.get("display_name", "Baby"))
+        + " · Lv."
+        + str(int(baby_payload.get("level", 1)))
     )
     name_label.font_size = 28
     name_label.outline_size = 7
