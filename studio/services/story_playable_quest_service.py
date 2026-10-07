@@ -125,6 +125,16 @@ class StoryPlayableQuestService:
             ],
             rewards=[
                 QuestReward(
+                    reward_id="story_portal_medal",
+                    reward_type=QuestRewardType.EQUIPMENT,
+                    target_id="reward_portal_medal",
+                    amount=1,
+                    metadata={
+                        "rarity": "purple",
+                        "item_level": 1,
+                    },
+                ),
+                QuestReward(
                     reward_id="story_baby_bond",
                     reward_type=QuestRewardType.BABY_BOND,
                     amount=5,
