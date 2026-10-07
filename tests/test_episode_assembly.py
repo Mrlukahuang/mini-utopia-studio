@@ -25,7 +25,19 @@ class FakeShotRenderer:
 
     def status_for(self, *, episode_id, scene_id, shot_id):
         episode = self.repo.get_episode(episode_id)
-        return episode.shot_renders[shot_id]
+        existing = episode.shot_renders.get(shot_id)
+        if existing is not None:
+            return existing
+        return ShotRenderRecord(
+            episode_id=episode_id,
+            scene_id=scene_id,
+            shot_id=shot_id,
+            source_fingerprint=f"MISSING_{shot_id}",
+            storyboard_approval_fingerprint="",
+            status="missing",
+            video_path=f"renders/{shot_id}.mp4",
+            duration_seconds=2.0,
+        )
 
     @staticmethod
     def _valid_mp4(path: Path) -> bool:
