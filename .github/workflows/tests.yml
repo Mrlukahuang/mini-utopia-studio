@@ -98,7 +98,7 @@ jobs:
 
       - name: Smoke-test Bridge Character write from Godot
         run: |
-          python3 tests/bridge_godot_write_smoke_server.py > /tmp/bridge-write-smoke.log 2>&1 &
+          PYTHONPATH=. python3 tests/bridge_godot_write_smoke_server.py > /tmp/bridge-write-smoke.log 2>&1 &
           BRIDGE_PID=$!
           cleanup() {
             kill "$BRIDGE_PID" 2>/dev/null || true
