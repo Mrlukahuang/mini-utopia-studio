@@ -13,6 +13,7 @@ from studio.services.baby_service import BabyService
 from studio.services.equipment_service import EquipmentService
 from studio.services.play_session_service import CreatorPlaySessionService
 from studio.ui.creator.avatar_preview import render_avatar_preview
+from studio.ui.creator.migration_notice import render_legacy_creator_notice
 from studio.ui.theme import render_game_hero
 
 
@@ -44,6 +45,8 @@ def render_dressing_room(ctx) -> None:
         "给角色换装备，看属性变化，再带着 Active Baby 一起出发。",
         kicker="AVATAR · EQUIPMENT · BABY",
     )
+
+    render_legacy_creator_notice(surface="Dressing Room")
 
     characters = [
         asset

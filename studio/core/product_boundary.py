@@ -18,3 +18,12 @@ GODOT_USER_DATA_ROLE = "cache_or_session_only"
 ARCHITECTURE_INVARIANT = (
     "Streamlit may view. Godot may create and edit. Python Core owns the truth."
 )
+
+
+# Migration-era Streamlit editors are preserved temporarily for data access,
+# but they are frozen: do not add new child-facing editing capability here.
+FROZEN_STREAMLIT_CREATOR_SURFACES = (
+    "character_factory",
+    "dressing_room",
+    "my_stuff_equipment_editing",
+)

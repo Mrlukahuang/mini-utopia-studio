@@ -21,6 +21,7 @@ from studio.ui.creator.avatar_editor import (
 )
 from studio.ui.creator.avatar_legacy_bridge import legacy_visual_updates
 from studio.ui.creator.avatar_preview import render_avatar_preview
+from studio.ui.creator.migration_notice import render_legacy_creator_notice
 from studio.ui.creator.character_presets import (
     CUSTOM,
     AGE_OPTIONS,
@@ -409,6 +410,8 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
         "给 TA 取名字、捏外形、选性格，再穿上第一套衣服。完成后就会加入你的角色收藏。",
         kicker="CHARACTER FACTORY · MAKE A HERO",
     )
+
+    render_legacy_creator_notice(surface="Character Factory")
 
     if studio_mode:
         render_reference_settings(ctx)
