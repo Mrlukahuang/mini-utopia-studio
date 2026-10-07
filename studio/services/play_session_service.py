@@ -11,6 +11,9 @@ from studio.services.equipment_service import EquipmentService
 from studio.services.world_gameplay_layer_service import (
     WorldGameplayLayerService,
 )
+from studio.services.world_creative_layout_service import (
+    WorldCreativeLayoutService,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -68,6 +71,7 @@ class CreatorPlaySessionService:
 
         world_name: str | None = None
         world_gameplay = None
+        creative_layout = None
         if world_asset_id is not None:
             world_asset = self.repository.get_asset(world_asset_id)
             if world_asset is None or world_asset.asset_type != AssetType.LOCATION:
@@ -76,6 +80,9 @@ class CreatorPlaySessionService:
             world_gameplay = WorldGameplayLayerService(
                 self.repository
             ).get_layer(world_asset_id)
+            creative_layout = WorldCreativeLayoutService(
+                self.repository
+            ).get_layout(world_asset_id)
 
         return PlaySessionRuntimeSpec(
             character_asset_id=character_asset.asset_id,
@@ -85,6 +92,7 @@ class CreatorPlaySessionService:
             baby=self.babies.runtime_spec(),
             quest=quest,
             world_gameplay=world_gameplay,
+            creative_layout=creative_layout,
             world_asset_id=world_asset_id,
             world_name=world_name,
         )
