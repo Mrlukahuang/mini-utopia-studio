@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, ValidationError
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from studio.core.enums import AssetType, ReviewStatus
 from studio.models.asset import now_utc
@@ -31,11 +33,21 @@ class BridgeCharacterContract(BaseModel):
 class BridgeCharacterUpdate(BaseModel):
     """Validated Godot -> Python Core Character update payload."""
 
-    schema_version: str = BRIDGE_CHARACTER_SCHEMA_VERSION
-    revision: str
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["1.0"] = BRIDGE_CHARACTER_SCHEMA_VERSION
+    revision: str = Field(min_length=1)
     display_name: str = Field(min_length=1, max_length=120)
     description: str = Field(default="", max_length=4000)
     profile: CharacterProfile
+
+    @field_validator("display_name")
+    @classmethod
+    def _display_name_must_have_visible_text(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("display_name must contain visible text")
+        return stripped
 
 
 class CharacterWriteValidationError(ValueError):
