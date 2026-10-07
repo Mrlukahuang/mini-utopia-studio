@@ -92,6 +92,10 @@ jobs:
 
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/bridge_health_smoke.gd
 
+      - name: Smoke-test Bridge Character contract in Godot
+        run: |
+          /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/bridge_character_contract_smoke.gd
+
       - name: Smoke-test nullable Equipment runtime
         run: |
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/equipment_runtime_null_smoke.gd
