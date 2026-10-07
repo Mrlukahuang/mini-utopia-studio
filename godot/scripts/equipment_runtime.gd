@@ -168,7 +168,11 @@ static func _build_sword(root: Node3D, color: Color) -> void:
     blade.material_override = _material(color)
     root.add_child(blade)
 
-    root.rotation_degrees = Vector3(0.0, 0.0, -45.0)
+    # Front is +Z in the shared Avatar contract. Pitch the blade forward and
+    # upward while keeping only a small outward roll so it does not cross the
+    # torso in the default stance.
+    root.position = Vector3(0.0, 0.0, 0.05)
+    root.rotation_degrees = Vector3(45.0, 0.0, -8.0)
 
 
 static func _build_shield(root: Node3D, color: Color) -> void:
@@ -182,6 +186,11 @@ static func _build_shield(root: Node3D, color: Color) -> void:
     shield.rotation_degrees = Vector3(90.0, 0.0, 0.0)
     shield.material_override = _material(color)
     root.add_child(shield)
+
+    # Left-hand shield sits outside the body and turns away from the torso.
+    # The partial yaw keeps the face readable while clearly pointing outward.
+    root.position = Vector3(-0.14, 0.0, 0.02)
+    root.rotation_degrees = Vector3(0.0, -55.0, 6.0)
 
 
 static func _build_headwear(
