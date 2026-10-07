@@ -13,6 +13,7 @@ from studio.models.runtime_character import CharacterRuntimeSpec
 from studio.models.quest import QuestDefinition
 from studio.models.world_gameplay import WorldGameplayLayer
 from studio.models.world_creative import WorldCreativeLayout
+from studio.models.world_runtime import GodotWorldSceneBinding
 
 
 PLAY_SESSION_SCHEMA_VERSION = "1.0"
@@ -37,6 +38,7 @@ class PlaySessionRuntimeSpec(BaseModel):
     quest: QuestDefinition | None = None
     world_gameplay: WorldGameplayLayer | None = None
     creative_layout: WorldCreativeLayout | None = None
+    world_runtime: GodotWorldSceneBinding | None = None
 
     world_asset_id: str | None = None
     world_name: str | None = None
