@@ -32,10 +32,22 @@ class StoryboardService:
         director: DirectorShotSessionService,
         *,
         capture_runner: Callable[[Path], None] | None = None,
+        project_root: str | Path | None = None,
     ):
         self.repository = repository
         self.director = director
         self.capture_runner = capture_runner
+        self.project_root = (
+            Path(project_root)
+            if project_root is not None
+            else PROJECT_ROOT
+        )
+        self.godot_root = self.project_root / "godot"
+        self.capture_request_path = (
+            self.godot_root
+            / "runtime_state"
+            / "storyboard_capture_request.json"
+        )
 
     def status_for(
         self,
@@ -73,7 +85,7 @@ class StoryboardService:
                 blocking_summary=self._blocking_summary(session),
             )
 
-        frame_exists = self._valid_png(PROJECT_ROOT / existing.frame_path)
+        frame_exists = self._valid_png(self.project_root / existing.frame_path)
         if existing.source_fingerprint != session.source_fingerprint:
             return existing.model_copy(
                 update={
@@ -112,7 +124,7 @@ class StoryboardService:
             episode_id=episode_id,
             shot_id=shot_id,
         )
-        output_path = PROJECT_ROOT / relative_path
+        output_path = self.project_root / relative_path
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         record = StoryboardFrameRecord(
@@ -141,15 +153,18 @@ class StoryboardService:
             "capture_time_seconds": record.capture_time_seconds,
             "director_session": session.model_dump(mode="json"),
         }
-        CAPTURE_REQUEST_PATH.parent.mkdir(parents=True, exist_ok=True)
-        CAPTURE_REQUEST_PATH.write_text(
+        self.capture_request_path.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+        self.capture_request_path.write_text(
             json.dumps(request, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
 
         try:
             if self.capture_runner is not None:
-                self.capture_runner(CAPTURE_REQUEST_PATH)
+                self.capture_runner(self.capture_request_path)
             else:
                 self._run_godot_capture()
 
@@ -179,7 +194,7 @@ class StoryboardService:
         return record
 
     def frame_bytes(self, record: StoryboardFrameRecord) -> bytes | None:
-        path = PROJECT_ROOT / record.frame_path
+        path = self.project_root / record.frame_path
         if not self._valid_png(path):
             return None
         return path.read_bytes()
@@ -195,11 +210,11 @@ class StoryboardService:
                 binary,
                 "--headless",
                 "--path",
-                str(GODOT_ROOT),
+                str(self.godot_root),
                 "--script",
                 "res://scripts/storyboard_capture.gd",
             ],
-            cwd=PROJECT_ROOT,
+            cwd=self.project_root,
             capture_output=True,
             text=True,
             timeout=90,
