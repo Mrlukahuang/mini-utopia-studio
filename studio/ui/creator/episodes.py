@@ -22,6 +22,7 @@ from studio.services.episode_service import EpisodeService
 from studio.services.production_status_service import (
     EpisodeProductionStatusService,
 )
+from studio.services.publish_package_service import PublishPackageService
 from studio.services.scene_breakdown_service import SceneBreakdownService
 from studio.services.shot_plan_service import ShotPlanService
 from studio.services.storyboard_service import StoryboardService
@@ -63,6 +64,10 @@ def render_episode_library(ctx) -> None:
     episode_assembly_service = EpisodeAssemblyService(
         ctx.repository,
         shot_render_service,
+    )
+    publish_package_service = PublishPackageService(
+        ctx.repository,
+        episode_assembly_service,
     )
     production_status_service = EpisodeProductionStatusService(
         ctx.repository,
@@ -449,6 +454,135 @@ def render_episode_library(ctx) -> None:
                                 "Shot 或批准状态有变化；原视频保留，"
                                 "重新拼接后才会成为当前版本。"
                             )
+
+                publish_status = publish_package_service.status_for(
+                    episode.episode_id
+                )
+                if assembly_status.status == "ready":
+                    with st.container(border=True):
+                        st.markdown("#### 📦 Publish Package / 发布包")
+                        package_title = st.text_input(
+                            "Title / 标题",
+                            value=(
+                                publish_status.title
+                                if publish_status.title
+                                else episode.title
+                            ),
+                            key=f"publish_title_{episode.episode_id}",
+                        )
+                        package_description = st.text_area(
+                            "Description / 简介",
+                            value=publish_status.description,
+                            height=80,
+                            key=f"publish_desc_{episode.episode_id}",
+                        )
+
+                        package_badge = {
+                            "ready": "✅ Ready / 发布包已准备",
+                            "stale": "🟠 Stale / 需要更新",
+                            "failed": "⚠️ Failed / 生成失败",
+                            "missing": "⬜ Not Generated / 尚未生成",
+                        }.get(
+                            publish_status.status,
+                            publish_status.status,
+                        )
+                        st.caption(package_badge)
+
+                        if st.button(
+                            (
+                                "🔄 Regenerate Publish Package / 更新发布包"
+                                if publish_status.status in {"ready", "stale", "failed"}
+                                else "📦 Generate Publish Package / 生成发布包"
+                            ),
+                            key=f"publish_package_{episode.episode_id}",
+                            type="primary",
+                            use_container_width=True,
+                        ):
+                            with st.spinner("📦 正在整理成片、字幕和发布资料…"):
+                                generated_package = (
+                                    publish_package_service.generate(
+                                        episode.episode_id,
+                                        title=package_title,
+                                        description=package_description,
+                                    )
+                                )
+                            if generated_package.status == "ready":
+                                st.rerun()
+                            else:
+                                st.warning(
+                                    "发布包生成失败："
+                                    + generated_package.error
+                                )
+
+                        if publish_status.status == "ready":
+                            final_video = publish_package_service.file_bytes(
+                                publish_status.final_video_path
+                            )
+                            srt_bytes = publish_package_service.file_bytes(
+                                publish_status.subtitle_srt_path
+                            )
+                            transcript_bytes = publish_package_service.file_bytes(
+                                publish_status.transcript_path
+                            )
+                            metadata_bytes = publish_package_service.file_bytes(
+                                publish_status.metadata_path
+                            )
+
+                            if final_video is not None:
+                                st.video(final_video)
+
+                            d1, d2 = st.columns(2)
+                            if final_video is not None:
+                                d1.download_button(
+                                    "⬇️ Final MP4 / 成片",
+                                    data=final_video,
+                                    file_name=f"{episode.episode_id}.mp4",
+                                    mime="video/mp4",
+                                    key=f"publish_video_{episode.episode_id}",
+                                    use_container_width=True,
+                                )
+                            if srt_bytes is not None:
+                                d2.download_button(
+                                    "⬇️ SRT / 字幕",
+                                    data=srt_bytes,
+                                    file_name=f"{episode.episode_id}.srt",
+                                    mime="application/x-subrip",
+                                    key=f"publish_srt_{episode.episode_id}",
+                                    use_container_width=True,
+                                )
+
+                            d3, d4 = st.columns(2)
+                            if transcript_bytes is not None:
+                                d3.download_button(
+                                    "⬇️ Transcript / 文稿",
+                                    data=transcript_bytes,
+                                    file_name=f"{episode.episode_id}.txt",
+                                    mime="text/plain",
+                                    key=f"publish_transcript_{episode.episode_id}",
+                                    use_container_width=True,
+                                )
+                            if metadata_bytes is not None:
+                                d4.download_button(
+                                    "⬇️ Metadata / 发布信息",
+                                    data=metadata_bytes,
+                                    file_name=f"{episode.episode_id}.json",
+                                    mime="application/json",
+                                    key=f"publish_metadata_{episode.episode_id}",
+                                    use_container_width=True,
+                                )
+
+                            if publish_status.cover_frame_path:
+                                cover_bytes = (
+                                    publish_package_service.file_bytes(
+                                        publish_status.cover_frame_path
+                                    )
+                                )
+                                if cover_bytes is not None:
+                                    st.image(
+                                        cover_bytes,
+                                        caption="🖼️ Cover Candidate / 封面候选",
+                                        use_container_width=True,
+                                    )
 
                 render_audio_timeline(
                     ctx,
