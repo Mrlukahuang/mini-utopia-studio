@@ -8,6 +8,7 @@ from studio.models.job import Job
 from studio.models.equipment import CreatorCollection
 from studio.models.baby import BabyRoster
 from studio.models.quest import QuestDefinition
+from studio.models.universe_memory import UniverseMemoryRecord
 
 
 class StudioRepository(ABC):
@@ -46,6 +47,21 @@ class StudioRepository(ABC):
         raise NotImplementedError
 
     def list_quests(self) -> list[QuestDefinition]:
+        raise NotImplementedError
+
+    def save_universe_memory(self, memory: UniverseMemoryRecord) -> None:
+        raise NotImplementedError
+
+    def get_universe_memory(
+        self,
+        memory_id: str,
+    ) -> UniverseMemoryRecord | None:
+        raise NotImplementedError
+
+    def list_universe_memories(
+        self,
+        universe_id: str | None = None,
+    ) -> list[UniverseMemoryRecord]:
         raise NotImplementedError
 
     @abstractmethod
