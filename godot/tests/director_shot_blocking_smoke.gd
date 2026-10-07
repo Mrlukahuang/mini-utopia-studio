@@ -132,7 +132,11 @@ func _verify(runtime: MiniUtopiaDirectorShotRuntime) -> void:
     if runtime.actor.position.distance_to(
         Vector3(2.0, 0.0, 8.0)
     ) > 0.01:
-        push_error("director_shot_blocking_smoke: start position mismatch")
+        push_error(
+            "director_shot_blocking_smoke: start position mismatch · actual="
+            + str(runtime.actor.position)
+            + " expected=(2, 0, 8)"
+        )
         quit(1)
         return
     if not runtime.blocking_has_path:
