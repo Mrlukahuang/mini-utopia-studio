@@ -186,6 +186,19 @@ def _choice(selected: str, previous: str, options: list[str]) -> str:
     return CUSTOM
 
 
+def resolve_character_save_target(
+    editing_character_id: str | None,
+    saved_character_id: str | None,
+) -> str | None:
+    """Return the one Character asset that this builder run may mutate.
+
+    saved_character_id is the idempotency guard for a newly-created hero:
+    once the first Save creates an asset, any repeated Save event updates that
+    same asset instead of creating another Character.
+    """
+    return editing_character_id or saved_character_id
+
+
 def _factory_equipment_state(equipment_service):
     collection = equipment_service.ensure_starter_collection()
     definitions = equipment_service.list_definitions()
@@ -375,6 +388,7 @@ def reset_character_creation_state() -> None:
         "character_master_candidate_path",
         "character_master_character_id",
         "char_equipment_selection",
+        "character_save_asset_id",
     ):
         st.session_state.pop(key, None)
 
@@ -1002,24 +1016,34 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
             use_container_width=True,
         ):
             try:
-                editing_id = st.session_state.get("editing_character_id")
+                save_target_id = resolve_character_save_target(
+                    st.session_state.get("editing_character_id"),
+                    st.session_state.get("character_save_asset_id"),
+                )
                 asset = character_factory.save_character(
                     name=name,
                     description=st.session_state.get("char_source", ""),
                     profile=final_profile,
-                    asset_id=editing_id,
+                    asset_id=save_target_id,
                 )
                 saved_character_id = asset.asset_id
+
+                # Set the idempotency guard before any other side effect. Even
+                # if a second click/rerun arrives before navigation completes,
+                # it can only update this same Character.
+                st.session_state.character_save_asset_id = saved_character_id
                 _persist_factory_equipment_selection(
                     ctx.equipment,
                     character_asset_id=saved_character_id,
                     selection=equipment_selection,
                 )
+
                 reset_character_creation_state()
-                st.session_state.pending_app_page = "🎭 My Characters"
+                # Preserve the guard across the terminal rerun. It is cleared
+                # only when the user explicitly starts another Character.
+                st.session_state.character_save_asset_id = saved_character_id
                 st.session_state.last_saved_character_id = saved_character_id
-                st.success("🌟 保存成功！你的角色已经加入 My Characters。")
-                st.balloons()
+                st.session_state.app_page = "🎭 My Characters"
                 st.rerun()
             except Exception as exc:
                 st.error(f"保存失败 / Save failed: {exc}")
@@ -1053,13 +1077,17 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
                 use_container_width=True,
             ):
                 try:
-                    editing_id = st.session_state.get("editing_character_id")
+                    save_target_id = resolve_character_save_target(
+                        st.session_state.get("editing_character_id"),
+                        st.session_state.get("character_save_asset_id"),
+                    )
                     asset = character_factory.save_character(
                         name=name,
                         description=st.session_state.get("char_source", ""),
                         profile=final_profile,
-                        asset_id=editing_id,
+                        asset_id=save_target_id,
                     )
+                    st.session_state.character_save_asset_id = asset.asset_id
                     _persist_factory_equipment_selection(
                         ctx.equipment,
                         character_asset_id=asset.asset_id,
