@@ -366,6 +366,15 @@ func _apply_shot_blocking() -> void:
     )
 
     var raw_baby_offset = blocking.get("baby_offset", {})
+    print(
+        "DIR-06 blocking: start=",
+        blocking_start,
+        " end=",
+        blocking_end,
+        " movement=",
+        blocking_movement_style
+    )
+
     if typeof(raw_baby_offset) == TYPE_DICTIONARY:
         actor.set_meta(
             "director_baby_side_offset",
