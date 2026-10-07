@@ -7,6 +7,7 @@ from studio.models.asset import now_utc
 from studio.models.storyboard import StoryboardFrameRecord
 from studio.models.audio_timeline import EpisodeAudioLine
 from studio.models.subtitle_track import SubtitleCue
+from studio.models.shot_render import ShotRenderRecord
 
 
 class DialogueLine(BaseModel):
@@ -119,5 +120,6 @@ class Episode(BaseModel):
     )
     audio_timeline: list[EpisodeAudioLine] = Field(default_factory=list)
     subtitle_track: list[SubtitleCue] = Field(default_factory=list)
+    shot_renders: dict[str, ShotRenderRecord] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=now_utc)
     updated_at: datetime = Field(default_factory=now_utc)
