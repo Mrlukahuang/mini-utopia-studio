@@ -1,4 +1,6 @@
 from datetime import datetime
+from typing import Literal
+
 from pydantic import BaseModel, Field
 from studio.core.enums import ReviewStatus, StoryMode
 from studio.models.asset import now_utc
@@ -8,6 +10,24 @@ class DialogueLine(BaseModel):
     character_asset_id: str
     text: str
     emotion: str = ""
+
+
+class ShotBlockingPoint(BaseModel):
+    x: float = 0.0
+    y: float = 0.0
+    z: float = 0.0
+
+
+class ShotBlockingSpec(BaseModel):
+    actor_start: ShotBlockingPoint = Field(default_factory=ShotBlockingPoint)
+    actor_end: ShotBlockingPoint = Field(default_factory=ShotBlockingPoint)
+    facing_degrees: float = 0.0
+    baby_offset: ShotBlockingPoint = Field(
+        default_factory=lambda: ShotBlockingPoint(x=-0.8, y=0.0, z=1.0)
+    )
+    movement_style: Literal["hold", "walk", "run"] = "hold"
+    source: Literal["generated", "creator"] = "generated"
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
 
 
 class Shot(BaseModel):
@@ -21,6 +41,7 @@ class Shot(BaseModel):
     expression: str = ""
     dialogue: list[DialogueLine] = Field(default_factory=list)
     continuity_notes: list[str] = Field(default_factory=list)
+    blocking: ShotBlockingSpec | None = None
 
 
 class Scene(BaseModel):
