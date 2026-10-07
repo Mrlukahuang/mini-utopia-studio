@@ -186,8 +186,11 @@ func update_motion(
         _arm_r.rotation.z = -idle
 
 
-func play_attack_swing() -> void:
-    _attack_pose_remaining = 0.22
+func play_attack_swing(duration: float = 0.22) -> void:
+    _attack_pose_remaining = maxf(
+        _attack_pose_remaining,
+        maxf(0.05, duration)
+    )
 
 
 func play_reaction_pose(duration: float = 0.55) -> void:
