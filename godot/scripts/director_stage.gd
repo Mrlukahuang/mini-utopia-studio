@@ -2,6 +2,10 @@ extends Node3D
 
 var director_runtime: MiniUtopiaDirectorShotRuntime
 var status_label: Label
+var fallback_world_environment: WorldEnvironment
+var fallback_environment_resource: Environment
+var fallback_key_light: DirectionalLight3D
+var fallback_fill_light: DirectionalLight3D
 
 
 func _ready() -> void:
@@ -27,34 +31,50 @@ func stage_payload(payload: Dictionary) -> void:
         add_child(director_runtime)
 
     director_runtime.configure(payload)
+    _set_fallback_environment_enabled(
+        not director_runtime.bound_world_loaded
+    )
     _show_ready(payload)
 
 
 func _build_environment() -> void:
-    var environment := Environment.new()
-    environment.background_mode = Environment.BG_COLOR
-    environment.background_color = Color("#DCEBFF")
-    environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-    environment.ambient_light_color = Color("#FFF8EC")
-    environment.ambient_light_energy = 1.25
+    fallback_environment_resource = Environment.new()
+    fallback_environment_resource.background_mode = Environment.BG_COLOR
+    fallback_environment_resource.background_color = Color("#DCEBFF")
+    fallback_environment_resource.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+    fallback_environment_resource.ambient_light_color = Color("#FFF8EC")
+    fallback_environment_resource.ambient_light_energy = 1.25
 
-    var world_environment := WorldEnvironment.new()
-    world_environment.name = "DirectorWorldEnvironment"
-    world_environment.environment = environment
-    add_child(world_environment)
+    fallback_world_environment = WorldEnvironment.new()
+    fallback_world_environment.name = "DirectorWorldEnvironment"
+    fallback_world_environment.environment = fallback_environment_resource
+    add_child(fallback_world_environment)
 
-    var key_light := DirectionalLight3D.new()
-    key_light.name = "DirectorKeyLight"
-    key_light.rotation_degrees = Vector3(-52.0, -28.0, 0.0)
-    key_light.light_energy = 1.45
-    key_light.shadow_enabled = true
-    add_child(key_light)
+    fallback_key_light = DirectionalLight3D.new()
+    fallback_key_light.name = "DirectorKeyLight"
+    fallback_key_light.rotation_degrees = Vector3(-52.0, -28.0, 0.0)
+    fallback_key_light.light_energy = 1.45
+    fallback_key_light.shadow_enabled = true
+    add_child(fallback_key_light)
 
-    var fill_light := DirectionalLight3D.new()
-    fill_light.name = "DirectorFillLight"
-    fill_light.rotation_degrees = Vector3(-25.0, 145.0, 0.0)
-    fill_light.light_energy = 0.55
-    add_child(fill_light)
+    fallback_fill_light = DirectionalLight3D.new()
+    fallback_fill_light.name = "DirectorFillLight"
+    fallback_fill_light.rotation_degrees = Vector3(-25.0, 145.0, 0.0)
+    fallback_fill_light.light_energy = 0.55
+    add_child(fallback_fill_light)
+
+
+func _set_fallback_environment_enabled(enabled: bool) -> void:
+    if fallback_world_environment != null:
+        fallback_world_environment.environment = (
+            fallback_environment_resource
+            if enabled
+            else null
+        )
+    if fallback_key_light != null:
+        fallback_key_light.visible = enabled
+    if fallback_fill_light != null:
+        fallback_fill_light.visible = enabled
 
 
 func _build_overlay() -> void:
@@ -105,6 +125,12 @@ func _show_ready(payload: Dictionary) -> void:
     if typeof(camera_payload) == TYPE_DICTIONARY:
         camera_text = String(camera_payload.get("movement", ""))
 
+    var world_line := "Fallback Stage"
+    if director_runtime != null and director_runtime.bound_world_loaded:
+        world_line = "Real World · " + director_runtime.bound_scene_path
+    elif director_runtime != null and not director_runtime.world_load_error.is_empty():
+        world_line = "Fallback · " + director_runtime.world_load_error
+
     status_label.text = (
         "🎬 Director Stage / 导演模式"
         + "\n"
@@ -118,4 +144,6 @@ func _show_ready(payload: Dictionary) -> void:
         + "s"
         + "\n🎥 "
         + camera_text
+        + "\n🌍 "
+        + world_line
     )
