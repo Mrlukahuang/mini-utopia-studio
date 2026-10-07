@@ -41,8 +41,16 @@ class PublishPackageService:
         if episode is None:
             raise ValueError(f"Episode not found: {episode_id}")
 
-        expected = self._expected_record(episode_id)
         existing = episode.publish_package
+        expected = self._expected_record(
+            episode_id,
+            title=(existing.title if existing is not None else None),
+            description=(
+                existing.description
+                if existing is not None
+                else None
+            ),
+        )
         if existing is None:
             return expected
 
