@@ -30,6 +30,12 @@ class CharacterReader(Protocol):
 
     def get_character(self, character_id: str) -> dict | None: ...
 
+    def update_character(
+        self,
+        character_id: str,
+        payload: dict,
+    ) -> dict | None: ...
+
 
 _default_character_reader: CharacterReader | None = None
 
@@ -144,8 +150,8 @@ class BridgeApplication:
             )
 
         if route.startswith("/characters/"):
-            if method != "GET":
-                return self._method_not_allowed("GET")
+            if method not in {"GET", "PUT"}:
+                return self._method_not_allowed("GET, PUT")
             character_id = unquote(route[len("/characters/"):]).strip()
             if not character_id or "/" in character_id:
                 return BridgeResponse(
@@ -158,7 +164,68 @@ class BridgeApplication:
             reader = self._character_reader()
             if isinstance(reader, BridgeResponse):
                 return reader
-            character = reader.get_character(character_id)
+
+            if method == "GET":
+                character = reader.get_character(character_id)
+                if character is None:
+                    return BridgeResponse(
+                        status=HTTPStatus.NOT_FOUND,
+                        payload={
+                            "error": "character_not_found",
+                            "character_id": character_id,
+                        },
+                    )
+                return BridgeResponse(
+                    status=HTTPStatus.OK,
+                    payload=character,
+                )
+
+            parsed = self._parse_json_object(body)
+            if isinstance(parsed, BridgeResponse):
+                return parsed
+
+            # Character-specific exceptions are imported lazily so Bridge
+            # /health stays dependency-light for Godot bootstrap probes.
+            from studio.bridge.characters import (
+                CharacterRevisionConflict,
+                CharacterWriteValidationError,
+            )
+
+            try:
+                character = reader.update_character(
+                    character_id,
+                    parsed,
+                )
+            except CharacterWriteValidationError:
+                return BridgeResponse(
+                    status=HTTPStatus.BAD_REQUEST,
+                    payload={
+                        "error": "invalid_character_update",
+                        "message": (
+                            "Character update payload failed validation."
+                        ),
+                    },
+                )
+            except CharacterRevisionConflict as exc:
+                return BridgeResponse(
+                    status=HTTPStatus.CONFLICT,
+                    payload={
+                        "error": "revision_conflict",
+                        "character_id": character_id,
+                        "current_revision": exc.current_revision,
+                    },
+                )
+            except Exception:
+                return BridgeResponse(
+                    status=HTTPStatus.SERVICE_UNAVAILABLE,
+                    payload={
+                        "error": "repository_unavailable",
+                        "message": (
+                            "Canonical Creator repository is unavailable."
+                        ),
+                    },
+                )
+
             if character is None:
                 return BridgeResponse(
                     status=HTTPStatus.NOT_FOUND,
