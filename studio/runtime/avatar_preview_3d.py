@@ -274,12 +274,10 @@ function buildSword(item) {{
   addMesh(g, roundedBox(.10,.35,.10,.035), mat('#74513B',.76), [0,-.26,0], 'Handle');
   const gem = addMesh(g,new THREE.SphereGeometry(.10,16,10),mat(rarity,.34,.14),[0,-.48,0],'Pommel');
   gem.castShadow=true;
-  // Local hand pose: blade leans forward + upward from the right hand.
-  // Front for this Avatar contract is +Z, so X rotation gives a readable
-  // combat-ready 45° pitch without laying the sword across the torso.
-  g.position.set(.04,-.39,.10);
-  g.rotation.x=Math.PI/4;
-  g.rotation.z=-Math.PI/22.5;
+  // Strong forward read: mostly +Z with a smaller upward component.
+  g.position.set(.04,-.40,.18);
+  g.rotation.x=THREE.MathUtils.degToRad(68);
+  g.rotation.z=THREE.MathUtils.degToRad(-4);
   return g;
 }}
 
@@ -296,11 +294,10 @@ function buildShield(item) {{
     g,new THREE.SphereGeometry(.09,14,10),
     mat('#FFF4D7',.46,.15),[0,0,.09],'ShieldBoss'
   );
-  // Keep the shield on the outside of the left hand and yaw its face away
-  // from the torso while retaining enough forward angle to stay readable.
-  g.position.set(-.18,-.22,.10);
-  g.rotation.y=-Math.PI*.30;
-  g.rotation.z=Math.PI/30;
+  // Put the shield clearly outside the body and face it almost fully outward.
+  g.position.set(-.28,-.22,.06);
+  g.rotation.y=THREE.MathUtils.degToRad(-82);
+  g.rotation.z=THREE.MathUtils.degToRad(4);
   return g;
 }}
 
