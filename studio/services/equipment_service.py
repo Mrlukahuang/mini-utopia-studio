@@ -159,6 +159,7 @@ class EquipmentService:
         for definition in STARTER_DEFINITIONS:
             slug = definition.definition_id
             asset = existing_assets.get(slug)
+            is_new = asset is None
             if asset is None:
                 asset = Asset.create(
                     AssetType.EQUIPMENT,
@@ -166,25 +167,36 @@ class EquipmentService:
                     slug=slug,
                     description=definition.description,
                     status=ReviewStatus.APPROVED,
-                    metadata={
-                        "equipment_definition": definition.model_dump(mode="json"),
-                        "system_default": True,
-                    },
+                    metadata={"system_default": True},
                 )
-                self.repository.save_asset(asset)
 
+            dirty = is_new
             if asset.metadata.get("system_default"):
-                # Code is canonical for system defaults. This is also how the
-                # v1 starter Outfit safely migrates to the v2 Top slot while
-                # preserving the stable Asset ID used by owned instances.
+                # Code is canonical for system defaults. Only write when the
+                # stored definition actually differs; this keeps Streamlit
+                # reruns from rewriting every starter asset on every preview.
                 resolved = definition.model_copy(
                     update={"definition_id": asset.asset_id}
                 )
-                asset.display_name = resolved.display_name
-                asset.description = resolved.description
-                asset.metadata["equipment_definition"] = resolved.model_dump(mode="json")
-                asset.metadata["equipment_schema_version"] = 2
-                self.repository.save_asset(asset)
+                desired_definition = resolved.model_dump(mode="json")
+                if asset.display_name != resolved.display_name:
+                    asset.display_name = resolved.display_name
+                    dirty = True
+                if asset.description != resolved.description:
+                    asset.description = resolved.description
+                    dirty = True
+                if (
+                    asset.metadata.get("equipment_definition")
+                    != desired_definition
+                ):
+                    asset.metadata["equipment_definition"] = desired_definition
+                    dirty = True
+                if asset.metadata.get("equipment_schema_version") != 2:
+                    asset.metadata["equipment_schema_version"] = 2
+                    dirty = True
+                if asset.metadata.get("system_default") is not True:
+                    asset.metadata["system_default"] = True
+                    dirty = True
             else:
                 resolved = EquipmentDefinition.model_validate(
                     asset.metadata.get(
@@ -196,9 +208,13 @@ class EquipmentService:
                     resolved = resolved.model_copy(
                         update={"definition_id": asset.asset_id}
                     )
-                    asset.metadata["equipment_definition"] = resolved.model_dump(mode="json")
-                    self.repository.save_asset(asset)
+                    asset.metadata["equipment_definition"] = (
+                        resolved.model_dump(mode="json")
+                    )
+                    dirty = True
 
+            if dirty:
+                self.repository.save_asset(asset)
             result[resolved.definition_id] = resolved
 
         return result
@@ -237,7 +253,7 @@ class EquipmentService:
         return collection
 
     def ensure_starter_collection(self) -> CreatorCollection:
-        definitions = self.ensure_default_definitions()
+        self.ensure_default_definitions()
         by_slug = {
             asset.slug: EquipmentDefinition.model_validate(
                 asset.metadata["equipment_definition"]
@@ -247,6 +263,7 @@ class EquipmentService:
         }
 
         collection = self.get_collection()
+        dirty = False
 
         # Backward-compatible loadout migration: keep the owned item instance
         # and move only the pointer from legacy Outfit -> Top.
@@ -254,6 +271,7 @@ class EquipmentService:
             migrated = loadout.migrate_v2()
             if migrated != loadout:
                 collection.loadouts[character_id] = migrated
+                dirty = True
 
         existing_seeds = {item.generation_seed for item in collection.items}
 
@@ -269,9 +287,12 @@ class EquipmentService:
                     generation_seed=seed,
                 )
             )
+            existing_seeds.add(seed)
+            dirty = True
 
-        collection.updated_at = now_utc()
-        self.repository.save_collection(collection)
+        if dirty:
+            collection.updated_at = now_utc()
+            self.repository.save_collection(collection)
         return collection
 
     def base_stats(self, character_asset_id: str) -> StatBlock:
@@ -336,6 +357,60 @@ class EquipmentService:
         )
         collection.updated_at = now_utc()
         self.repository.save_collection(collection)
+        return collection
+
+    def apply_loadout(
+        self,
+        *,
+        character_asset_id: str,
+        slot_items: dict[EquipmentSlot, str | None],
+    ) -> CreatorCollection:
+        """Validate and persist a complete loadout in one collection write."""
+
+        asset = self.repository.get_asset(character_asset_id)
+        if asset is None or asset.asset_type != AssetType.CHARACTER:
+            raise ValueError(f"Character not found: {character_asset_id}")
+
+        profile = CharacterProfile.model_validate(
+            asset.metadata.get("character_profile", {})
+        )
+        character_tags = set(profile.avatar.compatible_tags or ["humanoid"])
+        collection = self.ensure_starter_collection()
+        definitions = self.list_definitions()
+        loadout = collection.loadout_for(character_asset_id)
+
+        for slot in PLAYABLE_EQUIPMENT_SLOTS:
+            item_id = slot_items.get(slot)
+            if item_id is None:
+                loadout = loadout.with_item(slot, None)
+                continue
+
+            item = collection.item_by_id(item_id)
+            if item is None:
+                raise ValueError(f"Equipment item not owned: {item_id}")
+
+            definition = definitions.get(item.definition_id)
+            if definition is None:
+                raise ValueError(
+                    f"Equipment definition not found: {item.definition_id}"
+                )
+            if definition.slot != slot:
+                raise ValueError(
+                    f"Equipment slot mismatch: {definition.display_name}"
+                )
+
+            required_tags = set(definition.compatible_tags)
+            if required_tags and character_tags.isdisjoint(required_tags):
+                raise ValueError(
+                    "Equipment is incompatible with this Character: "
+                    f"{definition.display_name}"
+                )
+            loadout = loadout.with_item(slot, item.item_instance_id)
+
+        if collection.loadouts.get(character_asset_id) != loadout:
+            collection.loadouts[character_asset_id] = loadout
+            collection.updated_at = now_utc()
+            self.repository.save_collection(collection)
         return collection
 
     def set_favorite(
