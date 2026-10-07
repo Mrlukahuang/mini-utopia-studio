@@ -1,7 +1,7 @@
 from __future__ import annotations
 import re
 from studio.core.enums import AssetType, ReviewStatus
-from studio.models.asset import Asset
+from studio.models.asset import Asset, now_utc
 from studio.models.character import CharacterProfile
 from studio.models.world import WorldProfile
 from studio.repositories.base import StudioRepository
@@ -42,6 +42,7 @@ class AssetService:
         asset.slug = slugify(name)
         asset.description = description
         asset.metadata["character_profile"] = profile.model_dump(mode="json")
+        asset.updated_at = now_utc()
         self.repository.save_asset(asset)
         return asset
 
@@ -98,6 +99,7 @@ class AssetService:
         if asset is None or asset.asset_type != AssetType.LOCATION:
             raise ValueError(f"World not found: {asset_id}")
         asset.status = ReviewStatus.ARCHIVED
+        asset.updated_at = now_utc()
         self.repository.save_asset(asset)
         return asset
 
@@ -156,5 +158,6 @@ class AssetService:
         if asset is None or asset.asset_type != AssetType.CHARACTER:
             raise ValueError(f"Character not found: {asset_id}")
         asset.status = ReviewStatus.ARCHIVED
+        asset.updated_at = now_utc()
         self.repository.save_asset(asset)
         return asset
