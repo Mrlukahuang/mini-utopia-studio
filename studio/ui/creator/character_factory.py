@@ -186,6 +186,19 @@ def _choice(selected: str, previous: str, options: list[str]) -> str:
     return CUSTOM
 
 
+def resolve_character_save_target(
+    editing_character_id: str | None,
+    saved_character_id: str | None,
+) -> str | None:
+    """Return the one Character asset that this builder run may mutate.
+
+    saved_character_id is the idempotency guard for a newly-created hero:
+    once the first Save creates an asset, any repeated Save event updates that
+    same asset instead of creating another Character.
+    """
+    return editing_character_id or saved_character_id
+
+
 def _factory_equipment_state(equipment_service):
     collection = equipment_service.ensure_starter_collection()
     definitions = equipment_service.list_definitions()
@@ -375,6 +388,7 @@ def reset_character_creation_state() -> None:
         "character_master_candidate_path",
         "character_master_character_id",
         "char_equipment_selection",
+        "character_save_asset_id",
     ):
         st.session_state.pop(key, None)
 
@@ -1002,27 +1016,40 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
             use_container_width=True,
         ):
             try:
-                editing_id = st.session_state.get("editing_character_id")
+                save_target_id = resolve_character_save_target(
+                    st.session_state.get("editing_character_id"),
+                    st.session_state.get("character_save_asset_id"),
+                )
                 asset = character_factory.save_character(
                     name=name,
                     description=st.session_state.get("char_source", ""),
                     profile=final_profile,
-                    asset_id=editing_id,
+                    asset_id=save_target_id,
                 )
                 saved_character_id = asset.asset_id
+
+                # Set the idempotency guard before any other side effect. Even
+                # if a second click/rerun arrives before navigation completes,
+                # it can only update this same Character.
+                st.session_state.character_save_asset_id = saved_character_id
                 _persist_factory_equipment_selection(
                     ctx.equipment,
                     character_asset_id=saved_character_id,
                     selection=equipment_selection,
                 )
+
                 reset_character_creation_state()
-                st.session_state.pending_app_page = "🎭 My Characters"
+                # Preserve the guard across the terminal rerun. It is cleared
+                # only when the user explicitly starts another Character.
+                st.session_state.character_save_asset_id = saved_character_id
                 st.session_state.last_saved_character_id = saved_character_id
-                st.success("🌟 保存成功！你的角色已经加入 My Characters。")
-                st.balloons()
-                st.rerun()
+                st.session_state.app_page = "🎭 My Characters"
             except Exception as exc:
                 st.error(f"保存失败 / Save failed: {exc}")
+            else:
+                # Keep Streamlit control-flow outside the persistence
+                # exception handler so navigation can never be swallowed.
+                st.rerun()
 
     count = int(st.session_state.get("creator_generation_count", 0))
     remaining = max(0, MAX_GENERATIONS_PER_SESSION - count)
@@ -1053,13 +1080,17 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
                 use_container_width=True,
             ):
                 try:
-                    editing_id = st.session_state.get("editing_character_id")
+                    save_target_id = resolve_character_save_target(
+                        st.session_state.get("editing_character_id"),
+                        st.session_state.get("character_save_asset_id"),
+                    )
                     asset = character_factory.save_character(
                         name=name,
                         description=st.session_state.get("char_source", ""),
                         profile=final_profile,
-                        asset_id=editing_id,
+                        asset_id=save_target_id,
                     )
+                    st.session_state.character_save_asset_id = asset.asset_id
                     _persist_factory_equipment_selection(
                         ctx.equipment,
                         character_asset_id=asset.asset_id,
@@ -1075,9 +1106,10 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
                     st.session_state.character_master_candidate_path = candidate.path
                     st.session_state.character_master_character_id = asset.asset_id
                     st.session_state.creator_generation_count = count + 1
-                    st.rerun()
                 except Exception as exc:
                     st.error(f"生成失败 / Generation failed: {exc}")
+                else:
+                    st.rerun()
 
     candidate_path = st.session_state.get("character_master_candidate_path")
     candidate_character_id = st.session_state.get("character_master_character_id")
@@ -1122,14 +1154,17 @@ def render_character_factory(ctx, character_factory, *, studio_mode: bool = Fals
                         candidate_path=candidate_path,
                     )
                     reset_character_creation_state()
-                    st.session_state.pending_app_page = "🎭 My Characters"
-                    st.success(
-                        f"角色正式加入 Mini Utopia！ · {candidate_character_id}"
+                    st.session_state.character_save_asset_id = (
+                        candidate_character_id
                     )
-                    st.balloons()
-                    st.rerun()
+                    st.session_state.last_saved_character_id = (
+                        candidate_character_id
+                    )
+                    st.session_state.app_page = "🎭 My Characters"
                 except Exception as exc:
                     st.error(f"保存失败 / Approval failed: {exc}")
+                else:
+                    st.rerun()
         with new:
             if st.button("🆕 New Character / 新角色", use_container_width=True):
                 _start_over()
