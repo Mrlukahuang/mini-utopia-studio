@@ -12,6 +12,7 @@ from studio.models.baby import BabyRoster
 from studio.models.story import Story
 from studio.models.quest import QuestDefinition
 from studio.models.universe import Universe
+from studio.models.universe_memory import UniverseMemoryRecord
 from studio.repositories.base import StudioRepository
 
 
@@ -186,6 +187,41 @@ class SupabaseStudioRepository(StudioRepository):
             QuestDefinition.model_validate(data)
             for data in self._list(kind="quest")
         ]
+
+    def save_universe_memory(self, memory: UniverseMemoryRecord) -> None:
+        self._upsert(
+            record_id=memory.memory_id,
+            kind="universe_memory",
+            name=memory.source_key,
+            data=memory.model_dump(mode="json"),
+            updated_at=memory.updated_at.isoformat(),
+        )
+
+    def get_universe_memory(
+        self,
+        memory_id: str,
+    ) -> UniverseMemoryRecord | None:
+        data = self._get_one(
+            kind="universe_memory",
+            record_id=memory_id,
+        )
+        return UniverseMemoryRecord.model_validate(data) if data else None
+
+    def list_universe_memories(
+        self,
+        universe_id: str | None = None,
+    ) -> list[UniverseMemoryRecord]:
+        memories = [
+            UniverseMemoryRecord.model_validate(data)
+            for data in self._list(kind="universe_memory")
+        ]
+        if universe_id is not None:
+            memories = [
+                memory
+                for memory in memories
+                if memory.universe_id == universe_id
+            ]
+        return memories
 
     def save_collection(self, collection: CreatorCollection) -> None:
         self._upsert(
