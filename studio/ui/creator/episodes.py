@@ -13,6 +13,9 @@ from studio.services.director_shot_session_service import (
     DirectorShotSessionService,
 )
 from studio.services.episode_service import EpisodeService
+from studio.services.production_status_service import (
+    EpisodeProductionStatusService,
+)
 from studio.services.scene_breakdown_service import SceneBreakdownService
 from studio.services.shot_plan_service import ShotPlanService
 from studio.services.storyboard_service import StoryboardService
@@ -37,6 +40,10 @@ def render_episode_library(ctx) -> None:
     storyboard_service = StoryboardService(
         ctx.repository,
         director_service,
+    )
+    production_status_service = EpisodeProductionStatusService(
+        ctx.repository,
+        storyboard_service,
     )
     episodes = episode_service.list_episodes()
     episodes = [
@@ -214,6 +221,111 @@ def render_episode_library(ctx) -> None:
                                     None,
                                 )
                                 st.rerun()
+
+                production = production_status_service.status(
+                    episode.episode_id
+                )
+                with st.container(border=True):
+                    st.markdown("#### 🎬 Production Progress / 制作进度")
+                    st.progress(
+                        production.progress_percent / 100,
+                        text=f"{production.progress_percent}% · "
+                        "Story → Scene → Shot → Storyboard → Render",
+                    )
+                    p1, p2, p3, p4 = st.columns(4)
+                    p1.metric(
+                        "Scenes",
+                        f"{production.scenes_ready}/{production.scenes_total}",
+                    )
+                    p2.metric(
+                        "Shots",
+                        f"{production.shots_ready}/{production.shots_total}",
+                    )
+                    p3.metric(
+                        "Storyboard",
+                        f"{production.storyboard_ready}/{production.storyboard_total}",
+                    )
+                    p4.metric(
+                        "Approved",
+                        f"{production.storyboard_approved}/{production.storyboard_total}",
+                    )
+
+                    next_labels = {
+                        "build_scenes": "📝 Build Scenes / 拆场景",
+                        "build_shots": "🎥 Build Shot List / 生成镜头",
+                        "generate_storyboard": "🖼️ Generate Next Frame / 生成下一张分镜",
+                        "review_storyboard": "👀 Review Storyboard Below / 审核下方分镜",
+                        "render_shots": "🎬 Storyboard Approved · Ready to Render",
+                        "assemble_episode": "✂️ Shots Rendered · Ready to Assemble",
+                        "complete": "✅ Episode Complete / 剧集完成",
+                    }
+                    next_label = next_labels[production.next_action]
+
+                    if production.next_action == "build_scenes":
+                        if st.button(
+                            next_label,
+                            key=f"production_next_scenes_{episode.episode_id}",
+                            type="primary",
+                            use_container_width=True,
+                        ):
+                            scene_service.build_from_story(
+                                episode.episode_id
+                            )
+                            st.rerun()
+                    elif production.next_action == "build_shots":
+                        if st.button(
+                            next_label,
+                            key=f"production_next_shots_{episode.episode_id}",
+                            type="primary",
+                            use_container_width=True,
+                        ):
+                            shot_service.build_for_episode(
+                                episode.episode_id
+                            )
+                            st.rerun()
+                    elif production.next_action == "generate_storyboard":
+                        if st.button(
+                            next_label,
+                            key=f"production_next_storyboard_{episode.episode_id}",
+                            type="primary",
+                            use_container_width=True,
+                        ):
+                            for production_scene in episode.scenes:
+                                generated_one = False
+                                for production_shot in production_scene.shots:
+                                    frame = storyboard_service.status_for(
+                                        episode_id=episode.episode_id,
+                                        scene_id=production_scene.scene_id,
+                                        shot_id=production_shot.shot_id,
+                                    )
+                                    if frame.status != "ready":
+                                        with st.spinner(
+                                            "🎬 正在生成下一张 Storyboard…"
+                                        ):
+                                            storyboard_service.generate_frame(
+                                                episode_id=episode.episode_id,
+                                                scene_id=production_scene.scene_id,
+                                                shot_id=production_shot.shot_id,
+                                            )
+                                        generated_one = True
+                                        break
+                                if generated_one:
+                                    break
+                            st.rerun()
+                    elif production.next_action == "review_storyboard":
+                        st.info(
+                            next_label
+                            + " · "
+                            + f"{production.storyboard_needs_change} 需修改 · "
+                            + f"{production.storyboard_stale} 已过期"
+                        )
+                    elif production.next_action in {
+                        "render_shots",
+                        "assemble_episode",
+                    }:
+                        st.success(next_label)
+                    else:
+                        st.success(next_label)
 
                 st.markdown("#### 🖼️ Storyboard / 分镜板")
                 storyboard_rows = [
