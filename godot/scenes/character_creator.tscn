@@ -144,18 +144,21 @@ theme_override_constants/separation = 6
 
 [node name="SlimButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/BodyRow"]
 custom_minimum_size = Vector2(0, 34)
+toggle_mode = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Slim"
 
 [node name="StandardButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/BodyRow"]
 custom_minimum_size = Vector2(0, 34)
+toggle_mode = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Standard"
 
 [node name="ChubbyButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/BodyRow"]
 custom_minimum_size = Vector2(0, 34)
+toggle_mode = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Chubby"
@@ -173,26 +176,31 @@ theme_override_constants/v_separation = 6
 
 [node name="HumanButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SpeciesGrid"]
 custom_minimum_size = Vector2(126, 34)
+toggle_mode = true
 layout_mode = 2
 text = "Human"
 
 [node name="SheepButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SpeciesGrid"]
 custom_minimum_size = Vector2(126, 34)
+toggle_mode = true
 layout_mode = 2
 text = "Sheep"
 
 [node name="RobotButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SpeciesGrid"]
 custom_minimum_size = Vector2(126, 34)
+toggle_mode = true
 layout_mode = 2
 text = "Robot"
 
 [node name="CatButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SpeciesGrid"]
 custom_minimum_size = Vector2(126, 34)
+toggle_mode = true
 layout_mode = 2
 text = "Cat"
 
 [node name="CloudButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SpeciesGrid"]
 custom_minimum_size = Vector2(126, 34)
+toggle_mode = true
 layout_mode = 2
 text = "Cloud"
 
@@ -209,26 +217,31 @@ theme_override_constants/v_separation = 6
 
 [node name="SkinButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SurfaceGrid"]
 custom_minimum_size = Vector2(82, 32)
+toggle_mode = true
 layout_mode = 2
 text = "Skin"
 
 [node name="FurButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SurfaceGrid"]
 custom_minimum_size = Vector2(82, 32)
+toggle_mode = true
 layout_mode = 2
 text = "Fur"
 
 [node name="WoolButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SurfaceGrid"]
 custom_minimum_size = Vector2(82, 32)
+toggle_mode = true
 layout_mode = 2
 text = "Wool"
 
 [node name="MetalButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SurfaceGrid"]
 custom_minimum_size = Vector2(82, 32)
+toggle_mode = true
 layout_mode = 2
 text = "Metal"
 
 [node name="CloudButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SurfaceGrid"]
 custom_minimum_size = Vector2(82, 32)
+toggle_mode = true
 layout_mode = 2
 text = "Cloud"
 
