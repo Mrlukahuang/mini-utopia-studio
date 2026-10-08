@@ -1,0 +1,204 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/character_creator_shell.gd" id="1_shell"]
+[ext_resource type="Script" path="res://scripts/bridge_client.gd" id="2_bridge"]
+
+[node name="CharacterCreator" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_shell")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.969, 0.953, 0.99, 1)
+
+[node name="BridgeClient" type="Node" parent="."]
+script = ExtResource("2_bridge")
+
+[node name="RootMargin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 28.0
+offset_top = 22.0
+offset_right = -28.0
+offset_bottom = -22.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MainColumn" type="VBoxContainer" parent="RootMargin"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="HeaderRow" type="HBoxContainer" parent="RootMargin/MainColumn"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="TitleColumn" type="VBoxContainer" parent="RootMargin/MainColumn/HeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 2
+
+[node name="Kicker" type="Label" parent="RootMargin/MainColumn/HeaderRow/TitleColumn"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.43, 0.36, 0.68, 1)
+theme_override_font_sizes/font_size = 15
+text = "MINI UTOPIA · CHARACTER CREATOR"
+
+[node name="Title" type="Label" parent="RootMargin/MainColumn/HeaderRow/TitleColumn"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.16, 0.14, 0.24, 1)
+theme_override_font_sizes/font_size = 30
+text = "Make Your Mini Hero ✨"
+
+[node name="Subtitle" type="Label" parent="RootMargin/MainColumn/HeaderRow/TitleColumn"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.34, 0.31, 0.43, 1)
+theme_override_font_sizes/font_size = 16
+text = "Create, dress, and save your hero in Mini Utopia."
+
+[node name="CharacterLabel" type="Label" parent="RootMargin/MainColumn/HeaderRow"]
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_colors/font_color = Color(0.33, 0.25, 0.53, 1)
+theme_override_font_sizes/font_size = 18
+text = "New Hero"
+horizontal_alignment = 2
+
+[node name="StepTabs" type="HBoxContainer" parent="RootMargin/MainColumn"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="LookStep" type="Button" parent="RootMargin/MainColumn/StepTabs"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "1 · Look"
+
+[node name="PersonalityStep" type="Button" parent="RootMargin/MainColumn/StepTabs"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "2 · Personality"
+
+[node name="OutfitStep" type="Button" parent="RootMargin/MainColumn/StepTabs"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "3 · Outfit"
+
+[node name="ReadyStep" type="Button" parent="RootMargin/MainColumn/StepTabs"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "4 · Ready"
+
+[node name="CreatorBody" type="HBoxContainer" parent="RootMargin/MainColumn"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 18
+
+[node name="ChoicePanel" type="PanelContainer" parent="RootMargin/MainColumn/CreatorBody"]
+custom_minimum_size = Vector2(310, 0)
+layout_mode = 2
+
+[node name="Margin" type="MarginContainer" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 18
+
+[node name="Content" type="VBoxContainer" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Heading" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.18, 0.16, 0.26, 1)
+theme_override_font_sizes/font_size = 22
+text = "Build Your Hero"
+
+[node name="Hint" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.35, 0.46, 1)
+theme_override_font_sizes/font_size = 15
+text = "CC01 is the Creator shell.\nAppearance controls arrive next."
+autowrap_mode = 2
+
+[node name="Spacer" type="Control" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ChildNote" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.39, 0.31, 0.57, 1)
+theme_override_font_sizes/font_size = 14
+text = "No Godot Editor controls here.\nThis is the Mini Utopia game UI."
+autowrap_mode = 2
+
+[node name="PreviewPanel" type="PanelContainer" parent="RootMargin/MainColumn/CreatorBody"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="PreviewCenter" type="CenterContainer" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel"]
+layout_mode = 2
+
+[node name="PreviewPlaceholder" type="VBoxContainer" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/PreviewCenter"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="AvatarIcon" type="Label" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/PreviewCenter/PreviewPlaceholder"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 64
+text = "🧸"
+horizontal_alignment = 1
+
+[node name="PreviewTitle" type="Label" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/PreviewCenter/PreviewPlaceholder"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.24, 0.21, 0.34, 1)
+theme_override_font_sizes/font_size = 22
+text = "Your 3D Hero lives here"
+horizontal_alignment = 1
+
+[node name="PreviewHint" type="Label" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/PreviewCenter/PreviewPlaceholder"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.44, 0.4, 0.52, 1)
+theme_override_font_sizes/font_size = 15
+text = "CC02 connects the persistent Avatar runtime."
+horizontal_alignment = 1
+
+[node name="StatusBar" type="PanelContainer" parent="RootMargin/MainColumn"]
+layout_mode = 2
+
+[node name="StatusLabel" type="Label" parent="RootMargin/MainColumn/StatusBar"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "Starting Creator…"
+horizontal_alignment = 1
+
+[node name="FooterRow" type="HBoxContainer" parent="RootMargin/MainColumn"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="BackButton" type="Button" parent="RootMargin/MainColumn/FooterRow"]
+custom_minimum_size = Vector2(180, 50)
+layout_mode = 2
+text = "← Back"
+
+[node name="FooterSpacer" type="Control" parent="RootMargin/MainColumn/FooterRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="SaveButton" type="Button" parent="RootMargin/MainColumn/FooterRow"]
+custom_minimum_size = Vector2(240, 50)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "💖 Save My Hero"
