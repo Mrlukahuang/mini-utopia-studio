@@ -1,7 +1,7 @@
 extends SceneTree
 
 const CHARACTER_ID := "CHAR_EQUIPMENT_SMOKE"
-const BASE_URL := "http://127.0.0.1:8765"
+const BASE_URL := "http://127.0.0.1:8766"
 const EXPECTED_SLOTS := [
     "top",
     "bottom",
