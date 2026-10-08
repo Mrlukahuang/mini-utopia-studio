@@ -8,6 +8,7 @@ const DEFAULT_SUBTITLE := "Create, dress, and save your hero in Mini Utopia."
 @onready var character_label: Label = $RootMargin/MainColumn/HeaderRow/CharacterLabel
 @onready var back_button: Button = $RootMargin/MainColumn/FooterRow/BackButton
 @onready var save_button: Button = $RootMargin/MainColumn/FooterRow/SaveButton
+@onready var avatar_stage: MiniUtopiaCreatorAvatarStage = $RootMargin/MainColumn/CreatorBody/PreviewPanel/AvatarStage
 
 var character_id := ""
 var loaded_character: Dictionary = {}
@@ -57,6 +58,11 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         character_label.text = (
             display_name if not display_name.is_empty() else character_id
         )
+        var profile = payload.get("profile", {})
+        if typeof(profile) == TYPE_DICTIONARY:
+            var appearance = profile.get("avatar", {})
+            if typeof(appearance) == TYPE_DICTIONARY:
+                avatar_stage.apply_appearance(appearance)
         save_button.disabled = false
         _set_status("Character loaded · ready to create.", false)
         return

@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/character_creator_shell.gd" id="1_shell"]
 [ext_resource type="Script" path="res://scripts/bridge_client.gd" id="2_bridge"]
+[ext_resource type="Script" path="res://scripts/creator_avatar_stage.gd" id="3_stage"]
 
 [node name="CharacterCreator" type="Control"]
 layout_mode = 3
@@ -148,31 +149,28 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="PreviewCenter" type="CenterContainer" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel"]
+[node name="AvatarStage" type="SubViewportContainer" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel"]
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+stretch = true
+script = ExtResource("3_stage")
 
-[node name="PreviewPlaceholder" type="VBoxContainer" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/PreviewCenter"]
-layout_mode = 2
-theme_override_constants/separation = 10
-
-[node name="AvatarIcon" type="Label" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/PreviewCenter/PreviewPlaceholder"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 64
-text = "🧸"
-horizontal_alignment = 1
-
-[node name="PreviewTitle" type="Label" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/PreviewCenter/PreviewPlaceholder"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.24, 0.21, 0.34, 1)
-theme_override_font_sizes/font_size = 22
-text = "Your 3D Hero lives here"
-horizontal_alignment = 1
-
-[node name="PreviewHint" type="Label" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/PreviewCenter/PreviewPlaceholder"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.44, 0.4, 0.52, 1)
-theme_override_font_sizes/font_size = 15
-text = "CC02 connects the persistent Avatar runtime."
+[node name="StageHint" type="Label" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel"]
+layout_mode = 1
+anchors_preset = 12
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 14.0
+offset_top = -38.0
+offset_right = -14.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.34, 0.31, 0.43, 0.86)
+theme_override_font_sizes/font_size = 14
+text = "Drag to rotate · Scroll to zoom"
 horizontal_alignment = 1
 
 [node name="StatusBar" type="PanelContainer" parent="RootMargin/MainColumn"]
