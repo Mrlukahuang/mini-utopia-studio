@@ -129,20 +129,108 @@ text = "Build Your Hero"
 [node name="Hint" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.38, 0.35, 0.46, 1)
-theme_override_font_sizes/font_size = 15
-text = "CC01 is the Creator shell.\nAppearance controls arrive next."
-autowrap_mode = 2
-
-[node name="Spacer" type="Control" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content"]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="ChildNote" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.39, 0.31, 0.57, 1)
 theme_override_font_sizes/font_size = 14
-text = "No Godot Editor controls here.\nThis is the Mini Utopia game UI."
+text = "Tap a choice. Your 3D hero changes instantly."
 autowrap_mode = 2
+
+[node name="BodyLabel" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "Body / 体型"
+
+[node name="BodyRow" type="HBoxContainer" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="SlimButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/BodyRow"]
+custom_minimum_size = Vector2(0, 34)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Slim"
+
+[node name="StandardButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/BodyRow"]
+custom_minimum_size = Vector2(0, 34)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Standard"
+
+[node name="ChubbyButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/BodyRow"]
+custom_minimum_size = Vector2(0, 34)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Chubby"
+
+[node name="SpeciesLabel" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "Species / 角色"
+
+[node name="SpeciesGrid" type="GridContainer" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content"]
+layout_mode = 2
+columns = 2
+theme_override_constants/h_separation = 6
+theme_override_constants/v_separation = 6
+
+[node name="HumanButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SpeciesGrid"]
+custom_minimum_size = Vector2(126, 34)
+layout_mode = 2
+text = "Human"
+
+[node name="SheepButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SpeciesGrid"]
+custom_minimum_size = Vector2(126, 34)
+layout_mode = 2
+text = "Sheep"
+
+[node name="RobotButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SpeciesGrid"]
+custom_minimum_size = Vector2(126, 34)
+layout_mode = 2
+text = "Robot"
+
+[node name="CatButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SpeciesGrid"]
+custom_minimum_size = Vector2(126, 34)
+layout_mode = 2
+text = "Cat"
+
+[node name="CloudButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SpeciesGrid"]
+custom_minimum_size = Vector2(126, 34)
+layout_mode = 2
+text = "Cloud"
+
+[node name="SurfaceLabel" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "Surface / 质感"
+
+[node name="SurfaceGrid" type="GridContainer" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content"]
+layout_mode = 2
+columns = 3
+theme_override_constants/h_separation = 6
+theme_override_constants/v_separation = 6
+
+[node name="SkinButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SurfaceGrid"]
+custom_minimum_size = Vector2(82, 32)
+layout_mode = 2
+text = "Skin"
+
+[node name="FurButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SurfaceGrid"]
+custom_minimum_size = Vector2(82, 32)
+layout_mode = 2
+text = "Fur"
+
+[node name="WoolButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SurfaceGrid"]
+custom_minimum_size = Vector2(82, 32)
+layout_mode = 2
+text = "Wool"
+
+[node name="MetalButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SurfaceGrid"]
+custom_minimum_size = Vector2(82, 32)
+layout_mode = 2
+text = "Metal"
+
+[node name="CloudButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SurfaceGrid"]
+custom_minimum_size = Vector2(82, 32)
+layout_mode = 2
+text = "Cloud"
 
 [node name="PreviewPanel" type="PanelContainer" parent="RootMargin/MainColumn/CreatorBody"]
 layout_mode = 2
@@ -155,6 +243,33 @@ size_flags_horizontal = 3
 size_flags_vertical = 3
 stretch = true
 script = ExtResource("3_stage")
+
+[node name="ZoomControls" type="HBoxContainer" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -220.0
+offset_top = 12.0
+offset_right = -12.0
+offset_bottom = 48.0
+grow_horizontal = 0
+theme_override_constants/separation = 6
+
+[node name="ZoomOutButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/ZoomControls"]
+custom_minimum_size = Vector2(56, 36)
+layout_mode = 2
+text = "−"
+
+[node name="ResetButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/ZoomControls"]
+custom_minimum_size = Vector2(88, 36)
+layout_mode = 2
+text = "Reset"
+
+[node name="ZoomInButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/ZoomControls"]
+custom_minimum_size = Vector2(56, 36)
+layout_mode = 2
+text = "+"
 
 [node name="StageHint" type="Label" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel"]
 layout_mode = 1
@@ -170,7 +285,7 @@ grow_vertical = 0
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.34, 0.31, 0.43, 0.86)
 theme_override_font_sizes/font_size = 14
-text = "Drag to rotate · Scroll to zoom"
+text = "Drag to rotate · Use + / − to zoom"
 horizontal_alignment = 1
 
 [node name="StatusBar" type="PanelContainer" parent="RootMargin/MainColumn"]
