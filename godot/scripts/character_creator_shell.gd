@@ -50,17 +50,21 @@ func _read_user_args() -> void:
 
 
 func _on_bridge_success(kind: String, payload: Dictionary) -> void:
-    if kind != "character:get":
+    if kind == "character:get":
+        loaded_character = payload.duplicate(true)
+        character_id = String(payload.get("character_id", character_id))
+        var display_name := String(payload.get("display_name", character_id))
+        character_label.text = (
+            display_name if not display_name.is_empty() else character_id
+        )
+        save_button.disabled = false
+        _set_status("Character loaded · ready to create.", false)
         return
 
-    loaded_character = payload.duplicate(true)
-    character_id = String(payload.get("character_id", character_id))
-    var display_name := String(payload.get("display_name", character_id))
-    character_label.text = (
-        display_name if not display_name.is_empty() else character_id
-    )
-    save_button.disabled = false
-    _set_status("Character loaded · ready to create.", false)
+    if kind == "character:put":
+        loaded_character = payload.duplicate(true)
+        save_button.disabled = false
+        _set_status("Saved! Your hero is safe in Mini Utopia. 💖", false)
 
 
 func _on_bridge_failure(
@@ -69,17 +73,29 @@ func _on_bridge_failure(
     _error_code: String,
     message: String
 ) -> void:
-    if kind != "character:get":
+    save_button.disabled = true
+
+    if kind == "character:get":
+        if status_code == 404:
+            _set_status(
+                "Character not found. Return and choose another hero.",
+                true
+            )
+        else:
+            _set_status(
+                message + " Start the Mini Utopia Bridge and try again.",
+                true
+            )
         return
 
-    save_button.disabled = true
-    if status_code == 404:
-        _set_status("Character not found. Return and choose another hero.", true)
-    else:
-        _set_status(
-            message + " Start the Mini Utopia Bridge and try again.",
-            true
-        )
+    if kind == "character:put":
+        if status_code == 409:
+            _set_status(
+                "This hero changed somewhere else. Reopen it before saving.",
+                true
+            )
+        else:
+            _set_status("Save failed. " + message, true)
 
 
 func _on_back_pressed() -> void:
@@ -95,11 +111,23 @@ func _on_save_pressed() -> void:
         return
 
     save_button.disabled = true
-    _set_status(
-        "Save wiring is ready; appearance editing arrives in CC02–CC04.",
-        false
-    )
-    save_button.disabled = false
+    _set_status("Saving your hero…", false)
+
+    var payload := {
+        "schema_version": String(
+            loaded_character.get("schema_version", "1.0")
+        ),
+        "revision": String(loaded_character.get("revision", "")),
+        "display_name": String(
+            loaded_character.get("display_name", character_id)
+        ),
+        "description": String(loaded_character.get("description", "")),
+        "profile": loaded_character.get("profile", {}),
+    }
+    var error := bridge.put_character(character_id, payload)
+    if error != OK:
+        save_button.disabled = false
+        _set_status("Could not start Save. Please try again.", true)
 
 
 func _set_status(message: String, is_error: bool) -> void:
