@@ -103,10 +103,10 @@ static func allowed_eye_ids(species_head_id: String) -> Array[String]:
 
 
 static func allowed_hair_ids(species_head_id: String) -> Array[String]:
-    if species_head_id in {
-        "species_head_robot_v1": true,
-        "species_head_cloud_v1": true,
-    }:
+    if (
+        species_head_id == "species_head_robot_v1"
+        or species_head_id == "species_head_cloud_v1"
+    ):
         return ["hair_none", "hair_short_v1", "hair_fluffy_v1"]
     return [
         "hair_none",
