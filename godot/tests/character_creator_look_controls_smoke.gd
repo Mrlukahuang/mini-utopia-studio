@@ -52,14 +52,18 @@ func _initialize() -> void:
 
     (species_grid.get_node("SheepButton") as Button).pressed.emit()
     appearance = stage.current_appearance()
-    if appearance.get("surface_type") != "wool":
-        _fail("Sheep did not normalize Surface to wool")
+    if appearance.get("surface_type") != "fur":
+        _fail("Sheep should preserve already-compatible fur")
         return
 
-    fur_button.pressed.emit()
+    var wool_button := surface_grid.get_node("WoolButton") as Button
+    if wool_button.disabled:
+        _fail("valid Sheep wool surface was disabled")
+        return
+    wool_button.pressed.emit()
     appearance = stage.current_appearance()
-    if appearance.get("surface_type") != "fur":
-        _fail("valid Sheep fur choice did not apply")
+    if appearance.get("surface_type") != "wool":
+        _fail("valid Sheep wool choice did not apply")
         return
 
     if stage.avatar_root_instance_id() != first_root_id:
