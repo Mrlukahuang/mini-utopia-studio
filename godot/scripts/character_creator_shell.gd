@@ -22,6 +22,13 @@ const SURFACE_BUTTONS := {
     "MetalButton": "metal",
     "CloudButton": "cloud",
 }
+const ANIMATION_BUTTONS := {
+    "IdleButton": "Idle",
+    "WalkButton": "Walk",
+    "RunButton": "Run",
+    "JumpButton": "Jump",
+}
+
 const COLOR_BUTTONS := {
     "CreamButton": "#F6F1E8",
     "WarmButton": "#F2C7A5",
@@ -50,6 +57,7 @@ const COLOR_BUTTONS := {
 @onready var hair_style_option: OptionButton = $RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/HairStyleOption
 @onready var color_target_option: OptionButton = $RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorTargetOption
 @onready var color_grid: GridContainer = $RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid
+@onready var animation_controls: HBoxContainer = $RootMargin/MainColumn/CreatorBody/PreviewPanel/AnimationControls
 @onready var zoom_out_button: Button = $RootMargin/MainColumn/CreatorBody/PreviewPanel/ZoomControls/ZoomOutButton
 @onready var reset_button: Button = $RootMargin/MainColumn/CreatorBody/PreviewPanel/ZoomControls/ResetButton
 @onready var zoom_in_button: Button = $RootMargin/MainColumn/CreatorBody/PreviewPanel/ZoomControls/ZoomInButton
@@ -68,6 +76,7 @@ func _ready() -> void:
     bridge.request_succeeded.connect(_on_bridge_success)
     bridge.request_failed.connect(_on_bridge_failure)
     _wire_look_controls()
+    _wire_animation_controls()
 
     _draft_appearance = avatar_stage.current_appearance()
     _refresh_look_controls()
@@ -143,6 +152,32 @@ func _wire_look_controls() -> void:
     zoom_in_button.pressed.connect(avatar_stage.zoom_in)
     zoom_out_button.pressed.connect(avatar_stage.zoom_out)
     reset_button.pressed.connect(avatar_stage.reset_camera)
+
+
+func _wire_animation_controls() -> void:
+    for button_name in ANIMATION_BUTTONS:
+        var button := animation_controls.get_node(button_name) as Button
+        button.pressed.connect(
+            _on_animation_selected.bind(
+                String(ANIMATION_BUTTONS[button_name])
+            )
+        )
+    _refresh_animation_buttons()
+
+
+func _on_animation_selected(animation_name: String) -> void:
+    avatar_stage.play_preview_animation(animation_name)
+    _refresh_animation_buttons()
+    _set_status(animation_name + " preview · instant Godot runtime.", false)
+
+
+func _refresh_animation_buttons() -> void:
+    var current := avatar_stage.current_preview_animation()
+    for button_name in ANIMATION_BUTTONS:
+        var button := animation_controls.get_node(button_name) as Button
+        button.button_pressed = (
+            String(ANIMATION_BUTTONS[button_name]) == current
+        )
 
 
 func _on_body_selected(body_type: String) -> void:

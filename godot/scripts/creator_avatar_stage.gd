@@ -32,6 +32,8 @@ var _appearance: Dictionary = DEFAULT_APPEARANCE.duplicate(true)
 var _dragging := false
 var _last_mouse_position := Vector2.ZERO
 var _camera_distance := 6.2
+var _preview_animation := "Idle"
+var _preview_time := 0.0
 
 
 func _ready() -> void:
@@ -40,6 +42,31 @@ func _ready() -> void:
     gui_input.connect(_on_gui_input)
     _build_runtime_once()
     apply_appearance(_appearance)
+
+
+func _process(delta: float) -> void:
+    if _visual == null:
+        return
+    _preview_time += delta
+    _apply_preview_pose()
+
+
+func play_preview_animation(animation_name: String) -> void:
+    if not ["Idle", "Walk", "Run", "Jump"].has(animation_name):
+        return
+    _preview_animation = animation_name
+    _preview_time = 0.0
+    _reset_preview_pose()
+    _apply_preview_pose()
+
+
+func current_preview_animation() -> String:
+    return _preview_animation
+
+
+func advance_preview_for_test(delta: float) -> void:
+    _preview_time += delta
+    _apply_preview_pose()
 
 
 func apply_appearance(appearance: Dictionary) -> void:
@@ -395,6 +422,70 @@ func _apply_hair(hair_style_id: String) -> void:
     else:
         _hair.scale = Vector3(0.86, 0.34, 0.79)
         _hair.position.y = 2.27
+
+
+func _reset_preview_pose() -> void:
+    if _visual == null:
+        return
+    _visual.position = Vector3.ZERO
+    for node_name in ["ArmL", "ArmR", "LegL", "LegR"]:
+        var limb := _visual.get_node_or_null(node_name) as MeshInstance3D
+        if limb != null:
+            limb.rotation.x = 0.0
+
+
+func _apply_preview_pose() -> void:
+    if _visual == null:
+        return
+
+    _reset_preview_pose()
+
+    var arm_l := _visual.get_node_or_null("ArmL") as MeshInstance3D
+    var arm_r := _visual.get_node_or_null("ArmR") as MeshInstance3D
+    var leg_l := _visual.get_node_or_null("LegL") as MeshInstance3D
+    var leg_r := _visual.get_node_or_null("LegR") as MeshInstance3D
+
+    match _preview_animation:
+        "Walk":
+            var walk_phase: float = sin(_preview_time * 6.0)
+            _visual.position.y = absf(sin(_preview_time * 6.0)) * 0.045
+            if arm_l != null:
+                arm_l.rotation.x = walk_phase * 0.48
+            if arm_r != null:
+                arm_r.rotation.x = -walk_phase * 0.48
+            if leg_l != null:
+                leg_l.rotation.x = -walk_phase * 0.36
+            if leg_r != null:
+                leg_r.rotation.x = walk_phase * 0.36
+
+        "Run":
+            var run_phase: float = sin(_preview_time * 10.0)
+            _visual.position.y = absf(sin(_preview_time * 10.0)) * 0.085
+            if arm_l != null:
+                arm_l.rotation.x = run_phase * 0.72
+            if arm_r != null:
+                arm_r.rotation.x = -run_phase * 0.72
+            if leg_l != null:
+                leg_l.rotation.x = -run_phase * 0.58
+            if leg_r != null:
+                leg_r.rotation.x = run_phase * 0.58
+
+        "Jump":
+            var jump_phase: float = absf(sin(_preview_time * 2.8))
+            _visual.position.y = jump_phase * 0.62
+            if arm_l != null:
+                arm_l.rotation.x = -0.62
+            if arm_r != null:
+                arm_r.rotation.x = -0.62
+            if leg_l != null:
+                leg_l.rotation.x = 0.26
+            if leg_r != null:
+                leg_r.rotation.x = 0.26
+
+        _:
+            _visual.position.y = (
+                0.018 + sin(_preview_time * 2.2) * 0.014
+            )
 
 
 func _on_gui_input(event: InputEvent) -> void:
