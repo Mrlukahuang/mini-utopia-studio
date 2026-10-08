@@ -40,7 +40,7 @@ def build_application() -> BridgeApplication:
 if __name__ == "__main__":
     server = build_server(
         host="127.0.0.1",
-        port=8765,
+        port=8766,
         application=build_application(),
     )
     print("bridge_godot_equipment_smoke_server: READY", flush=True)
