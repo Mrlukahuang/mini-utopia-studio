@@ -13,6 +13,7 @@ def test_active_godot_scene_folder_stays_small_and_current():
         "avatar_contract_smoke_test.tscn",
         "equipment_runtime_smoke_test.tscn",
         "director_stage.tscn",
+        "character_creator.tscn",
     }
 
 
