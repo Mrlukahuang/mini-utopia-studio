@@ -63,6 +63,28 @@ func put_character(
     )
 
 
+func get_equipment(character_id: String) -> int:
+    return _start_request(
+        "equipment:get",
+        "/characters/%s/equipment" % character_id.uri_encode(),
+        HTTPClient.METHOD_GET
+    )
+
+
+func put_equipment_slot(
+    character_id: String,
+    slot: String,
+    item_instance_id: Variant
+) -> int:
+    return _start_request(
+        "equipment:put:" + slot,
+        "/characters/%s/equipment/%s"
+        % [character_id.uri_encode(), slot.uri_encode()],
+        HTTPClient.METHOD_PUT,
+        {"item_instance_id": item_instance_id}
+    )
+
+
 func _start_request(
     kind: String,
     path: String,
