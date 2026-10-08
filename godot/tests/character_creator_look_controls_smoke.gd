@@ -17,13 +17,13 @@ func _initialize() -> void:
     var first_root_id := stage.avatar_root_instance_id()
 
     var body_row := scene.get_node(
-        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/BodyRow"
+        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/BodyRow"
     )
     var species_grid := scene.get_node(
-        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SpeciesGrid"
+        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SpeciesGrid"
     )
     var surface_grid := scene.get_node(
-        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SurfaceGrid"
+        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SurfaceGrid"
     )
 
     (body_row.get_node("ChubbyButton") as Button).pressed.emit()
