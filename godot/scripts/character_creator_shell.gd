@@ -3,15 +3,42 @@ extends Control
 const DEFAULT_TITLE := "Make Your Mini Hero ✨"
 const DEFAULT_SUBTITLE := "Create, dress, and save your hero in Mini Utopia."
 
+const BODY_BUTTONS := {
+    "SlimButton": "slim",
+    "StandardButton": "standard",
+    "ChubbyButton": "chubby",
+}
+const SPECIES_BUTTONS := {
+    "HumanButton": "species_head_human_v1",
+    "SheepButton": "species_head_sheep_v1",
+    "RobotButton": "species_head_robot_v1",
+    "CatButton": "species_head_cat_v1",
+    "CloudButton": "species_head_cloud_v1",
+}
+const SURFACE_BUTTONS := {
+    "SkinButton": "skin",
+    "FurButton": "fur",
+    "WoolButton": "wool",
+    "MetalButton": "metal",
+    "CloudButton": "cloud",
+}
+
 @onready var bridge: MiniUtopiaBridgeClient = $BridgeClient
 @onready var status_label: Label = $RootMargin/MainColumn/StatusBar/StatusLabel
 @onready var character_label: Label = $RootMargin/MainColumn/HeaderRow/CharacterLabel
 @onready var back_button: Button = $RootMargin/MainColumn/FooterRow/BackButton
 @onready var save_button: Button = $RootMargin/MainColumn/FooterRow/SaveButton
 @onready var avatar_stage: MiniUtopiaCreatorAvatarStage = $RootMargin/MainColumn/CreatorBody/PreviewPanel/AvatarStage
+@onready var body_row: HBoxContainer = $RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/BodyRow
+@onready var species_grid: GridContainer = $RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SpeciesGrid
+@onready var surface_grid: GridContainer = $RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SurfaceGrid
+@onready var zoom_out_button: Button = $RootMargin/MainColumn/CreatorBody/PreviewPanel/ZoomControls/ZoomOutButton
+@onready var reset_button: Button = $RootMargin/MainColumn/CreatorBody/PreviewPanel/ZoomControls/ResetButton
+@onready var zoom_in_button: Button = $RootMargin/MainColumn/CreatorBody/PreviewPanel/ZoomControls/ZoomInButton
 
 var character_id := ""
 var loaded_character: Dictionary = {}
+var _draft_appearance: Dictionary = {}
 var _return_scene := "res://scenes/main.tscn"
 
 
@@ -20,6 +47,10 @@ func _ready() -> void:
     save_button.pressed.connect(_on_save_pressed)
     bridge.request_succeeded.connect(_on_bridge_success)
     bridge.request_failed.connect(_on_bridge_failure)
+    _wire_look_controls()
+
+    _draft_appearance = avatar_stage.current_appearance()
+    _refresh_look_controls()
 
     _read_user_args()
     _set_status("Connecting to Mini Utopia…", false)
@@ -50,6 +81,152 @@ func _read_user_args() -> void:
                 _return_scene = value
 
 
+func _wire_look_controls() -> void:
+    for button_name in BODY_BUTTONS:
+        var button := body_row.get_node(button_name) as Button
+        button.pressed.connect(
+            _on_body_selected.bind(String(BODY_BUTTONS[button_name]))
+        )
+
+    for button_name in SPECIES_BUTTONS:
+        var button := species_grid.get_node(button_name) as Button
+        button.pressed.connect(
+            _on_species_selected.bind(
+                String(SPECIES_BUTTONS[button_name])
+            )
+        )
+
+    for button_name in SURFACE_BUTTONS:
+        var button := surface_grid.get_node(button_name) as Button
+        button.pressed.connect(
+            _on_surface_selected.bind(
+                String(SURFACE_BUTTONS[button_name])
+            )
+        )
+
+    zoom_in_button.pressed.connect(avatar_stage.zoom_in)
+    zoom_out_button.pressed.connect(avatar_stage.zoom_out)
+    reset_button.pressed.connect(avatar_stage.reset_camera)
+
+
+func _on_body_selected(body_type: String) -> void:
+    _draft_appearance["body_type"] = body_type
+    _commit_live_appearance("Body changed instantly.")
+
+
+func _on_species_selected(species_head_id: String) -> void:
+    _draft_appearance["species_head_id"] = species_head_id
+
+    var allowed_surfaces := (
+        MiniUtopiaCreatorAvatarCatalog.allowed_surface_ids(species_head_id)
+    )
+    var current_surface := String(
+        _draft_appearance.get("surface_type", "skin")
+    )
+    if not allowed_surfaces.has(current_surface):
+        _draft_appearance["surface_type"] = (
+            MiniUtopiaCreatorAvatarCatalog.species_default_surface(
+                species_head_id
+            )
+        )
+
+    var allowed_eyes := (
+        MiniUtopiaCreatorAvatarCatalog.allowed_eye_ids(species_head_id)
+    )
+    var current_eye := String(
+        _draft_appearance.get("eye_style_id", "eyes_round_soft_v1")
+    )
+    if not allowed_eyes.has(current_eye):
+        _draft_appearance["eye_style_id"] = allowed_eyes[0]
+
+    var allowed_hair := (
+        MiniUtopiaCreatorAvatarCatalog.allowed_hair_ids(species_head_id)
+    )
+    var current_hair := String(
+        _draft_appearance.get("hair_style_id", "hair_none")
+    )
+    if not allowed_hair.has(current_hair):
+        _draft_appearance["hair_style_id"] = allowed_hair[0]
+
+    _commit_live_appearance("Species changed instantly.")
+
+
+func _on_surface_selected(surface_type: String) -> void:
+    var species_head_id := String(
+        _draft_appearance.get(
+            "species_head_id",
+            "species_head_human_v1"
+        )
+    )
+    var allowed := (
+        MiniUtopiaCreatorAvatarCatalog.allowed_surface_ids(species_head_id)
+    )
+    if not allowed.has(surface_type):
+        _refresh_look_controls()
+        return
+
+    _draft_appearance["surface_type"] = surface_type
+    _commit_live_appearance("Surface changed instantly.")
+
+
+func _commit_live_appearance(message: String) -> void:
+    _draft_appearance["customized"] = true
+    avatar_stage.apply_appearance(_draft_appearance)
+    _draft_appearance = avatar_stage.current_appearance()
+    _sync_loaded_profile_avatar()
+    _refresh_look_controls()
+
+    if loaded_character.is_empty():
+        _set_status(message + " Preview mode · not saved yet.", false)
+    else:
+        _set_status(message + " Press Save when ready.", false)
+
+
+func _sync_loaded_profile_avatar() -> void:
+    if loaded_character.is_empty():
+        return
+    var profile = loaded_character.get("profile", {})
+    if typeof(profile) != TYPE_DICTIONARY:
+        return
+    profile["avatar"] = _draft_appearance.duplicate(true)
+    loaded_character["profile"] = profile
+
+
+func _refresh_look_controls() -> void:
+    var body_type := String(
+        _draft_appearance.get("body_type", "standard")
+    )
+    for button_name in BODY_BUTTONS:
+        var button := body_row.get_node(button_name) as Button
+        button.button_pressed = (
+            String(BODY_BUTTONS[button_name]) == body_type
+        )
+
+    var species_head_id := String(
+        _draft_appearance.get(
+            "species_head_id",
+            "species_head_human_v1"
+        )
+    )
+    for button_name in SPECIES_BUTTONS:
+        var button := species_grid.get_node(button_name) as Button
+        button.button_pressed = (
+            String(SPECIES_BUTTONS[button_name]) == species_head_id
+        )
+
+    var allowed_surfaces := (
+        MiniUtopiaCreatorAvatarCatalog.allowed_surface_ids(species_head_id)
+    )
+    var surface_type := String(
+        _draft_appearance.get("surface_type", "skin")
+    )
+    for button_name in SURFACE_BUTTONS:
+        var button := surface_grid.get_node(button_name) as Button
+        var option_id := String(SURFACE_BUTTONS[button_name])
+        button.disabled = not allowed_surfaces.has(option_id)
+        button.button_pressed = option_id == surface_type
+
+
 func _on_bridge_success(kind: String, payload: Dictionary) -> void:
     if kind == "character:get":
         loaded_character = payload.duplicate(true)
@@ -62,7 +239,10 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         if typeof(profile) == TYPE_DICTIONARY:
             var appearance = profile.get("avatar", {})
             if typeof(appearance) == TYPE_DICTIONARY:
-                avatar_stage.apply_appearance(appearance)
+                _draft_appearance = appearance.duplicate(true)
+                avatar_stage.apply_appearance(_draft_appearance)
+                _draft_appearance = avatar_stage.current_appearance()
+                _refresh_look_controls()
         save_button.disabled = false
         _set_status("Character loaded · ready to create.", false)
         return

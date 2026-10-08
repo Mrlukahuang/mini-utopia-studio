@@ -89,7 +89,10 @@ func apply_appearance(appearance: Dictionary) -> void:
         Color("#7A5238")
     )
 
-    _set_mesh_color(_head, surface_color)
+    _apply_surface(
+        String(merged.get("surface_type", "skin")),
+        surface_color
+    )
     _set_mesh_color(_hair, hair_color)
     _set_mesh_color(_eye_l, eye_color)
     _set_mesh_color(_eye_r, eye_color)
@@ -108,6 +111,20 @@ func avatar_root_instance_id() -> int:
 
 func avatar_root() -> Node3D:
     return _avatar_root
+
+
+func zoom_in() -> void:
+    _camera_distance = max(4.3, _camera_distance - 0.45)
+    _update_camera_distance()
+
+
+func zoom_out() -> void:
+    _camera_distance = min(8.4, _camera_distance + 0.45)
+    _update_camera_distance()
+
+
+func camera_distance() -> float:
+    return _camera_distance
 
 
 func reset_camera() -> void:
@@ -284,6 +301,34 @@ func _build_avatar() -> void:
     )
 
 
+func _apply_surface(surface_type: String, color: Color) -> void:
+    _set_mesh_color(_head, color)
+    _set_mesh_color(_ear_l, color)
+    _set_mesh_color(_ear_r, color)
+
+    for arm_name in ["ArmL", "ArmR"]:
+        var arm := _visual.get_node_or_null(arm_name) as MeshInstance3D
+        if arm != null:
+            _set_mesh_color(arm, color)
+
+    var material := _head.material_override as StandardMaterial3D
+    if material == null:
+        return
+
+    material.metallic = 0.0
+    material.roughness = 0.84
+    match surface_type:
+        "metal":
+            material.metallic = 0.72
+            material.roughness = 0.32
+        "cloud":
+            material.roughness = 1.0
+        "wool":
+            material.roughness = 0.96
+        "fur":
+            material.roughness = 0.92
+
+
 func _apply_species(species_head_id: String) -> void:
     var is_cat := species_head_id == "species_head_cat_v1"
     var is_sheep := species_head_id == "species_head_sheep_v1"
@@ -338,15 +383,13 @@ func _on_gui_input(event: InputEvent) -> void:
             mouse_button.pressed
             and mouse_button.button_index == MOUSE_BUTTON_WHEEL_UP
         ):
-            _camera_distance = max(4.3, _camera_distance - 0.35)
-            _update_camera_distance()
+            zoom_in()
             accept_event()
         elif (
             mouse_button.pressed
             and mouse_button.button_index == MOUSE_BUTTON_WHEEL_DOWN
         ):
-            _camera_distance = min(8.4, _camera_distance + 0.35)
-            _update_camera_distance()
+            zoom_out()
             accept_event()
 
     elif event is InputEventMouseMotion and _dragging:
