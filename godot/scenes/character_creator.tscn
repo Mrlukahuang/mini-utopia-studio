@@ -116,134 +116,246 @@ theme_override_constants/margin_top = 18
 theme_override_constants/margin_right = 18
 theme_override_constants/margin_bottom = 18
 
-[node name="Content" type="VBoxContainer" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin"]
+[node name="Scroll" type="ScrollContainer" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin"]
 layout_mode = 2
-theme_override_constants/separation = 12
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
 
-[node name="Heading" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content"]
+[node name="Content" type="VBoxContainer" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="Heading" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.18, 0.16, 0.26, 1)
 theme_override_font_sizes/font_size = 22
 text = "Build Your Hero"
 
-[node name="Hint" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content"]
+[node name="Hint" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.38, 0.35, 0.46, 1)
 theme_override_font_sizes/font_size = 14
 text = "Tap a choice. Your 3D hero changes instantly."
 autowrap_mode = 2
 
-[node name="BodyLabel" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content"]
+[node name="BodyLabel" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 15
 text = "Body / 体型"
 
-[node name="BodyRow" type="HBoxContainer" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content"]
+[node name="BodyRow" type="HBoxContainer" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="SlimButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/BodyRow"]
+[node name="SlimButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/BodyRow"]
 custom_minimum_size = Vector2(0, 34)
 toggle_mode = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Slim"
 
-[node name="StandardButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/BodyRow"]
+[node name="StandardButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/BodyRow"]
 custom_minimum_size = Vector2(0, 34)
 toggle_mode = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Standard"
 
-[node name="ChubbyButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/BodyRow"]
+[node name="ChubbyButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/BodyRow"]
 custom_minimum_size = Vector2(0, 34)
 toggle_mode = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Chubby"
 
-[node name="SpeciesLabel" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content"]
+[node name="SpeciesLabel" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 15
 text = "Species / 角色"
 
-[node name="SpeciesGrid" type="GridContainer" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content"]
+[node name="SpeciesGrid" type="GridContainer" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
 columns = 2
 theme_override_constants/h_separation = 6
 theme_override_constants/v_separation = 6
 
-[node name="HumanButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SpeciesGrid"]
+[node name="HumanButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SpeciesGrid"]
 custom_minimum_size = Vector2(126, 34)
 toggle_mode = true
 layout_mode = 2
 text = "Human"
 
-[node name="SheepButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SpeciesGrid"]
+[node name="SheepButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SpeciesGrid"]
 custom_minimum_size = Vector2(126, 34)
 toggle_mode = true
 layout_mode = 2
 text = "Sheep"
 
-[node name="RobotButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SpeciesGrid"]
+[node name="RobotButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SpeciesGrid"]
 custom_minimum_size = Vector2(126, 34)
 toggle_mode = true
 layout_mode = 2
 text = "Robot"
 
-[node name="CatButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SpeciesGrid"]
+[node name="CatButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SpeciesGrid"]
 custom_minimum_size = Vector2(126, 34)
 toggle_mode = true
 layout_mode = 2
 text = "Cat"
 
-[node name="CloudButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SpeciesGrid"]
+[node name="CloudButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SpeciesGrid"]
 custom_minimum_size = Vector2(126, 34)
 toggle_mode = true
 layout_mode = 2
 text = "Cloud"
 
-[node name="SurfaceLabel" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content"]
+[node name="SurfaceLabel" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 15
 text = "Surface / 质感"
 
-[node name="SurfaceGrid" type="GridContainer" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content"]
+[node name="SurfaceGrid" type="GridContainer" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
 columns = 3
 theme_override_constants/h_separation = 6
 theme_override_constants/v_separation = 6
 
-[node name="SkinButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SurfaceGrid"]
+[node name="SkinButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SurfaceGrid"]
 custom_minimum_size = Vector2(82, 32)
 toggle_mode = true
 layout_mode = 2
 text = "Skin"
 
-[node name="FurButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SurfaceGrid"]
+[node name="FurButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SurfaceGrid"]
 custom_minimum_size = Vector2(82, 32)
 toggle_mode = true
 layout_mode = 2
 text = "Fur"
 
-[node name="WoolButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SurfaceGrid"]
+[node name="WoolButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SurfaceGrid"]
 custom_minimum_size = Vector2(82, 32)
 toggle_mode = true
 layout_mode = 2
 text = "Wool"
 
-[node name="MetalButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SurfaceGrid"]
+[node name="MetalButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SurfaceGrid"]
 custom_minimum_size = Vector2(82, 32)
 toggle_mode = true
 layout_mode = 2
 text = "Metal"
 
-[node name="CloudButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Content/SurfaceGrid"]
+[node name="CloudButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SurfaceGrid"]
 custom_minimum_size = Vector2(82, 32)
 toggle_mode = true
 layout_mode = 2
 text = "Cloud"
+
+[node name="EyeLabel" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "Eyes / 眼睛"
+
+[node name="EyeStyleOption" type="OptionButton" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+
+[node name="HairLabel" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "Hair / 发型"
+
+[node name="HairStyleOption" type="OptionButton" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+
+[node name="ColorLabel" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "Colors / 颜色"
+
+[node name="ColorTargetOption" type="OptionButton" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+
+[node name="ColorGrid" type="GridContainer" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
+layout_mode = 2
+columns = 3
+theme_override_constants/h_separation = 6
+theme_override_constants/v_separation = 6
+
+[node name="CreamButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
+custom_minimum_size = Vector2(82, 32)
+toggle_mode = true
+layout_mode = 2
+text = "Cream"
+
+[node name="WarmButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
+custom_minimum_size = Vector2(82, 32)
+toggle_mode = true
+layout_mode = 2
+text = "Warm"
+
+[node name="TanButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
+custom_minimum_size = Vector2(82, 32)
+toggle_mode = true
+layout_mode = 2
+text = "Tan"
+
+[node name="BrownButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
+custom_minimum_size = Vector2(82, 32)
+toggle_mode = true
+layout_mode = 2
+text = "Brown"
+
+[node name="DarkButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
+custom_minimum_size = Vector2(82, 32)
+toggle_mode = true
+layout_mode = 2
+text = "Dark"
+
+[node name="BlackButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
+custom_minimum_size = Vector2(82, 32)
+toggle_mode = true
+layout_mode = 2
+text = "Black"
+
+[node name="PinkButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
+custom_minimum_size = Vector2(82, 32)
+toggle_mode = true
+layout_mode = 2
+text = "Pink"
+
+[node name="MintButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
+custom_minimum_size = Vector2(82, 32)
+toggle_mode = true
+layout_mode = 2
+text = "Mint"
+
+[node name="LavenderButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
+custom_minimum_size = Vector2(82, 32)
+toggle_mode = true
+layout_mode = 2
+text = "Lavender"
+
+[node name="SkyButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
+custom_minimum_size = Vector2(82, 32)
+toggle_mode = true
+layout_mode = 2
+text = "Sky"
+
+[node name="PeachButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
+custom_minimum_size = Vector2(82, 32)
+toggle_mode = true
+layout_mode = 2
+text = "Peach"
+
+[node name="GoldButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
+custom_minimum_size = Vector2(82, 32)
+toggle_mode = true
+layout_mode = 2
+text = "Gold"
 
 [node name="PreviewPanel" type="PanelContainer" parent="RootMargin/MainColumn/CreatorBody"]
 layout_mode = 2

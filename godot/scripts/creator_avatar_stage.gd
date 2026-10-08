@@ -9,7 +9,7 @@ const DEFAULT_APPEARANCE := {
     "surface_color_hex": "#F2C7A5",
     "eye_style_id": "eyes_round_soft_v1",
     "eye_color_hex": "#7A5238",
-    "hair_style_id": "hair_short_v1",
+    "hair_style_id": "hair_none",
     "hair_color_hex": "#5B4036",
 }
 
@@ -98,6 +98,7 @@ func apply_appearance(appearance: Dictionary) -> void:
     _set_mesh_color(_eye_r, eye_color)
 
     _apply_species(String(merged.get("species_head_id", "")))
+    _apply_eye_style(String(merged.get("eye_style_id", "")))
     _apply_hair(String(merged.get("hair_style_id", "")))
 
 
@@ -348,6 +349,30 @@ func _apply_species(species_head_id: String) -> void:
         _head.scale = Vector3(0.92, 0.82, 0.82)
     else:
         _head.scale = Vector3(0.82, 0.78, 0.76)
+
+
+func _apply_eye_style(eye_style_id: String) -> void:
+    var eye_scale := Vector3(0.11, 0.14, 0.08)
+    var eye_y := 2.05
+
+    match eye_style_id:
+        "eyes_sparkle_v1":
+            eye_scale = Vector3(0.15, 0.17, 0.09)
+            eye_y = 2.07
+        "eyes_sleepy_v1":
+            eye_scale = Vector3(0.15, 0.055, 0.08)
+            eye_y = 2.03
+        "eyes_robot_v1":
+            eye_scale = Vector3(0.18, 0.085, 0.07)
+            eye_y = 2.05
+        "eyes_cat_v1":
+            eye_scale = Vector3(0.075, 0.19, 0.07)
+            eye_y = 2.06
+
+    _eye_l.scale = eye_scale
+    _eye_r.scale = eye_scale
+    _eye_l.position.y = eye_y
+    _eye_r.position.y = eye_y
 
 
 func _apply_hair(hair_style_id: String) -> void:
