@@ -64,6 +64,7 @@ const COLOR_BUTTONS := {
 
 var character_id := ""
 var loaded_character: Dictionary = {}
+var equipment_state: Dictionary = {}
 var _draft_appearance: Dictionary = {}
 var _eye_option_ids: Array[String] = []
 var _hair_option_ids: Array[String] = []
@@ -455,7 +456,24 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
                 _draft_appearance = avatar_stage.current_appearance()
                 _refresh_look_controls()
         save_button.disabled = false
-        _set_status("Character loaded · ready to create.", false)
+        _set_status("Character loaded · loading My Stuff…", false)
+        var equipment_error := bridge.get_equipment(character_id)
+        if equipment_error != OK:
+            _set_status(
+                "Character loaded · My Stuff could not start loading.",
+                true
+            )
+        return
+
+    if kind == "equipment:get" or kind.begins_with("equipment:put:"):
+        equipment_state = payload.duplicate(true)
+        var runtime = payload.get("runtime", {})
+        if typeof(runtime) == TYPE_DICTIONARY:
+            avatar_stage.apply_equipment_runtime(runtime)
+        _set_status(
+            "Character + My Stuff loaded · nine equipment slots ready.",
+            false
+        )
         return
 
     if kind == "character:put":
@@ -470,6 +488,10 @@ func _on_bridge_failure(
     _error_code: String,
     message: String
 ) -> void:
+    if kind.begins_with("equipment:"):
+        _set_status("My Stuff could not load. " + message, true)
+        return
+
     save_button.disabled = true
 
     if kind == "character:get":
