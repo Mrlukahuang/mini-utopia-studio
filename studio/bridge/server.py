@@ -41,7 +41,19 @@ class CharacterReader(Protocol):
     ) -> dict | None: ...
 
 
+class EquipmentGateway(Protocol):
+    def get_state(self, character_id: str) -> dict | None: ...
+
+    def set_slot(
+        self,
+        character_id: str,
+        slot_value: str,
+        item_instance_id: str | None,
+    ) -> dict | None: ...
+
+
 _default_character_reader: CharacterReader | None = None
+_default_equipment_gateway: EquipmentGateway | None = None
 
 
 def _default_character_reader_factory() -> CharacterReader:
@@ -62,6 +74,22 @@ def _default_character_reader_factory() -> CharacterReader:
     return _default_character_reader
 
 
+
+
+def _default_equipment_gateway_factory() -> EquipmentGateway:
+    """Lazily bind Equipment Bridge routes to Python Core services."""
+
+    global _default_equipment_gateway
+    if _default_equipment_gateway is None:
+        from studio.bridge.equipment import EquipmentBridgeGateway
+        from studio.core.config import get_settings
+        from studio.services.bootstrap import build_context
+
+        context = build_context(get_settings())
+        _default_equipment_gateway = EquipmentBridgeGateway(context.repository)
+    return _default_equipment_gateway
+
+
 @dataclass(frozen=True)
 class BridgeResponse:
     status: int
@@ -75,10 +103,14 @@ class BridgeApplication:
         self,
         *,
         character_reader_factory: Callable[[], CharacterReader] | None = None,
+        equipment_gateway_factory: Callable[[], EquipmentGateway] | None = None,
     ) -> None:
         self._sessions: dict[str, dict[str, Any]] = {}
         self._character_reader_factory = (
             character_reader_factory or _default_character_reader_factory
+        )
+        self._equipment_gateway_factory = (
+            equipment_gateway_factory or _default_equipment_gateway_factory
         )
 
     def handle(
@@ -151,6 +183,90 @@ class BridgeApplication:
                     "schema_version": BRIDGE_CHARACTER_SCHEMA_VERSION,
                     "characters": reader.list_characters(),
                 },
+            )
+
+        equipment_route = self._parse_equipment_route(route)
+        if equipment_route is not None:
+            character_id, slot_value = equipment_route
+            gateway = self._equipment_gateway()
+            if isinstance(gateway, BridgeResponse):
+                return gateway
+
+            if slot_value is None:
+                if method != "GET":
+                    return self._method_not_allowed("GET")
+                try:
+                    state = gateway.get_state(character_id)
+                except Exception:
+                    return self._repository_unavailable()
+                if state is None:
+                    return BridgeResponse(
+                        status=HTTPStatus.NOT_FOUND,
+                        payload={
+                            "error": "character_not_found",
+                            "character_id": character_id,
+                        },
+                    )
+                return BridgeResponse(
+                    status=HTTPStatus.OK,
+                    payload=state,
+                )
+
+            if method != "PUT":
+                return self._method_not_allowed("PUT")
+            parsed = self._parse_json_object(body)
+            if isinstance(parsed, BridgeResponse):
+                return parsed
+            if set(parsed) - {"item_instance_id"}:
+                return BridgeResponse(
+                    status=HTTPStatus.BAD_REQUEST,
+                    payload={
+                        "error": "invalid_equipment_update",
+                        "message": "Only item_instance_id may be updated.",
+                    },
+                )
+            item_instance_id = parsed.get("item_instance_id")
+            if item_instance_id is not None and not isinstance(
+                item_instance_id,
+                str,
+            ):
+                return BridgeResponse(
+                    status=HTTPStatus.BAD_REQUEST,
+                    payload={
+                        "error": "invalid_equipment_update",
+                        "message": (
+                            "item_instance_id must be a string or null."
+                        ),
+                    },
+                )
+            try:
+                state = gateway.set_slot(
+                    character_id,
+                    slot_value,
+                    item_instance_id,
+                )
+            except ValueError as exc:
+                return BridgeResponse(
+                    status=HTTPStatus.BAD_REQUEST,
+                    payload={
+                        "error": "invalid_equipment_update",
+                        "message": str(exc),
+                    },
+                )
+            except Exception:
+                return self._repository_unavailable()
+
+            if state is None:
+                return BridgeResponse(
+                    status=HTTPStatus.NOT_FOUND,
+                    payload={
+                        "error": "character_not_found",
+                        "character_id": character_id,
+                    },
+                )
+            return BridgeResponse(
+                status=HTTPStatus.OK,
+                payload=state,
             )
 
         if route.startswith("/characters/"):
@@ -244,17 +360,49 @@ class BridgeApplication:
             },
         )
 
+    @staticmethod
+    def _parse_equipment_route(
+        route: str,
+    ) -> tuple[str, str | None] | None:
+        parts = route.strip("/").split("/")
+        if len(parts) not in {3, 4}:
+            return None
+        if parts[0] != "characters" or parts[2] != "equipment":
+            return None
+
+        character_id = unquote(parts[1]).strip()
+        if not character_id or "/" in character_id:
+            return None
+
+        if len(parts) == 3:
+            return character_id, None
+
+        slot_value = unquote(parts[3]).strip()
+        if not slot_value or "/" in slot_value:
+            return None
+        return character_id, slot_value
+
+    def _equipment_gateway(self) -> EquipmentGateway | BridgeResponse:
+        try:
+            return self._equipment_gateway_factory()
+        except Exception:
+            return self._repository_unavailable()
+
+    @staticmethod
+    def _repository_unavailable() -> BridgeResponse:
+        return BridgeResponse(
+            status=HTTPStatus.SERVICE_UNAVAILABLE,
+            payload={
+                "error": "repository_unavailable",
+                "message": "Canonical Creator repository is unavailable.",
+            },
+        )
+
     def _character_reader(self) -> CharacterReader | BridgeResponse:
         try:
             return self._character_reader_factory()
         except Exception:
-            return BridgeResponse(
-                status=HTTPStatus.SERVICE_UNAVAILABLE,
-                payload={
-                    "error": "repository_unavailable",
-                    "message": "Canonical Creator repository is unavailable.",
-                },
-            )
+            return self._repository_unavailable()
 
     @staticmethod
     def _parse_json_object(body: bytes) -> dict[str, Any] | BridgeResponse:
