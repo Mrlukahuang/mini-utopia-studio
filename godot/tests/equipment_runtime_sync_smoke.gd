@@ -44,8 +44,14 @@ func _initialize() -> void:
 
     var body := avatar.get_node("Visual/Body") as MeshInstance3D
     var foot := avatar.get_node("Visual/FootL") as MeshInstance3D
-    var base_body_material := body.get_meta("mini_utopia_base_material", null)
-    var base_foot_material := foot.get_meta("mini_utopia_base_material", null)
+    var base_body_material: Variant = body.get_meta(
+        "mini_utopia_base_material",
+        null
+    )
+    var base_foot_material: Variant = foot.get_meta(
+        "mini_utopia_base_material",
+        null
+    )
     if base_body_material == null or base_foot_material == null:
         _fail("clothing base materials were not remembered")
         return
