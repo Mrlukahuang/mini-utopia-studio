@@ -150,6 +150,44 @@ jobs:
         run: |
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/character_creator_animation_controls_smoke.gd
 
+      - name: Smoke-test Equipment Bridge nine-slot round trip
+        run: |
+          PYTHONPATH=. python3 tests/bridge_godot_equipment_smoke_server.py > /tmp/bridge-equipment-smoke.log 2>&1 &
+          BRIDGE_PID=$!
+          cleanup() {
+            kill "$BRIDGE_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          python3 - <<'PY'
+          import time
+          import urllib.request
+
+          deadline = time.monotonic() + 5.0
+          last_error = None
+          while time.monotonic() < deadline:
+              try:
+                  with urllib.request.urlopen(
+                      "http://127.0.0.1:8765/health",
+                      timeout=0.5,
+                  ) as response:
+                      assert response.status == 200
+                      break
+              except Exception as exc:
+                  last_error = exc
+                  time.sleep(0.1)
+          else:
+              raise RuntimeError(
+                  f"Equipment Bridge smoke server did not become ready: {last_error}"
+              )
+          PY
+
+          /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/bridge_equipment_roundtrip_smoke.gd
+
+      - name: Smoke-test complete Equipment runtime synchronization
+        run: |
+          /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/equipment_runtime_sync_smoke.gd
+
       - name: Smoke-test nullable Equipment runtime
         run: |
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/equipment_runtime_null_smoke.gd
