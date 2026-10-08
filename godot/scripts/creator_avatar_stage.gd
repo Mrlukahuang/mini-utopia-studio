@@ -447,8 +447,8 @@ func _apply_preview_pose() -> void:
 
     match _preview_animation:
         "Walk":
-            var walk_phase := sin(_preview_time * 6.0)
-            _visual.position.y = abs(sin(_preview_time * 6.0)) * 0.045
+            var walk_phase: float = sin(_preview_time * 6.0)
+            _visual.position.y = absf(sin(_preview_time * 6.0)) * 0.045
             if arm_l != null:
                 arm_l.rotation.x = walk_phase * 0.48
             if arm_r != null:
@@ -459,8 +459,8 @@ func _apply_preview_pose() -> void:
                 leg_r.rotation.x = walk_phase * 0.36
 
         "Run":
-            var run_phase := sin(_preview_time * 10.0)
-            _visual.position.y = abs(sin(_preview_time * 10.0)) * 0.085
+            var run_phase: float = sin(_preview_time * 10.0)
+            _visual.position.y = absf(sin(_preview_time * 10.0)) * 0.085
             if arm_l != null:
                 arm_l.rotation.x = run_phase * 0.72
             if arm_r != null:
@@ -471,7 +471,7 @@ func _apply_preview_pose() -> void:
                 leg_r.rotation.x = run_phase * 0.58
 
         "Jump":
-            var jump_phase := abs(sin(_preview_time * 2.8))
+            var jump_phase: float = absf(sin(_preview_time * 2.8))
             _visual.position.y = jump_phase * 0.62
             if arm_l != null:
                 arm_l.rotation.x = -0.62
