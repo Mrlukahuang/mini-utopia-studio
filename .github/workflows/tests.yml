@@ -168,7 +168,7 @@ jobs:
           while time.monotonic() < deadline:
               try:
                   with urllib.request.urlopen(
-                      "http://127.0.0.1:8765/health",
+                      "http://127.0.0.1:8766/health",
                       timeout=0.5,
                   ) as response:
                       assert response.status == 200
