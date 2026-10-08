@@ -396,6 +396,44 @@ custom_minimum_size = Vector2(56, 36)
 layout_mode = 2
 text = "+"
 
+[node name="AnimationControls" type="HBoxContainer" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel"]
+layout_mode = 1
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -226.0
+offset_top = -88.0
+offset_right = 226.0
+offset_bottom = -48.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/separation = 6
+
+[node name="IdleButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/AnimationControls"]
+custom_minimum_size = Vector2(108, 38)
+toggle_mode = true
+layout_mode = 2
+text = "Idle"
+
+[node name="WalkButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/AnimationControls"]
+custom_minimum_size = Vector2(108, 38)
+toggle_mode = true
+layout_mode = 2
+text = "Walk"
+
+[node name="RunButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/AnimationControls"]
+custom_minimum_size = Vector2(108, 38)
+toggle_mode = true
+layout_mode = 2
+text = "Run"
+
+[node name="JumpButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/AnimationControls"]
+custom_minimum_size = Vector2(108, 38)
+toggle_mode = true
+layout_mode = 2
+text = "Jump"
+
 [node name="StageHint" type="Label" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel"]
 layout_mode = 1
 anchors_preset = 12
