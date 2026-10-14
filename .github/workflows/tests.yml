@@ -479,3 +479,58 @@ jobs:
           assert 14.5 <= duration <= 15.5, duration
           print("two_family_heroes_mp4: PASS · 15 seconds, both canonical Heroes")
           PY
+
+      - name: Render genuine edited 30-second two-Hero family MP4
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          # Only synthetic Heroes. Real family movies must never use CI.
+          path = Path("godot/runtime_state/family_movie_export_request.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          data["director_choices"] = {
+              "camera": "close", "action": "celebrate", "duration_seconds": 30
+          }
+          data["fps"] = 1
+          data["equipment_runtime"]["equipped"]["headwear"]["visual_recipe"] = {
+              "schema_version": "1.0", "shape": "star",
+              "color_hex": "#B9E7D0", "accent_color_hex": "#F2C75C"
+          }
+          path.write_text(json.dumps(data), encoding="utf-8")
+          PY
+          /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://scripts/family_movie_prepare.gd
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          request = json.loads(Path("godot/runtime_state/shot_capture_request.json").read_text())
+          film = request["director_session"]
+          assert request["frame_count"] == 30
+          assert request["fps"] == 1
+          assert film["duration_seconds"] == 30.0
+          assert film["child_director_choices"] == {
+              "action": "celebrate", "camera": "close", "duration_seconds": 30
+          }
+          assert film["camera"]["fov"] == 39.0
+          assert film["shot"]["blocking"]["movement_style"] == "hold"
+          assert film["character_asset_id"] == "CHAR_TEST_FAMILY_FILM"
+          assert film["second_character_asset_id"] == "CHAR_TEST_FAMILY_FILM_GUEST"
+          assert film["play_session"]["equipment"]["equipped"]["headwear"]["visual_recipe"]["shape"] == "star"
+          assert film["second_play_session"]["equipment"]["equipped"]["headwear"]["item_instance_id"] == "ITEM_GUEST_TEST_CROWN"
+          print("edited_30s_capture_contract: PASS")
+          PY
+          xvfb-run -a /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --path godot --rendering-method gl_compatibility --resolution 480x270 --script res://scripts/shot_frame_capture.gd
+          test "$(find godot/runtime_state/family_movie_frames/EP_FAMILY_PREVIEW -name 'frame_*.png' | wc -l)" -eq 30
+          ffmpeg -hide_banner -loglevel error -y -framerate 1 -i godot/runtime_state/family_movie_frames/EP_FAMILY_PREVIEW/frame_%05d.png -c:v libx264 -pix_fmt yuv420p -movflags +faststart godot/runtime_state/family_movies/two_heroes_edited_30s.mp4
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+          movie = Path("godot/runtime_state/family_movies/two_heroes_edited_30s.mp4")
+          assert movie.is_file() and movie.stat().st_size > 256
+          seconds = float(subprocess.check_output([
+              "ffprobe", "-v", "error", "-show_entries", "format=duration",
+              "-of", "default=noprint_wrappers=1:nokey=1", str(movie)
+          ], text=True).strip())
+          assert 29.5 <= seconds <= 30.5, seconds
+          print("two_heroes_edited_30s: PASS real MP4, same cast and hand-crafted prop")
+          PY

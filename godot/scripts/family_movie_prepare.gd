@@ -73,12 +73,30 @@ func _initialize() -> void:
         _fail("unable to construct shared Director session")
         return
 
-    # CI uses low FPS to keep the full 15-second timeline inexpensive.
+    # The exact same bounded child choices are used by interactive Director
+    # and the private MP4 capture worker. No imported executable instructions
+    # or actor mutation is permitted.
+    var raw_choices = request.get("director_choices", {})
+    if typeof(raw_choices) != TYPE_DICTIONARY:
+        _fail("child Director choices must be an object")
+        return
+    director = MiniUtopiaFamilyDirectorSession.with_child_choices(
+        director, raw_choices
+    )
+    if director.is_empty():
+        _fail("invalid Director choices")
+        return
+
+    # CI uses low FPS to keep the full 15/30-second timeline inexpensive.
     # Production render workers can select higher FPS within these bounds.
     var fps := clampi(int(request.get("fps", 2)), 1, 24)
     var width := clampi(int(request.get("width", 480)), 160, 1280)
     var height := clampi(int(request.get("height", 270)), 90, 720)
-    var frame_count := int(MiniUtopiaFamilyDirectorSession.DURATION_SECONDS) * fps
+    var film_seconds := int(director.get("duration_seconds", 15))
+    if film_seconds not in [15, 30]:
+        _fail("only 15/30-second private family shots supported")
+        return
+    var frame_count := film_seconds * fps
     var target := {
         "schema_version": "1.0",
         "output_dir": OUTPUT_DIR,
@@ -108,7 +126,7 @@ func _initialize() -> void:
         String(play.get("character_asset_id", "")),
         " · ",
         frame_count,
-        " frames / 15s"
+        " frames / ", film_seconds, "s"
     )
     quit(0)
 
