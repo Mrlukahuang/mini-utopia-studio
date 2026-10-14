@@ -16,9 +16,17 @@ class EquipmentBridgeGateway:
     through EquipmentService and the configured StudioRepository.
     """
 
-    def __init__(self, repository: StudioRepository):
+    def __init__(
+        self,
+        repository: StudioRepository,
+        *,
+        collection_id: str = "COLL_DEFAULT",
+        owner_key: str = "default_creator",
+    ):
         self.repository = repository
-        self.service = EquipmentService(repository)
+        self.service = EquipmentService(
+            repository, collection_id=collection_id, owner_key=owner_key
+        )
 
     def get_state(self, character_id: str) -> dict | None:
         asset = self.repository.get_asset(character_id)
