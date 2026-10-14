@@ -82,7 +82,8 @@ func _initialize() -> void:
         _fail("owned saved film not staged")
         return
     if family.director_shot_choices != {
-        "action": "celebrate", "camera": "close", "duration_seconds": 30
+        "action": "celebrate", "camera": "close", "duration_seconds": 30,
+        "caption_preset": "hello"
     }:
         _fail("saved camera, movement or duration were lost")
         return
@@ -108,6 +109,12 @@ func _initialize() -> void:
     if scene.film_title_input.text != "Cloud Adventure":
         _fail("saved film title not restored")
         return
+    if family.director_shot_choices.get("caption_preset") != "hello":
+        _fail("saved safe subtitle choice not restored")
+        return
+    if scene.director_runtime.subtitle_label == null or scene.director_runtime.subtitle_label.text != "Hello, friend!":
+        _fail("saved subtitle is missing from restored movie preview")
+        return
     if scene.film_note_input.text != "The two heroes celebrate":
         _fail("private story note not restored")
         return
@@ -132,7 +139,7 @@ func _draft() -> Dictionary:
         "character_id": "CHAR_OWN_LILY",
         "second_character_id": "CHAR_OWN_CAT",
         "camera": "close", "action": "celebrate",
-        "duration_seconds": 30,
+        "duration_seconds": 30, "caption_preset": "hello",
         "private_story_note": "The two heroes celebrate"
     }
 
