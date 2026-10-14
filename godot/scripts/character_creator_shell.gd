@@ -479,6 +479,8 @@ func _refresh_color_buttons() -> void:
 
 func _on_bridge_success(kind: String, payload: Dictionary) -> void:
     if kind == "character:get":
+        equipment_state.clear()
+        play_button.disabled = true
         loaded_character = payload.duplicate(true)
         character_id = String(payload.get("character_id", character_id))
         var display_name := String(payload.get("display_name", character_id))
@@ -496,12 +498,8 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
                 _draft_appearance = avatar_stage.current_appearance()
                 _refresh_look_controls()
         save_button.disabled = false
-        play_button.disabled = false
-        if bridge.has_family_session():
-            # Equipment endpoints are not part of Family API v1 yet.
-            _set_status("Family Cloud hero loaded · ready to edit.", false)
-            return
-        _set_status("Character loaded · loading My Stuff…", false)
+        play_button.disabled = true
+        _set_status("Hero loaded · fetching your own clothes and props…", false)
         var equipment_error := bridge.get_equipment(character_id)
         if equipment_error != OK:
             _set_status(
@@ -513,11 +511,17 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
     if kind == "equipment:get" or kind.begins_with("equipment:put:"):
         equipment_state = payload.duplicate(true)
         var runtime = payload.get("runtime", {})
-        if typeof(runtime) == TYPE_DICTIONARY:
+        var valid := (
+            typeof(runtime) == TYPE_DICTIONARY
+            and String(runtime.get("character_asset_id", "")) == character_id
+        )
+        if valid:
             avatar_stage.apply_equipment_runtime(runtime)
+        play_button.disabled = not valid or loaded_character.is_empty()
         _set_status(
-            "Character + My Stuff loaded · nine equipment slots ready.",
-            false
+            "Hero + your clothes and props loaded."
+            if valid else "Clothes could not be verified.",
+            not valid
         )
         return
 
@@ -527,14 +531,19 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         character_label.text = String(payload.get("display_name", "New Hero"))
         hero_name_input.text = character_label.text
         save_button.disabled = character_id.is_empty()
-        play_button.disabled = character_id.is_empty()
-        _set_status("Your hero is saved with a permanent ID! 💖", false)
+        play_button.disabled = true
+        equipment_state.clear()
+        _set_status("Hero saved · loading your own clothes and props…", false)
+        if not character_id.is_empty():
+            var equipment_error := bridge.get_equipment(character_id)
+            if equipment_error != OK:
+                _set_status("Saved, but clothes are not ready yet.", true)
         return
 
     if kind == "character:put":
         loaded_character = payload.duplicate(true)
         save_button.disabled = false
-        play_button.disabled = false
+        play_button.disabled = equipment_state.is_empty()
         _set_status("Saved! Your hero is safe in Mini Utopia. 💖", false)
 
 
@@ -545,6 +554,7 @@ func _on_bridge_failure(
     message: String
 ) -> void:
     if kind.begins_with("equipment:"):
+        play_button.disabled = true
         _set_status("My Stuff could not load. " + message, true)
         return
 
@@ -587,6 +597,14 @@ func _on_play_pressed() -> void:
     var family_state := get_node_or_null("/root/FamilySceneState") as MiniUtopiaFamilySceneState
     if family_state == null or not family_state.select_character(loaded_character):
         _set_status("Your saved hero could not enter the village.", true)
+        return
+    var runtime = equipment_state.get("runtime", {})
+    if (
+        typeof(runtime) != TYPE_DICTIONARY
+        or not family_state.select_equipment(runtime)
+    ):
+        family_state.clear_selection()
+        _set_status("Your own clothes and props must load before playing.", true)
         return
     var target := "res://scenes/main.tscn"
     if not ResourceLoader.exists(target):
