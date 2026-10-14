@@ -13,9 +13,10 @@ var second_cast_equipment: Dictionary = {}
 var pending_character_id := ""
 var _family_api_url := ""
 var _family_token := ""
+var _family_profile_id := ""
 
 
-func connect_family(api_url: String, token: String) -> bool:
+func connect_family(api_url: String, token: String, profile_id: String = "") -> bool:
     # Stage credentials in a temporary client to reuse the same HTTPS-only
     # validation as all other Godot Character requests.
     var normalized := MiniUtopiaBridgeEndpointPolicy.normalize(api_url, true)
@@ -34,6 +35,7 @@ func connect_family(api_url: String, token: String) -> bool:
     disconnect_family()
     _family_api_url = normalized
     _family_token = token
+    _family_profile_id = profile_id if profile_id in ["child_a", "child_b"] else ""
     return true
 
 
@@ -53,6 +55,11 @@ func disconnect_family() -> void:
     pending_character_id = ""
     _family_api_url = ""
     _family_token = ""
+    _family_profile_id = ""
+
+
+func current_profile_id() -> String:
+    return _family_profile_id
 
 
 func open_character(character_id: String) -> bool:
