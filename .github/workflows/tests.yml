@@ -350,3 +350,68 @@ jobs:
           assert b"ftyp" in path.read_bytes()[:32]
           print("shot_video_capture_smoke: PASS · MP4 created")
           PY
+
+      - name: Smoke-test full 15-second family Hero film MP4
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          # Synthetic contract only: never add a real child's data to CI.
+          fixture = {
+              "character": {
+                  "schema_version": "1.0",
+                  "character_id": "CHAR_TEST_FAMILY_FILM",
+                  "display_name": "CI Little Sheep",
+                  "profile": {
+                      "avatar": {
+                          "rig_family": "humanoid_kaykit_v1",
+                          "body_type": "chubby",
+                          "species_head_id": "species_head_sheep_v1",
+                          "surface_color_hex": "#F7B7D2",
+                          "hair_style_id": "hair_bob_v1"
+                      }
+                  }
+              },
+              "equipment_runtime": {
+                  "character_asset_id": "CHAR_TEST_FAMILY_FILM",
+                  "equipped": {
+                      "headwear": {
+                          "item_instance_id": "ITEM_TEST_FILM_CROWN",
+                          "display_name": "Tiny Crown",
+                          "rarity": "gold"
+                      }
+                  },
+                  "final_stats": {"hp": 100, "atk": 10, "defense": 8}
+              },
+              "fps": 2,
+              "width": 480,
+              "height": 270
+          }
+          dest = Path("godot/runtime_state/family_movie_export_request.json")
+          dest.parent.mkdir(parents=True, exist_ok=True)
+          dest.write_text(json.dumps(fixture), encoding="utf-8")
+          PY
+          /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://scripts/family_movie_prepare.gd
+          xvfb-run -a /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --path godot --rendering-method gl_compatibility --resolution 480x270 --script res://scripts/shot_frame_capture.gd
+          test "$(find godot/runtime_state/family_movie_frames/EP_FAMILY_PREVIEW -name 'frame_*.png' | wc -l)" -eq 30
+          mkdir -p godot/runtime_state/family_movies
+          ffmpeg -hide_banner -loglevel error -y -framerate 2 -i godot/runtime_state/family_movie_frames/EP_FAMILY_PREVIEW/frame_%05d.png -c:v libx264 -pix_fmt yuv420p -movflags +faststart godot/runtime_state/family_movies/family_test_15s.mp4
+          python3 - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+          movie = Path("godot/runtime_state/family_movies/family_test_15s.mp4")
+          assert movie.is_file() and movie.stat().st_size > 256
+          result = subprocess.run(
+              ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+               "-of", "default=noprint_wrappers=1:nokey=1", str(movie)],
+              capture_output=True, text=True, check=True,
+          )
+          duration = float(result.stdout.strip())
+          assert 14.5 <= duration <= 15.5, duration
+          capture = json.loads(Path("godot/runtime_state/shot_capture_request.json").read_text())
+          assert capture["director_session"]["character_asset_id"] == "CHAR_TEST_FAMILY_FILM"
+          assert capture["director_session"]["play_session"]["equipment"]["equipped"]["headwear"]["item_instance_id"] == "ITEM_TEST_FILM_CROWN"
+          print("family_movie_15s_smoke: PASS · real 15s MP4 from same Hero + crown")
+          PY
