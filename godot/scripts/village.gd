@@ -32,6 +32,16 @@ func _ready() -> void:
     _build_forest()
     _build_storybook_dressing()
     _build_locked_gate()
+    var creator_button := get_node_or_null("HUD/OpenCreatorButton") as Button
+    if creator_button != null:
+        creator_button.pressed.connect(_open_character_creator)
+
+
+func _open_character_creator() -> void:
+    # A child never needs to open the Godot Editor or Streamlit to create.
+    Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+    get_tree().change_scene_to_file("res://scenes/character_creator.tscn")
+
 
 func _process(_delta: float) -> void:
     if gate_unlocked or gate_label == null:
