@@ -310,3 +310,110 @@ def test_equipment_collection_owner_mismatch_is_rejected(tmp_path):
     )
     with pytest.raises(ValueError, match="owner mismatch"):
         wrong.get_collection()
+
+
+# Production-facing issuance path: adult presents ONE high-entropy parent
+# credential and selects a child; the game receives only a 30-minute token.
+PARENT_SECRET = "parent_unlock_secret_very_long_synthetic_value_12345"
+PARENT_AUTH = "Bearer " + PARENT_SECRET
+
+
+def test_parent_unlock_issues_expiring_child_scoped_sessions(tmp_path):
+    from studio.family_api import SESSION_TTL_SECONDS
+
+    db = tmp_path / "short_sessions.db"
+    repo = SQLiteStudioRepository(db)
+    app = FamilyApplication(
+        repo,
+        token_hashes={
+            "child_a": _token_hash("test-child-a-legacy-credential"),
+            "child_b": _token_hash("test-child-b-legacy-credential"),
+        },
+        allowed_origins=(ORIGIN,),
+        parent_unlock_hash=_token_hash(PARENT_SECRET),
+    )
+
+    created = call(app, "POST", "/characters", auth="Bearer test-child-a-legacy-credential",
+                   payload={"display_name": "Sheep"})
+    assert created.status == 201
+    id_a = created.payload["character_id"]
+
+    missing_parent = call(
+        app, "POST", "/family/sessions",
+        auth="Bearer test-child-a-legacy-credential",
+        payload={"profile_id": "child_a"},
+    )
+    assert missing_parent.status == 401
+
+    for payload in (
+        {}, {"profile_id": "unknown"},
+        {"profile_id": "child_a", "family_owner": "child_b"},
+        {"profile_id": 99},
+    ):
+        invalid = call(app, "POST", "/family/sessions",
+                       auth=PARENT_AUTH, payload=payload)
+        assert invalid.status == 400
+
+    issued = call(app, "POST", "/family/sessions",
+                  auth=PARENT_AUTH, payload={"profile_id": "child_a"})
+    assert issued.status == 201
+    assert issued.payload["expires_in_seconds"] == SESSION_TTL_SECONDS
+    assert issued.payload["profile_id"] == "child_a"
+    token = issued.payload["access_token"]
+    assert len(token) >= 32
+    assert PARENT_SECRET not in json.dumps(issued.payload)
+    assert app.authenticate(PARENT_AUTH) is None
+
+    short_auth = "Bearer " + token
+    own = call(app, "GET", "/characters", auth=short_auth)
+    assert own.status == 200
+    assert own.payload["characters"][0]["character_id"] == id_a
+
+    issued_b = call(app, "POST", "/family/sessions",
+                    auth=PARENT_AUTH, payload={"profile_id": "child_b"})
+    assert issued_b.status == 201
+    other_auth = "Bearer " + issued_b.payload["access_token"]
+    assert call(app, "GET", f"/characters/{id_a}", auth=other_auth).status == 404
+    assert call(app, "GET", "/characters", auth=other_auth).payload["characters"] == []
+
+    # Server stores digest only; expiration is enforced without a client clock.
+    digest = hashlib.sha256(token.encode()).hexdigest()
+    assert digest in app._sessions
+    assert token not in app._sessions
+    owner, _ = app._sessions[digest]
+    app._sessions[digest] = (owner, 0.0)
+    assert call(app, "GET", "/characters", auth=short_auth).status == 401
+    assert call(app, "GET", "/characters", auth=other_auth).status == 200
+
+    revoked = call(app, "DELETE", "/family/sessions/current", auth=other_auth)
+    assert revoked.status == 204
+    assert call(app, "GET", "/characters", auth=other_auth).status == 401
+    assert call(
+        app, "DELETE", "/family/sessions/current",
+        auth="Bearer test-child-a-legacy-credential",
+    ).status == 403
+
+
+def test_parent_unlock_invalid_attempts_are_rate_limited_and_secrets_not_logged(tmp_path):
+    app = FamilyApplication(
+        SQLiteStudioRepository(tmp_path / "rate_limited.db"),
+        token_hashes={"child_a": _token_hash("fake_a"), "child_b": _token_hash("fake_b")},
+        allowed_origins=(ORIGIN,),
+        parent_unlock_hash=_token_hash(PARENT_SECRET),
+    )
+    for _ in range(5):
+        resp = call(app, "POST", "/family/sessions",
+                    auth="Bearer wrong_parent_password_for_tests",
+                    payload={"profile_id": "child_a"})
+        assert resp.status == 401
+    limited = call(
+        app, "POST", "/family/sessions", auth=PARENT_AUTH,
+        payload={"profile_id": "child_a"},
+    )
+    assert limited.status == 429
+
+    disabled = make_app(SQLiteStudioRepository(tmp_path / "disabled.db"))
+    assert call(
+        disabled, "POST", "/family/sessions", auth=PARENT_AUTH,
+        payload={"profile_id": "child_a"},
+    ).status == 503
