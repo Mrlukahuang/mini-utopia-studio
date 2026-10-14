@@ -28,6 +28,7 @@ var adult_share_panel: VBoxContainer
 var share_secret_input: LineEdit
 var share_submit: Button
 var share_revoke: Button
+var guests_refresh_button: Button
 
 
 func _ready() -> void:
@@ -97,6 +98,14 @@ func _build_ui() -> void:
     toolbar.name = "Toolbar"
     toolbar.add_theme_constant_override("separation", 10)
     column.add_child(toolbar)
+
+    guests_refresh_button = Button.new()
+    guests_refresh_button.name = "RefreshParentApprovedGuests"
+    guests_refresh_button.text = "🎬 Find parent-approved guest actors"
+    guests_refresh_button.custom_minimum_size.y = 52
+    guests_refresh_button.disabled = true
+    guests_refresh_button.pressed.connect(_refresh_approved_guests)
+    column.add_child(guests_refresh_button)
 
     new_button = Button.new()
     new_button.name = "NewHeroButton"
@@ -230,6 +239,7 @@ func _set_connected(connected: bool) -> void:
     logout_button.disabled = not connected
     refresh_button.disabled = not connected
     new_button.disabled = not connected
+    guests_refresh_button.disabled = not connected
     if not connected:
         shoot_button.disabled = true
         adult_share_panel.visible = false
@@ -510,6 +520,90 @@ func _on_shoot_together_pressed() -> void:
         return
     Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
     get_tree().change_scene_to_file("res://scenes/director_stage.tscn")
+
+
+func _on_share_candidate(character_id: String) -> void:
+    var family := _family_state()
+    if (
+        family == null
+        or family.current_profile_id().is_empty()
+        or not family.has_family_connection()
+    ):
+        return
+    _share_character_id = character_id
+    adult_share_panel.visible = true
+    share_revoke.visible = (
+        not _active_grant_id.is_empty()
+        and _last_shared_character_id == character_id
+    )
+    share_secret_input.clear()
+    _set_status("Parent: approve this Hero acting in sibling's film for 15 min.", false)
+
+
+func _submit_parent_share(revoke: bool) -> void:
+    var family := _family_state()
+    if (
+        family == null
+        or not family.has_family_connection()
+        or family.current_profile_id().is_empty()
+        or _share_character_id.is_empty()
+        or bridge.is_busy()
+    ):
+        _set_status("Reopen your private Hero library before approving.", true)
+        return
+    var parent_secret := share_secret_input.text.strip_edges()
+    share_secret_input.clear()
+    var source := family.current_profile_id()
+    var viewer := "child_b" if source == "child_a" else "child_a"
+    var grant := _active_grant_id if revoke else ""
+    var error := bridge.parent_cast_consent(
+        parent_secret, source, viewer, _share_character_id, grant
+    )
+    parent_secret = ""
+    if error != OK:
+        _set_status("Parent approval could not start securely.", true)
+        return
+    share_submit.disabled = true
+    share_revoke.disabled = true
+    _set_status("Checking parent approval with private server…", false)
+
+
+func _on_parent_share_submit() -> void:
+    _submit_parent_share(false)
+
+
+func _on_parent_revoke_submit() -> void:
+    if _active_grant_id.is_empty():
+        return
+    _submit_parent_share(true)
+
+
+func _refresh_approved_guests() -> void:
+    if bridge.is_busy():
+        return
+    var error := bridge.list_approved_cast_guests()
+    if error != OK:
+        _set_status("Could not check approved guest actors.", true)
+
+
+func _on_guest_pressed(grant_id: String) -> void:
+    var family := _family_state()
+    if (
+        family == null
+        or family.active_play_session().is_empty()
+        or bridge.is_busy()
+    ):
+        _set_status("First select your own saved Hero to direct the movie.", true)
+        return
+    family.clear_second_cast()
+    _refresh_cast_button()
+    _pending_guest_grant_id = grant_id
+    var error := bridge.get_approved_cast_guest(grant_id)
+    if error != OK:
+        _pending_guest_grant_id = ""
+        _set_status("Could not load approved guest actor.", true)
+    else:
+        _set_status("Checking parent's film guest approval…", false)
 
 
 func _on_hero_pressed(character_id: String) -> void:
