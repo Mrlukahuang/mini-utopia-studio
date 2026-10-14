@@ -16,6 +16,7 @@ import re
 import secrets
 import threading
 import time
+from pathlib import Path
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Literal, Mapping
@@ -29,6 +30,10 @@ from studio.family_props import FamilyCraftedProp, craft_family_prop
 from studio.family_films import FamilyFilmDraft, cast_is_owned, film_contract, save_film_draft
 from studio.family_film_render import build_family_film_render_source
 from studio.family_movie_review import current_review_state, decide_private_film_review
+from studio.family_movie_media import (
+    PrivateMovieMediaError, release_status, set_parent_release,
+    download_released_media,
+)
 from studio.bridge.errors import CharacterRevisionConflict, CharacterWriteValidationError
 from studio.bridge.server import BridgeResponse, MAX_REQUEST_BODY_BYTES
 from studio.core.enums import AssetType, ReviewStatus
@@ -76,6 +81,7 @@ class FamilyApplication:
         token_hashes: Mapping[str, str],
         allowed_origins: tuple[str, ...],
         parent_unlock_hash: str | None = None,
+        private_movie_root: Path | None = None,
     ) -> None:
         if len(token_hashes) < 2:
             raise ValueError("At least two separately authenticated profiles required")
@@ -101,6 +107,9 @@ class FamilyApplication:
         self.allowed_origins = frozenset(allowed_origins)
         self.parent_unlock_hash = (
             parent_unlock_hash.lower() if parent_unlock_hash else None
+        )
+        self.private_movie_root = (
+            Path(private_movie_root) if private_movie_root is not None else None
         )
         self._session_lock = threading.RLock()
         # Only token SHA-256 digests are retained on the server, not raw tokens.
@@ -358,6 +367,24 @@ class FamilyApplication:
             del self._sessions[digest]
         return BridgeResponse(HTTPStatus.NO_CONTENT, {})
 
+    def private_mp4_for_download(
+        self, *, authorization: str, film_id: str, origin: str | None
+    ) -> bytes | None:
+        # The binary handler does not pass raw tokens into a URL, redirect,
+        # static file_server or browser cache; it requires a child bearer.
+        if origin is not None and origin not in self.allowed_origins:
+            return None
+        if not re.fullmatch(r"FILM_[A-Za-z0-9_-]{3,96}", film_id):
+            return None
+        owner = self.authenticate(authorization)
+        if owner is None:
+            return None
+        with self._session_lock:
+            return download_released_media(
+                self.repository, self.private_movie_root,
+                owner=owner, film_id=film_id,
+            )
+
     def handle(
         self,
         *,
@@ -422,6 +449,51 @@ class FamilyApplication:
             if review is None:
                 return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
             return BridgeResponse(HTTPStatus.OK, review)
+        if route == "/family/movie-releases":
+            if method != "POST":
+                return BridgeResponse(
+                    HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"}
+                )
+            denied = self._require_parent(authorization)
+            if denied is not None:
+                return denied
+            try:
+                data = json.loads(body)
+            except (UnicodeError, ValueError):
+                return BridgeResponse(
+                    HTTPStatus.BAD_REQUEST, {"error": "invalid_movie_release"}
+                )
+            if (
+                not isinstance(data, dict)
+                or set(data) != {"profile_id", "film_id", "revision", "decision"}
+                or any(not isinstance(value, str) for value in data.values())
+                or data["profile_id"] not in self.token_hashes
+                or not re.fullmatch(r"FILM_[A-Za-z0-9_-]{3,96}", data["film_id"])
+                or not re.fullmatch(r"[0-9]{1,12}", data["revision"])
+                or data["decision"] not in ("release", "revoke")
+            ):
+                return BridgeResponse(
+                    HTTPStatus.BAD_REQUEST, {"error": "invalid_movie_release"}
+                )
+            with self._session_lock:
+                try:
+                    release = set_parent_release(
+                        self.repository, self.private_movie_root,
+                        owner=data["profile_id"], film_id=data["film_id"],
+                        revision=data["revision"], decision=data["decision"],
+                    )
+                except PrivateMovieMediaError:
+                    return BridgeResponse(
+                        HTTPStatus.CONFLICT, {"error": "private_movie_not_ready"}
+                    )
+                except ValueError:
+                    return BridgeResponse(
+                        HTTPStatus.CONFLICT, {"error": "revision_conflict"}
+                    )
+            if release is None:
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            return BridgeResponse(HTTPStatus.OK, release)
+
         if route == "/family/cast-grants":
             if method != "POST":
                 return BridgeResponse(HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"})
@@ -474,6 +546,23 @@ class FamilyApplication:
                     })
                 saved = save_film_draft(self.repository, owner, draft)
             return BridgeResponse(HTTPStatus.CREATED, saved)
+
+        if route.endswith("/media-status") and route.startswith("/family/films/"):
+            film_id = unquote(route[len("/family/films/"):-len("/media-status")])
+            if not re.fullmatch(r"FILM_[A-Za-z0-9_-]{3,96}", film_id):
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            if method != "GET":
+                return BridgeResponse(
+                    HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"}
+                )
+            with self._session_lock:
+                result = release_status(
+                    self.repository, self.private_movie_root,
+                    owner=owner, film_id=film_id,
+                )
+            if result is None:
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            return BridgeResponse(HTTPStatus.OK, result)
 
         if route.endswith("/review") and route.startswith("/family/films/"):
             film_id = unquote(route[len("/family/films/"):-len("/review")])
@@ -776,6 +865,42 @@ def build_family_server(
                         "error": "service_unavailable",
                     })
 
+            # Authenticated binary delivery bypasses Caddy's static file
+            # server. No bearer in URLs, cookies, redirects or shared caches.
+            if method == "GET":
+                download_route = re.fullmatch(
+                    r"/family/films/(FILM_[A-Za-z0-9_-]{3,96})/download",
+                    urlsplit(self.path).path,
+                )
+                if download_route is not None:
+                    binary = application.private_mp4_for_download(
+                        authorization=self.headers.get("Authorization", ""),
+                        origin=self.headers.get("Origin"),
+                        film_id=download_route.group(1),
+                    )
+                    if binary is not None:
+                        self.send_response(HTTPStatus.OK)
+                        self.send_header("Content-Type", "video/mp4")
+                        self.send_header("Content-Length", str(len(binary)))
+                        self.send_header(
+                            "Content-Disposition",
+                            'attachment; filename="mini-utopia-'
+                            + download_route.group(1) + '.mp4"',
+                        )
+                        self.send_header("Cache-Control", "private, no-store")
+                        self.send_header("X-Content-Type-Options", "nosniff")
+                        self.send_header("Referrer-Policy", "no-referrer")
+                        self.send_header("Vary", "Origin")
+                        origin = self.headers.get("Origin")
+                        if origin in application.allowed_origins:
+                            self.send_header("Access-Control-Allow-Origin", origin)
+                        self.end_headers()
+                        self.wfile.write(binary)
+                        return
+                    response = BridgeResponse(
+                        HTTPStatus.NOT_FOUND, {"error": "not_found"}
+                    )
+
             payload = json.dumps(response.payload, ensure_ascii=False).encode("utf-8")
             self.send_response(int(response.status))
             self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -830,6 +955,10 @@ def main() -> None:
         token_hashes=hashes,
         allowed_origins=origins,
         parent_unlock_hash=os.environ.get("FAMILY_PARENT_UNLOCK_SHA256") or None,
+        private_movie_root=(
+            Path(os.environ["FAMILY_PRIVATE_MOVIES_ROOT"])
+            if os.environ.get("FAMILY_PRIVATE_MOVIES_ROOT") else None
+        ),
     )
     server = build_family_server(app, port=args.port)
     print("Private family API listening on loopback; TLS proxy required for Web")

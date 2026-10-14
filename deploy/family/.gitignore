@@ -4,3 +4,4 @@ web/
 *.db-shm
 *.db-wal
 backups/
+private-movies/

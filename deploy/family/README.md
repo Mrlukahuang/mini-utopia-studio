@@ -83,8 +83,9 @@ them into GitHub artifacts, bug reports or chats.
   Production secrets need adult provisioning and rotation policies.
 - Production should include automatic off-host encrypted backups, recovery
   drill, dependency patching and server monitoring before regular use.
-- No authenticated film download service or in-browser MP4 renderer has yet
-  been deployed. Do not expose a writable upload directory via Caddy.
+- An authenticated private MP4 download service is included but **not deployed**.
+  A parent must separately approve rendering and release the exact encoded MP4.
+  Do not expose the media directory via Caddy static files.
 - This package doesn't create cloud accounts, DNS, firewall rules, or spend
   money. An adult must approve and complete that setup when requested.
 - Final acceptance requires a real Mac/iPad test for save, outfits, play,
@@ -130,3 +131,33 @@ available to children, implement an adult-reviewed job queue, independent
 render worker resource limits, owner-scoped private MP4 download, cleanup/
 retention controls and real iPad Safari review. The public repository must
 never contain a rendered household MP4, child audio or private film JSON.
+
+
+## Private reviewed MP4 media store (adult-only configuration)
+
+The Compose package now mounts `deploy/family/private-movies/` **read-only**
+inside the API as `/movies`. This path is excluded from Git. Before any
+real hosting, create it securely as the API runtime UID/GID 10001:
+
+```bash
+sudo install -d -m 700 -o 10001 -g 10001 deploy/family/private-movies
+```
+
+A trusted adult's private host requires a reviewed Godot 4.7.2 checkout,
+Godot, FFmpeg/FFprobe/Xvfb and access to a current, protected SQLite state.
+The offline movie worker may run as UID 10001 with
+`--store-root /ABSOLUTE/HOST/PATH/deploy/family/private-movies` (instead of
+`--output`). It creates 0700 owner/film folders and a fingerprint-named
+0600 MP4. It MUST NOT send real child render payloads or videos to GitHub.
+
+After the parent reviews the **actual locally rendered MP4**, they POST a
+separate authenticated `/family/movie-releases` decision for the child,
+FILM ID and revision, with `decision: "release"`. The private API verifies
+the prior FILM approval and current actor/outfit fingerprint, hashes the
+encoded MP4 and stores the release receipt only in SQLite. Child A can
+retrieve ONLY Child A's media at `GET /family/films/{id}/download` with its
+short-lived Authorization bearer. Access is denied after parent revocation,
+film or wardrobe changes, changes to the MP4 bytes or lost owner access.
+No public static files, signed URL in browser history or shared media are
+created. The iPad Download button and live-host acceptance still require
+real-device testing; this package remains prepared, not deployed.
