@@ -3,6 +3,12 @@ extends Node3D
 var director_runtime: MiniUtopiaDirectorShotRuntime
 var status_label: Label
 var child_choice_buttons: Dictionary = {}
+var film_bridge: MiniUtopiaBridgeClient
+var film_title_input: LineEdit
+var film_note_input: LineEdit
+var save_film_button: Button
+var saved_film_id := ""
+var saved_film_revision := ""
 var fallback_world_environment: WorldEnvironment
 var fallback_environment_resource: Environment
 var fallback_key_light: DirectionalLight3D
@@ -12,6 +18,17 @@ var fallback_fill_light: DirectionalLight3D
 func _ready() -> void:
     _build_environment()
     _build_overlay()
+
+    film_bridge = MiniUtopiaBridgeClient.new()
+    film_bridge.name = "DirectorFamilyFilmBridge"
+    add_child(film_bridge)
+    film_bridge.request_succeeded.connect(_on_film_bridge_success)
+    film_bridge.request_failed.connect(_on_film_bridge_failure)
+    var family_state := get_node_or_null(
+        "/root/FamilySceneState"
+    ) as MiniUtopiaFamilySceneState
+    if family_state != null:
+        family_state.bind_family_client(film_bridge)
 
     director_runtime = MiniUtopiaDirectorShotRuntime.new()
     director_runtime.name = "DirectorShotRuntime"
