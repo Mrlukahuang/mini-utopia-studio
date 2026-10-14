@@ -18,6 +18,8 @@ var connect_button: Button
 var new_button: Button
 var refresh_button: Button
 var logout_button: Button
+var shoot_button: Button
+var _pending_cast_character_id := ""
 
 
 func _ready() -> void:
@@ -94,6 +96,14 @@ func _build_ui() -> void:
     new_button.custom_minimum_size = Vector2(170, 52)
     new_button.pressed.connect(_on_new_pressed)
     toolbar.add_child(new_button)
+
+    shoot_button = Button.new()
+    shoot_button.name = "ShootWithCastButton"
+    shoot_button.text = "🎬 Film Together"
+    shoot_button.custom_minimum_size = Vector2(200, 52)
+    shoot_button.disabled = true
+    shoot_button.pressed.connect(_on_shoot_together_pressed)
+    toolbar.add_child(shoot_button)
 
     refresh_button = Button.new()
     refresh_button.name = "RefreshButton"
@@ -177,6 +187,11 @@ func _set_connected(connected: bool) -> void:
     logout_button.disabled = not connected
     refresh_button.disabled = not connected
     new_button.disabled = not connected
+    if not connected:
+        shoot_button.disabled = true
+        _pending_cast_character_id = ""
+    else:
+        _refresh_cast_button()
 
 
 func _on_connect_pressed() -> void:
@@ -255,6 +270,42 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         _refresh_characters()
         return
 
+    if kind == "character:get" and not _pending_cast_character_id.is_empty():
+        var family := _family_state()
+        if (
+            family == null
+            or not bridge.has_family_session()
+            or String(payload.get("character_id", "")) != _pending_cast_character_id
+            or not family.select_second_cast_character(payload)
+        ):
+            _reset_cast_request()
+            _set_status("That actor isn't available in your private Heroes.", true)
+            return
+        var equipment_error := bridge.get_equipment(_pending_cast_character_id)
+        if equipment_error != OK:
+            _reset_cast_request()
+            family.clear_second_cast()
+            _set_status("Could not load your actor's wardrobe.", true)
+        return
+
+    if kind == "equipment:get" and not _pending_cast_character_id.is_empty():
+        var family := _family_state()
+        var runtime = payload.get("runtime", {})
+        if (
+            family == null
+            or typeof(runtime) != TYPE_DICTIONARY
+            or String(runtime.get("character_asset_id", "")) != _pending_cast_character_id
+            or not family.select_second_cast_equipment(runtime)
+        ):
+            if family != null:
+                family.clear_second_cast()
+            _set_status("Second actor's clothes could not be verified.", true)
+        else:
+            _set_status("Two saved Heroes are ready. Tap 🎬 Film Together!", false)
+        _reset_cast_request()
+        _refresh_cast_button()
+        return
+
     if kind != "characters:list" or not bridge.has_family_session():
         return
     var raw = payload.get("characters", [])
@@ -288,6 +339,20 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         button.pressed.connect(_on_hero_pressed.bind(character_id))
         hero_list.add_child(button)
 
+        var family := _family_state()
+        var primary := (
+            String(family.active_character.get("character_id", ""))
+            if family != null else ""
+        )
+        if not primary.is_empty() and character_id != primary:
+            var cast_button := Button.new()
+            cast_button.name = "Cast_" + character_id
+            cast_button.text = "🎬 Invite " + name + " into my film"
+            cast_button.custom_minimum_size.y = 58
+            cast_button.add_theme_font_size_override("font_size", 18)
+            cast_button.pressed.connect(_on_cast_pressed.bind(character_id))
+            hero_list.add_child(cast_button)
+
     var message := (
         "No saved Heroes yet. Tap ＋ New Hero to create one!"
         if heroes.is_empty()
@@ -315,6 +380,15 @@ func _on_bridge_failure(kind: String, status_code: int, _code: String, _message:
         )
         return
 
+    if kind in ["character:get", "equipment:get"] and not _pending_cast_character_id.is_empty():
+        var family := _family_state()
+        if family != null:
+            family.clear_second_cast()
+        _reset_cast_request()
+        _refresh_cast_button()
+        _set_status("The second actor could not be loaded from your account.", true)
+        return
+
     if kind != "characters:list":
         return
     if status_code in [401, 403]:
@@ -327,6 +401,54 @@ func _on_bridge_failure(kind: String, status_code: int, _code: String, _message:
         _set_status("Parent: this session is not authorized. Please reconnect.", true)
         return
     _set_status("Could not load your Heroes. Check the private connection.", true)
+
+
+## Each candidate must be fetched again through the current child's
+## server-scoped GET; never cast directly from a name in a client list.
+func _on_cast_pressed(character_id: String) -> void:
+    var family := _family_state()
+    if (
+        family == null
+        or not family.has_family_connection()
+        or not bridge.has_family_session()
+        or family.active_play_session().is_empty()
+        or character_id == String(family.active_character.get("character_id", ""))
+        or bridge.is_busy()
+    ):
+        _set_status("Select your main saved Hero before adding another actor.", true)
+        return
+    family.clear_second_cast()
+    _refresh_cast_button()
+    _pending_cast_character_id = character_id
+    var error := bridge.get_character(character_id)
+    if error != OK:
+        _reset_cast_request()
+        _set_status("Could not request your second actor.", true)
+        return
+    _set_status("Checking actor and wardrobe in your private account…", false)
+
+
+func _reset_cast_request() -> void:
+    _pending_cast_character_id = ""
+
+
+func _refresh_cast_button() -> void:
+    var family := _family_state()
+    shoot_button.disabled = (
+        family == null
+        or not family.has_family_connection()
+        or family.active_play_session().is_empty()
+        or family.second_cast_play_session().is_empty()
+    )
+
+
+func _on_shoot_together_pressed() -> void:
+    _refresh_cast_button()
+    if shoot_button.disabled:
+        _set_status("Choose another saved Hero from your account first.", true)
+        return
+    Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+    get_tree().change_scene_to_file("res://scenes/director_stage.tscn")
 
 
 func _on_hero_pressed(character_id: String) -> void:
@@ -347,6 +469,7 @@ func _on_new_pressed() -> void:
 
 
 func _on_disconnect_pressed() -> void:
+    _reset_cast_request()
     # Proactively revoke the short-lived server token when safe to do so;
     # local disconnect ALWAYS clears memory even if offline or busy.
     if bridge.has_family_session() and not bridge.is_busy():

@@ -18,9 +18,16 @@ func _ready() -> void:
 
     var selection := get_node_or_null("/root/FamilySceneState") as MiniUtopiaFamilySceneState
     if selection != null:
-        var family_payload := MiniUtopiaFamilyDirectorSession.from_play_session(
-            selection.active_play_session()
-        )
+        var family_payload := {}
+        var second := selection.second_cast_play_session()
+        if not second.is_empty():
+            family_payload = MiniUtopiaFamilyDirectorSession.from_two_play_sessions(
+                selection.active_play_session(), second
+            )
+        if family_payload.is_empty():
+            family_payload = MiniUtopiaFamilyDirectorSession.from_play_session(
+                selection.active_play_session()
+            )
         if not family_payload.is_empty():
             stage_payload(family_payload)
             return
