@@ -188,7 +188,8 @@ func restore_owned_film(film: Dictionary) -> bool:
         )
     ):
         return false
-    var second_id := String(draft.get("second_character_id", ""))
+    var raw_second = draft.get("second_character_id", null)
+    var second_id := String(raw_second) if typeof(raw_second) == TYPE_STRING else ""
     if not second_id.is_empty():
         if (
             second_cast_is_parent_guest
