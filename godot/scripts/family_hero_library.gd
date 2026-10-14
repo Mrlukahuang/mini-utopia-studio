@@ -158,6 +158,9 @@ func _set_connected(connected: bool) -> void:
 
 
 func _on_connect_pressed() -> void:
+    if bridge.is_busy():
+        _set_status("A Hero request is still loading. Please retry.", true)
+        return
     var family := _family_state()
     if family == null:
         _set_status("Family session is not available.", true)
@@ -192,7 +195,7 @@ func _refresh_characters() -> void:
 
 
 func _on_bridge_success(kind: String, payload: Dictionary) -> void:
-    if kind != "characters:list":
+    if kind != "characters:list" or not bridge.has_family_session():
         return
     var raw = payload.get("characters", [])
     if String(payload.get("schema_version", "")) != "1.0" or typeof(raw) != TYPE_ARRAY:
@@ -272,6 +275,8 @@ func _on_new_pressed() -> void:
 
 
 func _on_disconnect_pressed() -> void:
+    # If an old request completes after logout, _on_bridge_success must not
+    # show the previous child's Character names.
     var family := _family_state()
     if family != null:
         family.disconnect_family()
