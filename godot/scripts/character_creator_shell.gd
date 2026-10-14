@@ -152,6 +152,9 @@ func _refresh_outfit_choices() -> void:
     if _outfit_choices == null:
         return
     for child in _outfit_choices.get_children():
+        # Release names immediately; queued nodes otherwise collide with the
+        # new choices on rapid iPad Outfit/Look tab switching.
+        _outfit_choices.remove_child(child)
         child.queue_free()
 
     if equipment_state.is_empty():
