@@ -183,12 +183,16 @@ def render_private_movie(
 
         # Exclusive creation: existing files are never overwritten. No child
         # media is kept in source checkout or Github Actions artifacts.
+        created_output = False
         try:
-            with output.open("xb") as dest, staging.open("rb") as video:
-                shutil.copyfileobj(video, dest)
+            with output.open("xb") as dest:
+                created_output = True
+                with staging.open("rb") as video:
+                    shutil.copyfileobj(video, dest)
             output.chmod(0o600)
         except Exception:
-            output.unlink(missing_ok=True)
+            if created_output:
+                output.unlink(missing_ok=True)
             raise
 
     return {
