@@ -1,0 +1,15 @@
+.git
+.github
+data
+tests
+godot
+docs
+scripts
+tools
+*.db
+*.db-wal
+*.db-shm
+.env
+**/.env
+deploy/family/web
+deploy/family/backups
