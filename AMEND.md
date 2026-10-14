@@ -29,14 +29,30 @@
 ## 条目
 
 ### A-006 家庭 MacBook 无域名、仅局域网 HTTPS 部署（V1-W1-01）
-- 状态：PROPOSED
+- 状态：APPROVED（项目负责人于 2026-10-15 聊天批准）
 - 日期：2026-10-15
 - 提出者：GPT（根据项目负责人的 MacBook Air 15-inch M5／无域名／仅家庭 Wi-Fi 要求）
-- 变更内容：提议把 V1-W1-01 的“公网域名 + Caddy 公网证书”部署方式，针对家庭试用改为 **方案 A：MacBook Air 上的 Caddy 内部 CA（`tls internal`）+ 固定私网 IPv4 地址 + iPad/Mac 显式信任该家庭 CA**。Godot Web、Python Core + SQLite、家长审核与 Godot/FFmpeg 成片技术栈不变。HTTPS 同源加载游戏和 API；不购买域名、不对公网开放、不设置路由器端口转发。只允许批准的家庭 LAN 接口提供访问，家长必须单独确认 LAN 端口开放、证书安装、密钥初始化及任何付费操作。
+- 变更内容：批准把 V1-W1-01 的“公网域名 + Caddy 公网证书”部署方式，针对家庭试用改为 **方案 A：MacBook Air 上的 Caddy 内部 CA（`tls internal`）+ 固定私网 IPv4 地址 + iPad/Mac 显式信任该家庭 CA**。Godot Web、Python Core + SQLite、家长审核与 Godot/FFmpeg 成片技术栈不变。HTTPS 同源加载游戏和 API；不购买域名、不对公网开放、不设置路由器端口转发。只允许批准的家庭 LAN 接口提供访问，家长已一次性批准部署配置、局域网端口绑定、内部 CA 建立和仅存本机 .env 的家长/孩子访问密钥初始化；付费项目、删除数据、向公网开放端口仍须另行确认。
 - 原因：当前家庭没有域名，只在家中同一 Wi-Fi 使用；计划 W2 的 iPad Safari 录音需要可信 HTTPS 安全上下文及麦克风许可，不能以普通 `http://192.168.x.x` 替代。
-- 影响：V1-W1-01 的部署步骤；获批后预计仅调整现有 `deploy/family/Caddyfile`、`deploy/family/compose.yaml`、`deploy/family/.env.example`、`deploy/family/README.md` 及现有部署检查中强制公网域名的假设（具体文件修改仍要先提交对应任务计划并逐项授权）。需给 MacBook 在路由器分配固定私网地址，限制 Docker 端口仅绑定批准的家庭 LAN IP，建立并持久保存 Caddy CA，向家庭自有 iPad 和 Mac 安装**仅根证书公钥**并显式信任，验证 Safari 无证书警告、同源登录及 `isSecureContext` / 录音授权；真实私有电影和密钥仍不得进入 GitHub。MacBook 须插电、保持开机且不自动睡眠；真机渲染对 Apple Silicon M5 的兼容性需单独验收。
+- 影响：V1-W1-01 的部署步骤；在 V1-W1-01 中调整现有 `deploy/family/Caddyfile`、`deploy/family/compose.yaml`、`deploy/family/.env.example`、`deploy/family/README.md` 及现有部署检查中强制公网域名的假设（部署配置修改已获批，按一个任务一个 PR 执行）。MacBook 已在本机手动固定为 192.168.1.50，需确认与 DHCP 不冲突，限制 Docker 端口仅绑定批准的家庭 LAN IP，建立并持久保存 Caddy CA，向家庭自有 iPad 和 Mac 安装**仅根证书公钥**并显式信任，验证 Safari 无证书警告、同源登录及 `isSecureContext` / 录音授权；真实私有电影和密钥仍不得进入 GitHub。MacBook 须插电、保持开机且不自动睡眠；真机渲染对 Apple Silicon M5 的兼容性需单独验收。
 - 备选方案（尚未批准）：**方案 B：Tailscale Serve + 自动可信的 `*.ts.net` HTTPS**；不用购买个人域名，也不用在家用路由器做公网端口转发或在 iPad 安装自建根 CA，但需要 Tailscale 账户、Mac/iPad 安装客户端、MagicDNS、HTTPS 证书和授权；设备名可能公开在证书透明度日志中，并且 tailnet 连接有可能在外网使用，与“严格仅家庭 Wi-Fi”不是同一约束。方案 B **不得因本条获批而自动执行**；如改选 B，必须另外提出具体 AMEND、获人类批准后才可实施，且不得开启 Funnel。
-- 不改会怎样：现有 `FAMILY_DOMAIN`、Caddy 公网 DNS/证书及离线预检都假设真实域名，现有 Compose 还默认映射主机所有接口的 80/443；直接按原部署说明无法满足无域名、仅家庭 LAN、iPad 可信 HTTPS 和后续浏览器录音要求。V1-W1-01 继续保持未完成，直到人类批准方案并在真 iPad 上验收。
+- 不改会怎样：现有 `FAMILY_DOMAIN`、Caddy 公网 DNS/证书及离线预检都假设真实域名，现有 Compose 还默认映射主机所有接口的 80/443；直接按原部署说明无法满足无域名、仅家庭 LAN、iPad 可信 HTTPS 和后续浏览器录音要求。V1-W1-01 继续保持未完成，直到完成真 iPad 验收。
+
+### A-007 自主模式：CI 全绿自动合并，只在授权/花钱/卡住时叫人
+- 状态：APPROVED（项目负责人于 2026-10-15 聊天中提出并批准）
+- 日期：2026-10-15
+- 提出者：人类
+- 变更内容：新增 AGENTS.md §9 自主模式。代理可以从 V1_PLAN 本周任务中连续领取任务，CI 全绿后自己合并 PR；只有遇到授权类事项、单任务付费超过 1 美元、不可逆/高风险操作、卡住、或本周任务做完时，才停下来叫人。每天最多合并 6 个 PR。治理文件（AGENTS.md、AMEND.md、scope_guard、workflows）的修改仍需人类合并。
+- 原因：逐个审核计划和 PR 太慢；Scope Guard 和 CI 已经能拦住跑偏。
+- 影响：AGENTS.md §0、§9；每小时自主任务可以按 §9 恢复。
+
+### A-005 允许归档旧文档到 docs/archive/
+- 状态：APPROVED（合并本 PR 即视为人类批准）
+- 日期：2026-10-15
+- 提出者：GPT 发现冲突 / Claude 起草
+- 变更内容：AGENTS.md §2 的"禁止新建 docs/*.md"增加例外：把**已有**内容移入 `docs/archive/` 做归档是允许的；在 archive 中不得写新内容。
+- 原因：V1-W1-04 需要把 README 旧内容移到 `docs/archive/README_LEGACY.md`，与 §2 文字冲突（Scope Guard 本来就放行 docs/archive/）。
+- 影响：AGENTS.md §2、PR 模板。
 
 ### A-004 Pixal3D 仅限非公开使用
 - 状态：APPROVED
