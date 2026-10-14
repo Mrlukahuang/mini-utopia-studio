@@ -16,6 +16,9 @@ var _request: HTTPRequest
 var _active_kind := ""
 var _family_token := ""
 const TOKEN_ALPHABET := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
+const MAX_PRIVATE_MP4_BYTES := 32 * 1024 * 1024
+var _prepared_movie_bytes: PackedByteArray = PackedByteArray()
+var _prepared_movie_id := ""
 
 
 func _ready() -> void:
@@ -64,6 +67,8 @@ func set_family_session(token: String) -> bool:
 
 func clear_family_session() -> void:
     _family_token = ""
+    _prepared_movie_bytes.clear()
+    _prepared_movie_id = ""
 
 
 func has_family_session() -> bool:
@@ -257,6 +262,53 @@ func get_family_film_review(film_id: String) -> int:
     )
 
 
+func prepare_private_movie_download(film_id: String) -> int:
+    if not film_id.begins_with("FILM_") or "/" in film_id:
+        return ERR_INVALID_PARAMETER
+    if not has_family_session() or _request == null:
+        return ERR_UNCONFIGURED
+    if is_busy():
+        return ERR_BUSY
+    _prepared_movie_id = ""
+    _prepared_movie_bytes.clear()
+    _request.timeout = 60.0
+    _request.body_size_limit = MAX_PRIVATE_MP4_BYTES + 1
+    var error := _start_request(
+        "films:download:" + film_id,
+        "/family/films/" + film_id.uri_encode() + "/download",
+        HTTPClient.METHOD_GET
+    )
+    if error != OK:
+        _request.timeout = 5.0
+        _request.body_size_limit = -1
+    return error
+
+
+func has_prepared_private_movie(film_id: String) -> bool:
+    return (
+        has_family_session()
+        and film_id == _prepared_movie_id
+        and _prepared_movie_bytes.size() > 256
+    )
+
+
+func save_prepared_private_movie(film_id: String) -> int:
+    # Called synchronously from the child's SECOND direct button click:
+    # Safari blocks programmatic downloads triggered in HTTP callbacks.
+    if not has_prepared_private_movie(film_id):
+        return ERR_UNCONFIGURED
+    if not OS.has_feature("web"):
+        return ERR_UNAVAILABLE
+    JavaScriptBridge.download_buffer(
+        _prepared_movie_bytes,
+        "mini-utopia-" + film_id + ".mp4",
+        "video/mp4"
+    )
+    _prepared_movie_bytes.clear()
+    _prepared_movie_id = ""
+    return OK
+
+
 func list_family_films() -> int:
     return _start_request("films:list", "/family/films", HTTPClient.METHOD_GET)
 
@@ -402,6 +454,39 @@ func _on_request_completed(
 ) -> void:
     var kind := _active_kind
     _active_kind = ""
+
+    if kind.begins_with("films:download:"):
+        _request.timeout = 5.0
+        _request.body_size_limit = -1
+        var film_id := kind.trim_prefix("films:download:")
+        if (
+            result != HTTPRequest.RESULT_SUCCESS
+            or response_code != HTTPClient.RESPONSE_OK
+        ):
+            request_failed.emit(
+                "films:download", response_code,
+                "private_mp4_unavailable",
+                "Parent has not released an MP4 to this child."
+            )
+            return
+        if (
+            body.size() <= 256
+            or body.size() > MAX_PRIVATE_MP4_BYTES
+            or body[4] != 102 or body[5] != 116
+            or body[6] != 121 or body[7] != 112
+        ):
+            request_failed.emit(
+                "films:download", 0, "invalid_mp4",
+                "Private movie download was not a safe MP4."
+            )
+            return
+        _prepared_movie_bytes = body.duplicate()
+        _prepared_movie_id = film_id
+        request_succeeded.emit(
+            "films:download-ready",
+            {"film_id": film_id, "bytes": _prepared_movie_bytes.size()}
+        )
+        return
 
     if result != HTTPRequest.RESULT_SUCCESS:
         request_failed.emit(
