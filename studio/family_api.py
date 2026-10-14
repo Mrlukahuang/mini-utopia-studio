@@ -865,6 +865,42 @@ def build_family_server(
                         "error": "service_unavailable",
                     })
 
+            # Authenticated binary delivery bypasses Caddy's static file
+            # server. No bearer in URLs, cookies, redirects or shared caches.
+            if method == "GET":
+                download_route = re.fullmatch(
+                    r"/family/films/(FILM_[A-Za-z0-9_-]{3,96})/download",
+                    urlsplit(self.path).path,
+                )
+                if download_route is not None:
+                    binary = application.private_mp4_for_download(
+                        authorization=self.headers.get("Authorization", ""),
+                        origin=self.headers.get("Origin"),
+                        film_id=download_route.group(1),
+                    )
+                    if binary is not None:
+                        self.send_response(HTTPStatus.OK)
+                        self.send_header("Content-Type", "video/mp4")
+                        self.send_header("Content-Length", str(len(binary)))
+                        self.send_header(
+                            "Content-Disposition",
+                            'attachment; filename="mini-utopia-'
+                            + download_route.group(1) + '.mp4"',
+                        )
+                        self.send_header("Cache-Control", "private, no-store")
+                        self.send_header("X-Content-Type-Options", "nosniff")
+                        self.send_header("Referrer-Policy", "no-referrer")
+                        self.send_header("Vary", "Origin")
+                        origin = self.headers.get("Origin")
+                        if origin in application.allowed_origins:
+                            self.send_header("Access-Control-Allow-Origin", origin)
+                        self.end_headers()
+                        self.wfile.write(binary)
+                        return
+                    response = BridgeResponse(
+                        HTTPStatus.NOT_FOUND, {"error": "not_found"}
+                    )
+
             payload = json.dumps(response.payload, ensure_ascii=False).encode("utf-8")
             self.send_response(int(response.status))
             self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -919,6 +955,10 @@ def main() -> None:
         token_hashes=hashes,
         allowed_origins=origins,
         parent_unlock_hash=os.environ.get("FAMILY_PARENT_UNLOCK_SHA256") or None,
+        private_movie_root=(
+            Path(os.environ["FAMILY_PRIVATE_MOVIES_ROOT"])
+            if os.environ.get("FAMILY_PRIVATE_MOVIES_ROOT") else None
+        ),
     )
     server = build_family_server(app, port=args.port)
     print("Private family API listening on loopback; TLS proxy required for Web")
