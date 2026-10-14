@@ -724,6 +724,25 @@ func _refresh_color_buttons() -> void:
 
 
 func _on_bridge_success(kind: String, payload: Dictionary) -> void:
+    if kind == "prop:craft":
+        var crafted = payload.get("crafted", {})
+        var owned = payload.get("equipment", {})
+        if (
+            typeof(crafted) != TYPE_DICTIONARY
+            or typeof(owned) != TYPE_DICTIONARY
+            or String(crafted.get("character_id", "")) != character_id
+            or String(owned.get("character_id", "")) != character_id
+        ):
+            _set_status("Your new prop could not be verified.", true)
+            return
+        equipment_state = owned.duplicate(true)
+        _refresh_outfit_choices()
+        var runtime = equipment_state.get("runtime", {})
+        if typeof(runtime) == TYPE_DICTIONARY:
+            avatar_stage.apply_equipment_runtime(runtime)
+        _set_status("New prop saved! Tap Wear to put it on your Hero.", false)
+        return
+
     if kind == "character:get":
         equipment_state.clear()
         _appearance_dirty = false
@@ -805,6 +824,9 @@ func _on_bridge_failure(
     _error_code: String,
     message: String
 ) -> void:
+    if kind == "prop:craft":
+        _set_status("Could not create your prop. Choose a different name or try again.", true)
+        return
     if kind.begins_with("equipment:"):
         play_button.disabled = true
         _set_status("My Stuff could not load. " + message, true)
