@@ -121,6 +121,12 @@ jobs:
           set -euo pipefail
           "$GODOT_BINARY" --headless --path godot --script res://tests/creator_new_hero_smoke.gd
 
+      - name: Smoke-test village Hero Creator entrypoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GODOT_BINARY" --headless --path godot --script res://tests/village_creator_entrypoint_smoke.gd
+
       - name: Export Web release
         shell: bash
         run: |
