@@ -34,6 +34,13 @@ var movie_list: VBoxContainer
 var _movie_restore: Dictionary = {}
 var _movie_phase := ""
 var _movie_cast_id := ""
+var _pending_review_film_id := ""
+var _review_film: Dictionary = {}
+var parent_movie_panel: VBoxContainer
+var parent_movie_summary: Label
+var parent_movie_secret: LineEdit
+var parent_movie_approve: Button
+var parent_movie_revoke: Button
 
 
 func _ready() -> void:
@@ -190,6 +197,40 @@ func _build_ui() -> void:
     share_revoke.pressed.connect(_on_parent_revoke_submit)
     adult_share_panel.add_child(share_revoke)
 
+    parent_movie_panel = VBoxContainer.new()
+    parent_movie_panel.name = "ParentMovieReviewPanel"
+    parent_movie_panel.visible = false
+    parent_movie_panel.add_theme_constant_override("separation", 8)
+    column.add_child(parent_movie_panel)
+
+    parent_movie_summary = Label.new()
+    parent_movie_summary.name = "FilmDetailsToReview"
+    parent_movie_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    parent_movie_summary.add_theme_font_size_override("font_size", 18)
+    parent_movie_panel.add_child(parent_movie_summary)
+
+    parent_movie_secret = LineEdit.new()
+    parent_movie_secret.name = "ParentFilmReviewSecret"
+    parent_movie_secret.secret = true
+    parent_movie_secret.max_length = 256
+    parent_movie_secret.placeholder_text = "Parent unlock · never saved"
+    parent_movie_secret.custom_minimum_size.y = 52
+    parent_movie_panel.add_child(parent_movie_secret)
+
+    parent_movie_approve = Button.new()
+    parent_movie_approve.name = "ApprovePrivateRenderButton"
+    parent_movie_approve.text = "👨‍👩‍👧 Parent: Approve private movie render"
+    parent_movie_approve.custom_minimum_size.y = 54
+    parent_movie_approve.pressed.connect(_on_parent_film_approve_pressed)
+    parent_movie_panel.add_child(parent_movie_approve)
+
+    parent_movie_revoke = Button.new()
+    parent_movie_revoke.name = "RevokePrivateRenderButton"
+    parent_movie_revoke.text = "Parent: Revoke movie render permission"
+    parent_movie_revoke.custom_minimum_size.y = 54
+    parent_movie_revoke.pressed.connect(_on_parent_film_revoke_pressed)
+    parent_movie_panel.add_child(parent_movie_revoke)
+
     connection_panel = VBoxContainer.new()
     connection_panel.name = "ParentConnection"
     connection_panel.add_theme_constant_override("separation", 8)
@@ -263,6 +304,7 @@ func _set_connected(connected: bool) -> void:
     guests_refresh_button.disabled = not connected
     movies_button.disabled = not connected
     if not connected:
+        _cancel_parent_movie_review()
         _cancel_movie_restore()
         _clear_movie_list()
         shoot_button.disabled = true
