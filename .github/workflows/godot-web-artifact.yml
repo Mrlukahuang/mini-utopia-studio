@@ -145,6 +145,12 @@ jobs:
           set -euo pipefail
           "$GODOT_BINARY" --headless --path godot --script res://tests/family_outfit_game_director_smoke.gd
 
+      - name: Smoke-test child wardrobe touch selections
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GODOT_BINARY" --headless --path godot --script res://tests/creator_touch_wardrobe_smoke.gd
+
       - name: Export Web release
         shell: bash
         run: |
