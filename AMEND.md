@@ -28,6 +28,14 @@
 
 ## 条目
 
+### A-005 允许归档旧文档到 docs/archive/
+- 状态：APPROVED（合并本 PR 即视为人类批准）
+- 日期：2026-10-15
+- 提出者：GPT 发现冲突 / Claude 起草
+- 变更内容：AGENTS.md §2 的"禁止新建 docs/*.md"增加例外：把**已有**内容移入 `docs/archive/` 做归档是允许的；在 archive 中不得写新内容。
+- 原因：V1-W1-04 需要把 README 旧内容移到 `docs/archive/README_LEGACY.md`，与 §2 文字冲突（Scope Guard 本来就放行 docs/archive/）。
+- 影响：AGENTS.md §2、PR 模板。
+
 ### A-004 Pixal3D 仅限非公开使用
 - 状态：APPROVED
 - 日期：2026-10-15

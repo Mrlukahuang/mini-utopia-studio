@@ -14,7 +14,7 @@
 
 ## 范围自检
 - [ ] 只做了这个任务，没有顺手修别的
-- [ ] 没有新建 docs/*.md（V1_PLAN.md / AMEND.md / AGENTS.md 除外）
+- [ ] 没有新建 docs/*.md（V1_PLAN.md / AMEND.md / AGENTS.md 以及归档到 docs/archive/ 的除外）
 - [ ] 没有新增 provider、换模型、换框架，也没有改 AGENTS.md §5 的锁定决策（如果有，对应的 AMEND 编号：A-___）
 - [ ] 已更新 docs/V1_PLAN.md 中的任务状态
 - [ ] 范围外发现已写进 V1_PLAN.md §10
