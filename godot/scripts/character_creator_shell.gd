@@ -47,6 +47,7 @@ const COLOR_BUTTONS := {
 @onready var bridge: MiniUtopiaBridgeClient = $BridgeClient
 @onready var status_label: Label = $RootMargin/MainColumn/StatusBar/StatusLabel
 @onready var character_label: Label = $RootMargin/MainColumn/HeaderRow/CharacterLabel
+@onready var hero_name_input: LineEdit = $RootMargin/MainColumn/HeaderRow/TitleColumn/HeroNameInput
 @onready var back_button: Button = $RootMargin/MainColumn/FooterRow/BackButton
 @onready var save_button: Button = $RootMargin/MainColumn/FooterRow/SaveButton
 @onready var avatar_stage: MiniUtopiaCreatorAvatarStage = $RootMargin/MainColumn/CreatorBody/PreviewPanel/AvatarStage
@@ -74,6 +75,7 @@ var _return_scene := "res://scenes/main.tscn"
 func _ready() -> void:
     back_button.pressed.connect(_on_back_pressed)
     save_button.pressed.connect(_on_save_pressed)
+    hero_name_input.text_changed.connect(_on_hero_name_changed)
     bridge.request_succeeded.connect(_on_bridge_success)
     bridge.request_failed.connect(_on_bridge_failure)
     _wire_look_controls()
@@ -88,7 +90,7 @@ func _ready() -> void:
     if character_id.is_empty():
         character_label.text = "New Hero"
         _set_status(
-            "Creator shell ready · choose a character to edit next.",
+            "Name your hero · parent Family Cloud sign-in required to save.",
             false
         )
         save_button.disabled = true
@@ -102,6 +104,34 @@ func _ready() -> void:
             _set_status("Family Cloud not connected yet · preview only.", true)
         else:
             _set_status("Could not start Character load.", true)
+
+
+func activate_family_session(token: String, api_base_url: String) -> bool:
+    # The future parent login flow supplies the token only at runtime.
+    bridge.configure(api_base_url)
+    if not bridge.set_family_session(token):
+        save_button.disabled = true
+        _set_status("Family Cloud sign-in required to save.", true)
+        return false
+
+    if character_id.is_empty():
+        _on_hero_name_changed(hero_name_input.text)
+        _set_status("Family Cloud connected · name and save your hero.", false)
+    else:
+        save_button.disabled = true
+        var error := bridge.get_character(character_id)
+        if error != OK:
+            _set_status("Could not load the Family Cloud hero.", true)
+            return false
+    return true
+
+
+func _on_hero_name_changed(_value: String) -> void:
+    var has_name := not hero_name_input.text.strip_edges().is_empty()
+    if character_id.is_empty():
+        save_button.disabled = not (has_name and bridge.has_family_session())
+    elif not loaded_character.is_empty():
+        save_button.disabled = not has_name
 
 
 func _read_user_args() -> void:
@@ -449,6 +479,7 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         character_label.text = (
             display_name if not display_name.is_empty() else character_id
         )
+        hero_name_input.text = display_name
         var profile = payload.get("profile", {})
         if typeof(profile) == TYPE_DICTIONARY:
             var appearance = profile.get("avatar", {})
@@ -459,6 +490,10 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
                 _draft_appearance = avatar_stage.current_appearance()
                 _refresh_look_controls()
         save_button.disabled = false
+        if bridge.has_family_session():
+            # Equipment endpoints are not part of Family API v1 yet.
+            _set_status("Family Cloud hero loaded · ready to edit.", false)
+            return
         _set_status("Character loaded · loading My Stuff…", false)
         var equipment_error := bridge.get_equipment(character_id)
         if equipment_error != OK:
@@ -477,6 +512,15 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             "Character + My Stuff loaded · nine equipment slots ready.",
             false
         )
+        return
+
+    if kind == "character:post":
+        loaded_character = payload.duplicate(true)
+        character_id = String(payload.get("character_id", ""))
+        character_label.text = String(payload.get("display_name", "New Hero"))
+        hero_name_input.text = character_label.text
+        save_button.disabled = character_id.is_empty()
+        _set_status("Your hero is saved with a permanent ID! 💖", false)
         return
 
     if kind == "character:put":
@@ -512,6 +556,11 @@ func _on_bridge_failure(
             _set_status(message + help, true)
         return
 
+    if kind == "character:post":
+        save_button.disabled = false
+        _set_status("Could not create your hero. " + message, true)
+        return
+
     if kind == "character:put":
         if status_code == 409:
             _set_status(
@@ -530,8 +579,30 @@ func _on_back_pressed() -> void:
 
 
 func _on_save_pressed() -> void:
-    if character_id.is_empty() or loaded_character.is_empty():
-        _set_status("Nothing to save yet.", true)
+    var name := hero_name_input.text.strip_edges()
+    if name.is_empty():
+        _set_status("Please give your hero a name first.", true)
+        return
+
+    if character_id.is_empty():
+        if not bridge.has_family_session():
+            _set_status("Parent Cloud sign-in is required to save.", true)
+            return
+        save_button.disabled = true
+        _set_status("Creating your hero…", false)
+        var create_error := bridge.create_character({
+            "schema_version": "1.0",
+            "display_name": name,
+            "description": "",
+            "profile": {"avatar": _draft_appearance.duplicate(true)},
+        })
+        if create_error != OK:
+            save_button.disabled = false
+            _set_status("Could not begin creating your hero.", true)
+        return
+
+    if loaded_character.is_empty():
+        _set_status("Please load your hero before saving changes.", true)
         return
 
     save_button.disabled = true
@@ -542,9 +613,7 @@ func _on_save_pressed() -> void:
             loaded_character.get("schema_version", "1.0")
         ),
         "revision": String(loaded_character.get("revision", "")),
-        "display_name": String(
-            loaded_character.get("display_name", character_id)
-        ),
+        "display_name": name,
         "description": String(loaded_character.get("description", "")),
         "profile": loaded_character.get("profile", {}),
     }
@@ -552,7 +621,6 @@ func _on_save_pressed() -> void:
     if error != OK:
         save_button.disabled = false
         _set_status("Could not start Save. Please try again.", true)
-
 
 func _set_status(message: String, is_error: bool) -> void:
     status_label.text = message
