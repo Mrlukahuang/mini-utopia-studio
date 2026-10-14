@@ -41,23 +41,26 @@ jobs:
         run: |
           docker build -f deploy/family/Dockerfile -t mini-utopia-family-api:ci .
 
-      - name: Import isolated server and run without Streamlit or AI packages
+      - name: Import isolated server without Streamlit or AI packages
         run: |
-          docker run --rm mini-utopia-family-api:ci python -c "
-          from studio.family_api import FamilyApplication, build_family_server;
-          from studio.repositories.sqlite import SQLiteStudioRepository;
-          from pathlib import Path;
-          import tempfile, hashlib;
-          with tempfile.TemporaryDirectory() as temp:
+          docker run --rm -i --read-only --tmpfs /tmp mini-utopia-family-api:ci python - <<'PY'
+          from pathlib import Path
+          from tempfile import TemporaryDirectory
+          import hashlib
+          from studio.family_api import FamilyApplication, build_family_server
+          from studio.repositories.sqlite import SQLiteStudioRepository
+
+          with TemporaryDirectory() as folder:
               app = FamilyApplication(
-                  SQLiteStudioRepository(Path(temp)/'db.sqlite'),
+                  SQLiteStudioRepository(Path(folder) / "db.sqlite"),
                   token_hashes={
-                      'child_a': hashlib.sha256(b'fake-a').hexdigest(),
-                      'child_b': hashlib.sha256(b'fake-b').hexdigest(),
+                      "child_a": hashlib.sha256(b"fake-a").hexdigest(),
+                      "child_b": hashlib.sha256(b"fake-b").hexdigest(),
                   },
-                  allowed_origins=('https://family.example.test',),
-                  parent_unlock_hash=hashlib.sha256(b'fake-parent').hexdigest()
+                  allowed_origins=("https://family.example.test",),
+                  parent_unlock_hash=hashlib.sha256(b"fake-parent").hexdigest(),
               )
               server = build_family_server(app, port=0)
               server.server_close()
-          "
+          print("family_container_smoke: PASS")
+          PY
