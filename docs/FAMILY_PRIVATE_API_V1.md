@@ -28,6 +28,8 @@ from the unauthenticated desktop-only `studio.bridge.server`.
 | GET | `/family/films/{id}` | Read current child's saved film |
 | PUT | `/family/films/{id}` | Revision-checked update |
 | GET | `/family/films/{film_id}/render-source` | Current child only: assemble canonical actor/equipment film-render inputs from SQLite; no video or publish permission |
+| POST | `/family/film-reviews` | Parent-only approve/revoke exact FILM ID, revision and current private actor/outfit snapshot |
+| GET | `/family/films/{film_id}/review` | Current child checks whether parent approval is still valid |
 | OPTIONS | any | Strict, origin-scoped Web preflight |
 
 Every non-OPTIONS request requires `Authorization: Bearer <child-token>`.
@@ -145,3 +147,35 @@ This route **does not generate, store, publish or download MP4**. A trusted,
 parent-approved private worker must still run Godot and FFmpeg on a protected
 host and implement adult-controlled delivery. Never submit real household
 film input, output or media to a public repository or GitHub Actions.
+
+
+## Explicit parent review before private MP4 export
+
+Before a real household film may be rendered, an adult reviews that child's
+saved FILM draft and its current cast/outfits, then submits a **separate**
+parent-unlock-authenticated review decision:
+
+```http
+POST /family/film-reviews
+Authorization: Bearer <PARENT_UNLOCK>
+Content-Type: application/json
+
+{"profile_id":"child_a","film_id":"FILM_...","revision":"1","decision":"approve"}
+```
+
+`decision: "revoke"` withdraws permission without removing the child's
+draft. The route is rate-limited by the existing parent-unlock protection;
+child bearer tokens cannot approve their own content. Only the child who
+owns the film can `GET /family/films/{id}/review` to see a simple approved/
+needs-review status. Other child profiles receive a non-disclosing 404.
+
+The approved snapshot is bound to the exact saved FILM revision **and** a
+SHA-256 digest of the current canonical actor appearance, equipment, props
+and director choices. A child edits the film, changes an outfit, or an actor
+is reassigned/archived: the earlier approval ceases to authorize a new render.
+Approval does not alter the child's film revision; the next draft edit does
+not get a spurious optimistic-lock conflict. Reviews persist in the private
+SQLite database and may be explicitly revoked. They do not grant public
+sharing or download rights. The private MP4 worker refuses to start unless
+approval is still valid. The synthetic CI movie has only a synthetic adult
+approval; no private family data is used in public GitHub Actions.
