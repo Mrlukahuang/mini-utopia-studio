@@ -161,3 +161,23 @@ film or wardrobe changes, changes to the MP4 bytes or lost owner access.
 No public static files, signed URL in browser history or shared media are
 created. The iPad Download button and live-host acceptance still require
 real-device testing; this package remains prepared, not deployed.
+
+
+## Verified synthetic end-to-end movie release regression
+
+The GitHub test workflow runs a **synthetic-only** end-to-end acceptance
+check using a temporary SQLite database and real Godot/Xvfb/FFmpeg:
+create a Hero and a handcrafted prop, save a film, adult approve its exact
+revision, render an isolated MP4 in a 0700 private folder, then confirm it
+remains unavailable to the child until the adult separately releases the
+finished file. It verifies the owner can download byte-identical MP4 data,
+a sibling cannot, and revocation immediately denies further downloads.
+Temporary synthetic footage is deleted and is never attached to GitHub.
+
+The real private worker also reopens current canonical records and checks
+parent approval **after encoding and before writing the finished MP4**:
+a parent revocation, film edit or appearance/equipment change during the
+lengthy render aborts publication. Output larger than the private download
+limit (32 MiB) is rejected. Tests simulate both race conditions without
+real family data. This does not replace private host deployment or adult
+review of the actual finished household video.
