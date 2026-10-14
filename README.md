@@ -1,3 +1,7 @@
+> **⚠️ 当前阶段：v1 冲刺（2026-10-15 起）**
+> 所有开发（人类和 AI 代理）请先读 [`AGENTS.md`](AGENTS.md) → [`docs/V1_PLAN.md`](docs/V1_PLAN.md) → [`AMEND.md`](AMEND.md)。
+> 本 README 下方的旧章节可能已过时，不能作为任务依据。
+
 # Mini Utopia · AI Creative Studio
 
 > **Travel Around Every World.**  
