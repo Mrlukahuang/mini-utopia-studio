@@ -329,6 +329,86 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         _refresh_characters()
         return
 
+    if kind in ["family:cast-approve", "family:cast-revoke"]:
+        share_submit.disabled = false
+        share_revoke.disabled = false
+        if kind == "family:cast-approve":
+            var grant := String(payload.get("grant_id", ""))
+            if not grant.begins_with("CAST_"):
+                _set_status("Parent approval response was not valid.", true)
+                return
+            _active_grant_id = grant
+            _last_shared_character_id = _share_character_id
+            share_revoke.visible = true
+            _set_status("Parent approved this Hero for sibling's film (15 min).", false)
+        else:
+            _active_grant_id = ""
+            _last_shared_character_id = ""
+            share_revoke.visible = false
+            _set_status("Parent revoked guest filming permission.", false)
+        return
+
+    if kind == "castguests:list":
+        if not bridge.has_family_session():
+            return
+        var approved = payload.get("guests", [])
+        if typeof(approved) != TYPE_ARRAY:
+            _set_status("Approved guest list could not be read.", true)
+            return
+        for old_button in hero_list.get_children():
+            if String(old_button.name).begins_with("Guest_"):
+                hero_list.remove_child(old_button)
+                old_button.queue_free()
+        for raw_guest in approved:
+            if typeof(raw_guest) != TYPE_DICTIONARY:
+                continue
+            var grant_id := String(raw_guest.get("grant_id", ""))
+            if not grant_id.begins_with("CAST_"):
+                continue
+            var guest := Button.new()
+            guest.name = "Guest_" + grant_id
+            guest.text = (
+                "🎬 Parent-approved guest: "
+                + String(raw_guest.get("display_name", "Guest Hero"))
+            )
+            guest.custom_minimum_size.y = 58
+            guest.pressed.connect(_on_guest_pressed.bind(grant_id))
+            hero_list.add_child(guest)
+        _set_status(
+            str(approved.size()) + " guest actor permission(s) available.",
+            false
+        )
+        return
+
+    if kind == "castguests:get":
+        var family := _family_state()
+        if (
+            family == null
+            or not bridge.has_family_session()
+            or _pending_guest_grant_id.is_empty()
+            or String(payload.get("grant_id", "")) != _pending_guest_grant_id
+        ):
+            _pending_guest_grant_id = ""
+            return
+        _pending_guest_grant_id = ""
+        var character = payload.get("character", {})
+        var runtime = payload.get("equipment_runtime", {})
+        var accepted := (
+            typeof(character) == TYPE_DICTIONARY
+            and typeof(runtime) == TYPE_DICTIONARY
+        )
+        if accepted:
+            accepted = family.select_second_cast_character(character)
+        if accepted:
+            accepted = family.select_second_cast_equipment(runtime)
+        if not accepted:
+            family.clear_second_cast()
+            _set_status("Parent guest actor could not be verified.", true)
+        else:
+            _set_status("Approved guest is ready. Tap Film Together!", false)
+        _refresh_cast_button()
+        return
+
     if kind == "character:get" and not _pending_cast_character_id.is_empty():
         var family := _family_state()
         if (
