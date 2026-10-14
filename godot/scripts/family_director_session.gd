@@ -7,6 +7,21 @@ extends RefCounted
 
 const DURATION_SECONDS := 15.0
 
+# Immutable kid-safe captions. No raw story notes, uploaded text or commands
+# cross the rendering boundary. Live Director and captured MP4 share this map.
+const CAPTION_PRESETS := {
+    "none": "",
+    "hello": "Hello, friend!",
+    "adventure": "Let's explore together!",
+    "hooray": "We did it!",
+}
+
+
+static func caption_text(preset_id: String) -> String:
+    return String(CAPTION_PRESETS.get(preset_id, ""))
+
+
+
 
 static func from_play_session(play_session: Dictionary) -> Dictionary:
     var character_id := String(play_session.get("character_asset_id", ""))
@@ -152,6 +167,9 @@ static func with_child_choices(
     var seconds := int(choices.get("duration_seconds", 15))
     if seconds not in [15, 30]:
         seconds = 15
+    var caption_preset := String(choices.get("caption_preset", "none"))
+    if not CAPTION_PRESETS.has(caption_preset):
+        caption_preset = "none"
     var shot: Dictionary = result.get("shot", {})
     var blocking: Dictionary = shot.get("blocking", {})
     var second: Dictionary = shot.get("second_blocking", {})
@@ -194,6 +212,7 @@ static func with_child_choices(
             camera["movement"] = "Follow my Heroes"
     result["camera"] = camera
     result["child_director_choices"] = {
-        "action": action, "camera": lens, "duration_seconds": seconds
+        "action": action, "camera": lens, "duration_seconds": seconds,
+        "caption_preset": caption_preset
     }
     return result
