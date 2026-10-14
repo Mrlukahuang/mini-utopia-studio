@@ -193,6 +193,12 @@ jobs:
           set -euo pipefail
           "$GODOT_BINARY" --headless --path godot --script res://tests/family_crafted_prop_game_director_smoke.gd
 
+      - name: Smoke-test child iPad private movie saving
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GODOT_BINARY" --headless --path godot --script res://tests/family_save_film_ui_smoke.gd
+
       - name: Export Web release
         shell: bash
         run: |
