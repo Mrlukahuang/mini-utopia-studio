@@ -1,12 +1,73 @@
 class_name MiniUtopiaFamilySceneState
 extends Node
 
-## Per-run, non-persistent selection between Godot scenes. Stores only the
-## canonical Character contract returned by the server (NOT family auth).
-## Scene changes reuse the same identity but no private data is written to disk.
+## Per-run, non-persistent selection and HTTPS session across Godot scenes.
+## Child's bearer token stays ONLY in this memory-resident autoload; never
+## export it, log it, persist it or add it to URLs. Parent provisioning remains
+## separate from this session transport and character-library user interface.
 
 var active_character: Dictionary = {}
 var active_equipment: Dictionary = {}
+var pending_character_id := ""
+var _family_api_url := ""
+var _family_token := ""
+
+
+func connect_family(api_url: String, token: String) -> bool:
+    # Stage credentials in a temporary client to reuse the same HTTPS-only
+    # validation as all other Godot Character requests.
+    var normalized := MiniUtopiaBridgeEndpointPolicy.normalize(api_url, true)
+    if normalized.is_empty():
+        return false
+    var probe := MiniUtopiaBridgeClient.new()
+    probe.base_url = normalized
+    if not probe.set_family_session(token):
+        probe.clear_family_session()
+        probe.free()
+        return false
+    probe.clear_family_session()
+    probe.free()
+
+    # A new parent/child connection must discard old selections first.
+    disconnect_family()
+    _family_api_url = normalized
+    _family_token = token
+    return true
+
+
+func bind_family_client(client: MiniUtopiaBridgeClient) -> bool:
+    if client == null or _family_api_url.is_empty() or _family_token.is_empty():
+        return false
+    client.configure(_family_api_url)
+    return client.set_family_session(_family_token)
+
+
+func has_family_connection() -> bool:
+    return not _family_api_url.is_empty() and not _family_token.is_empty()
+
+
+func disconnect_family() -> void:
+    clear_selection()
+    pending_character_id = ""
+    _family_api_url = ""
+    _family_token = ""
+
+
+func open_character(character_id: String) -> bool:
+    if not has_family_connection() or not character_id.begins_with("CHAR_"):
+        return false
+    if character_id.contains("/") or character_id.contains("?"):
+        return false
+    pending_character_id = character_id
+    return true
+
+
+func start_new_character() -> void:
+    pending_character_id = ""
+
+
+func _exit_tree() -> void:
+    disconnect_family()
 
 
 func select_character(contract: Dictionary) -> bool:
