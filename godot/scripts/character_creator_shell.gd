@@ -98,7 +98,10 @@ func _ready() -> void:
     save_button.disabled = true
     var error := bridge.get_character(character_id)
     if error != OK:
-        _set_status("Could not start Character load.", true)
+        if error == ERR_UNCONFIGURED and OS.has_feature("web"):
+            _set_status("Family Cloud not connected yet · preview only.", true)
+        else:
+            _set_status("Could not start Character load.", true)
 
 
 func _read_user_args() -> void:
@@ -501,10 +504,12 @@ func _on_bridge_failure(
                 true
             )
         else:
-            _set_status(
-                message + " Start the Mini Utopia Bridge and try again.",
-                true
+            var help := (
+                " Family Cloud is unavailable."
+                if OS.has_feature("web")
+                else " Start the Mini Utopia Bridge and try again."
             )
+            _set_status(message + help, true)
         return
 
     if kind == "character:put":
