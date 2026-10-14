@@ -393,6 +393,35 @@ func _refresh_films() -> void:
         _set_status("Finding your private saved movies…", false)
 
 
+func _on_film_download_pressed(film_id: String) -> void:
+    if not bridge.has_family_session():
+        _set_status("Unlock your private account before saving a movie.", true)
+        return
+    if bridge.has_prepared_private_movie(film_id):
+        # This second direct tap preserves Safari's user-gesture requirement.
+        var saved := bridge.save_prepared_private_movie(film_id)
+        if saved == OK:
+            _set_status("Your private MP4 was offered for saving on this device.", false)
+        else:
+            _set_status("Saving this MP4 is supported in the Web version.", true)
+        var ready := movie_list.get_node_or_null("Download_" + film_id) as Button
+        if ready != null:
+            ready.text = "🎬 Prepare private MP4 again"
+        return
+    if bridge.is_busy() or not _movie_phase.is_empty():
+        return
+    var error := bridge.prepare_private_movie_download(film_id)
+    if error != OK:
+        _set_status("Could not request your private MP4.", true)
+        return
+    var download_button := movie_list.get_node_or_null(
+        "Download_" + film_id
+    ) as Button
+    if download_button != null:
+        download_button.disabled = true
+    _set_status("Checking parent's final MP4 release and loading safely…", false)
+
+
 func _on_saved_movie_pressed(film_id: String) -> void:
     if (
         not bridge.has_family_session()
@@ -609,6 +638,21 @@ func _on_parent_film_revoke_pressed() -> void:
 
 
 func _on_bridge_success(kind: String, payload: Dictionary) -> void:
+    if kind == "films:download-ready":
+        var id := String(payload.get("film_id", ""))
+        var button := movie_list.get_node_or_null("Download_" + id) as Button
+        if (
+            button == null
+            or not bridge.has_prepared_private_movie(id)
+            or int(payload.get("bytes", 0)) <= 256
+        ):
+            _set_status("Private movie buffer is not available.", true)
+            return
+        button.disabled = false
+        button.text = "💾 Save MP4 to this iPad / Mac"
+        _set_status("Movie ready! Tap the Save MP4 button now.", false)
+        return
+
     if kind == "films:get" and not _pending_review_film_id.is_empty():
         var expected_id := _pending_review_film_id
         _pending_review_film_id = ""
@@ -686,6 +730,15 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
                 _on_parent_review_movie_pressed.bind(id)
             )
             movie_list.add_child(review_button)
+
+            var save_movie_button := Button.new()
+            save_movie_button.name = "Download_" + id
+            save_movie_button.text = "⬇ Prepare private MP4 (parent release required)"
+            save_movie_button.custom_minimum_size.y = 56
+            save_movie_button.pressed.connect(
+                _on_film_download_pressed.bind(id)
+            )
+            movie_list.add_child(save_movie_button)
         _set_status(str(films.size()) + " private movie(s) saved.", false)
         return
     if _consume_movie_restore(kind, payload):
@@ -909,6 +962,21 @@ func _clear_hero_list() -> void:
 
 
 func _on_bridge_failure(kind: String, status_code: int, _code: String, _message: String) -> void:
+    if kind == "films:download":
+        for entry in movie_list.get_children():
+            if String(entry.name).begins_with("Download_"):
+                var button := entry as Button
+                if button != null:
+                    button.disabled = false
+                    button.text = "⬇ Prepare private MP4 (parent release required)"
+        _set_status(
+            "Parent must approve the finished MP4 before you can save it."
+            if status_code in [403, 404]
+            else "Private video could not be loaded. Check your connection.",
+            true
+        )
+        return
+
     if kind == "films:get" and not _pending_review_film_id.is_empty():
         _cancel_parent_movie_review()
         _set_status("This film is not currently available to this child.", true)
