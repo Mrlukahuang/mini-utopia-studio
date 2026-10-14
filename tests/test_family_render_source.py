@@ -82,7 +82,8 @@ def test_private_render_source_reuses_owned_two_heroes_and_handmade_prop(tmp_pat
     assert custom["visual_recipe"]["shape"] == "star"
     assert custom["visual_recipe"]["color_hex"] == "#B9E7D0"
     assert data["director_choices"] == {
-        "camera": "close", "action": "celebrate", "duration_seconds": 30
+        "camera": "close", "action": "celebrate", "duration_seconds": 30,
+        "caption_preset": "none",
     }
     assert (data["fps"], data["width"], data["height"]) == (2, 480, 270)
     assert "description" not in data["character"]
@@ -131,6 +132,7 @@ def test_render_source_reflects_latest_edit_without_new_character(tmp_path):
     source = call(app, "GET", endpoint)
     assert source.payload["source_revision"] == "2"
     assert source.payload["director_choices"] == {
-        "camera": "wide", "action": "walk", "duration_seconds": 30
+        "camera": "wide", "action": "walk", "duration_seconds": 30,
+        "caption_preset": "none",
     }
     assert source.payload["character"]["character_id"] == cid
