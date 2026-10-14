@@ -20,6 +20,14 @@ var refresh_button: Button
 var logout_button: Button
 var shoot_button: Button
 var _pending_cast_character_id := ""
+var _pending_guest_grant_id := ""
+var _share_character_id := ""
+var _active_grant_id := ""
+var _last_shared_character_id := ""
+var adult_share_panel: VBoxContainer
+var share_secret_input: LineEdit
+var share_submit: Button
+var share_revoke: Button
 
 
 func _ready() -> void:
@@ -126,6 +134,41 @@ func _build_ui() -> void:
     logout_button.pressed.connect(_on_disconnect_pressed)
     toolbar.add_child(logout_button)
 
+    adult_share_panel = VBoxContainer.new()
+    adult_share_panel.name = "ParentFilmConsent"
+    adult_share_panel.visible = false
+    adult_share_panel.add_theme_constant_override("separation", 8)
+    column.add_child(adult_share_panel)
+
+    var consent_text := Label.new()
+    consent_text.name = "ConsentMessage"
+    consent_text.text = "Parent approval · share this actor with sibling for 15 minutes"
+    consent_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    adult_share_panel.add_child(consent_text)
+
+    share_secret_input = LineEdit.new()
+    share_secret_input.name = "ParentConsentSecret"
+    share_secret_input.secret = true
+    share_secret_input.max_length = 256
+    share_secret_input.custom_minimum_size.y = 48
+    share_secret_input.placeholder_text = "Parent-only unlock (one time)"
+    adult_share_panel.add_child(share_secret_input)
+
+    share_submit = Button.new()
+    share_submit.name = "ApproveShareButton"
+    share_submit.text = "Parent: Approve 15-minute guest role"
+    share_submit.custom_minimum_size.y = 52
+    share_submit.pressed.connect(_on_parent_share_submit)
+    adult_share_panel.add_child(share_submit)
+
+    share_revoke = Button.new()
+    share_revoke.name = "RevokeShareButton"
+    share_revoke.text = "Parent: Revoke this guest permission"
+    share_revoke.custom_minimum_size.y = 52
+    share_revoke.visible = false
+    share_revoke.pressed.connect(_on_parent_revoke_submit)
+    adult_share_panel.add_child(share_revoke)
+
     connection_panel = VBoxContainer.new()
     connection_panel.name = "ParentConnection"
     connection_panel.add_theme_constant_override("separation", 8)
@@ -189,6 +232,12 @@ func _set_connected(connected: bool) -> void:
     new_button.disabled = not connected
     if not connected:
         shoot_button.disabled = true
+        adult_share_panel.visible = false
+        share_secret_input.clear()
+        _share_character_id = ""
+        _active_grant_id = ""
+        _last_shared_character_id = ""
+        _pending_guest_grant_id = ""
         _pending_cast_character_id = ""
     else:
         _refresh_cast_button()
@@ -254,7 +303,7 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             and profile == _pending_profile_id
             and expires > 0
             and expires <= 1800
-            and family.connect_family(bridge.base_url, issued_token)
+            and family.connect_family(bridge.base_url, issued_token, profile)
         )
         issued_token = ""
         _pending_profile_id = ""
@@ -340,6 +389,18 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         hero_list.add_child(button)
 
         var family := _family_state()
+        if (
+            family != null
+            and family.has_family_connection()
+            and not family.current_profile_id().is_empty()
+        ):
+            var share := Button.new()
+            share.name = "Share_" + character_id
+            share.text = "👨‍👩‍👧 Parent: allow " + name + " in sibling's film"
+            share.custom_minimum_size.y = 52
+            share.pressed.connect(_on_share_candidate.bind(character_id))
+            hero_list.add_child(share)
+
         var primary := (
             String(family.active_character.get("character_id", ""))
             if family != null else ""
