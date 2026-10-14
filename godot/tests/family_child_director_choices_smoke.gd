@@ -33,7 +33,7 @@ func _initialize() -> void:
     if controls == null:
         _fail("child director controls missing")
         return
-    for key in ["camera", "action", "duration_seconds"]:
+    for key in ["camera", "action", "duration_seconds", "caption_preset"]:
         var button := controls.get_node_or_null("Choice_" + key) as Button
         if button == null or button.custom_minimum_size.y < 48:
             _fail("iPad director touch button missing or undersized: " + key)
@@ -44,6 +44,21 @@ func _initialize() -> void:
 
     if stage.director_runtime.actor == null or stage.director_runtime.second_actor == null:
         _fail("two saved Heroes not staged")
+        return
+    stage._cycle_child_choice("caption_preset")
+    if family.director_shot_choices.get("caption_preset") != "hello":
+        _fail("kid-safe subtitle choice did not advance")
+        return
+    if stage.director_runtime.subtitle_label == null or stage.director_runtime.subtitle_label.text != "Hello, friend!":
+        _fail("live subtitle text not drawn by shared movie runtime")
+        return
+    stage.director_runtime.advance_shot(3.0)
+    if not stage.director_runtime.subtitle_panel.visible:
+        _fail("subtitle should appear during its timed dialogue beat")
+        return
+    stage._on_replay_pressed()
+    if stage.director_runtime.subtitle_panel.visible:
+        _fail("subtitle did not reset on Replay")
         return
     stage._cycle_child_choice("camera")
     if family.director_shot_choices["camera"] != "wide":
@@ -95,7 +110,7 @@ func _initialize() -> void:
         return
 
     family.disconnect_family()
-    if family.director_shot_choices["duration_seconds"] != 15:
+    if family.director_shot_choices["duration_seconds"] != 15 or family.director_shot_choices.get("caption_preset") != "none":
         _fail("child choices leaked to the next profile after logout")
         return
 
