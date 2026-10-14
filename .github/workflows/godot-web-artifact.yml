@@ -205,6 +205,12 @@ jobs:
           set -euo pipefail
           "$GODOT_BINARY" --headless --path godot --script res://tests/family_reopen_saved_film_smoke.gd
 
+      - name: Smoke-test parent film review and revoke on iPad
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GODOT_BINARY" --headless --path godot --script res://tests/family_parent_movie_review_smoke.gd
+
       - name: Export Web release
         shell: bash
         run: |
