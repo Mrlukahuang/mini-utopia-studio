@@ -199,6 +199,12 @@ jobs:
           set -euo pipefail
           "$GODOT_BINARY" --headless --path godot --script res://tests/family_save_film_ui_smoke.gd
 
+      - name: Smoke-test My Movies resume with owner-verified cast and current equipment
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GODOT_BINARY" --headless --path godot --script res://tests/family_reopen_saved_film_smoke.gd
+
       - name: Export Web release
         shell: bash
         run: |
