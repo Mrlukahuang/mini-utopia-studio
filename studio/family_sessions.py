@@ -1,3 +1,5 @@
-"""Short-lived family session manager (server-side only)."""
+"""Short-lived family sessions."""
 
 from __future__ import annotations
+
+SESSION_TTL_SECONDS = 900
