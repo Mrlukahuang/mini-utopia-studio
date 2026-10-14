@@ -181,3 +181,28 @@ lengthy render aborts publication. Output larger than the private download
 limit (32 MiB) is rejected. Tests simulate both race conditions without
 real family data. This does not replace private host deployment or adult
 review of the actual finished household video.
+
+
+## Adult-only private movie render queue
+
+A new SQLite queue provides a single private, adult-operated renderer.
+Only an already-approved film revision may be enqueued, and it checks
+the parent's current approval and the saved character/wardrobe fingerprint
+before claiming work and before marking completion.
+
+\`\`\`bash
+python -m studio.family_render_queue --db /PRIVATE/family.db --fps 6 enqueue --owner child_a --film-id FILM_APPROVED_ID
+python -m studio.family_render_queue --db /PRIVATE/family.db --store-root /PRIVATE/movies --godot-project ./godot run-one
+python -m studio.family_render_queue --db /PRIVATE/family.db list
+\`\`\`
+
+At most one active render runs across processes, with two outstanding per
+child, four globally, eight new jobs per child per day, two attempts per
+job, a 32 MiB MP4 limit and a minimum of 128 MiB free space.
+
+A crashed job remains in the running state to block automatic duplicate
+renders. An adult must ensure the original worker is stopped, explicitly
+mark it interrupted-failed and choose to retry. A completed render does
+not permit downloads: the parent must separately inspect and release
+the final private MP4. There is no public HTTP queue or unattended cloud
+scheduler, and real children's media never goes to GitHub CI.
