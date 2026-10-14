@@ -15,7 +15,7 @@ import os
 import re
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Mapping
+from typing import Literal, Mapping
 from urllib.parse import unquote, urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
@@ -33,7 +33,7 @@ from studio.services.asset_service import slugify
 class FamilyCharacterCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: str = Field(default="1.0", pattern=r"^1\\.0$")
+    schema_version: Literal["1.0"] = "1.0"
     display_name: str = Field(min_length=1, max_length=120)
     description: str = Field(default="", max_length=4000)
     profile: CharacterProfile = Field(default_factory=CharacterProfile)
