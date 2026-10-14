@@ -424,6 +424,16 @@ class EquipmentService:
                 mesh_asset_id=definition.mesh_asset_id,
                 animation_class=definition.animation_class,
                 rolled_stats=item.rolled_stats,
+                visual_recipe=(
+                    owned_asset.metadata.get("visual_recipe")
+                    if (
+                        (owned_asset := self.repository.get_asset(
+                            definition.definition_id
+                        )) is not None
+                        and owned_asset.metadata.get("family_crafted_prop") is True
+                        and owned_asset.metadata.get("family_owner") == self.owner_key
+                    ) else None
+                ),
             )
 
         return EquipmentRuntimeSpec(
