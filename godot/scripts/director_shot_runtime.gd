@@ -5,6 +5,11 @@ const SESSION_PATH := "res://runtime_state/director_shot_session.json"
 
 var payload: Dictionary = {}
 var actor: CharacterBody3D
+var second_actor: CharacterBody3D
+var second_play_runtime: MiniUtopiaCreatorPlayRuntime
+var second_blocking_start := Vector3.ZERO
+var second_blocking_end := Vector3.ZERO
+var second_blocking_has_path := false
 var camera: Camera3D
 var play_runtime: MiniUtopiaCreatorPlayRuntime
 var world_context: Node3D
@@ -58,6 +63,8 @@ func configure(runtime_payload: Dictionary) -> void:
         if typeof(raw_play) == TYPE_DICTIONARY
         else {}
     )
+    _build_second_actor_if_authorized(play_payload)
+
     play_runtime = MiniUtopiaCreatorPlayRuntime.new()
     play_runtime.name = "CreatorPlayRuntime"
     add_child(play_runtime)
@@ -102,6 +109,51 @@ func configure(runtime_payload: Dictionary) -> void:
         duration_seconds,
         "s"
     )
+
+
+## Only accepts two different canonical family sessions. The UI must fetch
+## both from the SAME server-issued child token; this renderer never discovers
+## another profile's data or creates a cross-child sharing permission.
+func _build_second_actor_if_authorized(first: Dictionary) -> void:
+    var candidate = payload.get("second_play_session", {})
+    if typeof(candidate) != TYPE_DICTIONARY:
+        return
+    var second: Dictionary = candidate
+    if MiniUtopiaFamilyDirectorSession.from_two_play_sessions(
+        first, second
+    ).is_empty():
+        return
+
+    # Clone the untouched 3D skeleton BEFORE applying either outfit. Each
+    # runtime independently paints its canonical Character and equips gear.
+    second_actor = actor.duplicate() as CharacterBody3D
+    second_actor.name = "DirectorSecondActor"
+    add_child(second_actor)
+    second_play_runtime = MiniUtopiaCreatorPlayRuntime.new()
+    second_play_runtime.name = "SecondCreatorPlayRuntime"
+    add_child(second_play_runtime)
+    second_play_runtime.apply_payload_to_player(second_actor, second)
+
+    var shot = payload.get("shot", {})
+    var second_blocking = (
+        shot.get("second_blocking", {})
+        if typeof(shot) == TYPE_DICTIONARY else {}
+    )
+    if typeof(second_blocking) != TYPE_DICTIONARY:
+        second_blocking = {}
+    second_blocking_start = _point_from_dict(
+        second_blocking.get("actor_start", {}),
+        Vector3(1.5, 0.0, 2.0)
+    )
+    second_blocking_end = _point_from_dict(
+        second_blocking.get("actor_end", {}),
+        Vector3(1.0, 0.0, -1.0)
+    )
+    second_actor.position = second_blocking_start
+    second_actor.rotation_degrees.y = float(
+        second_blocking.get("facing_degrees", 180.0)
+    )
+    second_blocking_has_path = true
 
 
 func _process(delta: float) -> void:
@@ -168,6 +220,23 @@ func advance_shot(delta: float) -> void:
         true,
         running
     )
+    if second_actor != null and second_play_runtime != null:
+        var second_velocity := Vector3.ZERO
+        if second_blocking_has_path:
+            var second_remaining := second_blocking_end - second_actor.position
+            var second_total := (
+                second_blocking_end - second_blocking_start
+            ).length()
+            var second_speed := second_total / maxf(duration_seconds, 0.001)
+            if second_remaining.length() > 0.001:
+                var second_direction := second_remaining.normalized()
+                second_actor.position += second_direction * minf(
+                    second_remaining.length(), second_speed * delta
+                )
+                second_velocity = second_direction * second_speed
+        second_play_runtime.update_motion(
+            delta, second_velocity, true, false
+        )
     _apply_camera_at_ratio(progress_ratio())
 
     if elapsed_seconds >= duration_seconds:
@@ -176,6 +245,8 @@ func advance_shot(delta: float) -> void:
             and movement_mode in ["walk", "run"]
         ):
             actor.position = blocking_end
+        if second_actor != null and second_blocking_has_path:
+            second_actor.position = second_blocking_end
         playing = false
 
 
@@ -203,6 +274,13 @@ func reset_shot() -> void:
             true,
             false
         )
+    if second_actor != null and second_play_runtime != null:
+        second_actor.position = second_blocking_start
+        second_actor.rotation_degrees.y = 180.0
+        second_play_runtime.reset_director_pose()
+        second_play_runtime.update_motion(
+            0.0, Vector3.ZERO, true, false
+        )
     _apply_camera_at_ratio(0.0)
 
 
@@ -216,6 +294,11 @@ func _clear_stage() -> void:
     for child in get_children():
         child.queue_free()
     actor = null
+    second_actor = null
+    second_play_runtime = null
+    second_blocking_start = Vector3.ZERO
+    second_blocking_end = Vector3.ZERO
+    second_blocking_has_path = false
     camera = null
     play_runtime = null
     world_context = null
@@ -520,14 +603,20 @@ func _execute_performance_cue(cue: Dictionary) -> void:
             play_runtime.play_attack_swing(
                 duration * maxf(0.35, intensity)
             )
+            if second_play_runtime != null:
+                second_play_runtime.play_reaction_pose(duration)
         "reaction":
             play_runtime.play_reaction_pose(
                 duration * maxf(0.35, intensity)
             )
+            if second_play_runtime != null:
+                second_play_runtime.play_reaction_pose(duration)
         "celebrate":
             play_runtime.play_celebrate_pose(
                 duration * maxf(0.35, intensity)
             )
+            if second_play_runtime != null:
+                second_play_runtime.play_celebrate_pose(duration)
         "look_at":
             var raw_direction = cue.get("direction_degrees", null)
             if raw_direction != null:
