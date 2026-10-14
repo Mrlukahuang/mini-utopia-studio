@@ -561,7 +561,7 @@ func _display_parent_movie_details(record: Dictionary) -> void:
         "👨‍👩‍👧 Parent film review — PRIVATE RENDER ONLY"
         + "\nTitle: " + String(draft.get("display_name", "Movie"))
         + "\nLead actor ID: " + String(draft.get("character_id", ""))
-        + "\nSecond actor ID: " + String(draft.get("second_character_id", ""))
+        + "\nSecond actor ID: " + str(draft.get("second_character_id", "") if draft.get("second_character_id", null) != null else "None")
         + "\nCamera: " + String(draft.get("camera", ""))
         + " · Action: " + String(draft.get("action", ""))
         + " · Length: " + str(draft.get("duration_seconds", 15)) + "s"
