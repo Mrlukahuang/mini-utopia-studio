@@ -198,6 +198,7 @@ class FamilyApplication:
 
         token = secrets.token_urlsafe(32)
         token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        now = time.monotonic()
         with self._session_lock:
             self._sessions = {
                 key: item for key, item in self._sessions.items()
