@@ -27,6 +27,7 @@ from studio.bridge.characters import CharacterBridgeReader
 from studio.bridge.equipment import EquipmentBridgeGateway
 from studio.family_props import FamilyCraftedProp, craft_family_prop
 from studio.family_films import FamilyFilmDraft, cast_is_owned, film_contract, save_film_draft
+from studio.family_film_render import build_family_film_render_source
 from studio.bridge.errors import CharacterRevisionConflict, CharacterWriteValidationError
 from studio.bridge.server import BridgeResponse, MAX_REQUEST_BODY_BYTES
 from studio.core.enums import AssetType, ReviewStatus
@@ -432,6 +433,25 @@ class FamilyApplication:
                     })
                 saved = save_film_draft(self.repository, owner, draft)
             return BridgeResponse(HTTPStatus.CREATED, saved)
+
+        if route.endswith("/render-source") and route.startswith("/family/films/"):
+            film_id = unquote(
+                route[len("/family/films/"):-len("/render-source")]
+            )
+            if not re.fullmatch(r"FILM_[A-Za-z0-9_-]{3,96}", film_id):
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            if method != "GET":
+                return BridgeResponse(
+                    HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"}
+                )
+            # No arbitrary contract upload: all Character and equipment data
+            # originate in the current child's canonical SQLite collection.
+            source = build_family_film_render_source(
+                self.repository, owner=owner, film_id=film_id
+            )
+            if source is None:
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            return BridgeResponse(HTTPStatus.OK, source)
 
         if route.startswith("/family/films/"):
             film_id = unquote(route[len("/family/films/"):])
