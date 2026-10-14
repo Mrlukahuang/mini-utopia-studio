@@ -29,6 +29,11 @@ var share_secret_input: LineEdit
 var share_submit: Button
 var share_revoke: Button
 var guests_refresh_button: Button
+var movies_button: Button
+var movie_list: VBoxContainer
+var _movie_restore: Dictionary = {}
+var _movie_phase := ""
+var _movie_cast_id := ""
 
 
 func _ready() -> void:
@@ -128,6 +133,13 @@ func _build_ui() -> void:
     refresh_button.custom_minimum_size = Vector2(150, 52)
     refresh_button.pressed.connect(_refresh_characters)
     toolbar.add_child(refresh_button)
+
+    movies_button = Button.new()
+    movies_button.name = "MyMoviesButton"
+    movies_button.text = "🎞 My Movies / 我的电影"
+    movies_button.custom_minimum_size = Vector2(190, 52)
+    movies_button.pressed.connect(_refresh_films)
+    toolbar.add_child(movies_button)
 
     var back := Button.new()
     back.name = "BackButton"
@@ -231,7 +243,16 @@ func _build_ui() -> void:
     hero_list.name = "HeroList"
     hero_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     hero_list.add_theme_constant_override("separation", 12)
-    scroll.add_child(hero_list)
+    var list_stack := VBoxContainer.new()
+    list_stack.name = "LibraryListStack"
+    list_stack.add_theme_constant_override("separation", 16)
+    scroll.add_child(list_stack)
+    list_stack.add_child(hero_list)
+
+    movie_list = VBoxContainer.new()
+    movie_list.name = "MovieList"
+    movie_list.add_theme_constant_override("separation", 10)
+    list_stack.add_child(movie_list)
 
 
 func _set_connected(connected: bool) -> void:
@@ -240,7 +261,10 @@ func _set_connected(connected: bool) -> void:
     refresh_button.disabled = not connected
     new_button.disabled = not connected
     guests_refresh_button.disabled = not connected
+    movies_button.disabled = not connected
     if not connected:
+        _cancel_movie_restore()
+        _clear_movie_list()
         shoot_button.disabled = true
         adult_share_panel.visible = false
         share_secret_input.clear()
