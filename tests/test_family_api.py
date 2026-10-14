@@ -225,3 +225,88 @@ def test_http_auth_cors_and_two_character_roundtrip(tmp_path):
         server.shutdown()
         server.server_close()
         worker.join(timeout=3)
+
+
+def test_equipment_is_scoped_to_each_child_and_persists(tmp_path):
+    database_path = tmp_path / "family_equipment.db"
+    repo = SQLiteStudioRepository(database_path)
+    app = make_app(repo)
+
+    a = call(app, "POST", "/characters", payload={"display_name": "Pink Sheep"})
+    b = call(app, "POST", "/characters", auth=AUTH_B, payload={"display_name": "Blue Cat"})
+    assert a.status == 201 and b.status == 201
+    cid_a, cid_b = a.payload["character_id"], b.payload["character_id"]
+
+    state_a = call(app, "GET", f"/characters/{cid_a}/equipment")
+    state_b = call(app, "GET", f"/characters/{cid_b}/equipment", auth=AUTH_B)
+    assert state_a.status == 200 and state_b.status == 200
+    assert state_a.payload["character_id"] == cid_a
+    assert len(state_a.payload["slots"]) == 9
+
+    # Different starter collections mean item instances cannot be borrowed.
+    a_ids = {item["item_instance_id"] for item in state_a.payload["items"]}
+    b_ids = {item["item_instance_id"] for item in state_b.payload["items"]}
+    assert a_ids and b_ids and a_ids.isdisjoint(b_ids)
+    assert repo.get_collection("COLL_DEFAULT") is None
+
+    sword = next(item for item in state_a.payload["items"] if item["slot"] == "weapon_main")
+    sword_id = sword["item_instance_id"]
+    equipped = call(
+        app, "PUT", f"/characters/{cid_a}/equipment/weapon_main",
+        payload={"item_instance_id": sword_id},
+    )
+    assert equipped.status == 200
+    assert equipped.payload["runtime"]["equipped"]["weapon_main"]["item_instance_id"] == sword_id
+
+    # Ownership validation happens before ANY equipment access.
+    assert call(app, "GET", f"/characters/{cid_a}/equipment", auth=AUTH_B).status == 404
+    assert call(
+        app, "PUT", f"/characters/{cid_a}/equipment/weapon_main",
+        auth=AUTH_B, payload={"item_instance_id": sword_id},
+    ).status == 404
+    assert call(
+        app, "PUT", f"/characters/{cid_b}/equipment/weapon_main",
+        auth=AUTH_B, payload={"item_instance_id": sword_id},
+    ).status == 400
+
+    for payload in ({}, {"item_instance_id": sword_id, "family_owner": "child_b"},
+                    {"item_instance_id": 42}):
+        assert call(
+            app, "PUT", f"/characters/{cid_a}/equipment/weapon_main",
+            payload=payload,
+        ).status == 400
+    assert call(
+        app, "PUT", f"/characters/{cid_a}/equipment/outfit",
+        payload={"item_instance_id": None},
+    ).status == 400
+    assert call(app, "GET", f"/characters/{cid_b}/equipment").status == 404
+
+    reopened = make_app(SQLiteStudioRepository(database_path))
+    saved = call(reopened, "GET", f"/characters/{cid_a}/equipment")
+    assert saved.status == 200
+    assert saved.payload["runtime"]["equipped"]["weapon_main"]["item_instance_id"] == sword_id
+    other = call(reopened, "GET", f"/characters/{cid_b}/equipment", auth=AUTH_B)
+    assert other.status == 200
+    assert "weapon_main" not in other.payload["runtime"]["equipped"]
+
+    unequipped = call(
+        reopened, "PUT", f"/characters/{cid_a}/equipment/weapon_main",
+        payload={"item_instance_id": None},
+    )
+    assert unequipped.status == 200
+    assert "weapon_main" not in unequipped.payload["runtime"]["equipped"]
+
+
+def test_equipment_collection_owner_mismatch_is_rejected(tmp_path):
+    from studio.services.equipment_service import EquipmentService
+
+    repo = SQLiteStudioRepository(tmp_path / "owners.db")
+    own_a = EquipmentService(
+        repo, collection_id="COLL_FAMILY_child_a", owner_key="child_a"
+    )
+    own_a.ensure_starter_collection()
+    wrong = EquipmentService(
+        repo, collection_id="COLL_FAMILY_child_a", owner_key="child_b"
+    )
+    with pytest.raises(ValueError, match="owner mismatch"):
+        wrong.get_collection()
