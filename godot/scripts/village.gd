@@ -36,6 +36,22 @@ func _ready() -> void:
     if creator_button != null:
         creator_button.pressed.connect(_open_character_creator)
 
+    var director_button := get_node_or_null("HUD/OpenDirectorButton") as Button
+    if director_button != null:
+        var selection := get_node_or_null("/root/FamilySceneState") as MiniUtopiaFamilySceneState
+        director_button.disabled = (
+            selection == null or selection.active_play_session().is_empty()
+        )
+        director_button.pressed.connect(_open_family_director)
+
+
+func _open_family_director() -> void:
+    var selection := get_node_or_null("/root/FamilySceneState") as MiniUtopiaFamilySceneState
+    if selection == null or selection.active_play_session().is_empty():
+        return
+    Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+    get_tree().change_scene_to_file("res://scenes/director_stage.tscn")
+
 
 func _open_character_creator() -> void:
     # A child never needs to open the Godot Editor or Streamlit to create.
