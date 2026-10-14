@@ -67,6 +67,7 @@ const COLOR_BUTTONS := {
 var character_id := ""
 var loaded_character: Dictionary = {}
 var equipment_state: Dictionary = {}
+var _appearance_dirty := false
 var _draft_appearance: Dictionary = {}
 var _eye_option_ids: Array[String] = []
 var _hair_option_ids: Array[String] = []
@@ -131,7 +132,13 @@ func activate_family_session(token: String, api_base_url: String) -> bool:
 func _on_hero_name_changed(_value: String) -> void:
     var has_name := not hero_name_input.text.strip_edges().is_empty()
     if not loaded_character.is_empty():
-        play_button.disabled = hero_name_input.text.strip_edges() != String(loaded_character.get("display_name", ""))
+        play_button.disabled = (
+            _appearance_dirty
+            or equipment_state.is_empty()
+            or hero_name_input.text.strip_edges() != String(
+                loaded_character.get("display_name", "")
+            )
+        )
     if character_id.is_empty():
         save_button.disabled = not (has_name and bridge.has_family_session())
     elif not loaded_character.is_empty():
@@ -341,6 +348,7 @@ func _normalize_detail_compatibility() -> void:
 func _commit_live_appearance(message: String) -> void:
     # Play uses the last server-saved Character, never unsaved appearance.
     play_button.disabled = true
+    _appearance_dirty = true
     _draft_appearance["customized"] = true
     _normalize_detail_compatibility()
     avatar_stage.apply_appearance(_draft_appearance)
@@ -480,6 +488,7 @@ func _refresh_color_buttons() -> void:
 func _on_bridge_success(kind: String, payload: Dictionary) -> void:
     if kind == "character:get":
         equipment_state.clear()
+        _appearance_dirty = false
         play_button.disabled = true
         loaded_character = payload.duplicate(true)
         character_id = String(payload.get("character_id", character_id))
@@ -517,7 +526,9 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         )
         if valid:
             avatar_stage.apply_equipment_runtime(runtime)
-        play_button.disabled = not valid or loaded_character.is_empty()
+        play_button.disabled = (
+            not valid or loaded_character.is_empty() or _appearance_dirty
+        )
         _set_status(
             "Hero + your clothes and props loaded."
             if valid else "Clothes could not be verified.",
@@ -527,6 +538,7 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
 
     if kind == "character:post":
         loaded_character = payload.duplicate(true)
+        _appearance_dirty = false
         character_id = String(payload.get("character_id", ""))
         character_label.text = String(payload.get("display_name", "New Hero"))
         hero_name_input.text = character_label.text
@@ -542,6 +554,7 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
 
     if kind == "character:put":
         loaded_character = payload.duplicate(true)
+        _appearance_dirty = false
         save_button.disabled = false
         play_button.disabled = equipment_state.is_empty()
         _set_status("Saved! Your hero is safe in Mini Utopia. 💖", false)
