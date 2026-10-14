@@ -480,6 +480,13 @@ text = "← Back"
 layout_mode = 2
 size_flags_horizontal = 3
 
+[node name="PlayButton" type="Button" parent="RootMargin/MainColumn/FooterRow"]
+custom_minimum_size = Vector2(218, 50)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "🎮 Play My Hero"
+disabled = true
+
 [node name="SaveButton" type="Button" parent="RootMargin/MainColumn/FooterRow"]
 custom_minimum_size = Vector2(240, 50)
 layout_mode = 2

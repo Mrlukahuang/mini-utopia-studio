@@ -21,6 +21,13 @@ var _world_creative: MiniUtopiaWorldCreativeRuntime
 
 
 func apply_to_player(player: CharacterBody3D) -> Dictionary:
+    # The selected, server-saved family Hero always takes priority over the
+    # checked-in demo fixture. The same adapter also feeds Director staging.
+    var selection := get_node_or_null("/root/FamilySceneState") as MiniUtopiaFamilySceneState
+    if selection != null:
+        var family_play := selection.active_play_session()
+        if not family_play.is_empty():
+            return apply_payload_to_player(player, family_play)
     var loaded := _load_session()
     if loaded.is_empty():
         print("PLAY-02: no Creator play-session payload; using scene defaults.")
@@ -368,6 +375,34 @@ func _apply_character(character: Dictionary) -> void:
         var eye := visual.get_node_or_null(eye_name) as MeshInstance3D
         if eye != null:
             eye.material_override = _material(eye_color)
+
+    var species := String(character.get("species_head_id", "species_head_human_v1"))
+    var ear_l := _ensure_sphere(
+        visual, "EarL",
+        Vector3(-0.30, 1.92, 0.0),
+        Vector3(0.26, 0.37, 0.22), surface_color
+    )
+    var ear_r := _ensure_sphere(
+        visual, "EarR",
+        Vector3(0.30, 1.92, 0.0),
+        Vector3(0.26, 0.37, 0.22), surface_color
+    )
+    ear_l.visible = species in ["species_head_cat_v1", "species_head_sheep_v1"]
+    ear_r.visible = ear_l.visible
+    ear_l.material_override = _material(surface_color)
+    ear_r.material_override = _material(surface_color)
+    if species == "species_head_sheep_v1":
+        ear_l.scale = Vector3(0.38, 0.25, 0.26)
+        ear_r.scale = Vector3(0.38, 0.25, 0.26)
+    else:
+        ear_l.scale = Vector3(0.26, 0.37, 0.22)
+        ear_r.scale = Vector3(0.26, 0.37, 0.22)
+    if head != null:
+        head.scale = (
+            Vector3(0.84, 0.88, 0.88)
+            if species == "species_head_robot_v1"
+            else Vector3.ONE
+        )
 
     if _arm_l != null:
         _arm_l.position.x = -0.47 * width
