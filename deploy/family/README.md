@@ -206,3 +206,26 @@ mark it interrupted-failed and choose to retry. A completed render does
 not permit downloads: the parent must separately inspect and release
 the final private MP4. There is no public HTTP queue or unattended cloud
 scheduler, and real children's media never goes to GitHub CI.
+
+
+## Restore integrity audit before real family hosting
+
+The adult-only check below takes an ONLINE, transactionally consistent copy
+of the private SQLite database into a chmod-700 temporary directory outside
+the repository. It opens that restored copy, performs SQLite integrity and
+foreign-key checks, reopens canonical Core FILM assets, and verifies current
+parent-released MP4 permissions and hashes when a private media directory is
+supplied. It prints only aggregate counts, never children's notes or files:
+
+\`\`\`bash
+python -m studio.family_backup_audit \
+  --db /srv/mini-utopia-private-data/studio.db \
+  --media-root /srv/mini-utopia-private-movies
+\`\`\`
+
+This command is read-only on the original database and does **not** create
+a retained backup. Temporary plaintext snapshots are removed at exit;
+there is no guarantee of physical secure erasure on SSDs. Before production,
+adults still need scheduled encrypted off-host backups and a separate
+approved restore rehearsal on an isolated host. Do not restore over a live
+SQLite DB or export a copy into Git, CI artifacts or a shared folder.
