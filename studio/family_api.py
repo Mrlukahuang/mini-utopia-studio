@@ -458,8 +458,8 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8766)
     args = parser.parse_args()
 
-    from studio.core.config import get_settings
-    from studio.services.bootstrap import build_context
+    from pathlib import Path
+    from studio.repositories.sqlite import SQLiteStudioRepository
 
     origins = tuple(
         origin.strip() for origin in os.environ.get("FAMILY_ALLOWED_ORIGINS", "").split(",")
@@ -474,8 +474,13 @@ def main() -> None:
             ("child_b", os.environ.get("FAMILY_CHILD_B_TOKEN_SHA256", "")),
         )
     }
+    # The private family API needs only the canonical SQLite repository,
+    # not the Streamlit UI, AI providers, or production studio plugins.
+    database_path = Path(os.environ.get("DATABASE_PATH", "data/studio.db"))
+    if not database_path.is_absolute():
+        database_path = Path.cwd() / database_path
     app = FamilyApplication(
-        build_context(get_settings()).repository,
+        SQLiteStudioRepository(database_path),
         token_hashes=hashes,
         allowed_origins=origins,
         parent_unlock_hash=os.environ.get("FAMILY_PARENT_UNLOCK_SHA256") or None,
