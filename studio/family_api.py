@@ -219,6 +219,65 @@ class FamilyApplication:
             "profile_id": requested["profile_id"],
         })
 
+    def _issue_cast_grant(self, authorization: str, body: bytes) -> BridgeResponse:
+        denied = self._require_parent(authorization)
+        if denied is not None:
+            return denied
+        try:
+            data = json.loads(body)
+        except (UnicodeError, ValueError):
+            return BridgeResponse(HTTPStatus.BAD_REQUEST, {"error": "invalid_cast_grant"})
+        expected = {"viewer_profile_id", "source_profile_id", "character_id"}
+        if not isinstance(data, dict) or set(data) != expected or any(
+            not isinstance(value, str) for value in data.values()
+        ):
+            return BridgeResponse(HTTPStatus.BAD_REQUEST, {"error": "invalid_cast_grant"})
+        viewer = data["viewer_profile_id"]
+        source = data["source_profile_id"]
+        cid = data["character_id"]
+        if (
+            viewer not in self.token_hashes
+            or source not in self.token_hashes
+            or viewer == source
+            or not re.fullmatch(r"CHAR_[A-Za-z0-9_-]{3,96}", cid)
+        ):
+            return BridgeResponse(HTTPStatus.BAD_REQUEST, {"error": "invalid_cast_grant"})
+        asset = self.repository.get_asset(cid)
+        if (
+            asset is None
+            or asset.asset_type != AssetType.CHARACTER
+            or asset.status == ReviewStatus.ARCHIVED
+            or asset.metadata.get("family_owner") != source
+        ):
+            return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+        now = time.monotonic()
+        grant_id = "CAST_" + secrets.token_urlsafe(24)
+        with self._session_lock:
+            self._cast_grants = {
+                key: entry for key, entry in self._cast_grants.items()
+                if entry[3] > now
+            }
+            if len(self._cast_grants) >= CAST_GRANT_LIMIT:
+                oldest = min(self._cast_grants, key=lambda key: self._cast_grants[key][3])
+                del self._cast_grants[oldest]
+            self._cast_grants[grant_id] = (
+                viewer, source, cid, now + CAST_GRANT_TTL_SECONDS
+            )
+        return BridgeResponse(HTTPStatus.CREATED, {
+            "schema_version": "1.0", "grant_id": grant_id,
+            "viewer_profile_id": viewer, "source_profile_id": source,
+            "character_id": cid, "expires_in_seconds": CAST_GRANT_TTL_SECONDS,
+        })
+
+    def _revoke_cast_grant(self, authorization: str, grant_id: str) -> BridgeResponse:
+        denied = self._require_parent(authorization)
+        if denied is not None:
+            return denied
+        with self._session_lock:
+            if self._cast_grants.pop(grant_id, None) is None:
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+        return BridgeResponse(HTTPStatus.NO_CONTENT, {})
+
     def _revoke_child_session(self, authorization: str) -> BridgeResponse:
         if self.authenticate(authorization) is None:
             return BridgeResponse(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
