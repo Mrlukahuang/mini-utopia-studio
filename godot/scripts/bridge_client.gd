@@ -14,6 +14,8 @@ const DEFAULT_BASE_URL := "http://127.0.0.1:8765"
 var base_url := DEFAULT_BASE_URL
 var _request: HTTPRequest
 var _active_kind := ""
+var _family_token := ""
+const TOKEN_ALPHABET := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
 
 
 func _ready() -> void:
@@ -32,13 +34,50 @@ func _ready() -> void:
 
 
 func configure(url: String) -> void:
-    base_url = MiniUtopiaBridgeEndpointPolicy.normalize(
+    var normalized := MiniUtopiaBridgeEndpointPolicy.normalize(
         url, OS.has_feature("web")
     )
+    # Do not send an existing child token to a different origin on reconfigure.
+    if normalized != base_url:
+        clear_family_session()
+    base_url = normalized
 
 
 func is_configured() -> bool:
     return MiniUtopiaBridgeEndpointPolicy.is_configured(base_url)
+
+
+func set_family_session(token: String) -> bool:
+    # Parent provisioning supplies an opaque base64url token at runtime only.
+    # Never write it into ProjectSettings, user://, console, a URL or a scene.
+    clear_family_session()
+    if token.length() < 32 or token.length() > 256:
+        return false
+    for char in token:
+        if not TOKEN_ALPHABET.contains(char):
+            return false
+    if not base_url.begins_with("https://"):
+        return false
+    _family_token = token
+    return true
+
+
+func clear_family_session() -> void:
+    _family_token = ""
+
+
+func has_family_session() -> bool:
+    return not _family_token.is_empty() and base_url.begins_with("https://")
+
+
+func _request_headers() -> PackedStringArray:
+    var headers := PackedStringArray([
+        "Accept: application/json",
+        "Content-Type: application/json",
+    ])
+    if has_family_session():
+        headers.append("Authorization: Bearer " + _family_token)
+    return headers
 
 
 func is_busy() -> bool:
@@ -50,6 +89,23 @@ func get_health() -> int:
         "health",
         "/health",
         HTTPClient.METHOD_GET
+    )
+
+
+func list_characters() -> int:
+    return _start_request(
+        "characters:list",
+        "/characters",
+        HTTPClient.METHOD_GET
+    )
+
+
+func create_character(payload: Dictionary) -> int:
+    return _start_request(
+        "character:post",
+        "/characters",
+        HTTPClient.METHOD_POST,
+        payload
     )
 
 
@@ -103,13 +159,14 @@ func _start_request(
 ) -> int:
     if _request == null or not is_configured():
         return ERR_UNCONFIGURED
+    # Secure remote service requires session credentials. Desktop loopback
+    # preserves the current unauthenticated Godot development workflow.
+    if base_url.begins_with("https://") and not has_family_session():
+        return ERR_UNCONFIGURED
     if is_busy():
         return ERR_BUSY
 
-    var headers := PackedStringArray([
-        "Accept: application/json",
-        "Content-Type: application/json",
-    ])
+    var headers := _request_headers()
     var request_data := ""
     if method != HTTPClient.METHOD_GET:
         request_data = JSON.stringify(payload)
@@ -126,6 +183,10 @@ func _start_request(
     return error
 
 
+func _exit_tree() -> void:
+    clear_family_session()
+
+
 func _on_request_completed(
     result: int,
     response_code: int,
@@ -140,7 +201,7 @@ func _on_request_completed(
             kind,
             0,
             "network_error",
-            "Mini Utopia Bridge is not reachable."
+            "Mini Utopia Family Cloud is unavailable." if OS.has_feature("web") else "Mini Utopia Bridge is not reachable."
         )
         return
 
