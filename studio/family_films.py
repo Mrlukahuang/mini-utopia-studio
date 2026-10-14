@@ -16,6 +16,8 @@ class FamilyFilmDraft(BaseModel):
     camera: Literal["follow", "wide", "close"] = "follow"
     action: Literal["walk", "run", "celebrate"] = "walk"
     duration_seconds: Literal[15, 30] = 15
+    # Whitelisted dialogue only: the private_story_note never enters MP4.
+    caption_preset: Literal["none", "hello", "adventure", "hooray"] = "none"
     private_story_note: str = Field(default="", max_length=280)
 
     @field_validator("display_name")
