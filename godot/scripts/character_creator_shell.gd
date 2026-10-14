@@ -95,6 +95,14 @@ func _ready() -> void:
     _refresh_look_controls()
 
     _read_user_args()
+    var family := get_node_or_null("/root/FamilySceneState") as MiniUtopiaFamilySceneState
+    if family != null and family.has_family_connection():
+        if character_id.is_empty() and not family.pending_character_id.is_empty():
+            character_id = family.pending_character_id
+        if not family.bind_family_client(bridge):
+            _set_status("Parent session is unavailable. Reopen My Heroes.", true)
+            save_button.disabled = true
+            return
     _set_status("Connecting to Mini Utopia…", false)
 
     if character_id.is_empty():
@@ -228,9 +236,14 @@ func _on_equipment_choice_pressed(slot: String, item_id: String) -> void:
 
 
 func activate_family_session(token: String, api_base_url: String) -> bool:
-    # The future parent login flow supplies the token only at runtime.
-    bridge.configure(api_base_url)
-    if not bridge.set_family_session(token):
+    # Explicit session activation is allowed only in memory; a parent-managed
+    # token issuer must replace raw token entry before public deployment.
+    var family := get_node_or_null("/root/FamilySceneState") as MiniUtopiaFamilySceneState
+    if family == null or not family.connect_family(api_base_url, token):
+        save_button.disabled = true
+        _set_status("Family Cloud sign-in required to save.", true)
+        return false
+    if not family.bind_family_client(bridge):
         save_button.disabled = true
         _set_status("Family Cloud sign-in required to save.", true)
         return false
@@ -746,6 +759,14 @@ func _on_play_pressed() -> void:
 
 
 func _on_back_pressed() -> void:
+    var family := get_node_or_null("/root/FamilySceneState") as MiniUtopiaFamilySceneState
+    if (
+        family != null
+        and family.has_family_connection()
+        and _return_scene == "res://scenes/main.tscn"
+    ):
+        get_tree().change_scene_to_file("res://scenes/family_hero_library.tscn")
+        return
     if ResourceLoader.exists(_return_scene):
         get_tree().change_scene_to_file(_return_scene)
         return
