@@ -50,6 +50,7 @@ const COLOR_BUTTONS := {
 @onready var hero_name_input: LineEdit = $RootMargin/MainColumn/HeaderRow/TitleColumn/HeroNameInput
 @onready var back_button: Button = $RootMargin/MainColumn/FooterRow/BackButton
 @onready var save_button: Button = $RootMargin/MainColumn/FooterRow/SaveButton
+@onready var play_button: Button = $RootMargin/MainColumn/FooterRow/PlayButton
 @onready var avatar_stage: MiniUtopiaCreatorAvatarStage = $RootMargin/MainColumn/CreatorBody/PreviewPanel/AvatarStage
 @onready var body_row: HBoxContainer = $RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/BodyRow
 @onready var species_grid: GridContainer = $RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SpeciesGrid
@@ -75,6 +76,7 @@ var _return_scene := "res://scenes/main.tscn"
 func _ready() -> void:
     back_button.pressed.connect(_on_back_pressed)
     save_button.pressed.connect(_on_save_pressed)
+    play_button.pressed.connect(_on_play_pressed)
     hero_name_input.text_changed.connect(_on_hero_name_changed)
     bridge.request_succeeded.connect(_on_bridge_success)
     bridge.request_failed.connect(_on_bridge_failure)
@@ -128,6 +130,8 @@ func activate_family_session(token: String, api_base_url: String) -> bool:
 
 func _on_hero_name_changed(_value: String) -> void:
     var has_name := not hero_name_input.text.strip_edges().is_empty()
+    if not loaded_character.is_empty():
+        play_button.disabled = hero_name_input.text.strip_edges() != String(loaded_character.get("display_name", ""))
     if character_id.is_empty():
         save_button.disabled = not (has_name and bridge.has_family_session())
     elif not loaded_character.is_empty():
@@ -335,6 +339,8 @@ func _normalize_detail_compatibility() -> void:
 
 
 func _commit_live_appearance(message: String) -> void:
+    # Play uses the last server-saved Character, never unsaved appearance.
+    play_button.disabled = true
     _draft_appearance["customized"] = true
     _normalize_detail_compatibility()
     avatar_stage.apply_appearance(_draft_appearance)
@@ -490,6 +496,7 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
                 _draft_appearance = avatar_stage.current_appearance()
                 _refresh_look_controls()
         save_button.disabled = false
+        play_button.disabled = false
         if bridge.has_family_session():
             # Equipment endpoints are not part of Family API v1 yet.
             _set_status("Family Cloud hero loaded · ready to edit.", false)
@@ -520,12 +527,14 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         character_label.text = String(payload.get("display_name", "New Hero"))
         hero_name_input.text = character_label.text
         save_button.disabled = character_id.is_empty()
+        play_button.disabled = character_id.is_empty()
         _set_status("Your hero is saved with a permanent ID! 💖", false)
         return
 
     if kind == "character:put":
         loaded_character = payload.duplicate(true)
         save_button.disabled = false
+        play_button.disabled = false
         _set_status("Saved! Your hero is safe in Mini Utopia. 💖", false)
 
 
@@ -569,6 +578,21 @@ func _on_bridge_failure(
             )
         else:
             _set_status("Save failed. " + message, true)
+
+
+func _on_play_pressed() -> void:
+    if play_button.disabled or loaded_character.is_empty():
+        _set_status("Save your hero before playing.", true)
+        return
+    var family_state := get_node_or_null("/root/FamilySceneState") as MiniUtopiaFamilySceneState
+    if family_state == null or not family_state.select_character(loaded_character):
+        _set_status("Your saved hero could not enter the village.", true)
+        return
+    var target := "res://scenes/main.tscn"
+    if not ResourceLoader.exists(target):
+        _set_status("Village is not available yet.", true)
+        return
+    get_tree().change_scene_to_file(target)
 
 
 func _on_back_pressed() -> void:
