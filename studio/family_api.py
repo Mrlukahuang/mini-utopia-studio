@@ -278,6 +278,68 @@ class FamilyApplication:
                 return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
         return BridgeResponse(HTTPStatus.NO_CONTENT, {})
 
+    def _list_cast_guests(self, viewer: str) -> BridgeResponse:
+        now = time.monotonic()
+        with self._session_lock:
+            matches = [
+                (grant_id, source, cid, expires)
+                for grant_id, (owner, source, cid, expires) in self._cast_grants.items()
+                if owner == viewer and expires > now
+            ]
+        guests = []
+        for grant_id, source, cid, expires in matches:
+            asset = self.repository.get_asset(cid)
+            if (
+                asset is None
+                or asset.asset_type != AssetType.CHARACTER
+                or asset.status == ReviewStatus.ARCHIVED
+                or asset.metadata.get("family_owner") != source
+            ):
+                continue
+            guests.append({
+                "grant_id": grant_id, "character_id": cid,
+                "display_name": asset.display_name,
+                "expires_in_seconds": max(0, int(expires - now)),
+            })
+        return BridgeResponse(HTTPStatus.OK, {
+            "schema_version": "1.0", "guests": guests,
+        })
+
+    def _get_cast_guest(self, viewer: str, grant_id: str) -> BridgeResponse:
+        now = time.monotonic()
+        with self._session_lock:
+            grant = self._cast_grants.get(grant_id)
+            if grant is None or grant[0] != viewer or grant[3] <= now:
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            _, source, cid, _expires = grant
+        asset = self.repository.get_asset(cid)
+        if (
+            asset is None
+            or asset.asset_type != AssetType.CHARACTER
+            or asset.status == ReviewStatus.ARCHIVED
+            or asset.metadata.get("family_owner") != source
+        ):
+            return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+        contract = self.reader._contract(asset).model_dump(mode="json")
+        # Grant covers acting appearance + equipped items, not biography,
+        # revisions, private notes, or the sibling's full wardrobe inventory.
+        limited = {
+            "schema_version": "1.0",
+            "character_id": cid,
+            "display_name": contract["display_name"],
+            "profile": {"avatar": contract["profile"]["avatar"]},
+        }
+        gateway = EquipmentBridgeGateway(
+            self.repository,
+            collection_id="COLL_FAMILY_" + source,
+            owner_key=source,
+        )
+        runtime = gateway.get_state(cid)["runtime"]
+        return BridgeResponse(HTTPStatus.OK, {
+            "schema_version": "1.0", "grant_id": grant_id,
+            "character": limited, "equipment_runtime": runtime,
+        })
+
     def _revoke_child_session(self, authorization: str) -> BridgeResponse:
         if self.authenticate(authorization) is None:
             return BridgeResponse(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
