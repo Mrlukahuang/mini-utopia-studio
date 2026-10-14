@@ -36,7 +36,7 @@ Mac/iPad Safari --trusted HTTPS--> MacBook's private IPv4:443/tcp
    No public DNS or host port 80 mapping. Persist named volumes caddy_data and
    family_data; never delete them during routine updates.
 6. Export **only** the Caddy public root cert using
-   `docker compose -f deploy/family/compose.yaml cp web:/data/caddy/pki/authorities/local/root.crt ./mini-utopia-root.crt`.
+   `docker compose --env-file deploy/family/.env -f deploy/family/compose.yaml cp web:/data/caddy/pki/authorities/local/root.crt ./mini-utopia-root.crt`.
    Install this public CA into each privately managed iPad and Mac trust store;
    on iPad enable full trust under Settings > General > About > Certificate
    Trust Settings. Never extract, copy or share root.key.
