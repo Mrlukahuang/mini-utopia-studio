@@ -151,6 +151,12 @@ jobs:
           set -euo pipefail
           "$GODOT_BINARY" --headless --path godot --script res://tests/creator_touch_wardrobe_smoke.gd
 
+      - name: Smoke-test private saved Hero library and account isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GODOT_BINARY" --headless --path godot --script res://tests/family_hero_library_smoke.gd
+
       - name: Export Web release
         shell: bash
         run: |
