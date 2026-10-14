@@ -73,8 +73,13 @@ func _initialize() -> void:
     if first_hat == null or second_hat == null:
         _fail("both saved crowns must be visible together")
         return
-    if first_hat.get_meta("item_instance_id", "") == second_hat.get_meta(
-        "item_instance_id", ""
+    if (
+        runtime.play_runtime.payload.get("equipment", {}).get(
+            "equipped", {}
+        ).get("headwear", {}).get("item_instance_id", "") != "ITEM_LILY_CROWN"
+        or runtime.second_play_runtime.payload.get("equipment", {}).get(
+            "equipped", {}
+        ).get("headwear", {}).get("item_instance_id", "") != "ITEM_MIA_CROWN"
     ):
         _fail("the second actor inherited the first actor's equipment")
         return
