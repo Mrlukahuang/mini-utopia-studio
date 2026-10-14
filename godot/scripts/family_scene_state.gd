@@ -15,6 +15,7 @@ var director_shot_choices: Dictionary = {
     "action": "walk", "camera": "follow", "duration_seconds": 15
 }
 var pending_character_id := ""
+var opened_saved_film: Dictionary = {}
 var _family_api_url := ""
 var _family_token := ""
 var _family_profile_id := ""
@@ -88,6 +89,7 @@ func select_character(contract: Dictionary) -> bool:
     if session.is_empty():
         return false
     active_character = contract.duplicate(true)
+    opened_saved_film.clear()
     # Never carry one child's clothes into another child's newly selected Hero.
     active_equipment.clear()
     # A new primary Hero may not keep an old or identical supporting actor.
@@ -168,10 +170,54 @@ func active_play_session() -> Dictionary:
     return play
 
 
+## Only after owner-scoped GET /family/films/{id}, GET /characters/{id},
+## and each actor's canonical equipment have all succeeded. Never cache a
+## film belonging to a different child, or temporary guest permission.
+func restore_owned_film(film: Dictionary) -> bool:
+    var film_id := String(film.get("film_id", ""))
+    var revision := String(film.get("revision", ""))
+    var draft = film.get("draft", {})
+    if (
+        not has_family_connection()
+        or not film_id.begins_with("FILM_")
+        or revision.is_empty()
+        or typeof(draft) != TYPE_DICTIONARY
+        or active_equipment.is_empty()
+        or String(draft.get("character_id", "")) != String(
+            active_character.get("character_id", "")
+        )
+    ):
+        return false
+    var raw_second = draft.get("second_character_id", null)
+    var second_id := String(raw_second) if typeof(raw_second) == TYPE_STRING else ""
+    if not second_id.is_empty():
+        if (
+            second_cast_is_parent_guest
+            or second_cast_play_session().is_empty()
+            or second_id != String(second_cast_character.get("character_id", ""))
+        ):
+            return false
+    elif not second_cast_character.is_empty():
+        return false
+    var camera := String(draft.get("camera", ""))
+    var action := String(draft.get("action", ""))
+    var seconds := int(draft.get("duration_seconds", 0))
+    if camera not in ["follow", "wide", "close"] or action not in [
+        "walk", "run", "celebrate"
+    ] or seconds not in [15, 30]:
+        return false
+    director_shot_choices = {
+        "camera": camera, "action": action, "duration_seconds": seconds
+    }
+    opened_saved_film = film.duplicate(true)
+    return true
+
+
 func clear_selection() -> void:
     director_shot_choices = {
         "action": "walk", "camera": "follow", "duration_seconds": 15
     }
+    opened_saved_film.clear()
     active_character.clear()
     active_equipment.clear()
     clear_second_cast()
