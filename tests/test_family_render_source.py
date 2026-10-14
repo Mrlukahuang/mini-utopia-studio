@@ -82,7 +82,8 @@ def test_private_render_source_reuses_owned_two_heroes_and_handmade_prop(tmp_pat
     assert custom["visual_recipe"]["shape"] == "star"
     assert custom["visual_recipe"]["color_hex"] == "#B9E7D0"
     assert data["director_choices"] == {
-        "camera": "close", "action": "celebrate", "duration_seconds": 30
+        "camera": "close", "action": "celebrate", "duration_seconds": 30,
+        "caption_preset": "none",
     }
     assert (data["fps"], data["width"], data["height"]) == (2, 480, 270)
     assert "description" not in data["character"]
@@ -131,6 +132,55 @@ def test_render_source_reflects_latest_edit_without_new_character(tmp_path):
     source = call(app, "GET", endpoint)
     assert source.payload["source_revision"] == "2"
     assert source.payload["director_choices"] == {
-        "camera": "wide", "action": "walk", "duration_seconds": 30
+        "camera": "wide", "action": "walk", "duration_seconds": 30,
+        "caption_preset": "none",
     }
     assert source.payload["character"]["character_id"] == cid
+
+
+def test_safe_preset_subtitle_survives_restart_but_private_notes_never_render(tmp_path):
+    db = tmp_path / "safe-subtitle.db"
+    app = application(db)
+    hero = call(app, "POST", "/characters", {"display_name": "Test Hero"})
+    cid = hero.payload["character_id"]
+    draft = {
+        "schema_version": "1.0", "display_name": "Safe Caption",
+        "character_id": cid, "camera": "wide", "action": "walk",
+        "duration_seconds": 15, "caption_preset": "hello",
+        "private_story_note": "DO NOT SEND CHILD NOTES TO VIDEO",
+    }
+    record = call(app, "POST", "/family/films", draft)
+    assert record.status == 201
+    fid = record.payload["film_id"]
+    assert call(app, "GET", f"/family/films/{fid}", child="child_b").status == 404
+    assert call(app, "GET", f"/family/films/{fid}/render-source", child="child_b").status == 404
+
+    source = call(app, "GET", f"/family/films/{fid}/render-source").payload
+    assert source["director_choices"]["caption_preset"] == "hello"
+    assert "DO NOT SEND CHILD NOTES TO VIDEO" not in json.dumps(source)
+    assert "private_story_note" not in json.dumps(source)
+    assert "Hello, friend!" not in json.dumps(source), "Only a whitelisted ID crosses into Godot"
+
+    reopened = application(db)
+    saved = call(reopened, "GET", f"/family/films/{fid}")
+    assert saved.payload["draft"]["caption_preset"] == "hello"
+    assert saved.payload["draft"]["private_story_note"] == draft["private_story_note"]
+
+    # Even a caption-only edit advances the canonical revision. A new parent
+    # decision is mandatory before exporting that changed video.
+    from studio.family_movie_review import decide_private_film_review, current_review_state
+    decision = decide_private_film_review(
+        reopened.repository, owner="child_a", film_id=fid,
+        revision="1", decision="approve",
+    )
+    assert decision["approved_for_private_render"]
+    edited = call(reopened, "PUT", f"/family/films/{fid}", {
+        "revision": "1", "draft": {**draft, "caption_preset": "hooray"},
+    })
+    assert edited.status == 200
+    assert edited.payload["revision"] == "2"
+    assert current_review_state(
+        reopened.repository, owner="child_a", film_id=fid
+    )["requires_parent_review"]
+    assert call(reopened, "GET", f"/family/films/{fid}/render-source").payload[
+        "director_choices"]["caption_preset"] == "hooray"

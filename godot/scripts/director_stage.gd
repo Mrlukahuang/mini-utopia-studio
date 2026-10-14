@@ -48,6 +48,7 @@ func _ready() -> void:
                     draft.get("display_name", "My Mini Utopia Movie")
                 )
                 film_note_input.text = String(draft.get("private_story_note", ""))
+                _refresh_choice_labels()
             stage_payload(family_payload)
             return
 
@@ -90,7 +91,7 @@ func _build_child_director_controls() -> void:
     title.text = "🎥 My Movie / 我来当导演"
     title.add_theme_font_size_override("font_size", 21)
     controls.add_child(title)
-    for key in ["camera", "action", "duration_seconds"]:
+    for key in ["camera", "action", "duration_seconds", "caption_preset"]:
         var button := Button.new()
         button.name = "Choice_" + key
         button.custom_minimum_size = Vector2(238, 54)
@@ -132,12 +133,17 @@ func _refresh_choice_labels() -> void:
     var camera_button: Button = child_choice_buttons.get("camera")
     var action_button: Button = child_choice_buttons.get("action")
     var length_button: Button = child_choice_buttons.get("duration_seconds")
+    var caption_button: Button = child_choice_buttons.get("caption_preset")
     if camera_button != null:
         camera_button.text = "📷 Camera: " + String(choices.get("camera", "follow")).capitalize()
     if action_button != null:
         action_button.text = "🎭 Action: " + String(choices.get("action", "walk")).capitalize()
     if length_button != null:
         length_button.text = "⏱️ Length: " + str(int(choices.get("duration_seconds", 15))) + "s"
+    if caption_button != null:
+        var preset_id := String(choices.get("caption_preset", "none"))
+        var caption := MiniUtopiaFamilyDirectorSession.caption_text(preset_id)
+        caption_button.text = "💬 Subtitle: " + (caption if not caption.is_empty() else "Off")
 
 
 func _cycle_child_choice(key: String) -> void:
@@ -152,6 +158,8 @@ func _cycle_child_choice(key: String) -> void:
             options = ["walk", "run", "celebrate"]
         "duration_seconds":
             options = [15, 30]
+        "caption_preset":
+            options = ["none", "hello", "adventure", "hooray"]
         _:
             return
     var old_value = family.director_shot_choices.get(key, options[0])
@@ -302,6 +310,7 @@ func _private_film_draft() -> Dictionary:
         "camera": String(family.director_shot_choices.get("camera", "follow")),
         "action": String(family.director_shot_choices.get("action", "walk")),
         "duration_seconds": int(family.director_shot_choices.get("duration_seconds", 15)),
+        "caption_preset": String(family.director_shot_choices.get("caption_preset", "none")),
         "private_story_note": film_note_input.text.strip_edges()
     }
 

@@ -509,7 +509,8 @@ jobs:
           assert request["fps"] == 1
           assert film["duration_seconds"] == 30.0
           assert film["child_director_choices"] == {
-              "action": "celebrate", "camera": "close", "duration_seconds": 30
+              "action": "celebrate", "camera": "close", "duration_seconds": 30,
+              "caption_preset": "none",
           }
           assert film["camera"]["fov"] == 39.0
           assert film["shot"]["blocking"]["movement_style"] == "hold"
@@ -600,7 +601,8 @@ jobs:
               draft = {
                   "schema_version": "1.0", "display_name": "Synthetic Cloud Story",
                   "character_id": cid, "camera": "wide", "action": "walk",
-                  "duration_seconds": 15,
+                  "duration_seconds": 15, "caption_preset": "hello",
+                  "private_story_note": "PRIVATE CHILD NOTES MUST NEVER APPEAR",
               }
               saved = api("POST", "/family/films", draft)
               assert saved.status == 201
@@ -631,6 +633,12 @@ jobs:
                   app.repository, owner="child_a", film_id=film_id
               )
               assert fp and len(fp) == 64
+              from studio.family_film_render import build_family_film_render_source
+              source = build_family_film_render_source(
+                  app.repository, owner="child_a", film_id=film_id
+              )
+              assert source["director_choices"]["caption_preset"] == "hello"
+              assert "PRIVATE CHILD NOTES" not in json.dumps(source)
               try:
                   queue.enqueue(owner="child_b", film_id=film_id, fps=2)
               except PrivateRenderQueueError:

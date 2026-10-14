@@ -54,6 +54,7 @@ def test_child_movies_save_reopen_edit_and_stay_private(tmp_path):
     assert fid.startswith("FILM_")
     assert doc["revision"] == "1"
     assert doc["draft"]["duration_seconds"] == 30
+    assert doc["draft"]["caption_preset"] == "none"
     assert call(api, "GET", f"{path}/{fid}", child="child_b").status == 404
     assert call(api, "PUT", f"{path}/{fid}", {"revision": "1", "draft": film(bid)},
                 child="child_b").status == 404
@@ -77,6 +78,7 @@ def test_child_movies_save_reopen_edit_and_stay_private(tmp_path):
     assert saved.payload["film_id"] == fid
     assert saved.payload["draft"]["duration_seconds"] == 15
     assert saved.payload["draft"]["private_story_note"] == "A moonlit adventure"
+    assert saved.payload["draft"]["caption_preset"] == "none"
     assert [x["film_id"] for x in call(
         reopened, "GET", path
     ).payload["films"]] == [fid]
@@ -93,6 +95,8 @@ def test_film_drafts_cannot_borrow_sibling_or_unsafe_content(tmp_path):
         (film(aid, second_character_id=bid), 404),
         (film(aid, second_character_id=aid), 404),
         (film(aid, camera="unsafe-camera"), 400),
+        (film(aid, caption_preset="unsafe_free_text"), 400),
+        (film(aid, caption_preset={"text": "raw words"}), 400),
         (film(aid, duration_seconds=240), 400),
         (film(aid, private_story_note="x" * 281), 400),
         (film(aid, extra_field=True), 400),
