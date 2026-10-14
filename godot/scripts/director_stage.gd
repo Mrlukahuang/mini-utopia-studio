@@ -2,6 +2,7 @@ extends Node3D
 
 var director_runtime: MiniUtopiaDirectorShotRuntime
 var status_label: Label
+var child_choice_buttons: Dictionary = {}
 var fallback_world_environment: WorldEnvironment
 var fallback_environment_resource: Environment
 var fallback_key_light: DirectionalLight3D
@@ -18,17 +19,9 @@ func _ready() -> void:
 
     var selection := get_node_or_null("/root/FamilySceneState") as MiniUtopiaFamilySceneState
     if selection != null:
-        var family_payload := {}
-        var second := selection.second_cast_play_session()
-        if not second.is_empty():
-            family_payload = MiniUtopiaFamilyDirectorSession.from_two_play_sessions(
-                selection.active_play_session(), second
-            )
-        if family_payload.is_empty():
-            family_payload = MiniUtopiaFamilyDirectorSession.from_play_session(
-                selection.active_play_session()
-            )
+        var family_payload := _current_family_payload()
         if not family_payload.is_empty():
+            _build_child_director_controls()
             stage_payload(family_payload)
             return
 
@@ -38,6 +31,92 @@ func _ready() -> void:
         return
 
     stage_payload(payload)
+
+
+func _current_family_payload() -> Dictionary:
+    var family := get_node_or_null("/root/FamilySceneState") as MiniUtopiaFamilySceneState
+    if family == null:
+        return {}
+    var first := family.active_play_session()
+    if first.is_empty():
+        return {}
+    var second := family.second_cast_play_session()
+    var stage := (
+        MiniUtopiaFamilyDirectorSession.from_two_play_sessions(first, second)
+        if not second.is_empty()
+        else MiniUtopiaFamilyDirectorSession.from_play_session(first)
+    )
+    return MiniUtopiaFamilyDirectorSession.with_child_choices(
+        stage, family.director_shot_choices
+    )
+
+
+func _build_child_director_controls() -> void:
+    var overlay := get_node_or_null("DirectorStageOverlay") as CanvasLayer
+    if overlay == null:
+        return
+    var controls := VBoxContainer.new()
+    controls.name = "KidDirectorChoices"
+    controls.position = Vector2(24, 170)
+    controls.add_theme_constant_override("separation", 8)
+    overlay.add_child(controls)
+    var title := Label.new()
+    title.text = "🎥 My Movie / 我来当导演"
+    title.add_theme_font_size_override("font_size", 21)
+    controls.add_child(title)
+    for key in ["camera", "action", "duration_seconds"]:
+        var button := Button.new()
+        button.name = "Choice_" + key
+        button.custom_minimum_size = Vector2(238, 54)
+        button.add_theme_font_size_override("font_size", 18)
+        button.pressed.connect(_cycle_child_choice.bind(key))
+        controls.add_child(button)
+        child_choice_buttons[key] = button
+    _refresh_choice_labels()
+
+
+func _refresh_choice_labels() -> void:
+    var family := get_node_or_null("/root/FamilySceneState") as MiniUtopiaFamilySceneState
+    if family == null:
+        return
+    var choices := family.director_shot_choices
+    var camera_button: Button = child_choice_buttons.get("camera")
+    var action_button: Button = child_choice_buttons.get("action")
+    var length_button: Button = child_choice_buttons.get("duration_seconds")
+    if camera_button != null:
+        camera_button.text = "📷 Camera: " + String(choices.get("camera", "follow")).capitalize()
+    if action_button != null:
+        action_button.text = "🎭 Action: " + String(choices.get("action", "walk")).capitalize()
+    if length_button != null:
+        length_button.text = "⏱️ Length: " + str(int(choices.get("duration_seconds", 15))) + "s"
+
+
+func _cycle_child_choice(key: String) -> void:
+    var family := get_node_or_null("/root/FamilySceneState") as MiniUtopiaFamilySceneState
+    if family == null or not child_choice_buttons.has(key):
+        return
+    var options: Array = []
+    match key:
+        "camera":
+            options = ["follow", "wide", "close"]
+        "action":
+            options = ["walk", "run", "celebrate"]
+        "duration_seconds":
+            options = [15, 30]
+        _:
+            return
+    var old_value = family.director_shot_choices.get(key, options[0])
+    var index := options.find(old_value)
+    family.director_shot_choices[key] = options[(index + 1) % options.size()]
+    _refresh_choice_labels()
+    var shot := _current_family_payload()
+    if shot.is_empty():
+        return
+    if director_runtime != null:
+        remove_child(director_runtime)
+        director_runtime.free()
+        director_runtime = null
+    stage_payload(shot)
 
 
 func stage_payload(payload: Dictionary) -> void:
