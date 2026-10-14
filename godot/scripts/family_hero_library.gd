@@ -12,6 +12,8 @@ var hero_list: VBoxContainer
 var connection_panel: VBoxContainer
 var api_input: LineEdit
 var token_input: LineEdit
+var profile_choice: OptionButton
+var _pending_profile_id := ""
 var connect_button: Button
 var new_button: Button
 var refresh_button: Button
@@ -107,8 +109,15 @@ func _build_ui() -> void:
     column.add_child(connection_panel)
 
     var hint := Label.new()
-    hint.text = "Parent setup · Private HTTPS Family Cloud"
+    hint.text = "Parent unlock · Private HTTPS Family Cloud (30-minute session)"
     connection_panel.add_child(hint)
+
+    profile_choice = OptionButton.new()
+    profile_choice.name = "ChildProfile"
+    profile_choice.custom_minimum_size.y = 48
+    profile_choice.add_item("Child A / 大宝", 0)
+    profile_choice.add_item("Child B / 二宝", 1)
+    connection_panel.add_child(profile_choice)
 
     api_input = LineEdit.new()
     api_input.name = "ApiUrl"
@@ -119,7 +128,7 @@ func _build_ui() -> void:
 
     token_input = LineEdit.new()
     token_input.name = "SecretToken"
-    token_input.placeholder_text = "Parent-provided private child access token"
+    token_input.placeholder_text = "Parent-only unlock secret (not the child's token)"
     token_input.secret = true
     token_input.custom_minimum_size.y = 48
     token_input.max_length = 256
@@ -127,7 +136,7 @@ func _build_ui() -> void:
 
     connect_button = Button.new()
     connect_button.name = "ConnectButton"
-    connect_button.text = "Parent: Connect this session"
+    connect_button.text = "Parent: Unlock a 30-minute child session"
     connect_button.custom_minimum_size.y = 52
     connect_button.pressed.connect(_on_connect_pressed)
     connection_panel.add_child(connect_button)
@@ -166,19 +175,29 @@ func _on_connect_pressed() -> void:
         _set_status("Family session is not available.", true)
         return
     var url := api_input.text.strip_edges()
-    var token := token_input.text.strip_edges()
-    # Erase visible widget contents immediately, even on failure.
+    var parent_secret := token_input.text.strip_edges()
+    # Erase masked widget text immediately, even if the network fails.
     token_input.clear()
-    if not family.connect_family(url, token):
-        _set_status("Use a private HTTPS address and a valid child access token.", true)
+    bridge.configure(url)
+    if not bridge.base_url.begins_with("https://"):
+        _set_status("A private HTTPS Family Cloud URL is required.", true)
         return
-    if not family.bind_family_client(bridge):
-        family.disconnect_family()
-        _set_status("Could not connect safely. Check parent settings.", true)
+
+    _pending_profile_id = (
+        "child_b" if profile_choice.get_selected_id() == 1 else "child_a"
+    )
+    var error := bridge.request_parent_approved_session(
+        _pending_profile_id, parent_secret
+    )
+    # The parent secret goes only to this one HTTPS request and never to the
+    # persistent in-memory FamilySceneState, project files, logs or URLs.
+    parent_secret = ""
+    if error != OK:
+        _pending_profile_id = ""
+        _set_status("Parent unlock could not start. Check URL and secret.", true)
         return
-    api_input.clear()
-    _set_connected(true)
-    _refresh_characters()
+    connect_button.disabled = true
+    _set_status("Parent approval requested securely…", false)
 
 
 func _refresh_characters() -> void:
@@ -195,6 +214,34 @@ func _refresh_characters() -> void:
 
 
 func _on_bridge_success(kind: String, payload: Dictionary) -> void:
+    if kind == "family:session":
+        connect_button.disabled = false
+        var family := _family_state()
+        var issued_token := String(payload.get("access_token", ""))
+        var expires := int(payload.get("expires_in_seconds", 0))
+        var profile := String(payload.get("profile_id", ""))
+        var valid := (
+            family != null
+            and String(payload.get("schema_version", "")) == "1.0"
+            and profile == _pending_profile_id
+            and expires > 0
+            and expires <= 1800
+            and family.connect_family(bridge.base_url, issued_token)
+        )
+        issued_token = ""
+        _pending_profile_id = ""
+        if not valid or not family.bind_family_client(bridge):
+            if family != null:
+                family.disconnect_family()
+            bridge.clear_family_session()
+            _set_connected(false)
+            _set_status("Parent approval failed. Please try again.", true)
+            return
+        api_input.clear()
+        _set_connected(true)
+        _refresh_characters()
+        return
+
     if kind != "characters:list" or not bridge.has_family_session():
         return
     var raw = payload.get("characters", [])
@@ -243,6 +290,18 @@ func _clear_hero_list() -> void:
 
 
 func _on_bridge_failure(kind: String, status_code: int, _code: String, _message: String) -> void:
+    if kind == "family:session":
+        connect_button.disabled = false
+        _pending_profile_id = ""
+        _set_connected(false)
+        _set_status(
+            "Parent unlock temporarily limited. Try again later."
+            if status_code == 429
+            else "Parent unlock denied. Check the private URL and secret.",
+            true
+        )
+        return
+
     if kind != "characters:list":
         return
     if status_code in [401, 403]:
@@ -275,8 +334,10 @@ func _on_new_pressed() -> void:
 
 
 func _on_disconnect_pressed() -> void:
-    # If an old request completes after logout, _on_bridge_success must not
-    # show the previous child's Character names.
+    # Proactively revoke the short-lived server token when safe to do so;
+    # local disconnect ALWAYS clears memory even if offline or busy.
+    if bridge.has_family_session() and not bridge.is_busy():
+        bridge.revoke_family_session()
     var family := _family_state()
     if family != null:
         family.disconnect_family()
