@@ -23,7 +23,7 @@ func _initialize() -> void:
     family.select_second_cast_character(_hero("CHAR_DIRECTOR_B", "#B9E7D0"))
     family.select_second_cast_equipment(_gear("CHAR_DIRECTOR_B", "ITEM_B_CROWN"))
 
-    var stage := load("res://scenes/director_stage.tscn").instantiate()
+    var stage = load("res://scenes/director_stage.tscn").instantiate()
     root.add_child(stage)
     await process_frame
 
@@ -42,8 +42,7 @@ func _initialize() -> void:
             _fail("choice button not connected: " + key)
             return
 
-    var original := stage.director_runtime
-    if original.actor == null or original.second_actor == null:
+    if stage.director_runtime.actor == null or stage.director_runtime.second_actor == null:
         _fail("two saved Heroes not staged")
         return
     stage._cycle_child_choice("camera")
