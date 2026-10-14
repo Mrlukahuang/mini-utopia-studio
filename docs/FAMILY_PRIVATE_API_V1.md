@@ -30,6 +30,9 @@ from the unauthenticated desktop-only `studio.bridge.server`.
 | GET | `/family/films/{film_id}/render-source` | Current child only: assemble canonical actor/equipment film-render inputs from SQLite; no video or publish permission |
 | POST | `/family/film-reviews` | Parent-only approve/revoke exact FILM ID, revision and current private actor/outfit snapshot |
 | GET | `/family/films/{film_id}/review` | Current child checks whether parent approval is still valid |
+| POST | `/family/movie-releases` | Parent-only: release or revoke one approved and encoded film to its own child |
+| GET | `/family/films/{film_id}/media-status` | Child sees only their own private MP4 readiness |
+| GET | `/family/films/{film_id}/download` | Binary video/mp4 with child bearer Authorization; only after separate adult release |
 | OPTIONS | any | Strict, origin-scoped Web preflight |
 
 Every non-OPTIONS request requires `Authorization: Bearer <child-token>`.
@@ -179,3 +182,38 @@ SQLite database and may be explicitly revoked. They do not grant public
 sharing or download rights. The private MP4 worker refuses to start unless
 approval is still valid. The synthetic CI movie has only a synthetic adult
 approval; no private family data is used in public GitHub Actions.
+
+
+## Parent-reviewed PRIVATE MP4 delivery
+
+A film draft approval is **not** permission to download. After rendering on
+an adult-owned machine, the adult previews the **actual** MP4 and separately
+releases that exact encoded file via HTTPS:
+
+```http
+POST /family/movie-releases
+Authorization: Bearer <PARENT_UNLOCK>
+Content-Type: application/json
+
+{"profile_id":"child_a","film_id":"FILM_...","revision":"1","decision":"release"}
+```
+
+The server requires the film's current adult approval, a real regular MP4
+(<= 32 MiB), chmod-600 media file and chmod-700 owner directories outside Git.
+It records the file's SHA-256, source fingerprint and FILM revision in the
+private SQLite database. The adult can later send `decision: "revoke"`.
+Changes to draft, actor/wardrobe or actual media bytes automatically invalidate
+the download grant. The other child's token gets 404. The child can query
+`GET /family/films/{id}/media-status`, and only an authenticated, same-origin
+child request with Authorization header can retrieve binary MP4 from
+`GET /family/films/{id}/download`. The server does **not** expose static
+media directories or generate anonymous/signed URL bearer links. MP4 replies
+set no-store, nosniff and private attachment headers.
+
+The media root is `FAMILY_PRIVATE_MOVIES_ROOT=/movies` inside the private
+API container, mapped **read-only** to the adult-owned host folder. A trusted
+adult worker must save the exact source-fingerprint-named MP4 to that store
+using `--store-root` and must run under the UID allowed to write the private
+host directory. Production configuration, real parent preview and browser
+save UI require deployment and iPad Safari testing; do not present this code
+as an already operational cloud service.
