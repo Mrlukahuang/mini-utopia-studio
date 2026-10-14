@@ -561,7 +561,7 @@ func _display_parent_movie_details(record: Dictionary) -> void:
         "👨‍👩‍👧 Parent film review — PRIVATE RENDER ONLY"
         + "\nTitle: " + String(draft.get("display_name", "Movie"))
         + "\nLead actor ID: " + String(draft.get("character_id", ""))
-        + "\nSecond actor ID: " + String(draft.get("second_character_id", ""))
+        + "\nSecond actor ID: " + str(draft.get("second_character_id", "") if draft.get("second_character_id", null) != null else "None")
         + "\nCamera: " + String(draft.get("camera", ""))
         + " · Action: " + String(draft.get("action", ""))
         + " · Length: " + str(draft.get("duration_seconds", 15)) + "s"
@@ -643,7 +643,7 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             _cancel_parent_movie_review()
             _set_status("Movie review response did not match selected film.", true)
             return
-        var approved := payload.get("approved_for_private_render", false) == true
+        var approved: bool = payload.get("approved_for_private_render", false) == true
         _set_status(
             "Parent approved this exact version for PRIVATE MP4 rendering."
             if approved else "Private film render approval revoked.", false
