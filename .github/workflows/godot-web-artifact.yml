@@ -155,7 +155,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          "$GODOT_BINARY" --headless --path godot --script res://tests/family_hero_library_smoke.gd
+          timeout --signal=TERM --kill-after=10s 120s "$GODOT_BINARY" --headless --path godot --script res://tests/family_hero_library_smoke.gd
 
       - name: Smoke-test parent-approved short child sessions
         shell: bash
