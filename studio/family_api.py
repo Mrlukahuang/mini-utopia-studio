@@ -377,12 +377,34 @@ class FamilyApplication:
             return self._issue_child_session(authorization, body)
         if route == "/family/sessions/current" and method == "DELETE":
             return self._revoke_child_session(authorization)
+        if route == "/family/cast-grants":
+            if method != "POST":
+                return BridgeResponse(HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"})
+            return self._issue_cast_grant(authorization, body)
+        if route.startswith("/family/cast-grants/"):
+            if method != "DELETE":
+                return BridgeResponse(HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"})
+            grant_id = unquote(route[len("/family/cast-grants/"):])
+            if not re.fullmatch(r"CAST_[A-Za-z0-9_-]{20,64}", grant_id):
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            return self._revoke_cast_grant(authorization, grant_id)
 
         owner = self.authenticate(authorization)
         if owner is None:
             return BridgeResponse(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
 
         route = urlsplit(path).path
+        if route == "/family/cast-guests":
+            if method != "GET":
+                return BridgeResponse(HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"})
+            return self._list_cast_guests(owner)
+        if route.startswith("/family/cast-guests/"):
+            if method != "GET":
+                return BridgeResponse(HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"})
+            grant_id = unquote(route[len("/family/cast-guests/"):])
+            if not re.fullmatch(r"CAST_[A-Za-z0-9_-]{20,64}", grant_id):
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            return self._get_cast_guest(owner, grant_id)
         if route == "/characters":
             if method == "GET":
                 results = []
