@@ -27,6 +27,7 @@ from the unauthenticated desktop-only `studio.bridge.server`.
 | POST | `/family/films` | Create a 15/30s draft of owned actors |
 | GET | `/family/films/{id}` | Read current child's saved film |
 | PUT | `/family/films/{id}` | Revision-checked update |
+| GET | `/family/films/{film_id}/render-source` | Current child only: assemble canonical actor/equipment film-render inputs from SQLite; no video or publish permission |
 | OPTIONS | any | Strict, origin-scoped Web preflight |
 
 Every non-OPTIONS request requires `Authorization: Bearer <child-token>`.
@@ -126,3 +127,21 @@ public child safety, secure secrets management and remote rate limiting are
 required before family release. Legacy SHA-hashed child bearer credentials
 are retained for private desktop migration/testing and must not be issued
 to children's browsers.
+
+
+### Private film render inputs
+
+`GET /family/films/{film_id}/render-source` requires the current child's
+short-lived bearer token. The server fetches the saved FILM draft, confirms
+that **every** current Character still belongs to the same child profile, and
+rebuilds each outfit from the current canonical equipment collection.
+The response is directly compatible with `godot/scripts/family_movie_prepare.gd`:
+`character`, `equipment_runtime`, optional `second_character` and
+`second_equipment_runtime`, plus `director_choices` and bounded output
+resolution/fps. It excludes private story notes, biographies, child session
+credentials, full inventories and unapproved sibling casts.
+
+This route **does not generate, store, publish or download MP4**. A trusted,
+parent-approved private worker must still run Godot and FFmpeg on a protected
+host and implement adult-controlled delivery. Never submit real household
+film input, output or media to a public repository or GitHub Actions.
