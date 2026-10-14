@@ -92,6 +92,51 @@ func get_health() -> int:
     )
 
 
+func request_parent_approved_session(
+    profile_id: String,
+    parent_token: String
+) -> int:
+    # The long-lived parent credential is used ONCE over HTTPS for an
+    # explicit, short-lived child session. Never store it in this client.
+    if _request == null or not base_url.begins_with("https://"):
+        return ERR_UNCONFIGURED
+    if is_busy():
+        return ERR_BUSY
+    if not profile_id in ["child_a", "child_b"]:
+        return ERR_INVALID_PARAMETER
+    if parent_token.length() < 32 or parent_token.length() > 256:
+        return ERR_INVALID_PARAMETER
+    for char in parent_token:
+        if not TOKEN_ALPHABET.contains(char):
+            return ERR_INVALID_PARAMETER
+
+    var headers := PackedStringArray([
+        "Accept: application/json",
+        "Content-Type: application/json",
+        "Authorization: Bearer " + parent_token
+    ])
+    _active_kind = "family:session"
+    var error := _request.request(
+        base_url + "/family/sessions",
+        headers,
+        HTTPClient.METHOD_POST,
+        JSON.stringify({"profile_id": profile_id})
+    )
+    if error != OK:
+        _active_kind = ""
+    return error
+
+
+func revoke_family_session() -> int:
+    if not has_family_session():
+        return ERR_UNCONFIGURED
+    return _start_request(
+        "family:revoke",
+        "/family/sessions/current",
+        HTTPClient.METHOD_DELETE
+    )
+
+
 func list_characters() -> int:
     return _start_request(
         "characters:list",
