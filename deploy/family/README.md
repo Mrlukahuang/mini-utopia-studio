@@ -89,3 +89,44 @@ them into GitHub artifacts, bug reports or chats.
   money. An adult must approve and complete that setup when requested.
 - Final acceptance requires a real Mac/iPad test for save, outfits, play,
   film previews, performance, session expiry and backup/restore.
+
+
+## Adult-run private MP4 rendering (offline first)
+
+This is a **local/private-host command**, not a child-exposed HTTP endpoint
+and not a GitHub Actions task. The host needs a checked-out trusted Godot
+project, Godot 4.7.2, FFmpeg/FFprobe, `xvfb-run`, and read-only access to
+its private SQLite database. The saved FILM ID comes from the child's
+private `/family/films` list; all actors, equipment and handmade props are
+loaded again from SQLite with the named child's owner scope.
+
+An adult creates a private, non-world-readable output directory **outside
+the repository** and starts the worker:
+
+```bash
+install -d -m 700 /srv/mini-utopia-private-movies
+python -m studio.family_private_movie_worker \
+  --db /srv/mini-utopia-private-data/studio.db \
+  --godot-project ./godot \
+  --owner child_a \
+  --film-id FILM_REPLACE_WITH_OWNED_ID \
+  --output /srv/mini-utopia-private-movies/episode-001.mp4 \
+  --fps 6
+```
+
+The worker makes a restricted 0700 temporary copy of the Godot project,
+**outside Git**, writes the minimum canonical render contract there,
+imports assets, prepares the staged scene, captures the frames via virtual
+display, runs FFmpeg to encode MP4, verifies the frame count and actual
+duration, then writes the output file with mode 0600. Temporary copies,
+character snapshots and PNG frames are removed on both success and failure.
+The worker refuses to overwrite existing videos or write inside the public
+Git repository, and its command-line entry refuses public GitHub Actions
+execution. It has no access to paid video generation providers.
+
+Only a trusted adult-operated process with access to the family DB may run
+this command. It is **not** an in-browser MP4 button yet. Before making it
+available to children, implement an adult-reviewed job queue, independent
+render worker resource limits, owner-scoped private MP4 download, cleanup/
+retention controls and real iPad Safari review. The public repository must
+never contain a rendered household MP4, child audio or private film JSON.
