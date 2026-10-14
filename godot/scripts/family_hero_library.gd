@@ -41,6 +41,8 @@ var parent_movie_summary: Label
 var parent_movie_secret: LineEdit
 var parent_movie_approve: Button
 var parent_movie_revoke: Button
+var parent_movie_release: Button
+var parent_movie_download_revoke: Button
 
 
 func _ready() -> void:
@@ -230,6 +232,30 @@ func _build_ui() -> void:
     parent_movie_revoke.custom_minimum_size.y = 54
     parent_movie_revoke.pressed.connect(_on_parent_film_revoke_pressed)
     parent_movie_panel.add_child(parent_movie_revoke)
+
+    var finished_hint := Label.new()
+    finished_hint.name = "FinishedMP4Hint"
+    finished_hint.text = (
+        "FINAL STEP: Parent reviews the actual PRIVATE MP4 on the family "
+        + "computer before permitting a child download. Approval to render "
+        + "alone does NOT release the finished video."
+    )
+    finished_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    parent_movie_panel.add_child(finished_hint)
+
+    parent_movie_release = Button.new()
+    parent_movie_release.name = "ReleaseFinishedMP4Button"
+    parent_movie_release.text = "Parent: Allow download of finished reviewed MP4"
+    parent_movie_release.custom_minimum_size.y = 58
+    parent_movie_release.pressed.connect(_on_parent_film_release_pressed)
+    parent_movie_panel.add_child(parent_movie_release)
+
+    parent_movie_download_revoke = Button.new()
+    parent_movie_download_revoke.name = "RevokeFinishedMP4Button"
+    parent_movie_download_revoke.text = "Parent: Stop MP4 downloads"
+    parent_movie_download_revoke.custom_minimum_size.y = 58
+    parent_movie_download_revoke.pressed.connect(_on_parent_film_download_revoke_pressed)
+    parent_movie_panel.add_child(parent_movie_download_revoke)
 
     connection_panel = VBoxContainer.new()
     connection_panel.name = "ParentConnection"
@@ -563,6 +589,10 @@ func _cancel_parent_movie_review() -> void:
         parent_movie_approve.disabled = false
     if parent_movie_revoke != null:
         parent_movie_revoke.disabled = false
+    if parent_movie_release != null:
+        parent_movie_release.disabled = false
+    if parent_movie_download_revoke != null:
+        parent_movie_download_revoke.disabled = false
 
 
 func _on_parent_review_movie_pressed(film_id: String) -> void:
@@ -637,7 +667,60 @@ func _on_parent_film_revoke_pressed() -> void:
     _parent_movie_decision("revoke")
 
 
+func _parent_final_movie_decision(decision: String) -> void:
+    var family := _family_state()
+    if (
+        family == null or family.current_profile_id().is_empty()
+        or not family.has_family_connection()
+        or _review_film.is_empty()
+        or bridge.is_busy()
+    ):
+        _set_status("Reopen this movie for parent review before release.", true)
+        return
+    var secret := parent_movie_secret.text.strip_edges()
+    parent_movie_secret.clear()
+    var error := bridge.parent_release_finished_movie(
+        secret, family.current_profile_id(),
+        String(_review_film.get("film_id", "")),
+        String(_review_film.get("revision", "")), decision
+    )
+    secret = ""
+    if error != OK:
+        _set_status("Final parent MP4 release request could not start.", true)
+        return
+    parent_movie_release.disabled = true
+    parent_movie_download_revoke.disabled = true
+    _set_status("Private server verifying the actual finished MP4…", false)
+
+
+func _on_parent_film_release_pressed() -> void:
+    _parent_final_movie_decision("release")
+
+
+func _on_parent_film_download_revoke_pressed() -> void:
+    _parent_final_movie_decision("revoke")
+
+
 func _on_bridge_success(kind: String, payload: Dictionary) -> void:
+    if kind.begins_with("family:movie-release:"):
+        parent_movie_release.disabled = false
+        parent_movie_download_revoke.disabled = false
+        if (
+            _review_film.is_empty()
+            or String(payload.get("film_id", "")) != String(_review_film.get("film_id", ""))
+            or String(payload.get("revision", "")) != String(_review_film.get("revision", ""))
+        ):
+            _cancel_parent_movie_review()
+            _set_status("Film changed. Parent must review again.", true)
+            return
+        var ready: bool = payload.get("released_to_child", false) == true
+        _set_status(
+            "Parent released this checked MP4 to its owning child."
+            if ready else "Parent stopped private MP4 downloads.",
+            false
+        )
+        return
+
     if kind == "films:download-ready":
         var id := String(payload.get("film_id", ""))
         var button := movie_list.get_node_or_null("Download_" + id) as Button
@@ -962,6 +1045,16 @@ func _clear_hero_list() -> void:
 
 
 func _on_bridge_failure(kind: String, status_code: int, _code: String, _message: String) -> void:
+    if kind.begins_with("family:movie-release:"):
+        parent_movie_release.disabled = false
+        parent_movie_download_revoke.disabled = false
+        _set_status(
+            "The final private MP4 is not ready, or this film changed."
+            if status_code == 409
+            else "Parent final MP4 release not authorized.",
+            true
+        )
+        return
     if kind == "films:download":
         for entry in movie_list.get_children():
             if String(entry.name).begins_with("Download_"):

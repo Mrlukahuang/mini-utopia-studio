@@ -17,3 +17,14 @@ func parent_review_film(
         "film_id": film_id, "revision": revision, "decision": decision,
     })
     return OK
+
+
+func parent_release_finished_movie(
+    _parent_token: String, profile_id: String,
+    film_id: String, revision: String, decision: String
+) -> int:
+    calls.append({
+        "kind": "family:movie-release", "profile_id": profile_id,
+        "film_id": film_id, "revision": revision, "decision": decision
+    })
+    return OK

@@ -118,6 +118,61 @@ func _initialize() -> void:
         _fail("child did not see that render approval was revoked")
         return
 
+    if (
+        library.parent_movie_release == null
+        or library.parent_movie_download_revoke == null
+        or library.parent_movie_release.custom_minimum_size.y < 48
+        or library.parent_movie_release.pressed.get_connections().is_empty()
+    ):
+        _fail("final film release touch control missing")
+        return
+
+    library.parent_movie_secret.text = "synthetic_parent_release_secret_0123456789"
+    library._on_parent_film_release_pressed()
+    var release: Dictionary = stub.calls.back()
+    if (
+        release.get("kind") != "family:movie-release"
+        or release.get("profile_id") != "child_a"
+        or release.get("film_id") != FILM
+        or release.get("revision") != "3"
+        or release.get("decision") != "release"
+    ):
+        _fail("final MP4 release did not require exact owner/movie revision")
+        return
+    if not library.parent_movie_secret.text.is_empty():
+        _fail("parent release secret was kept in input")
+        return
+    if not library.parent_movie_release.disabled:
+        _fail("final MP4 release button not locked during request")
+        return
+    library._on_bridge_failure(
+        "family:movie-release:release", 409, "private_movie_not_ready", ""
+    )
+    if not library.status_label.text.contains("not ready"):
+        _fail("missing encoded MP4 did not fail closed")
+        return
+    library.parent_movie_secret.text = "synthetic_parent_release_secret_0123456789"
+    library._on_parent_film_release_pressed()
+    library._on_bridge_success("family:movie-release:release", {
+        "film_id": FILM, "revision": "3", "released_to_child": true,
+        "bytes": 2048
+    })
+    if not library.status_label.text.contains("released"):
+        _fail("confirmed private MP4 release not visible")
+        return
+    library.parent_movie_secret.text = "synthetic_parent_release_secret_0123456789"
+    library._on_parent_film_download_revoke_pressed()
+    if stub.calls.back().get("decision") != "revoke":
+        _fail("parent cannot revoke private MP4 download")
+        return
+    library._on_bridge_success("family:movie-release:revoke", {
+        "film_id": FILM, "revision": "3", "released_to_child": false,
+        "bytes": 0
+    })
+    if not library.status_label.text.contains("stopped"):
+        _fail("parent revoke did not stop download")
+        return
+
     library.parent_movie_secret.text = "synthetic-secret-left-in-a-field"
     library._on_disconnect_pressed()
     if library.parent_movie_panel.visible or not library.parent_movie_secret.text.is_empty():
