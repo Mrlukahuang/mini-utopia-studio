@@ -1,6 +1,10 @@
-# Caddy + Python share a single Docker network namespace.
-# Only Caddy owns the public ports; Python binds to 127.0.0.1:8766.
-{$FAMILY_DOMAIN} {
+{
+    auto_https disable_redirects
+}
+
+# HTTPS on the adult-owned home Mac. Docker binds only the allowed LAN IP.
+https://{$FAMILY_LAN_IP} {
+    tls internal
     encode zstd gzip
 
     @api path /characters* /family/sessions* /family/cast-grants* /family/cast-guests* /family/films* /family/film-reviews /family/movie-releases
@@ -11,7 +15,6 @@
     handle {
         root * /srv/web
         file_server
-        # Explicitly forbid directory traversal/remote file serving.
         header X-Content-Type-Options nosniff
         header Referrer-Policy no-referrer
         header X-Frame-Options DENY
