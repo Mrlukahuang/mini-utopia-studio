@@ -139,6 +139,12 @@ jobs:
           set -euo pipefail
           "$GODOT_BINARY" --headless --path godot --script res://tests/family_director_launch_smoke.gd
 
+      - name: Smoke-test same child-owned outfit in game and Director
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GODOT_BINARY" --headless --path godot --script res://tests/family_outfit_game_director_smoke.gd
+
       - name: Export Web release
         shell: bash
         run: |
