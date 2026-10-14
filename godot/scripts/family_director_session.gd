@@ -81,3 +81,55 @@ static func from_play_session(play_session: Dictionary) -> Dictionary:
         },
         "play_session": play,
     }
+
+
+## Two distinct, already-authorized Character contracts may be staged together.
+## The caller MUST obtain both from the SAME child-scoped Family API session.
+## No sibling private records can be discovered through this movie API. The
+## parent-approved cross-child casting flow will be a separate server route.
+static func from_two_play_sessions(
+    first_play: Dictionary,
+    second_play: Dictionary
+) -> Dictionary:
+    var first := String(first_play.get("character_asset_id", ""))
+    var second := String(second_play.get("character_asset_id", ""))
+    if (
+        first.is_empty()
+        or second.is_empty()
+        or first == second
+        or not first.begins_with("CHAR_")
+        or not second.begins_with("CHAR_")
+        or String(first_play.get("source", "")) != "family_character"
+        or String(second_play.get("source", "")) != "family_character"
+        or typeof(first_play.get("character", null)) != TYPE_DICTIONARY
+        or typeof(second_play.get("character", null)) != TYPE_DICTIONARY
+    ):
+        return {}
+    for session in [first_play, second_play]:
+        var equipment = session.get("equipment", {})
+        if typeof(equipment) != TYPE_DICTIONARY:
+            return {}
+        if (
+            typeof(equipment.get("equipped", null)) != TYPE_DICTIONARY
+            or typeof(equipment.get("final_stats", null)) != TYPE_DICTIONARY
+        ):
+            return {}
+
+    var result := from_play_session(first_play)
+    if result.is_empty():
+        return {}
+    result["second_play_session"] = second_play.duplicate(true)
+    result["director_session_id"] = "DIR_FAMILY_PAIR_" + first + "_" + second
+    var shot: Dictionary = result["shot"]
+    var blocking: Dictionary = shot["blocking"]
+    blocking["actor_start"] = {"x": -1.5, "y": 0.0, "z": 2.0}
+    blocking["actor_end"] = {"x": -1.0, "y": 0.0, "z": -1.0}
+    shot["second_blocking"] = {
+        "actor_start": {"x": 1.5, "y": 0.0, "z": 2.0},
+        "actor_end": {"x": 1.0, "y": 0.0, "z": -1.0},
+        "facing_degrees": 180.0,
+        "movement_style": "walk",
+    }
+    shot["asset_ids"] = [first, second, "LOC_NEWBIE_VILLAGE"]
+    result["second_character_asset_id"] = second
+    return result
