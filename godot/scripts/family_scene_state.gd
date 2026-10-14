@@ -10,6 +10,9 @@ var active_character: Dictionary = {}
 var active_equipment: Dictionary = {}
 var second_cast_character: Dictionary = {}
 var second_cast_equipment: Dictionary = {}
+var director_shot_choices: Dictionary = {
+    "action": "walk", "camera": "follow", "duration_seconds": 15
+}
 var pending_character_id := ""
 var _family_api_url := ""
 var _family_token := ""
@@ -163,6 +166,9 @@ func active_play_session() -> Dictionary:
 
 
 func clear_selection() -> void:
+    director_shot_choices = {
+        "action": "walk", "camera": "follow", "duration_seconds": 15
+    }
     active_character.clear()
     active_equipment.clear()
     clear_second_cast()

@@ -181,6 +181,12 @@ jobs:
           set -euo pipefail
           "$GODOT_BINARY" --headless --path godot --script res://tests/family_parent_cast_consent_smoke.gd
 
+      - name: Smoke-test child-editable camera, action and 15/30-second film
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GODOT_BINARY" --headless --path godot --script res://tests/family_child_director_choices_smoke.gd
+
       - name: Export Web release
         shell: bash
         run: |

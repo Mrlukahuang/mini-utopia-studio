@@ -133,3 +133,67 @@ static func from_two_play_sessions(
     shot["asset_ids"] = [first, second, "LOC_NEWBIE_VILLAGE"]
     result["second_character_asset_id"] = second
     return result
+
+
+## Child's directorial choices change shot staging but NEVER change either
+## canonical Character ID, appearance or equipment payload.
+static func with_child_choices(
+    session: Dictionary, choices: Dictionary
+) -> Dictionary:
+    if session.is_empty():
+        return {}
+    var result := session.duplicate(true)
+    var action := String(choices.get("action", "walk"))
+    if action not in ["walk", "run", "celebrate"]:
+        action = "walk"
+    var lens := String(choices.get("camera", "follow"))
+    if lens not in ["follow", "wide", "close"]:
+        lens = "follow"
+    var seconds := int(choices.get("duration_seconds", 15))
+    if seconds not in [15, 30]:
+        seconds = 15
+    var shot: Dictionary = result.get("shot", {})
+    var blocking: Dictionary = shot.get("blocking", {})
+    var second: Dictionary = shot.get("second_blocking", {})
+    var movement := "hold" if action == "celebrate" else action
+    blocking["movement_style"] = movement
+    if not second.is_empty():
+        second["movement_style"] = movement
+        shot["second_blocking"] = second
+    shot["blocking"] = blocking
+    result["animation_intent"] = "idle" if action == "celebrate" else action
+    result["duration_seconds"] = float(seconds)
+    shot["duration_seconds"] = float(seconds)
+    var factor := float(seconds) / DURATION_SECONDS
+    var raw_cues = shot.get("performance_cues", [])
+    if typeof(raw_cues) == TYPE_ARRAY:
+        for cue in raw_cues:
+            if typeof(cue) == TYPE_DICTIONARY:
+                cue["start_seconds"] = float(cue.get("start_seconds", 0)) * factor
+    result["shot"] = shot
+
+    var camera: Dictionary = result.get("camera", {})
+    match lens:
+        "wide":
+            camera["position"] = [0.0, 5.0, 13.0]
+            camera["end_position"] = [0.0, 4.5, 11.0]
+            camera["look_at"] = [0.0, 1.1, 0.0]
+            camera["end_look_at"] = [0.0, 1.1, -1.0]
+            camera["fov"] = 58.0
+            camera["end_fov"] = 54.0
+            camera["movement"] = "Wide village shot"
+        "close":
+            camera["position"] = [0.0, 2.4, 5.5]
+            camera["end_position"] = [0.6, 2.1, 4.3]
+            camera["look_at"] = [0.0, 1.35, 0.0]
+            camera["end_look_at"] = [0.0, 1.35, -0.5]
+            camera["fov"] = 39.0
+            camera["end_fov"] = 35.0
+            camera["movement"] = "Close-up on my Heroes"
+        _:
+            camera["movement"] = "Follow my Heroes"
+    result["camera"] = camera
+    result["child_director_choices"] = {
+        "action": action, "camera": lens, "duration_seconds": seconds
+    }
+    return result
