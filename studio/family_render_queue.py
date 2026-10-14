@@ -245,7 +245,8 @@ class PrivateFamilyRenderQueue:
                 film_id=job["film_id"], fingerprint=job["fingerprint"],
                 create_dirs=True,
             )
-            if output.exists():
+            created_output = not output.exists()
+            if not created_output:
                 existing = read_private_media(output)
                 if existing is None:
                     raise PrivateRenderQueueError("Existing private media failed verification")
@@ -262,11 +263,16 @@ class PrivateFamilyRenderQueue:
             # If revoked during execution, remove any newly rendered bytes
             # before returning a blocked status. Never release automatically.
             result = self._finish(job, "completed")
-            if result["status"] != "completed" and output.exists():
+            if (
+                result["status"] != "completed"
+                and created_output
+                and output.exists()
+            ):
                 output.unlink()
             return result
-        except (PrivateMovieError, PrivateMovieMediaError,
-                PrivateRenderQueueError, OSError) as exc:
+        except Exception:
+            # Errors are deliberately reduced to a fixed code: filenames,
+            # subprocess stderr, and child-authored data must never be logged.
             # Never persist arbitrary shell/Godot stderr or a child's notes.
             self._finish(job, "failed", "render_failed")
             return {**job, "status": "failed", "error_code": "render_failed"}
@@ -325,6 +331,17 @@ class PrivateFamilyRenderQueue:
                     raise PrivateRenderQueueError(
                         "Retry requires unchanged adult approval and remaining attempts"
                     )
+                outstanding = conn.execute(
+                    """SELECT COUNT(*) FROM private_family_render_queue
+                       WHERE status IN ('queued','running')"""
+                ).fetchone()[0]
+                own = conn.execute(
+                    """SELECT COUNT(*) FROM private_family_render_queue
+                       WHERE owner=? AND status IN ('queued','running')""",
+                    (row["owner"],),
+                ).fetchone()[0]
+                if outstanding >= MAX_OUTSTANDING or own >= MAX_PER_CHILD_OUTSTANDING:
+                    raise PrivateRenderQueueError("Private render quota reached")
                 conn.execute(
                     """UPDATE private_family_render_queue
                        SET status='queued',error_code='',updated_at=?
