@@ -163,6 +163,12 @@ jobs:
           set -euo pipefail
           "$GODOT_BINARY" --headless --path godot --script res://tests/family_parent_short_session_smoke.gd
 
+      - name: Smoke-test two saved Heroes and outfits in one film shot
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GODOT_BINARY" --headless --path godot --script res://tests/family_two_heroes_director_smoke.gd
+
       - name: Export Web release
         shell: bash
         run: |
