@@ -519,6 +519,28 @@ func _clear_hero_list() -> void:
 
 
 func _on_bridge_failure(kind: String, status_code: int, _code: String, _message: String) -> void:
+    if kind in ["family:cast-approve", "family:cast-revoke"]:
+        share_submit.disabled = false
+        share_revoke.disabled = false
+        _set_status(
+            "Parent consent was not accepted. Check approval and retry.",
+            true
+        )
+        return
+
+    if kind == "castguests:get":
+        _pending_guest_grant_id = ""
+        var family := _family_state()
+        if family != null:
+            family.clear_second_cast()
+        _refresh_cast_button()
+        _set_status("Guest approval expired or was revoked by parent.", true)
+        return
+
+    if kind == "castguests:list":
+        _set_status("Could not refresh parent-approved guest actors.", true)
+        return
+
     if kind == "family:session":
         connect_button.disabled = false
         _pending_profile_id = ""
