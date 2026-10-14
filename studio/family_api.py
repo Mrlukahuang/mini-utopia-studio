@@ -367,6 +367,24 @@ class FamilyApplication:
             del self._sessions[digest]
         return BridgeResponse(HTTPStatus.NO_CONTENT, {})
 
+    def private_mp4_for_download(
+        self, *, authorization: str, film_id: str, origin: str | None
+    ) -> bytes | None:
+        # The binary handler does not pass raw tokens into a URL, redirect,
+        # static file_server or browser cache; it requires a child bearer.
+        if origin is not None and origin not in self.allowed_origins:
+            return None
+        if not re.fullmatch(r"FILM_[A-Za-z0-9_-]{3,96}", film_id):
+            return None
+        owner = self.authenticate(authorization)
+        if owner is None:
+            return None
+        with self._session_lock:
+            return download_released_media(
+                self.repository, self.private_movie_root,
+                owner=owner, film_id=film_id,
+            )
+
     def handle(
         self,
         *,
@@ -431,6 +449,51 @@ class FamilyApplication:
             if review is None:
                 return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
             return BridgeResponse(HTTPStatus.OK, review)
+        if route == "/family/movie-releases":
+            if method != "POST":
+                return BridgeResponse(
+                    HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"}
+                )
+            denied = self._require_parent(authorization)
+            if denied is not None:
+                return denied
+            try:
+                data = json.loads(body)
+            except (UnicodeError, ValueError):
+                return BridgeResponse(
+                    HTTPStatus.BAD_REQUEST, {"error": "invalid_movie_release"}
+                )
+            if (
+                not isinstance(data, dict)
+                or set(data) != {"profile_id", "film_id", "revision", "decision"}
+                or any(not isinstance(value, str) for value in data.values())
+                or data["profile_id"] not in self.token_hashes
+                or not re.fullmatch(r"FILM_[A-Za-z0-9_-]{3,96}", data["film_id"])
+                or not re.fullmatch(r"[0-9]{1,12}", data["revision"])
+                or data["decision"] not in ("release", "revoke")
+            ):
+                return BridgeResponse(
+                    HTTPStatus.BAD_REQUEST, {"error": "invalid_movie_release"}
+                )
+            with self._session_lock:
+                try:
+                    release = set_parent_release(
+                        self.repository, self.private_movie_root,
+                        owner=data["profile_id"], film_id=data["film_id"],
+                        revision=data["revision"], decision=data["decision"],
+                    )
+                except PrivateMovieMediaError:
+                    return BridgeResponse(
+                        HTTPStatus.CONFLICT, {"error": "private_movie_not_ready"}
+                    )
+                except ValueError:
+                    return BridgeResponse(
+                        HTTPStatus.CONFLICT, {"error": "revision_conflict"}
+                    )
+            if release is None:
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            return BridgeResponse(HTTPStatus.OK, release)
+
         if route == "/family/cast-grants":
             if method != "POST":
                 return BridgeResponse(HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"})
@@ -483,6 +546,23 @@ class FamilyApplication:
                     })
                 saved = save_film_draft(self.repository, owner, draft)
             return BridgeResponse(HTTPStatus.CREATED, saved)
+
+        if route.endswith("/media-status") and route.startswith("/family/films/"):
+            film_id = unquote(route[len("/family/films/"):-len("/media-status")])
+            if not re.fullmatch(r"FILM_[A-Za-z0-9_-]{3,96}", film_id):
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            if method != "GET":
+                return BridgeResponse(
+                    HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"}
+                )
+            with self._session_lock:
+                result = release_status(
+                    self.repository, self.private_movie_root,
+                    owner=owner, film_id=film_id,
+                )
+            if result is None:
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            return BridgeResponse(HTTPStatus.OK, result)
 
         if route.endswith("/review") and route.startswith("/family/films/"):
             film_id = unquote(route[len("/family/films/"):-len("/review")])
