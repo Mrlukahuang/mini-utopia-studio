@@ -405,6 +405,7 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             family.clear_second_cast()
             _set_status("Parent guest actor could not be verified.", true)
         else:
+            family.second_cast_is_parent_guest = true
             _set_status("Approved guest is ready. Tap Film Together!", false)
         _refresh_cast_button()
         return
