@@ -10,6 +10,7 @@ var active_character: Dictionary = {}
 var active_equipment: Dictionary = {}
 var second_cast_character: Dictionary = {}
 var second_cast_equipment: Dictionary = {}
+var second_cast_is_parent_guest := false
 var director_shot_choices: Dictionary = {
     "action": "walk", "camera": "follow", "duration_seconds": 15
 }
@@ -123,6 +124,7 @@ func select_second_cast_character(contract: Dictionary) -> bool:
         return false
     second_cast_character = contract.duplicate(true)
     second_cast_equipment.clear()
+    second_cast_is_parent_guest = false
     return true
 
 
@@ -154,6 +156,7 @@ func second_cast_play_session() -> Dictionary:
 func clear_second_cast() -> void:
     second_cast_character.clear()
     second_cast_equipment.clear()
+    second_cast_is_parent_guest = false
 
 
 func active_play_session() -> Dictionary:

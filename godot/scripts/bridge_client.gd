@@ -206,6 +206,37 @@ func parent_cast_consent(
     return error
 
 
+func list_family_films() -> int:
+    return _start_request("films:list", "/family/films", HTTPClient.METHOD_GET)
+
+
+func create_family_film(draft: Dictionary) -> int:
+    return _start_request(
+        "films:post", "/family/films", HTTPClient.METHOD_POST, draft
+    )
+
+
+func get_family_film(film_id: String) -> int:
+    if not film_id.begins_with("FILM_") or "/" in film_id:
+        return ERR_INVALID_PARAMETER
+    return _start_request(
+        "films:get", "/family/films/" + film_id.uri_encode(),
+        HTTPClient.METHOD_GET
+    )
+
+
+func update_family_film(
+    film_id: String, revision: String, draft: Dictionary
+) -> int:
+    if not film_id.begins_with("FILM_") or "/" in film_id:
+        return ERR_INVALID_PARAMETER
+    return _start_request(
+        "films:put", "/family/films/" + film_id.uri_encode(),
+        HTTPClient.METHOD_PUT,
+        {"revision": revision, "draft": draft}
+    )
+
+
 func list_characters() -> int:
     return _start_request(
         "characters:list",

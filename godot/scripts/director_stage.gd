@@ -3,6 +3,12 @@ extends Node3D
 var director_runtime: MiniUtopiaDirectorShotRuntime
 var status_label: Label
 var child_choice_buttons: Dictionary = {}
+var film_bridge: MiniUtopiaBridgeClient
+var film_title_input: LineEdit
+var film_note_input: LineEdit
+var save_film_button: Button
+var saved_film_id := ""
+var saved_film_revision := ""
 var fallback_world_environment: WorldEnvironment
 var fallback_environment_resource: Environment
 var fallback_key_light: DirectionalLight3D
@@ -12,6 +18,17 @@ var fallback_fill_light: DirectionalLight3D
 func _ready() -> void:
     _build_environment()
     _build_overlay()
+
+    film_bridge = MiniUtopiaBridgeClient.new()
+    film_bridge.name = "DirectorFamilyFilmBridge"
+    add_child(film_bridge)
+    film_bridge.request_succeeded.connect(_on_film_bridge_success)
+    film_bridge.request_failed.connect(_on_film_bridge_failure)
+    var family_state := get_node_or_null(
+        "/root/FamilySceneState"
+    ) as MiniUtopiaFamilySceneState
+    if family_state != null:
+        family_state.bind_family_client(film_bridge)
 
     director_runtime = MiniUtopiaDirectorShotRuntime.new()
     director_runtime.name = "DirectorShotRuntime"
@@ -73,6 +90,29 @@ func _build_child_director_controls() -> void:
         controls.add_child(button)
         child_choice_buttons[key] = button
     _refresh_choice_labels()
+
+    film_title_input = LineEdit.new()
+    film_title_input.name = "MyFilmTitle"
+    film_title_input.text = "My Mini Utopia Movie"
+    film_title_input.placeholder_text = "Name your movie"
+    film_title_input.max_length = 64
+    film_title_input.custom_minimum_size = Vector2(238, 50)
+    controls.add_child(film_title_input)
+
+    film_note_input = LineEdit.new()
+    film_note_input.name = "MyFilmNote"
+    film_note_input.placeholder_text = "Your story idea"
+    film_note_input.max_length = 280
+    film_note_input.custom_minimum_size = Vector2(238, 48)
+    controls.add_child(film_note_input)
+
+    save_film_button = Button.new()
+    save_film_button.name = "SaveMyMovieButton"
+    save_film_button.text = "Save My Movie"
+    save_film_button.custom_minimum_size = Vector2(238, 56)
+    save_film_button.disabled = not film_bridge.has_family_session()
+    save_film_button.pressed.connect(_on_save_private_film_pressed)
+    controls.add_child(save_film_button)
 
 
 func _refresh_choice_labels() -> void:
@@ -232,6 +272,81 @@ func _on_replay_pressed() -> void:
 func _on_back_to_village_pressed() -> void:
     Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
     get_tree().change_scene_to_file("res://scenes/main.tscn")
+
+
+func _private_film_draft() -> Dictionary:
+    var family := get_node_or_null("/root/FamilySceneState") as MiniUtopiaFamilySceneState
+    if family == null or family.active_play_session().is_empty():
+        return {}
+    var name := film_title_input.text.strip_edges()
+    if name.is_empty():
+        return {}
+    var second_id: Variant = null
+    if not family.second_cast_is_parent_guest:
+        var second := family.second_cast_play_session()
+        if not second.is_empty():
+            second_id = String(second.get("character_asset_id", ""))
+    return {
+        "schema_version": "1.0", "display_name": name,
+        "character_id": String(family.active_character.get("character_id", "")),
+        "second_character_id": second_id,
+        "camera": String(family.director_shot_choices.get("camera", "follow")),
+        "action": String(family.director_shot_choices.get("action", "walk")),
+        "duration_seconds": int(family.director_shot_choices.get("duration_seconds", 15)),
+        "private_story_note": film_note_input.text.strip_edges()
+    }
+
+
+func _on_save_private_film_pressed() -> void:
+    if film_bridge == null or not film_bridge.has_family_session() or film_bridge.is_busy():
+        return
+    var draft := _private_film_draft()
+    if draft.is_empty():
+        status_label.text = "Please name your film and select your saved Hero."
+        return
+    var error := (
+        film_bridge.create_family_film(draft)
+        if saved_film_id.is_empty()
+        else film_bridge.update_family_film(
+            saved_film_id, saved_film_revision, draft
+        )
+    )
+    if error != OK:
+        status_label.text = "Could not start private film save."
+        return
+    save_film_button.disabled = true
+    status_label.text = "Saving your film privately…"
+
+
+func _on_film_bridge_success(kind: String, payload: Dictionary) -> void:
+    if kind not in ["films:post", "films:put"]:
+        return
+    var id := String(payload.get("film_id", ""))
+    var revision := String(payload.get("revision", ""))
+    if not id.begins_with("FILM_") or revision.is_empty():
+        status_label.text = "Film save returned an invalid response."
+        save_film_button.disabled = false
+        return
+    saved_film_id = id
+    saved_film_revision = revision
+    save_film_button.disabled = false
+    status_label.text = "💖 Movie saved to your private Family Cloud!"
+    var family := get_node_or_null("/root/FamilySceneState") as MiniUtopiaFamilySceneState
+    if family != null and family.second_cast_is_parent_guest:
+        status_label.text += "\nSibling guest approval is temporary, not stored."
+
+
+func _on_film_bridge_failure(
+    kind: String, status_code: int, _code: String, _message: String
+) -> void:
+    if kind not in ["films:post", "films:put"]:
+        return
+    save_film_button.disabled = false
+    status_label.text = (
+        "Your saved movie changed. Reopen it before editing."
+        if status_code == 409
+        else "Could not save privately. Please retry."
+    )
 
 
 func _show_missing_payload() -> void:
