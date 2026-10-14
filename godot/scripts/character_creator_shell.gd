@@ -479,6 +479,7 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         character_label.text = (
             display_name if not display_name.is_empty() else character_id
         )
+        hero_name_input.text = display_name
         var profile = payload.get("profile", {})
         if typeof(profile) == TYPE_DICTIONARY:
             var appearance = profile.get("avatar", {})
@@ -489,6 +490,10 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
                 _draft_appearance = avatar_stage.current_appearance()
                 _refresh_look_controls()
         save_button.disabled = false
+        if bridge.has_family_session():
+            # Equipment endpoints are not part of Family API v1 yet.
+            _set_status("Family Cloud hero loaded · ready to edit.", false)
+            return
         _set_status("Character loaded · loading My Stuff…", false)
         var equipment_error := bridge.get_equipment(character_id)
         if equipment_error != OK:
@@ -507,6 +512,15 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             "Character + My Stuff loaded · nine equipment slots ready.",
             false
         )
+        return
+
+    if kind == "character:post":
+        loaded_character = payload.duplicate(true)
+        character_id = String(payload.get("character_id", ""))
+        character_label.text = String(payload.get("display_name", "New Hero"))
+        hero_name_input.text = character_label.text
+        save_button.disabled = character_id.is_empty()
+        _set_status("Your hero is saved with a permanent ID! 💖", false)
         return
 
     if kind == "character:put":
@@ -540,6 +554,11 @@ func _on_bridge_failure(
                 else " Start the Mini Utopia Bridge and try again."
             )
             _set_status(message + help, true)
+        return
+
+    if kind == "character:post":
+        save_button.disabled = false
+        _set_status("Could not create your hero. " + message, true)
         return
 
     if kind == "character:put":
