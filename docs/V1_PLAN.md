@@ -89,7 +89,7 @@ CC0 套件：KayKit / Kenney / Quaternius
 |---|---|---|---|
 | V1-W1-01 | 部署到家庭服务器，Mac + iPad 都能打开 | iPad Safari 通过 HTTPS 打开游戏，能登录孩子档案 | ⬜ |
 | V1-W1-02 | 按 §6 清单完成第一次真机试玩，记录到 §7 | §7 至少 1 条完整记录 | ⬜ |
-| V1-W1-03 | 修复试玩中**阻断闭环**的问题（每个问题一个 PR） | 闭环能从头走到尾 | ⬜ |
+| V1-W1-03 | 修复试玩中**阻断闭环**的问题（每个问题一个 PR） | 闭环能从头走到尾 | 🟡 |
 | V1-W1-04 | 重写 README：只保留项目介绍、当前架构、本地运行、文档地图，旧内容移到 `docs/archive/README_LEGACY.md` | README < 200 行，与 §2 一致 | ⬜ |
 
 **不做：** 任何新功能、性能优化、安全加固。
@@ -164,8 +164,10 @@ CC0 套件：KayKit / Kenney / Quaternius
 ```text
 当前周：W1
 可领取：V1-W1-01、V1-W1-02（需人类执行）、V1-W1-04
-V1-W1-03 等待试玩记录后由人类添加具体 bug 条目
+V1-W1-03 家长 2026-10-15 已报告具体阻断：Mac Safari/iPhone 登录时无法粘贴长口令，手输短密码被 Godot 客户端拒绝；本次只处理“8 位家长口令被客户端长度校验拒绝”，另一个粘贴问题不在此 PR
 ```
+
+**W1 家长设备预检（非孩子试玩记录，不能替代 §7）：** Mac Safari 与 iPhone Safari/Chrome 已在家庭 HTTPS 下加载游戏，直接 POST Child B 的家庭 API 返回 HTTP 201；Godot 家长解锁页面显示 `Parent unlock could not start` / `Parent unlock denied`。项目负责人明确要求允许 8 位家长口令。记录为 V1-W1-03 的单项阻断修复；真 iPad 验收及粘贴体验后续独立记录。
 
 ---
 

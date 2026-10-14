@@ -35,6 +35,21 @@ func _initialize() -> void:
         _fail("insecure URL authorized a child")
         return
 
+    # Adult-only 8-character secret is allowed, but child bearer sessions
+    # still require their original 32+ characters.
+    if not MiniUtopiaBridgeClient.valid_parent_secret("Ab3dE5fG"):
+        _fail("8-character adult unlock must be accepted")
+        return
+    if MiniUtopiaBridgeClient.valid_parent_secret("Ab3dE5f"):
+        _fail("7-character adult unlock must remain invalid")
+        return
+    if MiniUtopiaBridgeClient.valid_parent_secret("Ab3dE5f!"):
+        _fail("unsafe parent unlock alphabet was accepted")
+        return
+    if library.bridge.set_family_session("Ab3dE5fG"):
+        _fail("8-character child bearer token was accepted")
+        return
+
     # Validation for parent->short child exchange uses a different method
     # from regular child-only bearer requests.
     library.bridge.configure("https://family.example")

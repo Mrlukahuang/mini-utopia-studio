@@ -16,6 +16,7 @@ var _request: HTTPRequest
 var _active_kind := ""
 var _family_token := ""
 const TOKEN_ALPHABET := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
+const PARENT_SECRET_MIN_LENGTH := 8
 const MAX_PRIVATE_MP4_BYTES := 32 * 1024 * 1024
 var _prepared_movie_bytes: PackedByteArray = PackedByteArray()
 var _prepared_movie_id := ""
@@ -65,6 +66,16 @@ func set_family_session(token: String) -> bool:
     return true
 
 
+static func valid_parent_secret(value: String) -> bool:
+    # Adult unlock may be 8+ characters; child session tokens remain 32+.
+    if value.length() < PARENT_SECRET_MIN_LENGTH or value.length() > 256:
+        return false
+    for ch in value:
+        if not TOKEN_ALPHABET.contains(ch):
+            return false
+    return true
+
+
 func clear_family_session() -> void:
     _family_token = ""
     _prepared_movie_bytes.clear()
@@ -109,11 +120,8 @@ func request_parent_approved_session(
         return ERR_BUSY
     if not profile_id in ["child_a", "child_b"]:
         return ERR_INVALID_PARAMETER
-    if parent_token.length() < 32 or parent_token.length() > 256:
+    if not valid_parent_secret(parent_token):
         return ERR_INVALID_PARAMETER
-    for char in parent_token:
-        if not TOKEN_ALPHABET.contains(char):
-            return ERR_INVALID_PARAMETER
 
     var headers := PackedStringArray([
         "Accept: application/json",
@@ -173,11 +181,8 @@ func parent_cast_consent(
         or not character_id.begins_with("CHAR_")
     ):
         return ERR_INVALID_PARAMETER
-    if parent_token.length() < 32 or parent_token.length() > 256:
+    if not valid_parent_secret(parent_token):
         return ERR_INVALID_PARAMETER
-    for symbol in parent_token:
-        if not TOKEN_ALPHABET.contains(symbol):
-            return ERR_INVALID_PARAMETER
     if not revoke_grant_id.is_empty() and not revoke_grant_id.begins_with("CAST_"):
         return ERR_INVALID_PARAMETER
     var headers := PackedStringArray([
@@ -228,11 +233,8 @@ func parent_review_film(
         or decision not in ["approve", "revoke"]
     ):
         return ERR_INVALID_PARAMETER
-    if parent_token.length() < 32 or parent_token.length() > 256:
+    if not valid_parent_secret(parent_token):
         return ERR_INVALID_PARAMETER
-    for character in parent_token:
-        if not TOKEN_ALPHABET.contains(character):
-            return ERR_INVALID_PARAMETER
     var headers := PackedStringArray([
         "Accept: application/json",
         "Content-Type: application/json",
@@ -270,12 +272,9 @@ func parent_release_finished_movie(
         or not revision.is_valid_int()
         or int(revision) < 1
         or decision not in ["release", "revoke"]
-        or parent_token.length() < 32 or parent_token.length() > 256
+        or not valid_parent_secret(parent_token)
     ):
         return ERR_INVALID_PARAMETER
-    for character in parent_token:
-        if not TOKEN_ALPHABET.contains(character):
-            return ERR_INVALID_PARAMETER
     var headers := PackedStringArray([
         "Accept: application/json",
         "Content-Type: application/json",
