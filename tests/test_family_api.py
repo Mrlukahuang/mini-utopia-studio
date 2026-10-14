@@ -417,3 +417,126 @@ def test_parent_unlock_invalid_attempts_are_rate_limited_and_secrets_not_logged(
         disabled, "POST", "/family/sessions", auth=PARENT_AUTH,
         payload={"profile_id": "child_a"},
     ).status == 503
+
+
+def test_parent_grants_movie_only_cross_child_cast_and_revoke(tmp_path):
+    repo = SQLiteStudioRepository(tmp_path / "cast-grants.db")
+    parent = "Bearer synthetic_parent_cross_cast_unlock_secret_0123456789"
+    app = FamilyApplication(
+        repo,
+        token_hashes={
+            "child_a": _token_hash("a-private-random-token-for-tests"),
+            "child_b": _token_hash("b-private-random-token-for-tests"),
+        },
+        allowed_origins=(ORIGIN,),
+        parent_unlock_hash=_token_hash(parent[len("Bearer "):]),
+    )
+    a = call(app, "POST", "/characters", payload={
+        "display_name": "Sheep", "description": "Private child A biography",
+        "profile": {"avatar": {
+            "species_head_id": "species_head_sheep_v1",
+            "surface_color_hex": "#F7B7D2",
+        }},
+    })
+    b = call(app, "POST", "/characters", auth=AUTH_B, payload={
+        "display_name": "Cat", "description": "Private child B biography",
+        "profile": {"avatar": {
+            "species_head_id": "species_head_cat_v1",
+            "surface_color_hex": "#B9E7D0",
+        }},
+    })
+    aid, bid = a.payload["character_id"], b.payload["character_id"]
+    b_inventory = call(app, "GET", f"/characters/{bid}/equipment", auth=AUTH_B)
+    assert b_inventory.status == 200
+    crown = next(item for item in b_inventory.payload["items"] if item["slot"] == "headwear")
+    equipped = call(app, "PUT", f"/characters/{bid}/equipment/headwear",
+                    auth=AUTH_B, payload={"item_instance_id": crown["item_instance_id"]})
+    assert equipped.status == 200
+    assert call(app, "GET", f"/characters/{bid}").status == 404
+    assert call(app, "GET", f"/characters/{bid}/equipment").status == 404
+    assert call(app, "GET", "/family/cast-guests").payload["guests"] == []
+
+    approval = {
+        "viewer_profile_id": "child_a", "source_profile_id": "child_b",
+        "character_id": bid,
+    }
+    assert call(app, "POST", "/family/cast-grants", payload=approval).status == 401
+    assert call(app, "POST", "/family/cast-grants", auth=AUTH_B,
+                payload=approval).status == 401
+    assert call(app, "POST", "/family/cast-grants", auth=parent,
+                payload={**approval, "scope": "edit"}).status == 400
+    assert call(app, "POST", "/family/cast-grants", auth=parent,
+                payload={**approval, "source_profile_id": "child_a"}).status == 400
+    assert call(app, "POST", "/family/cast-grants", auth=parent,
+                payload={**approval, "viewer_profile_id": "child_b"}).status == 400
+    assert call(app, "POST", "/family/cast-grants", auth=parent,
+                payload={**approval, "character_id": aid}).status == 404
+
+    granted = call(app, "POST", "/family/cast-grants", auth=parent,
+                   payload=approval)
+    assert granted.status == 201
+    grant_id = granted.payload["grant_id"]
+    assert grant_id.startswith("CAST_")
+    assert granted.payload["expires_in_seconds"] == 900
+
+    guests_a = call(app, "GET", "/family/cast-guests")
+    guests_b = call(app, "GET", "/family/cast-guests", auth=AUTH_B)
+    assert [guest["grant_id"] for guest in guests_a.payload["guests"]] == [grant_id]
+    assert guests_b.payload["guests"] == []
+    view = call(app, "GET", f"/family/cast-guests/{grant_id}")
+    assert view.status == 200
+    assert set(view.payload) == {"schema_version", "grant_id", "character",
+                                "equipment_runtime"}
+    exposed = view.payload["character"]
+    assert exposed["character_id"] == bid
+    assert exposed["profile"]["avatar"]["species_head_id"] == "species_head_cat_v1"
+    assert "description" not in exposed
+    assert "revision" not in exposed
+    assert "character_profile" not in exposed
+    assert "Private child B biography" not in json.dumps(view.payload)
+    assert "items" not in view.payload  # no browsing full sibling inventory
+    assert view.payload["equipment_runtime"]["equipped"]["headwear"][
+        "item_instance_id"] == crown["item_instance_id"]
+    assert call(app, "GET", f"/family/cast-guests/{grant_id}",
+                auth=AUTH_B).status == 404
+    assert call(app, "GET", f"/characters/{bid}").status == 404
+    assert call(app, "PUT", f"/characters/{bid}", payload={}).status == 404
+    assert call(app, "GET", f"/characters/{bid}/equipment").status == 404
+    assert call(app, "DELETE", f"/family/cast-grants/{grant_id}").status == 401
+    assert call(app, "DELETE", f"/family/cast-grants/{grant_id}",
+                auth=parent).status == 204
+    assert call(app, "GET", f"/family/cast-guests/{grant_id}").status == 404
+    assert call(app, "GET", "/family/cast-guests").payload["guests"] == []
+    assert call(app, "GET", f"/characters/{bid}").status == 404
+
+
+def test_cross_child_cast_expires_and_server_restart_revokes(tmp_path):
+    repo = SQLiteStudioRepository(tmp_path / "expire-grant.db")
+    parent = "Bearer synthetic_parent_cross_cast_unlock_secret_0123456789"
+    def configured():
+        return FamilyApplication(
+            repo, token_hashes={
+                "child_a": _token_hash("a-private-random-token-for-tests"),
+                "child_b": _token_hash("b-private-random-token-for-tests"),
+            },
+            allowed_origins=(ORIGIN,),
+            parent_unlock_hash=_token_hash(parent[len("Bearer "):]),
+        )
+    app = configured()
+    b = call(app, "POST", "/characters", auth=AUTH_B,
+             payload={"display_name": "Approved guest"})
+    bid = b.payload["character_id"]
+    approval = {"viewer_profile_id": "child_a",
+                "source_profile_id": "child_b", "character_id": bid}
+    grant = call(app, "POST", "/family/cast-grants", auth=parent, payload=approval)
+    gid = grant.payload["grant_id"]
+    viewer, source, cid, _ = app._cast_grants[gid]
+    app._cast_grants[gid] = viewer, source, cid, 0.0
+    assert call(app, "GET", "/family/cast-guests").payload["guests"] == []
+    assert call(app, "GET", f"/family/cast-guests/{gid}").status == 404
+    fresh = call(app, "POST", "/family/cast-grants", auth=parent, payload=approval)
+    assert fresh.status == 201
+    restarted = configured()
+    assert call(restarted, "GET", "/family/cast-guests").payload["guests"] == []
+    assert call(restarted, "GET",
+                f"/family/cast-guests/{fresh.payload['grant_id']}").status == 404
