@@ -25,6 +25,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 
 from studio.bridge.characters import CharacterBridgeReader
 from studio.bridge.equipment import EquipmentBridgeGateway
+from studio.family_props import FamilyCraftedProp, craft_family_prop
 from studio.bridge.errors import CharacterRevisionConflict, CharacterWriteValidationError
 from studio.bridge.server import BridgeResponse, MAX_REQUEST_BODY_BYTES
 from studio.core.enums import AssetType, ReviewStatus
