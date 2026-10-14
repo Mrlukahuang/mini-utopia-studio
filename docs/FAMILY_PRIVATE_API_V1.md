@@ -15,6 +15,8 @@ from the unauthenticated desktop-only `studio.bridge.server`.
 | POST | `/characters` | Creates a new canonical `CHAR_...` with an owned, validated `CharacterProfile` |
 | GET | `/characters/{CHAR_ID}` | Reads only own character; cross-profile IDs return 404 |
 | PUT | `/characters/{CHAR_ID}` | Revision-checked update through existing Character Core contract |
+| GET | `/characters/{CHAR_ID}/equipment` | Nine slots and the current child's own inventory / runtime |
+| PUT | `/characters/{CHAR_ID}/equipment/{slot}` | Equip or unequip the current child's item, using `{"item_instance_id": "ITEM_..."}` or `null` |
 | OPTIONS | any | Strict, origin-scoped Web preflight |
 
 Every non-OPTIONS request requires `Authorization: Bearer <child-token>`.
@@ -67,3 +69,15 @@ with remote HTTPS deployment. Integrate the Godot Web Bridge client with
 authenticated sessions, then FAMILY-02 two-child profile switcher and
 end-to-end save/load on Mac and iPad. This infrastructure alone does not
 claim live multi-device availability.
+
+## Family equipment owner isolation
+
+Equipment is not copied into a second game database. For each authenticated child,
+`EquipmentService` uses a separate canonical CreatorCollection with ID
+`COLL_FAMILY_<profile>` and owner_key matching the authenticated profile.
+The existing desktop `COLL_DEFAULT` remains available for legacy development,
+but **is never exposed by the family API**. Each child's starter item instances
+have distinct stable `ITEM_...` IDs. A child cannot list, equip or even infer
+the existence of another child's Character or Equipment. Game and Director
+renderers should pass the server-supplied `runtime` payload through the shared
+CreatorPlayRuntime; clients must not fabricate ownership or stats.
