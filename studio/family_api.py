@@ -54,6 +54,8 @@ class FamilyCharacterCreate(BaseModel):
 SESSION_TTL_SECONDS = 1800
 PARENT_FAILURE_WINDOW_SECONDS = 60
 PARENT_FAILURE_LIMIT = 5
+CAST_GRANT_TTL_SECONDS = 900
+CAST_GRANT_LIMIT = 16
 
 
 class FamilyApplication:
@@ -100,6 +102,7 @@ class FamilyApplication:
         # Only token SHA-256 digests are retained on the server, not raw tokens.
         self._sessions: dict[str, tuple[str, float]] = {}
         self._parent_failures: list[float] = []
+        self._cast_grants: dict[str, tuple[str, str, str, float]] = {}
 
     @staticmethod
     def _valid_origin(origin: str) -> bool:
