@@ -211,6 +211,12 @@ jobs:
           set -euo pipefail
           "$GODOT_BINARY" --headless --path godot --script res://tests/family_parent_movie_review_smoke.gd
 
+      - name: Smoke-test child private MP4 two-tap Save and account memory isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GODOT_BINARY" --headless --path godot --script res://tests/family_private_movie_download_smoke.gd
+
       - name: Export Web release
         shell: bash
         run: |
