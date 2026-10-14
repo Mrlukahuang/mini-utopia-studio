@@ -28,6 +28,18 @@
 
 ## 条目
 
+### A-008 v1 精选 CC0 KayKit 素材和中文字体可直接入库
+- 状态：APPROVED（项目负责人于 2026-10-15 聊天批准）
+- 日期：2026-10-15
+- 提出者：人类（项目负责人）
+- 变更内容：允许把**精选**的 CC0 KayKit 正式素材直接提交到仓库，让 Godot Web 构建真正包含角色模型、Rig_Medium 骨骼及其必要动画、武器/装备；同时允许入库 **1 套**中文字体（Noto Sans SC 子集或 ZCOOL KuaiLe，依 `docs/MINI_UTOPIA_BRAND_CANON_V1.md` 确定），设为 Godot 全局主题字体。此范围的新增素材文件**合计不得超过 40 MB**，只能选 v1 闭环实际用到的内容，必须从官方 KayKit 发布取得原始素材，不能整包复制。
+- 来源和许可：CC0 KayKit 素材需在现有 `godot/THIRD_PARTY_NOTICES.md` 逐项注明来源、官方发布链接和 CC0 许可；中文字体须核实单独许可并准确标注（不能错误宣称 OFL 字体是 CC0）。不得引入版权、商标或再分发条款不明的文件。
+- 实施顺序：本周 `V1-W1-03` 家长提出的真机阻断问题按 5 个独立 PR 顺序修复：① 中文字体全局生效；② Character Creator iPad 横屏布局，1180×820 与 1366×1024，动画按钮不挡 3D 且每个触控区 ≥44pt；③ 精选 KayKit 角色/动画/装备入库并验证 Web 导出包含所需资源；④ Creator 及游戏使用 KayKit Rig_Medium、动作与手部装备插槽，素材缺失才回退占位；⑤ 已有家长 Child A/B 会话进入 Creator 后仍可直接保存和开始游戏。每个 PR 只解决一项阻断问题，不能提前标记 iPad 真机验收通过。
+- 可见验证：每个 UI 相关 PR 都必须在 CI 使用 Playwright 打开真实 Godot Web 构建，以 1180×820 和 1366×1024 截图，并将可查看的截图证据链接在 PR 中；只要出现中文方框、按钮文字重叠或动画按钮挡住 3D 角色，就不得认定通过。修改 `.github/workflows/` 仍须遵守 `AGENTS.md §9.2` 的治理文件人工合并规则。
+- 影响：`godot/project.godot` 的主题字体、Creator 相关 Godot UI、所选官方 KayKit 资源、`godot/THIRD_PARTY_NOTICES.md`、`docs/V1_PLAN.md` W1 真机问题记录及 Godot Web 构建/截图验收。不变更引擎、数据库、视频渲染、角色合同与 provider。
+- 原因：2026-10-15 真机截图中中文成为方框、Creator 动画控件遮住 3D，真实模型没有随 Web 产物入包，登录后 Creator 的 Play/Save 显示不可用，已阻断两个孩子在 iPad 上的 v1 试玩闭环。
+- 不改会怎样：只通过逻辑 smoke test 的 Web 构建仍可能在真机上出现乱码、占位模型和无法保存角色，不能满足 `V1-W1-01/02/03` 和 v1 孩子可玩验收。
+
 ### A-006 家庭 MacBook 无域名、仅局域网 HTTPS 部署（V1-W1-01）
 - 状态：APPROVED（项目负责人于 2026-10-15 聊天批准）
 - 日期：2026-10-15
