@@ -37,6 +37,10 @@ var elapsed_seconds := 0.0
 var duration_seconds := 0.0
 var animation_intent := "idle"
 var playing := false
+var subtitle_layer: CanvasLayer
+var subtitle_panel: PanelContainer
+var subtitle_label: Label
+
 
 
 func load_default_session() -> Dictionary:
@@ -56,6 +60,7 @@ func configure(runtime_payload: Dictionary) -> void:
     _apply_shot_blocking()
     _build_camera()
     _load_performance_cues()
+    _build_preset_subtitle()
 
     var raw_play = payload.get("play_session", {})
     var play_payload: Dictionary = (
@@ -238,6 +243,7 @@ func advance_shot(delta: float) -> void:
             delta, second_velocity, true, false
         )
     _apply_camera_at_ratio(progress_ratio())
+    _update_preset_subtitle()
 
     if elapsed_seconds >= duration_seconds:
         if (
@@ -282,12 +288,56 @@ func reset_shot() -> void:
             0.0, Vector3.ZERO, true, false
         )
     _apply_camera_at_ratio(0.0)
+    _update_preset_subtitle()
 
 
 func progress_ratio() -> float:
     if duration_seconds <= 0.0:
         return 0.0
     return clampf(elapsed_seconds / duration_seconds, 0.0, 1.0)
+
+
+func _build_preset_subtitle() -> void:
+    var choices = payload.get("child_director_choices", {})
+    if typeof(choices) != TYPE_DICTIONARY:
+        return
+    var preset_id := String(choices.get("caption_preset", "none"))
+    var safe_text := MiniUtopiaFamilyDirectorSession.caption_text(preset_id)
+    if safe_text.is_empty():
+        return
+    # Shared in-world runtime: both live iPad preview and headless frame
+    # capture draw this same fixed caption. Never display story notes here.
+    subtitle_layer = CanvasLayer.new()
+    subtitle_layer.name = "FamilySubtitleLayer"
+    subtitle_layer.layer = 2
+    add_child(subtitle_layer)
+    subtitle_panel = PanelContainer.new()
+    subtitle_panel.name = "SafePresetSubtitlePanel"
+    subtitle_panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+    subtitle_panel.offset_left = 130.0
+    subtitle_panel.offset_right = -130.0
+    subtitle_panel.offset_top = -108.0
+    subtitle_panel.offset_bottom = -30.0
+    subtitle_layer.add_child(subtitle_panel)
+    subtitle_label = Label.new()
+    subtitle_label.name = "SafePresetSubtitleLabel"
+    subtitle_label.text = safe_text
+    subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    subtitle_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+    subtitle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    subtitle_label.add_theme_font_size_override("font_size", 27)
+    subtitle_panel.add_child(subtitle_label)
+    _update_preset_subtitle()
+
+
+func _update_preset_subtitle() -> void:
+    if subtitle_panel == null:
+        return
+    # A single predictable subtitle beat within either 15s or 30s shot.
+    subtitle_panel.visible = (
+        elapsed_seconds >= duration_seconds * 0.16
+        and elapsed_seconds < duration_seconds * 0.60
+    )
 
 
 func _clear_stage() -> void:
@@ -300,6 +350,9 @@ func _clear_stage() -> void:
     second_blocking_end = Vector3.ZERO
     second_blocking_has_path = false
     camera = null
+    subtitle_layer = null
+    subtitle_panel = null
+    subtitle_label = null
     play_runtime = null
     world_context = null
     bound_world_instance = null
