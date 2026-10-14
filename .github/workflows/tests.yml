@@ -540,12 +540,15 @@ jobs:
           python3 - <<'PY'
           import hashlib
           import json
+          import subprocess
           import tempfile
           from pathlib import Path
 
           from studio.family_api import FamilyApplication
           from studio.family_movie_media import approved_fingerprint, media_path
-          from studio.family_private_movie_worker import render_private_movie
+          from studio.family_render_queue import (
+              PrivateFamilyRenderQueue, PrivateRenderQueueError,
+          )
           from studio.repositories.sqlite import SQLiteStudioRepository
 
           # Only synthetic children, actors, draft and MP4 are used here.
@@ -608,6 +611,13 @@ jobs:
               }
               release_uri = "/family/movie-releases"
               download_uri = f"/family/films/{film_id}/download"
+              queue = PrivateFamilyRenderQueue(db)
+              try:
+                  queue.enqueue(owner="child_a", film_id=film_id, fps=2)
+              except PrivateRenderQueueError:
+                  pass
+              else:
+                  raise AssertionError("Private queue accepted an unapproved film")
               assert api("POST", release_uri, {**choice, "decision": "release"},
                          token=adult).status == 409
               review = api("POST", "/family/film-reviews", {
@@ -621,21 +631,51 @@ jobs:
                   app.repository, owner="child_a", film_id=film_id
               )
               assert fp and len(fp) == 64
-              output = media_path(
-                  store, owner="child_a", film_id=film_id,
-                  fingerprint=fp, create_dirs=True
-              )
+              try:
+                  queue.enqueue(owner="child_b", film_id=film_id, fps=2)
+              except PrivateRenderQueueError:
+                  pass
+              else:
+                  raise AssertionError("Sibling may not enqueue another child's film")
+              job = queue.enqueue(owner="child_a", film_id=film_id, fps=2)
+              assert job["status"] == "queued"
+              assert job["fingerprint"] == fp
+              assert queue.enqueue(
+                  owner="child_a", film_id=film_id, fps=2
+              )["job_id"] == job["job_id"], "Queue requests must be idempotent"
+              assert queue.list_jobs(owner="child_b") == []
+              assert app.private_mp4_for_download(
+                  authorization="Bearer " + ca, film_id=film_id, origin=origin
+              ) is None
 
-              result = render_private_movie(
-                  db_path=db, project_dir=Path("godot"),
-                  film_id=film_id, owner="child_a", output_path=output,
+              # This calls the REAL isolated Godot/Xvfb/FFmpeg renderer through
+              # SQLite's adult-only queue, not a stub or direct worker shortcut.
+              result = queue.run_one(
+                  project_dir=Path("godot"), store_root=store,
                   godot="/tmp/godot/Godot_v4.7.2-stable_linux.x86_64",
                   ffmpeg="ffmpeg", ffprobe="ffprobe", xvfb_run="xvfb-run",
-                  fps=2,
               )
-              assert result["duration_seconds"] == 15
+              assert result and result["status"] == "completed"
+              assert result["job_id"] == job["job_id"]
+              assert result["attempts"] == 1
+              assert queue.run_one(
+                  project_dir=Path("godot"), store_root=store,
+              ) is None, "Completed private render may not rerun automatically"
+              restarted_queue = PrivateFamilyRenderQueue(db)
+              assert restarted_queue.list_jobs(owner="child_a")[0]["status"] == "completed"
+              assert restarted_queue.claim_one() is None
+
+              output = media_path(
+                  store, owner="child_a", film_id=film_id, fingerprint=fp,
+              )
               assert output.is_file() and output.stat().st_mode & 0o077 == 0
-              assert result["bytes"] > 256
+              assert output.stat().st_size > 256
+              duration = subprocess.run(
+                  ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                   "-of", "default=noprint_wrappers=1:nokey=1", str(output)],
+                  check=True, capture_output=True, text=True,
+              )
+              assert abs(float(duration.stdout.strip()) - 15) < 0.6
               assert app.private_mp4_for_download(
                   authorization="Bearer " + ca, film_id=film_id, origin=origin
               ) is None, "Adult must release AFTER seeing encoded MP4"
@@ -663,6 +703,7 @@ jobs:
                   authorization="Bearer " + ca, film_id=film_id, origin=origin
               ) is None
               assert not Path("godot/runtime_state/private-film.mp4").exists()
-              print("private_film_full_chain: PASS · parent approve → real "
-                    "synthetic MP4 → release → owner download → revoke")
+              print("private_film_queued_chain: PASS · parent approve → SQLite "
+                    "single-worker claim → real synthetic MP4 → parent "
+                    "release → owner download → revoke")
           PY
