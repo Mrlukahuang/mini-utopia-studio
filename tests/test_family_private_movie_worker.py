@@ -162,7 +162,7 @@ def test_parent_revocation_mid_render_cannot_publish_completed_mp4(tmp_path):
                 for n in range(30):
                     (folder / f"frame_{n:05d}.png").write_bytes(b"PNG")
         if argv[0] == "ffmpeg":
-            Path(argv[-1]).write_bytes(b"\\x00\\x00\\x00\\x18ftypisom" + b"0" * 512)
+            Path(argv[-1]).write_bytes(b"\x00\x00\x00\x18ftypisom" + b"0" * 512)
         if argv[0] == "ffprobe":
             # A parent has revoked access before the render finishes.
             revoked = decide_private_film_review(
@@ -171,7 +171,7 @@ def test_parent_revocation_mid_render_cannot_publish_completed_mp4(tmp_path):
             )
             assert revoked["approved_for_private_render"] is False
         return subprocess.CompletedProcess(
-            argv, 0, stdout="15.0\\n" if argv[0] == "ffprobe" else ""
+            argv, 0, stdout="15.0\n" if argv[0] == "ffprobe" else ""
         )
 
     with pytest.raises(PrivateMovieError, match="changed during rendering"):
@@ -205,10 +205,10 @@ def test_oversized_render_is_rejected_before_private_release(tmp_path):
                     (folder / f"frame_{n:05d}.png").write_bytes(b"PNG")
         if argv[0] == "ffmpeg":
             with Path(argv[-1]).open("wb") as movie:
-                movie.write(b"\\x00\\x00\\x00\\x18ftypisom")
+                movie.write(b"\x00\x00\x00\x18ftypisom")
                 movie.truncate(32 * 1024 * 1024 + 1)
         return subprocess.CompletedProcess(
-            argv, 0, stdout="15.0\\n" if argv[0] == "ffprobe" else ""
+            argv, 0, stdout="15.0\n" if argv[0] == "ffprobe" else ""
         )
 
     with pytest.raises(PrivateMovieError, match="32 MiB"):
