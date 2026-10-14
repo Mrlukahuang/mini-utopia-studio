@@ -17,6 +17,8 @@ from the unauthenticated desktop-only `studio.bridge.server`.
 | PUT | `/characters/{CHAR_ID}` | Revision-checked update through existing Character Core contract |
 | GET | `/characters/{CHAR_ID}/equipment` | Nine slots and the current child's own inventory / runtime |
 | PUT | `/characters/{CHAR_ID}/equipment/{slot}` | Equip or unequip the current child's item, using `{"item_instance_id": "ITEM_..."}` or `null` |
+| POST | `/family/sessions` | One-time parent unlock credential exchange: `{"profile_id":"child_a"}` or `child_b`; returns a 30-minute child-scoped bearer token |
+| DELETE | `/family/sessions/current` | Revokes the caller's current short-lived child session |
 | OPTIONS | any | Strict, origin-scoped Web preflight |
 
 Every non-OPTIONS request requires `Authorization: Bearer <child-token>`.
@@ -81,3 +83,38 @@ have distinct stable `ITEM_...` IDs. A child cannot list, equip or even infer
 the existence of another child's Character or Equipment. Game and Director
 renderers should pass the server-supplied `runtime` payload through the shared
 CreatorPlayRuntime; clients must not fabricate ownership or stats.
+
+## Parent-approved child sessions (FAMILY-02c)
+
+The child-facing My Heroes screen now asks the **parent** for a private API
+HTTPS URL, the child profile (A or B), and a parent-only unlock secret. Its
+`POST /family/sessions` exchange receives a **random 30-minute** child access
+token. The parent secret is discarded immediately by the Godot form; the
+session token lives only in runtime memory, expires server-side and is never
+written to JavaScript/PCK/Git, URLs, localStorage or Godot files.
+
+Parent setup requires one **independently generated, 32+ byte random secret**
+kept outside Git, with only its SHA-256 digest in
+`FAMILY_PARENT_UNLOCK_SHA256` on the private Python server. Generate it with
+`python -c "import secrets; print(secrets.token_urlsafe(32))"`; compute its
+hash in private using the local digest procedure above. Configure it in
+the secret manager of the private HTTPS host. Never paste actual keys into
+GitHub issues, pull requests, CI logs, docs, or chat.
+
+Security properties: auth over configured HTTPS only; explicit child profile
+selected by the parent; each child gets separately scoped Character and
+Equipment permissions; rate limit after five invalid parent unlock attempts
+per minute (application process); 30-minute server-side expiry; digest-only
+server session table (at most 32 concurrent tokens per process); best-effort
+revocation when the parent disconnects. Parent access is never sent as an
+ongoing child bearer token.
+
+**Deployment limitations:** this in-process session table is for one
+private server process. Production hosting must route all requests to one
+process or replace the temporary in-memory store with a securely shared,
+expiring session backend. Restart invalidates all issued sessions. TLS
+termination, authenticated parent provisioning, persistent data/backups,
+public child safety, secure secrets management and remote rate limiting are
+required before family release. Legacy SHA-hashed child bearer credentials
+are retained for private desktop migration/testing and must not be issued
+to children's browsers.
