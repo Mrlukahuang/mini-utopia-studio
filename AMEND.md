@@ -28,6 +28,16 @@
 
 ## 条目
 
+### A-006 家庭 MacBook 无域名、仅局域网 HTTPS 部署（V1-W1-01）
+- 状态：PROPOSED
+- 日期：2026-10-15
+- 提出者：GPT（根据项目负责人的 MacBook Air 15-inch M5／无域名／仅家庭 Wi-Fi 要求）
+- 变更内容：提议把 V1-W1-01 的“公网域名 + Caddy 公网证书”部署方式，针对家庭试用改为 **方案 A：MacBook Air 上的 Caddy 内部 CA（`tls internal`）+ 固定私网 IPv4 地址 + iPad/Mac 显式信任该家庭 CA**。Godot Web、Python Core + SQLite、家长审核与 Godot/FFmpeg 成片技术栈不变。HTTPS 同源加载游戏和 API；不购买域名、不对公网开放、不设置路由器端口转发。只允许批准的家庭 LAN 接口提供访问，家长必须单独确认 LAN 端口开放、证书安装、密钥初始化及任何付费操作。
+- 原因：当前家庭没有域名，只在家中同一 Wi-Fi 使用；计划 W2 的 iPad Safari 录音需要可信 HTTPS 安全上下文及麦克风许可，不能以普通 `http://192.168.x.x` 替代。
+- 影响：V1-W1-01 的部署步骤；获批后预计仅调整现有 `deploy/family/Caddyfile`、`deploy/family/compose.yaml`、`deploy/family/.env.example`、`deploy/family/README.md` 及现有部署检查中强制公网域名的假设（具体文件修改仍要先提交对应任务计划并逐项授权）。需给 MacBook 在路由器分配固定私网地址，限制 Docker 端口仅绑定批准的家庭 LAN IP，建立并持久保存 Caddy CA，向家庭自有 iPad 和 Mac 安装**仅根证书公钥**并显式信任，验证 Safari 无证书警告、同源登录及 `isSecureContext` / 录音授权；真实私有电影和密钥仍不得进入 GitHub。MacBook 须插电、保持开机且不自动睡眠；真机渲染对 Apple Silicon M5 的兼容性需单独验收。
+- 备选方案（尚未批准）：**方案 B：Tailscale Serve + 自动可信的 `*.ts.net` HTTPS**；不用购买个人域名，也不用在家用路由器做公网端口转发或在 iPad 安装自建根 CA，但需要 Tailscale 账户、Mac/iPad 安装客户端、MagicDNS、HTTPS 证书和授权；设备名可能公开在证书透明度日志中，并且 tailnet 连接有可能在外网使用，与“严格仅家庭 Wi-Fi”不是同一约束。方案 B **不得因本条获批而自动执行**；如改选 B，必须另外提出具体 AMEND、获人类批准后才可实施，且不得开启 Funnel。
+- 不改会怎样：现有 `FAMILY_DOMAIN`、Caddy 公网 DNS/证书及离线预检都假设真实域名，现有 Compose 还默认映射主机所有接口的 80/443；直接按原部署说明无法满足无域名、仅家庭 LAN、iPad 可信 HTTPS 和后续浏览器录音要求。V1-W1-01 继续保持未完成，直到人类批准方案并在真 iPad 上验收。
+
 ### A-004 Pixal3D 仅限非公开使用
 - 状态：APPROVED
 - 日期：2026-10-15
