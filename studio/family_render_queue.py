@@ -151,28 +151,41 @@ class PrivateFamilyRenderQueue:
                 raise
 
     def claim_one(self) -> dict | None:
-        """BEGIN IMMEDIATE serializes claims across private worker processes."""
-        with self._connect() as conn:
-            conn.execute("BEGIN IMMEDIATE")
-            try:
-                # A crashed worker does not allow another movie to start:
-                # the adult must diagnose/reset, rather than auto-spend.
-                busy = conn.execute(
-                    "SELECT 1 FROM private_family_render_queue WHERE status='running' LIMIT 1"
+        """One SQLite write transaction makes exactly one claim globally.
+
+        Read/validate canonical Character/Equipment before obtaining the
+        queue write lock: that validation can lazily seed equipment in the
+        main SQLite database, so running it inside BEGIN IMMEDIATE deadlocks.
+        The worker independently rechecks approval at start and finish.
+        """
+        while True:
+            with self._connect() as read:
+                candidate = read.execute(
+                    """SELECT * FROM private_family_render_queue
+                       WHERE status='queued'
+                       ORDER BY created_at,job_id LIMIT 1"""
                 ).fetchone()
-                if busy:
-                    conn.execute("COMMIT")
-                    return None
-                while True:
+            if candidate is None:
+                return None
+            current = self._approved(candidate["owner"], candidate["film_id"])
+            with self._connect() as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                try:
+                    busy = conn.execute(
+                        "SELECT 1 FROM private_family_render_queue "
+                        "WHERE status='running' LIMIT 1"
+                    ).fetchone()
+                    if busy:
+                        conn.execute("COMMIT")
+                        return None
                     row = conn.execute(
                         """SELECT * FROM private_family_render_queue
-                           WHERE status='queued'
-                           ORDER BY created_at, job_id LIMIT 1"""
+                           WHERE job_id=? AND status='queued'""",
+                        (candidate["job_id"],),
                     ).fetchone()
                     if row is None:
                         conn.execute("COMMIT")
-                        return None
-                    current = self._approved(row["owner"], row["film_id"])
+                        continue  # Claimed by another worker in the meantime.
                     if current != (row["revision"], row["fingerprint"]):
                         conn.execute(
                             """UPDATE private_family_render_queue
@@ -180,6 +193,7 @@ class PrivateFamilyRenderQueue:
                                    updated_at=? WHERE job_id=?""",
                             (time.time(), row["job_id"]),
                         )
+                        conn.execute("COMMIT")
                         continue
                     conn.execute(
                         """UPDATE private_family_render_queue
@@ -193,11 +207,17 @@ class PrivateFamilyRenderQueue:
                     ).fetchone()
                     conn.execute("COMMIT")
                     return self._record(fresh)
-            except Exception:
-                conn.execute("ROLLBACK")
-                raise
+                except Exception:
+                    conn.execute("ROLLBACK")
+                    raise
 
     def _finish(self, job: dict, state: str, code: str = "") -> dict:
+        # Avoid deadlocking on lazy canonical Equipment writes while holding
+        # a queue transaction. Download release always checks approval again.
+        if state == "completed" and self._approved(
+            job["owner"], job["film_id"]
+        ) != (job["revision"], job["fingerprint"]):
+            state, code = "blocked", "approval_changed"
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
@@ -207,10 +227,6 @@ class PrivateFamilyRenderQueue:
                 ).fetchone()
                 if row is None or row["status"] != "running":
                     raise PrivateRenderQueueError("Job no longer held by private worker")
-                if state == "completed" and self._approved(
-                    job["owner"], job["film_id"]
-                ) != (job["revision"], job["fingerprint"]):
-                    state, code = "blocked", "approval_changed"
                 conn.execute(
                     """UPDATE private_family_render_queue
                        SET status=?,error_code=?,updated_at=?
@@ -315,6 +331,14 @@ class PrivateFamilyRenderQueue:
 
     def retry_failed(self, job_id: str) -> dict:
         """At most two paid/local attempts and only with fresh parent approval."""
+        with self._connect() as read:
+            candidate = read.execute(
+                "SELECT * FROM private_family_render_queue WHERE job_id=?",
+                (job_id,),
+            ).fetchone()
+        if candidate is None:
+            raise PrivateRenderQueueError("Unknown private render job")
+        current = self._approved(candidate["owner"], candidate["film_id"])
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
@@ -325,8 +349,7 @@ class PrivateFamilyRenderQueue:
                 if (
                     row is None or row["status"] not in ("failed", "blocked")
                     or row["attempts"] >= MAX_ATTEMPTS
-                    or self._approved(row["owner"], row["film_id"])
-                    != (row["revision"], row["fingerprint"])
+                    or current != (row["revision"], row["fingerprint"])
                 ):
                     raise PrivateRenderQueueError(
                         "Retry requires unchanged adult approval and remaining attempts"
