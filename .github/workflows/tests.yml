@@ -509,7 +509,8 @@ jobs:
           assert request["fps"] == 1
           assert film["duration_seconds"] == 30.0
           assert film["child_director_choices"] == {
-              "action": "celebrate", "camera": "close", "duration_seconds": 30
+              "action": "celebrate", "camera": "close", "duration_seconds": 30,
+              "caption_preset": "none",
           }
           assert film["camera"]["fov"] == 39.0
           assert film["shot"]["blocking"]["movement_style"] == "hold"
