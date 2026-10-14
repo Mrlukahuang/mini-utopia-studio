@@ -17,6 +17,13 @@ var _active_kind := ""
 
 
 func _ready() -> void:
+    # Desktop development may reach the local Bridge. A browser must never
+    # attempt to connect to the viewer's 127.0.0.1; remote family service
+    # provisioning is intentionally a separate authenticated step.
+    if OS.has_feature("web"):
+        configure(String(ProjectSettings.get_setting(
+            "mini_utopia/family_api_base_url", ""
+        )))
     _request = HTTPRequest.new()
     _request.name = "HTTPRequest"
     _request.timeout = 5.0
@@ -25,10 +32,13 @@ func _ready() -> void:
 
 
 func configure(url: String) -> void:
-    var cleaned := url.strip_edges()
-    if cleaned.ends_with("/"):
-        cleaned = cleaned.left(cleaned.length() - 1)
-    base_url = cleaned if not cleaned.is_empty() else DEFAULT_BASE_URL
+    base_url = MiniUtopiaBridgeEndpointPolicy.normalize(
+        url, OS.has_feature("web")
+    )
+
+
+func is_configured() -> bool:
+    return MiniUtopiaBridgeEndpointPolicy.is_configured(base_url)
 
 
 func is_busy() -> bool:
@@ -91,7 +101,7 @@ func _start_request(
     method: HTTPClient.Method,
     payload: Dictionary = {}
 ) -> int:
-    if _request == null:
+    if _request == null or not is_configured():
         return ERR_UNCONFIGURED
     if is_busy():
         return ERR_BUSY
