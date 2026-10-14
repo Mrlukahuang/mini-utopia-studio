@@ -324,7 +324,196 @@ func _refresh_characters() -> void:
         _set_status("Could not start loading Heroes.", true)
 
 
+func _clear_movie_list() -> void:
+    if movie_list == null:
+        return
+    for child in movie_list.get_children():
+        movie_list.remove_child(child)
+        child.queue_free()
+
+
+func _cancel_movie_restore() -> void:
+    _movie_restore.clear()
+    _movie_phase = ""
+    _movie_cast_id = ""
+
+
+func _refresh_films() -> void:
+    if not bridge.has_family_session() or bridge.is_busy():
+        _set_status("Unlock your private account to see My Movies.", true)
+        return
+    if not _movie_phase.is_empty():
+        return
+    var error := bridge.list_family_films()
+    if error != OK:
+        _set_status("My Movies could not be loaded.", true)
+    else:
+        _set_status("Finding your private saved movies…", false)
+
+
+func _on_saved_movie_pressed(film_id: String) -> void:
+    if (
+        not bridge.has_family_session()
+        or bridge.is_busy()
+        or not _movie_phase.is_empty()
+        or not film_id.begins_with("FILM_")
+        or film_id.contains("/")
+    ):
+        _set_status("Finish the current request before reopening a movie.", true)
+        return
+    _cancel_movie_restore()
+    _movie_restore["requested_id"] = film_id
+    _movie_phase = "film"
+    var error := bridge.get_family_film(film_id)
+    if error != OK:
+        _movie_restore_failed("Could not reopen this private movie.")
+        return
+    _set_status("Checking saved film and fetching its original cast…", false)
+
+
+func _movie_restore_failed(message: String) -> void:
+    _cancel_movie_restore()
+    var family := _family_state()
+    if family != null:
+        family.clear_selection()
+    _refresh_cast_button()
+    _set_status(message, true)
+
+
+func _request_movie_cast(character_id: String, stage: String) -> void:
+    if not character_id.begins_with("CHAR_") or "/" in character_id:
+        _movie_restore_failed("Saved movie has an invalid actor.")
+        return
+    _movie_cast_id = character_id
+    _movie_phase = stage + "_character"
+    if bridge.get_character(character_id) != OK:
+        _movie_restore_failed("Could not verify saved film actor.")
+
+
+func _request_movie_gear(stage: String) -> void:
+    _movie_phase = stage + "_equipment"
+    if bridge.get_equipment(_movie_cast_id) != OK:
+        _movie_restore_failed("Could not fetch actor's own wardrobe.")
+
+
+func _finish_movie_restore() -> void:
+    var family := _family_state()
+    if family == null or not family.restore_owned_film(
+        _movie_restore.get("record", {})
+    ):
+        _movie_restore_failed("This saved film no longer has an authorized cast.")
+        return
+    _cancel_movie_restore()
+    Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+    get_tree().change_scene_to_file("res://scenes/director_stage.tscn")
+
+
+func _consume_movie_restore(kind: String, payload: Dictionary) -> bool:
+    if _movie_phase.is_empty():
+        return false
+    var family := _family_state()
+    if family == null or not bridge.has_family_session():
+        _movie_restore_failed("Unlock your private child account again.")
+        return true
+
+    if _movie_phase == "film" and kind == "films:get":
+        var draft = payload.get("draft", {})
+        if (
+            String(payload.get("film_id", "")) != String(
+                _movie_restore.get("requested_id", "")
+            )
+            or String(payload.get("revision", "")).is_empty()
+            or typeof(draft) != TYPE_DICTIONARY
+            or not String(draft.get("character_id", "")).begins_with("CHAR_")
+        ):
+            _movie_restore_failed("Private movie data was not verified.")
+            return true
+        _movie_restore["record"] = payload.duplicate(true)
+        family.clear_selection()
+        _request_movie_cast(String(draft["character_id"]), "primary")
+        return true
+
+    if kind == "character:get" and _movie_phase in [
+        "primary_character", "second_character"
+    ]:
+        if (
+            String(payload.get("character_id", "")) != _movie_cast_id
+            or not (
+                family.select_character(payload)
+                if _movie_phase == "primary_character"
+                else family.select_second_cast_character(payload)
+            )
+        ):
+            _movie_restore_failed("Saved actor is missing or not privately owned.")
+            return true
+        var which := "primary" if _movie_phase == "primary_character" else "second"
+        _request_movie_gear(which)
+        return true
+
+    if kind == "equipment:get" and _movie_phase in [
+        "primary_equipment", "second_equipment"
+    ]:
+        var gear = payload.get("runtime", {})
+        if (
+            typeof(gear) != TYPE_DICTIONARY
+            or String(gear.get("character_asset_id", "")) != _movie_cast_id
+            or not (
+                family.select_equipment(gear)
+                if _movie_phase == "primary_equipment"
+                else family.select_second_cast_equipment(gear)
+            )
+        ):
+            _movie_restore_failed("Actor clothes or props could not be verified.")
+            return true
+        if _movie_phase == "primary_equipment":
+            var draft: Dictionary = _movie_restore["record"]["draft"]
+            var raw_second = draft.get("second_character_id", null)
+            var second := String(raw_second) if typeof(raw_second) == TYPE_STRING else ""
+            if not second.is_empty():
+                if second == _movie_cast_id:
+                    _movie_restore_failed("Film cannot cast the same actor twice.")
+                    return true
+                _request_movie_cast(second, "second")
+                return true
+        _finish_movie_restore()
+        return true
+
+    return false
+
+
 func _on_bridge_success(kind: String, payload: Dictionary) -> void:
+    if kind == "films:list":
+        _clear_movie_list()
+        var films = payload.get("films", [])
+        if (
+            not bridge.has_family_session()
+            or String(payload.get("schema_version", "")) != "1.0"
+            or typeof(films) != TYPE_ARRAY
+        ):
+            _set_status("Private movie list could not be verified.", true)
+            return
+        var heading := Label.new()
+        heading.text = "🎞 My Movies / 我的电影"
+        heading.add_theme_font_size_override("font_size", 23)
+        movie_list.add_child(heading)
+        for entry in films:
+            if typeof(entry) != TYPE_DICTIONARY:
+                continue
+            var id := String(entry.get("film_id", ""))
+            var draft = entry.get("draft", {})
+            if not id.begins_with("FILM_") or typeof(draft) != TYPE_DICTIONARY:
+                continue
+            var button := Button.new()
+            button.name = "Film_" + id
+            button.text = "🎬 " + String(draft.get("display_name", "My Film")) + " · Continue"
+            button.custom_minimum_size.y = 62
+            button.add_theme_font_size_override("font_size", 18)
+            button.pressed.connect(_on_saved_movie_pressed.bind(id))
+            movie_list.add_child(button)
+        _set_status(str(films.size()) + " private movie(s) saved.", false)
+        return
+    if _consume_movie_restore(kind, payload):
+        return
     if kind == "family:session":
         connect_button.disabled = false
         var family := _family_state()
@@ -544,6 +733,15 @@ func _clear_hero_list() -> void:
 
 
 func _on_bridge_failure(kind: String, status_code: int, _code: String, _message: String) -> void:
+    if kind == "films:list":
+        _clear_movie_list()
+        _set_status("Your private movies could not be loaded.", true)
+        return
+    if not _movie_phase.is_empty() and kind in [
+        "films:get", "character:get", "equipment:get"
+    ]:
+        _movie_restore_failed("Saved movie or private actor cannot be reopened.")
+        return
     if kind in ["family:cast-approve", "family:cast-revoke"]:
         share_submit.disabled = false
         share_revoke.disabled = false
@@ -751,6 +949,7 @@ func _on_new_pressed() -> void:
 
 
 func _on_disconnect_pressed() -> void:
+    _cancel_movie_restore()
     _reset_cast_request()
     # Proactively revoke the short-lived server token when safe to do so;
     # local disconnect ALWAYS clears memory even if offline or busy.
