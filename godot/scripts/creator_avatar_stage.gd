@@ -32,6 +32,8 @@ var _appearance: Dictionary = DEFAULT_APPEARANCE.duplicate(true)
 var _equipment_runtime: Dictionary = {"equipped": {}}
 var _dragging := false
 var _last_mouse_position := Vector2.ZERO
+# Screen touches use independent finger IDs: one finger rotates, two zoom.
+var _touch_positions: Dictionary = {}
 var _camera_distance := 6.2
 var _preview_animation := "Idle"
 var _preview_time := 0.0
@@ -515,7 +517,44 @@ func _apply_preview_pose() -> void:
 
 
 func _on_gui_input(event: InputEvent) -> void:
+    if event is InputEventScreenTouch:
+        var touch := event as InputEventScreenTouch
+        if touch.pressed:
+            _touch_positions[touch.index] = touch.position
+        else:
+            _touch_positions.erase(touch.index)
+        # Do not inherit a desktop mouse drag when switching to touch.
+        _dragging = false
+        accept_event()
+        return
+
+    if event is InputEventScreenDrag:
+        var drag := event as InputEventScreenDrag
+        if not _touch_positions.has(drag.index):
+            return
+        if _touch_positions.size() == 1:
+            _touch_positions[drag.index] = drag.position
+            if _avatar_root != null:
+                _avatar_root.rotate_y(-drag.relative.x * 0.012)
+        elif _touch_positions.size() == 2:
+            var previous_distance := _pinch_distance()
+            _touch_positions[drag.index] = drag.position
+            var new_distance := _pinch_distance()
+            if previous_distance > 0.0 and new_distance > 0.0:
+                # Spreading fingers zooms in; bringing them together zooms out.
+                _camera_distance = clampf(
+                    _camera_distance - (new_distance - previous_distance) * 0.014,
+                    4.3,
+                    8.4
+                )
+                _update_camera_distance()
+        accept_event()
+        return
+
     if event is InputEventMouseButton:
+        # Safari can synthesize mouse events after touch; never rotate twice.
+        if DisplayServer.is_touchscreen_available() or not _touch_positions.is_empty():
+            return
         var mouse_button := event as InputEventMouseButton
         if mouse_button.button_index == MOUSE_BUTTON_LEFT:
             _dragging = mouse_button.pressed
@@ -534,12 +573,23 @@ func _on_gui_input(event: InputEvent) -> void:
             zoom_out()
             accept_event()
 
-    elif event is InputEventMouseMotion and _dragging:
+    elif event is InputEventMouseMotion and _dragging and _touch_positions.is_empty():
         var motion := event as InputEventMouseMotion
         var delta := motion.position - _last_mouse_position
         _last_mouse_position = motion.position
         _avatar_root.rotate_y(-delta.x * 0.012)
         accept_event()
+
+
+func _pinch_distance() -> float:
+    if _touch_positions.size() != 2:
+        return 0.0
+    var points := _touch_positions.values()
+    return (points[0] as Vector2).distance_to(points[1] as Vector2)
+
+
+func active_touch_count() -> int:
+    return _touch_positions.size()
 
 
 func _update_camera_distance() -> void:
