@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Callable
 
 from studio.family_film_render import build_family_film_render_source
+from studio.family_movie_review import current_review_state
 from studio.repositories.sqlite import SQLiteStudioRepository
 
 
@@ -88,11 +89,19 @@ def render_private_movie(
     output = _private_output_path(project, Path(output_path))
     if not Path(db_path).is_file():
         raise PrivateMovieError("Family database does not exist")
-    source = build_family_film_render_source(
-        SQLiteStudioRepository(Path(db_path)), owner=owner, film_id=film_id
+    repository = SQLiteStudioRepository(Path(db_path))
+    review = current_review_state(
+        repository, owner=owner, film_id=film_id
     )
-    if source is None:
+    if review is None:
         raise PrivateMovieError("Film or one of its actors is not currently owned")
+    if not review["approved_for_private_render"]:
+        raise PrivateMovieError("Current film and outfits require explicit parent approval")
+    source = build_family_film_render_source(
+        repository, owner=owner, film_id=film_id
+    )
+    if source is None or source["source_revision"] != review["revision"]:
+        raise PrivateMovieError("Film or owned render inputs changed after review")
     seconds = int(source["director_choices"]["duration_seconds"])
     if seconds not in (15, 30):
         raise PrivateMovieError("Invalid family film duration")
