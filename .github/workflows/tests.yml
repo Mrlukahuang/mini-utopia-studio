@@ -582,6 +582,12 @@ jobs:
               )
               assert saved.status == 201, saved.status
               film_id = saved.payload["film_id"]
+              from studio.family_movie_review import decide_private_film_review
+              review = decide_private_film_review(
+                  app.repository, owner="child_a", film_id=film_id,
+                  revision=saved.payload["revision"], decision="approve"
+              )
+              assert review["approved_for_private_render"]
               folder = temp / "private-out"
               folder.mkdir(mode=0o700)
               output = folder / "synthetic-episode.mp4"
