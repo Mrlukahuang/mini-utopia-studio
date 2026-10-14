@@ -535,75 +535,134 @@ jobs:
           print("two_heroes_edited_30s: PASS real MP4, same cast and hand-crafted prop")
           PY
 
-      - name: Smoke-test isolated private MP4 worker with synthetic family database
+      - name: End-to-end verified synthetic parent-review to private MP4 delivery
         run: |
           python3 - <<'PY'
           import hashlib
+          import json
           import tempfile
           from pathlib import Path
 
           from studio.family_api import FamilyApplication
+          from studio.family_movie_media import approved_fingerprint, media_path
           from studio.family_private_movie_worker import render_private_movie
           from studio.repositories.sqlite import SQLiteStudioRepository
 
-          # Entire database and 15-second movie are synthetic, never real
-          # household data. Exercise the real Godot/Xvfb/FFmpeg worker.
+          # Only synthetic children, actors, draft and MP4 are used here.
+          # Test real Godot 4.7.2/Xvfb/FFmpeg in a private /tmp tree.
           with tempfile.TemporaryDirectory(prefix="ci-fake-family-", dir="/tmp") as temp:
-              temp = Path(temp)
-              db = temp / "synthetic.db"
+              base = Path(temp)
+              db = base / "synthetic.db"
+              store = base / "private-movies"
+              store.mkdir(mode=0o700)
+              adult = "ci_synthetic_parent_unlock_0123456789abcdef"
+              ca = "ci-synthetic-child-a"
+              cb = "ci-synthetic-child-b"
+              origin = "https://family.example"
               app = FamilyApplication(
                   SQLiteStudioRepository(db),
                   token_hashes={
-                      "child_a": hashlib.sha256(b"synthetic-a").hexdigest(),
-                      "child_b": hashlib.sha256(b"synthetic-b").hexdigest(),
+                      "child_a": hashlib.sha256(ca.encode()).hexdigest(),
+                      "child_b": hashlib.sha256(cb.encode()).hexdigest(),
                   },
-                  allowed_origins=("https://family.example",),
+                  parent_unlock_hash=hashlib.sha256(adult.encode()).hexdigest(),
+                  allowed_origins=(origin,),
+                  private_movie_root=store,
               )
-              auth = "Bearer synthetic-a"
-              first = app.handle(
-                  method="POST", path="/characters",
-                  authorization=auth, origin="https://family.example",
-                  body=b'{"display_name":"CI Synthetic Cloud Sheep"}',
-              )
-              assert first.status == 201, first.status
-              cid = first.payload["character_id"]
-              import json
-              draft = {
+
+              def api(method, path, payload=None, token=ca):
+                  return app.handle(
+                      method=method, path=path,
+                      authorization="Bearer " + token, origin=origin,
+                      body=json.dumps(payload).encode() if payload is not None else b"",
+                  )
+
+              hero = api("POST", "/characters", {
+                  "display_name": "Synthetic Cloud Sheep"
+              })
+              assert hero.status == 201
+              cid = hero.payload["character_id"]
+              prop = api("POST", f"/characters/{cid}/crafted-props", {
                   "schema_version": "1.0",
-                  "display_name": "CI Synthetic Cloud Story",
-                  "character_id": cid,
-                  "camera": "wide", "action": "walk",
+                  "display_name": "Synthetic Mint Star",
+                  "shape": "star", "slot": "weapon_main",
+                  "color_hex": "#B9E7D0", "accent_color_hex": "#F2C75C",
+              })
+              assert prop.status == 201
+              item_id = prop.payload["crafted"]["item_instance_id"]
+              assert api("PUT", f"/characters/{cid}/equipment/weapon_main", {
+                  "item_instance_id": item_id
+              }).status == 200
+
+              draft = {
+                  "schema_version": "1.0", "display_name": "Synthetic Cloud Story",
+                  "character_id": cid, "camera": "wide", "action": "walk",
                   "duration_seconds": 15,
               }
-              saved = app.handle(
-                  method="POST", path="/family/films",
-                  authorization=auth, origin="https://family.example",
-                  body=json.dumps(draft).encode(),
-              )
-              assert saved.status == 201, saved.status
+              saved = api("POST", "/family/films", draft)
+              assert saved.status == 201
               film_id = saved.payload["film_id"]
-              from studio.family_movie_review import decide_private_film_review
-              review = decide_private_film_review(
-                  app.repository, owner="child_a", film_id=film_id,
-                  revision=saved.payload["revision"], decision="approve"
+              choice = {
+                  "profile_id": "child_a", "film_id": film_id,
+                  "revision": saved.payload["revision"],
+              }
+              release_uri = "/family/movie-releases"
+              download_uri = f"/family/films/{film_id}/download"
+              assert api("POST", release_uri, {**choice, "decision": "release"},
+                         token=adult).status == 409
+              review = api("POST", "/family/film-reviews", {
+                  **choice, "decision": "approve"
+              }, token=adult)
+              assert review.status == 200
+              assert review.payload["approved_for_private_render"] is True
+              assert api("POST", release_uri, {**choice, "decision": "release"},
+                         token=adult).status == 409
+              fp = approved_fingerprint(
+                  app.repository, owner="child_a", film_id=film_id
               )
-              assert review["approved_for_private_render"]
-              folder = temp / "private-out"
-              folder.mkdir(mode=0o700)
-              output = folder / "synthetic-episode.mp4"
+              assert fp and len(fp) == 64
+              output = media_path(
+                  store, owner="child_a", film_id=film_id,
+                  fingerprint=fp, create_dirs=True
+              )
+
               result = render_private_movie(
-                  db_path=db,
-                  project_dir=Path("godot"),
-                  film_id=film_id, owner="child_a",
-                  output_path=output,
+                  db_path=db, project_dir=Path("godot"),
+                  film_id=film_id, owner="child_a", output_path=output,
                   godot="/tmp/godot/Godot_v4.7.2-stable_linux.x86_64",
-                  ffmpeg="ffmpeg", ffprobe="ffprobe",
-                  xvfb_run="xvfb-run", fps=2,
+                  ffmpeg="ffmpeg", ffprobe="ffprobe", xvfb_run="xvfb-run",
+                  fps=2,
               )
-              assert result["film_id"] == film_id
               assert result["duration_seconds"] == 15
+              assert output.is_file() and output.stat().st_mode & 0o077 == 0
               assert result["bytes"] > 256
-              assert output.is_file()
+              assert app.private_mp4_for_download(
+                  authorization="Bearer " + ca, film_id=film_id, origin=origin
+              ) is None, "Adult must release AFTER seeing encoded MP4"
+
+              released = api("POST", release_uri, {
+                  **choice, "decision": "release"
+              }, token=adult)
+              assert released.status == 200
+              assert released.payload["released_to_child"] is True
+              actual = app.private_mp4_for_download(
+                  authorization="Bearer " + ca, film_id=film_id, origin=origin
+              )
+              assert actual == output.read_bytes()
+              assert actual[4:8] == b"ftyp"
+              assert app.private_mp4_for_download(
+                  authorization="Bearer " + cb, film_id=film_id, origin=origin
+              ) is None
+
+              revoked = api("POST", release_uri, {
+                  **choice, "decision": "revoke"
+              }, token=adult)
+              assert revoked.status == 200
+              assert revoked.payload["released_to_child"] is False
+              assert app.private_mp4_for_download(
+                  authorization="Bearer " + ca, film_id=film_id, origin=origin
+              ) is None
               assert not Path("godot/runtime_state/private-film.mp4").exists()
-              print("synthetic_private_worker_e2e: PASS · real 15s MP4, isolated")
+              print("private_film_full_chain: PASS · parent approve → real "
+                    "synthetic MP4 → release → owner download → revoke")
           PY
