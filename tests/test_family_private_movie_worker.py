@@ -7,6 +7,7 @@ import pytest
 
 from studio.family_api import FamilyApplication
 from studio.family_private_movie_worker import PrivateMovieError, render_private_movie
+from studio.family_movie_review import decide_private_film_review
 from studio.repositories.sqlite import SQLiteStudioRepository
 
 
@@ -42,6 +43,12 @@ def fixture_film(tmp_path):
         "private_story_note": "This is a private idea, not public CI content",
     })
     assert saved.status == 201
+    approval = decide_private_film_review(
+        api.repository, owner="child_a",
+        film_id=saved.payload["film_id"],
+        revision=saved.payload["revision"], decision="approve",
+    )
+    assert approval["approved_for_private_render"]
     repo = tmp_path / "fake_checkout"
     project = repo / "godot"
     project.mkdir(parents=True)
