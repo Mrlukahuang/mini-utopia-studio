@@ -12,14 +12,24 @@ var target: Node3D
 
 func _ready() -> void:
     target = get_node(target_path)
-    Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+    Input.mouse_mode = (Input.MOUSE_MODE_VISIBLE if DisplayServer.is_touchscreen_available() else Input.MOUSE_MODE_CAPTURED)
 
 func _unhandled_input(event: InputEvent) -> void:
+    if event is InputEventScreenDrag:
+        # D-pad/buttons consume their own touches; drag on the free right half
+        # rotates the camera without needing a mouse or cursor capture.
+        var drag := event as InputEventScreenDrag
+        if drag.position.x >= get_viewport().get_visible_rect().size.x * 0.42:
+            yaw -= drag.screen_relative.x * mouse_sensitivity
+            pitch -= drag.screen_relative.y * mouse_sensitivity
+            pitch = clamp(pitch, deg_to_rad(-60.0), deg_to_rad(12.0))
+        return
+
     if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
         yaw -= event.relative.x * mouse_sensitivity
         pitch -= event.relative.y * mouse_sensitivity
         pitch = clamp(pitch, deg_to_rad(-60.0), deg_to_rad(12.0))
-    elif event is InputEventMouseButton and event.pressed:
+    elif event is InputEventMouseButton and event.pressed and not DisplayServer.is_touchscreen_available():
         Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
     elif event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
         Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
