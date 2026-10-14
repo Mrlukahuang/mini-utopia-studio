@@ -397,6 +397,42 @@ class FamilyApplication:
             return BridgeResponse(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
 
         route = urlsplit(path).path
+        if route == "/family/films":
+            if method == "GET":
+                films = [
+                    film_contract(asset)
+                    for asset in self.repository.list_assets(AssetType.FILM)
+                    if asset.metadata.get("family_owner") == owner
+                    and asset.status != ReviewStatus.ARCHIVED
+                    and "family_film_draft" in asset.metadata
+                ]
+                return BridgeResponse(HTTPStatus.OK, {
+                    "schema_version": "1.0", "films": films,
+                })
+            if method != "POST":
+                return BridgeResponse(HTTPStatus.METHOD_NOT_ALLOWED, {
+                    "error": "method_not_allowed",
+                })
+            try:
+                draft = FamilyFilmDraft.model_validate(json.loads(body))
+            except (ValueError, UnicodeError, ValidationError):
+                return BridgeResponse(HTTPStatus.BAD_REQUEST, {
+                    "error": "invalid_film_draft",
+                })
+            if not cast_is_owned(self.repository, owner, draft):
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            with self._session_lock:
+                count = sum(
+                    1 for asset in self.repository.list_assets(AssetType.FILM)
+                    if asset.metadata.get("family_owner") == owner
+                )
+                if count >= 20:
+                    return BridgeResponse(HTTPStatus.CONFLICT, {
+                        "error": "film_draft_limit",
+                    })
+                saved = save_film_draft(self.repository, owner, draft)
+            return BridgeResponse(HTTPStatus.CREATED, saved)
+
         if route == "/family/cast-guests":
             if method != "GET":
                 return BridgeResponse(HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"})
