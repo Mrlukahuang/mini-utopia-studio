@@ -13,6 +13,9 @@ import hmac
 import json
 import os
 import re
+import secrets
+import threading
+import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Literal, Mapping
@@ -48,6 +51,11 @@ class FamilyCharacterCreate(BaseModel):
         return name
 
 
+SESSION_TTL_SECONDS = 1800
+PARENT_FAILURE_WINDOW_SECONDS = 60
+PARENT_FAILURE_LIMIT = 5
+
+
 class FamilyApplication:
     """Family owner isolation applies before any repository read or write.
 
@@ -61,6 +69,7 @@ class FamilyApplication:
         *,
         token_hashes: Mapping[str, str],
         allowed_origins: tuple[str, ...],
+        parent_unlock_hash: str | None = None,
     ) -> None:
         if len(token_hashes) < 2:
             raise ValueError("At least two separately authenticated profiles required")
@@ -76,10 +85,21 @@ class FamilyApplication:
         ):
             raise ValueError("Explicit HTTPS (or loopback dev) origins are required")
 
+        if parent_unlock_hash is not None and re.fullmatch(
+            r"[0-9a-fA-F]{64}", parent_unlock_hash
+        ) is None:
+            raise ValueError("Parent unlock must be a server-held SHA-256 hex digest")
         self.repository = repository
         self.reader = CharacterBridgeReader(repository)
         self.token_hashes = dict(token_hashes)
         self.allowed_origins = frozenset(allowed_origins)
+        self.parent_unlock_hash = (
+            parent_unlock_hash.lower() if parent_unlock_hash else None
+        )
+        self._session_lock = threading.RLock()
+        # Only token SHA-256 digests are retained on the server, not raw tokens.
+        self._sessions: dict[str, tuple[str, float]] = {}
+        self._parent_failures: list[float] = []
 
     @staticmethod
     def _valid_origin(origin: str) -> bool:
@@ -109,7 +129,98 @@ class FamilyApplication:
         for profile, digest in self.token_hashes.items():
             if hmac.compare_digest(calculated, digest.lower()):
                 match = profile
-        return match
+        if match is not None:
+            return match
+        now = time.monotonic()
+        with self._session_lock:
+            record = self._sessions.get(calculated)
+            if record is None:
+                return None
+            owner, expires_at = record
+            if expires_at <= now:
+                del self._sessions[calculated]
+                return None
+            return owner
+
+    def _issue_child_session(self, authorization: str, body: bytes) -> BridgeResponse:
+        if self.parent_unlock_hash is None:
+            return BridgeResponse(
+                HTTPStatus.SERVICE_UNAVAILABLE, {"error": "parent_login_not_configured"}
+            )
+        now = time.monotonic()
+        with self._session_lock:
+            self._parent_failures = [
+                value for value in self._parent_failures
+                if now - value < PARENT_FAILURE_WINDOW_SECONDS
+            ]
+            if len(self._parent_failures) >= PARENT_FAILURE_LIMIT:
+                return BridgeResponse(
+                    HTTPStatus.TOO_MANY_REQUESTS, {"error": "parent_login_rate_limited"}
+                )
+
+        prefix = "Bearer "
+        secret = authorization[len(prefix):] if authorization.startswith(prefix) else ""
+        digest = hashlib.sha256(secret.encode("utf-8")).hexdigest()
+        # The parent secret is used only for this exchange and never becomes
+        # a child API token or part of the returned session.
+        if not secret or len(secret) > 512 or not hmac.compare_digest(
+            digest, self.parent_unlock_hash
+        ):
+            with self._session_lock:
+                self._parent_failures.append(now)
+            return BridgeResponse(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
+
+        try:
+            requested = json.loads(body)
+        except (UnicodeError, ValueError):
+            return BridgeResponse(
+                HTTPStatus.BAD_REQUEST, {"error": "invalid_profile_selection"}
+            )
+        if (
+            not isinstance(requested, dict)
+            or set(requested) != {"profile_id"}
+            or not isinstance(requested["profile_id"], str)
+            or requested["profile_id"] not in self.token_hashes
+        ):
+            return BridgeResponse(
+                HTTPStatus.BAD_REQUEST, {"error": "invalid_profile_selection"}
+            )
+
+        token = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        with self._session_lock:
+            self._sessions = {
+                key: item for key, item in self._sessions.items()
+                if item[1] > now
+            }
+            # Bounded session table even if a parent repeatedly signs in.
+            if len(self._sessions) >= 32:
+                oldest = min(self._sessions, key=lambda key: self._sessions[key][1])
+                del self._sessions[oldest]
+            self._sessions[token_hash] = (
+                requested["profile_id"], now + SESSION_TTL_SECONDS
+            )
+
+        return BridgeResponse(HTTPStatus.CREATED, {
+            "schema_version": "1.0",
+            "access_token": token,
+            "token_type": "Bearer",
+            "expires_in_seconds": SESSION_TTL_SECONDS,
+            "profile_id": requested["profile_id"],
+        })
+
+    def _revoke_child_session(self, authorization: str) -> BridgeResponse:
+        if self.authenticate(authorization) is None:
+            return BridgeResponse(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
+        secret = authorization[len("Bearer "):]
+        digest = hashlib.sha256(secret.encode("utf-8")).hexdigest()
+        with self._session_lock:
+            if digest not in self._sessions:
+                return BridgeResponse(
+                    HTTPStatus.FORBIDDEN, {"error": "only_ephemeral_sessions_revocable"}
+                )
+            del self._sessions[digest]
+        return BridgeResponse(HTTPStatus.NO_CONTENT, {})
 
     def handle(
         self,
@@ -125,6 +236,16 @@ class FamilyApplication:
 
         if method == "OPTIONS":
             return BridgeResponse(HTTPStatus.NO_CONTENT, {})
+
+        route = urlsplit(path).path
+        if route == "/family/sessions":
+            if method != "POST":
+                return BridgeResponse(
+                    HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"}
+                )
+            return self._issue_child_session(authorization, body)
+        if route == "/family/sessions/current" and method == "DELETE":
+            return self._revoke_child_session(authorization)
 
         owner = self.authenticate(authorization)
         if owner is None:
@@ -281,6 +402,9 @@ def build_family_server(
         def do_PUT(self) -> None:  # noqa: N802
             self._respond("PUT")
 
+        def do_DELETE(self) -> None:  # noqa: N802
+            self._respond("DELETE")
+
         def _respond(self, method: str) -> None:
             try:
                 size = int(self.headers.get("Content-Length", "0"))
@@ -317,7 +441,7 @@ def build_family_server(
             if origin in application.allowed_origins:
                 self.send_header("Access-Control-Allow-Origin", origin)
                 self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
-                self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
+                self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
             self.end_headers()
             if method != "OPTIONS":
                 self.wfile.write(payload)
@@ -354,6 +478,7 @@ def main() -> None:
         build_context(get_settings()).repository,
         token_hashes=hashes,
         allowed_origins=origins,
+        parent_unlock_hash=os.environ.get("FAMILY_PARENT_UNLOCK_SHA256") or None,
     )
     server = build_family_server(app, port=args.port)
     print("Private family API listening on loopback; TLS proxy required for Web")

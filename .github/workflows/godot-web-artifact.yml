@@ -157,6 +157,12 @@ jobs:
           set -euo pipefail
           "$GODOT_BINARY" --headless --path godot --script res://tests/family_hero_library_smoke.gd
 
+      - name: Smoke-test parent-approved short child sessions
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GODOT_BINARY" --headless --path godot --script res://tests/family_parent_short_session_smoke.gd
+
       - name: Export Web release
         shell: bash
         run: |
