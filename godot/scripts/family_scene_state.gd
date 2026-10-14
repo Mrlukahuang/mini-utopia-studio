@@ -8,6 +8,8 @@ extends Node
 
 var active_character: Dictionary = {}
 var active_equipment: Dictionary = {}
+var second_cast_character: Dictionary = {}
+var second_cast_equipment: Dictionary = {}
 var pending_character_id := ""
 var _family_api_url := ""
 var _family_token := ""
@@ -77,6 +79,8 @@ func select_character(contract: Dictionary) -> bool:
     active_character = contract.duplicate(true)
     # Never carry one child's clothes into another child's newly selected Hero.
     active_equipment.clear()
+    # A new primary Hero may not keep an old or identical supporting actor.
+    clear_second_cast()
     return true
 
 
@@ -94,6 +98,54 @@ func select_equipment(runtime: Dictionary) -> bool:
     return true
 
 
+## Called only after a second GET /characters/{id} succeeded under the
+## current child's bearer token. The server, not this client, enforces owner.
+func select_second_cast_character(contract: Dictionary) -> bool:
+    var current := String(active_character.get("character_id", ""))
+    var candidate := String(contract.get("character_id", ""))
+    if (
+        not has_family_connection()
+        or current.is_empty()
+        or candidate.is_empty()
+        or current == candidate
+        or MiniUtopiaFamilyCharacterPlayAdapter.play_session_for(contract).is_empty()
+    ):
+        return false
+    second_cast_character = contract.duplicate(true)
+    second_cast_equipment.clear()
+    return true
+
+
+func select_second_cast_equipment(runtime: Dictionary) -> bool:
+    if (
+        second_cast_character.is_empty()
+        or String(runtime.get("character_asset_id", "")) != String(
+            second_cast_character.get("character_id", "")
+        )
+        or typeof(runtime.get("equipped", null)) != TYPE_DICTIONARY
+        or typeof(runtime.get("final_stats", null)) != TYPE_DICTIONARY
+    ):
+        return false
+    second_cast_equipment = runtime.duplicate(true)
+    return true
+
+
+func second_cast_play_session() -> Dictionary:
+    if second_cast_character.is_empty() or second_cast_equipment.is_empty():
+        return {}
+    var result := MiniUtopiaFamilyCharacterPlayAdapter.play_session_for(
+        second_cast_character
+    )
+    if not result.is_empty():
+        result["equipment"] = second_cast_equipment.duplicate(true)
+    return result
+
+
+func clear_second_cast() -> void:
+    second_cast_character.clear()
+    second_cast_equipment.clear()
+
+
 func active_play_session() -> Dictionary:
     var play := MiniUtopiaFamilyCharacterPlayAdapter.play_session_for(
         active_character
@@ -106,3 +158,4 @@ func active_play_session() -> Dictionary:
 func clear_selection() -> void:
     active_character.clear()
     active_equipment.clear()
+    clear_second_cast()
