@@ -1,0 +1,63 @@
+name: Mini Utopia - Private Family Deploy Package
+
+on:
+  pull_request:
+    paths:
+      - "deploy/family/**"
+      - ".dockerignore"
+      - "studio/family_api.py"
+      - "studio/family_backup.py"
+      - ".github/workflows/family-private-deploy-check.yml"
+  push:
+    branches: [main]
+    paths:
+      - "deploy/family/**"
+      - ".dockerignore"
+      - "studio/family_api.py"
+      - "studio/family_backup.py"
+      - ".github/workflows/family-private-deploy-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  private-api-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate private host Compose definition with fake hashes only
+        env:
+          FAMILY_DOMAIN: family.example.test
+          FAMILY_PARENT_UNLOCK_SHA256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          FAMILY_CHILD_A_TOKEN_SHA256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+          FAMILY_CHILD_B_TOKEN_SHA256: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+        run: |
+          docker compose -f deploy/family/compose.yaml config --quiet
+
+      - name: Build minimal Python family API image
+        run: |
+          docker build -f deploy/family/Dockerfile -t mini-utopia-family-api:ci .
+
+      - name: Import isolated server and run without Streamlit or AI packages
+        run: |
+          docker run --rm mini-utopia-family-api:ci python -c "
+          from studio.family_api import FamilyApplication, build_family_server;
+          from studio.repositories.sqlite import SQLiteStudioRepository;
+          from pathlib import Path;
+          import tempfile, hashlib;
+          with tempfile.TemporaryDirectory() as temp:
+              app = FamilyApplication(
+                  SQLiteStudioRepository(Path(temp)/'db.sqlite'),
+                  token_hashes={
+                      'child_a': hashlib.sha256(b'fake-a').hexdigest(),
+                      'child_b': hashlib.sha256(b'fake-b').hexdigest(),
+                  },
+                  allowed_origins=('https://family.example.test',),
+                  parent_unlock_hash=hashlib.sha256(b'fake-parent').hexdigest()
+              )
+              server = build_family_server(app, port=0)
+              server.server_close()
+          "
