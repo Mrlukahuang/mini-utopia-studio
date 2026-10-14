@@ -534,3 +534,70 @@ jobs:
           assert 29.5 <= seconds <= 30.5, seconds
           print("two_heroes_edited_30s: PASS real MP4, same cast and hand-crafted prop")
           PY
+
+      - name: Smoke-test isolated private MP4 worker with synthetic family database
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import tempfile
+          from pathlib import Path
+
+          from studio.family_api import FamilyApplication
+          from studio.family_private_movie_worker import render_private_movie
+          from studio.repositories.sqlite import SQLiteStudioRepository
+
+          # Entire database and 15-second movie are synthetic, never real
+          # household data. Exercise the real Godot/Xvfb/FFmpeg worker.
+          with tempfile.TemporaryDirectory(prefix="ci-fake-family-", dir="/tmp") as temp:
+              temp = Path(temp)
+              db = temp / "synthetic.db"
+              app = FamilyApplication(
+                  SQLiteStudioRepository(db),
+                  token_hashes={
+                      "child_a": hashlib.sha256(b"synthetic-a").hexdigest(),
+                      "child_b": hashlib.sha256(b"synthetic-b").hexdigest(),
+                  },
+                  allowed_origins=("https://family.example",),
+              )
+              auth = "Bearer synthetic-a"
+              first = app.handle(
+                  method="POST", path="/characters",
+                  authorization=auth, origin="https://family.example",
+                  body=b'{"display_name":"CI Synthetic Cloud Sheep"}',
+              )
+              assert first.status == 201, first.status
+              cid = first.payload["character_id"]
+              import json
+              draft = {
+                  "schema_version": "1.0",
+                  "display_name": "CI Synthetic Cloud Story",
+                  "character_id": cid,
+                  "camera": "wide", "action": "walk",
+                  "duration_seconds": 15,
+              }
+              saved = app.handle(
+                  method="POST", path="/family/films",
+                  authorization=auth, origin="https://family.example",
+                  body=json.dumps(draft).encode(),
+              )
+              assert saved.status == 201, saved.status
+              film_id = saved.payload["film_id"]
+              folder = temp / "private-out"
+              folder.mkdir(mode=0o700)
+              output = folder / "synthetic-episode.mp4"
+              result = render_private_movie(
+                  db_path=db,
+                  project_dir=Path("godot"),
+                  film_id=film_id, owner="child_a",
+                  output_path=output,
+                  godot="/tmp/godot/Godot_v4.7.2-stable_linux.x86_64",
+                  ffmpeg="ffmpeg", ffprobe="ffprobe",
+                  xvfb_run="xvfb-run", fps=2,
+              )
+              assert result["film_id"] == film_id
+              assert result["duration_seconds"] == 15
+              assert result["bytes"] > 256
+              assert output.is_file()
+              assert not Path("godot/runtime_state/private-film.mp4").exists()
+              print("synthetic_private_worker_e2e: PASS · real 15s MP4, isolated")
+          PY
