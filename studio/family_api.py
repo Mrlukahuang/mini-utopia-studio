@@ -145,7 +145,7 @@ class FamilyApplication:
                 return None
             return owner
 
-    def _issue_child_session(self, authorization: str, body: bytes) -> BridgeResponse:
+    def _require_parent(self, authorization: str) -> BridgeResponse | None:
         if self.parent_unlock_hash is None:
             return BridgeResponse(
                 HTTPStatus.SERVICE_UNAVAILABLE, {"error": "parent_login_not_configured"}
@@ -172,6 +172,13 @@ class FamilyApplication:
             with self._session_lock:
                 self._parent_failures.append(now)
             return BridgeResponse(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
+
+        return None
+
+    def _issue_child_session(self, authorization: str, body: bytes) -> BridgeResponse:
+        denied = self._require_parent(authorization)
+        if denied is not None:
+            return denied
 
         try:
             requested = json.loads(body)
