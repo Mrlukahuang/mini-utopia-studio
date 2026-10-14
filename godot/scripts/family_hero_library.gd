@@ -20,6 +20,15 @@ var refresh_button: Button
 var logout_button: Button
 var shoot_button: Button
 var _pending_cast_character_id := ""
+var _pending_guest_grant_id := ""
+var _share_character_id := ""
+var _active_grant_id := ""
+var _last_shared_character_id := ""
+var adult_share_panel: VBoxContainer
+var share_secret_input: LineEdit
+var share_submit: Button
+var share_revoke: Button
+var guests_refresh_button: Button
 
 
 func _ready() -> void:
@@ -90,6 +99,14 @@ func _build_ui() -> void:
     toolbar.add_theme_constant_override("separation", 10)
     column.add_child(toolbar)
 
+    guests_refresh_button = Button.new()
+    guests_refresh_button.name = "RefreshParentApprovedGuests"
+    guests_refresh_button.text = "🎬 Find parent-approved guest actors"
+    guests_refresh_button.custom_minimum_size.y = 52
+    guests_refresh_button.disabled = true
+    guests_refresh_button.pressed.connect(_refresh_approved_guests)
+    column.add_child(guests_refresh_button)
+
     new_button = Button.new()
     new_button.name = "NewHeroButton"
     new_button.text = "＋ New Hero"
@@ -125,6 +142,41 @@ func _build_ui() -> void:
     logout_button.custom_minimum_size = Vector2(210, 52)
     logout_button.pressed.connect(_on_disconnect_pressed)
     toolbar.add_child(logout_button)
+
+    adult_share_panel = VBoxContainer.new()
+    adult_share_panel.name = "ParentFilmConsent"
+    adult_share_panel.visible = false
+    adult_share_panel.add_theme_constant_override("separation", 8)
+    column.add_child(adult_share_panel)
+
+    var consent_text := Label.new()
+    consent_text.name = "ConsentMessage"
+    consent_text.text = "Parent approval · share this actor with sibling for 15 minutes"
+    consent_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    adult_share_panel.add_child(consent_text)
+
+    share_secret_input = LineEdit.new()
+    share_secret_input.name = "ParentConsentSecret"
+    share_secret_input.secret = true
+    share_secret_input.max_length = 256
+    share_secret_input.custom_minimum_size.y = 48
+    share_secret_input.placeholder_text = "Parent-only unlock (one time)"
+    adult_share_panel.add_child(share_secret_input)
+
+    share_submit = Button.new()
+    share_submit.name = "ApproveShareButton"
+    share_submit.text = "Parent: Approve 15-minute guest role"
+    share_submit.custom_minimum_size.y = 52
+    share_submit.pressed.connect(_on_parent_share_submit)
+    adult_share_panel.add_child(share_submit)
+
+    share_revoke = Button.new()
+    share_revoke.name = "RevokeShareButton"
+    share_revoke.text = "Parent: Revoke this guest permission"
+    share_revoke.custom_minimum_size.y = 52
+    share_revoke.visible = false
+    share_revoke.pressed.connect(_on_parent_revoke_submit)
+    adult_share_panel.add_child(share_revoke)
 
     connection_panel = VBoxContainer.new()
     connection_panel.name = "ParentConnection"
@@ -187,8 +239,15 @@ func _set_connected(connected: bool) -> void:
     logout_button.disabled = not connected
     refresh_button.disabled = not connected
     new_button.disabled = not connected
+    guests_refresh_button.disabled = not connected
     if not connected:
         shoot_button.disabled = true
+        adult_share_panel.visible = false
+        share_secret_input.clear()
+        _share_character_id = ""
+        _active_grant_id = ""
+        _last_shared_character_id = ""
+        _pending_guest_grant_id = ""
         _pending_cast_character_id = ""
     else:
         _refresh_cast_button()
@@ -254,7 +313,7 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             and profile == _pending_profile_id
             and expires > 0
             and expires <= 1800
-            and family.connect_family(bridge.base_url, issued_token)
+            and family.connect_family(bridge.base_url, issued_token, profile)
         )
         issued_token = ""
         _pending_profile_id = ""
@@ -268,6 +327,86 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         api_input.clear()
         _set_connected(true)
         _refresh_characters()
+        return
+
+    if kind in ["family:cast-approve", "family:cast-revoke"]:
+        share_submit.disabled = false
+        share_revoke.disabled = false
+        if kind == "family:cast-approve":
+            var grant := String(payload.get("grant_id", ""))
+            if not grant.begins_with("CAST_"):
+                _set_status("Parent approval response was not valid.", true)
+                return
+            _active_grant_id = grant
+            _last_shared_character_id = _share_character_id
+            share_revoke.visible = true
+            _set_status("Parent approved this Hero for sibling's film (15 min).", false)
+        else:
+            _active_grant_id = ""
+            _last_shared_character_id = ""
+            share_revoke.visible = false
+            _set_status("Parent revoked guest filming permission.", false)
+        return
+
+    if kind == "castguests:list":
+        if not bridge.has_family_session():
+            return
+        var approved = payload.get("guests", [])
+        if typeof(approved) != TYPE_ARRAY:
+            _set_status("Approved guest list could not be read.", true)
+            return
+        for old_button in hero_list.get_children():
+            if String(old_button.name).begins_with("Guest_"):
+                hero_list.remove_child(old_button)
+                old_button.queue_free()
+        for raw_guest in approved:
+            if typeof(raw_guest) != TYPE_DICTIONARY:
+                continue
+            var grant_id := String(raw_guest.get("grant_id", ""))
+            if not grant_id.begins_with("CAST_"):
+                continue
+            var guest := Button.new()
+            guest.name = "Guest_" + grant_id
+            guest.text = (
+                "🎬 Parent-approved guest: "
+                + String(raw_guest.get("display_name", "Guest Hero"))
+            )
+            guest.custom_minimum_size.y = 58
+            guest.pressed.connect(_on_guest_pressed.bind(grant_id))
+            hero_list.add_child(guest)
+        _set_status(
+            str(approved.size()) + " guest actor permission(s) available.",
+            false
+        )
+        return
+
+    if kind == "castguests:get":
+        var family := _family_state()
+        if (
+            family == null
+            or not bridge.has_family_session()
+            or _pending_guest_grant_id.is_empty()
+            or String(payload.get("grant_id", "")) != _pending_guest_grant_id
+        ):
+            _pending_guest_grant_id = ""
+            return
+        _pending_guest_grant_id = ""
+        var character = payload.get("character", {})
+        var runtime = payload.get("equipment_runtime", {})
+        var accepted := (
+            typeof(character) == TYPE_DICTIONARY
+            and typeof(runtime) == TYPE_DICTIONARY
+        )
+        if accepted:
+            accepted = family.select_second_cast_character(character)
+        if accepted:
+            accepted = family.select_second_cast_equipment(runtime)
+        if not accepted:
+            family.clear_second_cast()
+            _set_status("Parent guest actor could not be verified.", true)
+        else:
+            _set_status("Approved guest is ready. Tap Film Together!", false)
+        _refresh_cast_button()
         return
 
     if kind == "character:get" and not _pending_cast_character_id.is_empty():
@@ -340,6 +479,18 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         hero_list.add_child(button)
 
         var family := _family_state()
+        if (
+            family != null
+            and family.has_family_connection()
+            and not family.current_profile_id().is_empty()
+        ):
+            var share := Button.new()
+            share.name = "Share_" + character_id
+            share.text = "👨‍👩‍👧 Parent: allow " + name + " in sibling's film"
+            share.custom_minimum_size.y = 52
+            share.pressed.connect(_on_share_candidate.bind(character_id))
+            hero_list.add_child(share)
+
         var primary := (
             String(family.active_character.get("character_id", ""))
             if family != null else ""
@@ -368,6 +519,28 @@ func _clear_hero_list() -> void:
 
 
 func _on_bridge_failure(kind: String, status_code: int, _code: String, _message: String) -> void:
+    if kind in ["family:cast-approve", "family:cast-revoke"]:
+        share_submit.disabled = false
+        share_revoke.disabled = false
+        _set_status(
+            "Parent consent was not accepted. Check approval and retry.",
+            true
+        )
+        return
+
+    if kind == "castguests:get":
+        _pending_guest_grant_id = ""
+        var family := _family_state()
+        if family != null:
+            family.clear_second_cast()
+        _refresh_cast_button()
+        _set_status("Guest approval expired or was revoked by parent.", true)
+        return
+
+    if kind == "castguests:list":
+        _set_status("Could not refresh parent-approved guest actors.", true)
+        return
+
     if kind == "family:session":
         connect_button.disabled = false
         _pending_profile_id = ""
@@ -449,6 +622,90 @@ func _on_shoot_together_pressed() -> void:
         return
     Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
     get_tree().change_scene_to_file("res://scenes/director_stage.tscn")
+
+
+func _on_share_candidate(character_id: String) -> void:
+    var family := _family_state()
+    if (
+        family == null
+        or family.current_profile_id().is_empty()
+        or not family.has_family_connection()
+    ):
+        return
+    _share_character_id = character_id
+    adult_share_panel.visible = true
+    share_revoke.visible = (
+        not _active_grant_id.is_empty()
+        and _last_shared_character_id == character_id
+    )
+    share_secret_input.clear()
+    _set_status("Parent: approve this Hero acting in sibling's film for 15 min.", false)
+
+
+func _submit_parent_share(revoke: bool) -> void:
+    var family := _family_state()
+    if (
+        family == null
+        or not family.has_family_connection()
+        or family.current_profile_id().is_empty()
+        or _share_character_id.is_empty()
+        or bridge.is_busy()
+    ):
+        _set_status("Reopen your private Hero library before approving.", true)
+        return
+    var parent_secret := share_secret_input.text.strip_edges()
+    share_secret_input.clear()
+    var source := family.current_profile_id()
+    var viewer := "child_b" if source == "child_a" else "child_a"
+    var grant := _active_grant_id if revoke else ""
+    var error := bridge.parent_cast_consent(
+        parent_secret, source, viewer, _share_character_id, grant
+    )
+    parent_secret = ""
+    if error != OK:
+        _set_status("Parent approval could not start securely.", true)
+        return
+    share_submit.disabled = true
+    share_revoke.disabled = true
+    _set_status("Checking parent approval with private server…", false)
+
+
+func _on_parent_share_submit() -> void:
+    _submit_parent_share(false)
+
+
+func _on_parent_revoke_submit() -> void:
+    if _active_grant_id.is_empty():
+        return
+    _submit_parent_share(true)
+
+
+func _refresh_approved_guests() -> void:
+    if bridge.is_busy():
+        return
+    var error := bridge.list_approved_cast_guests()
+    if error != OK:
+        _set_status("Could not check approved guest actors.", true)
+
+
+func _on_guest_pressed(grant_id: String) -> void:
+    var family := _family_state()
+    if (
+        family == null
+        or family.active_play_session().is_empty()
+        or bridge.is_busy()
+    ):
+        _set_status("First select your own saved Hero to direct the movie.", true)
+        return
+    family.clear_second_cast()
+    _refresh_cast_button()
+    _pending_guest_grant_id = grant_id
+    var error := bridge.get_approved_cast_guest(grant_id)
+    if error != OK:
+        _pending_guest_grant_id = ""
+        _set_status("Could not load approved guest actor.", true)
+    else:
+        _set_status("Checking parent's film guest approval…", false)
 
 
 func _on_hero_pressed(character_id: String) -> void:

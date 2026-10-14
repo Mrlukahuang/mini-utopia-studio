@@ -137,6 +137,75 @@ func revoke_family_session() -> int:
     )
 
 
+func list_approved_cast_guests() -> int:
+    return _start_request(
+        "castguests:list", "/family/cast-guests", HTTPClient.METHOD_GET
+    )
+
+
+func get_approved_cast_guest(grant_id: String) -> int:
+    if not grant_id.begins_with("CAST_") or "/" in grant_id:
+        return ERR_INVALID_PARAMETER
+    return _start_request(
+        "castguests:get", "/family/cast-guests/" + grant_id.uri_encode(),
+        HTTPClient.METHOD_GET
+    )
+
+
+func parent_cast_consent(
+    parent_token: String,
+    source_profile_id: String,
+    viewer_profile_id: String,
+    character_id: String,
+    revoke_grant_id: String = ""
+) -> int:
+    if _request == null or not base_url.begins_with("https://") or is_busy():
+        return ERR_UNCONFIGURED if _request == null else ERR_BUSY
+    if (
+        source_profile_id not in ["child_a", "child_b"]
+        or viewer_profile_id not in ["child_a", "child_b"]
+        or source_profile_id == viewer_profile_id
+        or not character_id.begins_with("CHAR_")
+    ):
+        return ERR_INVALID_PARAMETER
+    if parent_token.length() < 32 or parent_token.length() > 256:
+        return ERR_INVALID_PARAMETER
+    for symbol in parent_token:
+        if not TOKEN_ALPHABET.contains(symbol):
+            return ERR_INVALID_PARAMETER
+    if not revoke_grant_id.is_empty() and not revoke_grant_id.begins_with("CAST_"):
+        return ERR_INVALID_PARAMETER
+    var headers := PackedStringArray([
+        "Accept: application/json",
+        "Content-Type: application/json",
+        "Authorization: Bearer " + parent_token
+    ])
+    var method := (
+        HTTPClient.METHOD_DELETE if not revoke_grant_id.is_empty()
+        else HTTPClient.METHOD_POST
+    )
+    var path := (
+        "/family/cast-grants/" + revoke_grant_id.uri_encode()
+        if not revoke_grant_id.is_empty()
+        else "/family/cast-grants"
+    )
+    var request_data := ""
+    if method == HTTPClient.METHOD_POST:
+        request_data = JSON.stringify({
+            "viewer_profile_id": viewer_profile_id,
+            "source_profile_id": source_profile_id,
+            "character_id": character_id
+        })
+    _active_kind = (
+        "family:cast-revoke" if method == HTTPClient.METHOD_DELETE
+        else "family:cast-approve"
+    )
+    var error := _request.request(base_url + path, headers, method, request_data)
+    if error != OK:
+        _active_kind = ""
+    return error
+
+
 func list_characters() -> int:
     return _start_request(
         "characters:list",

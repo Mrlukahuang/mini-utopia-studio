@@ -175,6 +175,12 @@ jobs:
           set -euo pipefail
           "$GODOT_BINARY" --headless --path godot --script res://tests/family_cast_picker_smoke.gd
 
+      - name: Smoke-test parent film consent and approved sibling guest on iPad
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GODOT_BINARY" --headless --path godot --script res://tests/family_parent_cast_consent_smoke.gd
+
       - name: Export Web release
         shell: bash
         run: |
