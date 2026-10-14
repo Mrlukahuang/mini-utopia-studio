@@ -253,6 +253,10 @@ class PrivateFamilyRenderQueue:
         job = self.claim_one()
         if job is None:
             return None
+        # Track ownership of a new output so a failed worker does not leave
+        # a corrupt MP4 that blocks the adult's explicit retry.
+        output: Path | None = None
+        created_output = False
         try:
             if shutil.disk_usage(store_root).free < MIN_FREE_BYTES:
                 raise PrivateRenderQueueError("Insufficient private disk space")
@@ -276,6 +280,13 @@ class PrivateFamilyRenderQueue:
                     godot=godot, ffmpeg=ffmpeg, ffprobe=ffprobe,
                     xvfb_run=xvfb_run,
                 )
+                # The real renderer verifies its own output, but an alternate
+                # renderer or interrupted write must never mark a broken or
+                # world-readable file as completed in the durable queue.
+                if read_private_media(output) is None:
+                    raise PrivateRenderQueueError(
+                        "Rendered private media failed verification"
+                    )
             # If revoked during execution, remove any newly rendered bytes
             # before returning a blocked status. Never release automatically.
             result = self._finish(job, "completed")
@@ -287,6 +298,13 @@ class PrivateFamilyRenderQueue:
                 output.unlink()
             return result
         except Exception:
+            if created_output and output is not None:
+                try:
+                    output.unlink(missing_ok=True)
+                except OSError:
+                    # No child can download without an independent parental
+                    # release. Retain a safe error code for manual inspection.
+                    pass
             # Errors are deliberately reduced to a fixed code: filenames,
             # subprocess stderr, and child-authored data must never be logged.
             # Never persist arbitrary shell/Godot stderr or a child's notes.
