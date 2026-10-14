@@ -26,6 +26,9 @@ static func attach_loadout(
     avatar_root: Node3D,
     payload: Dictionary
 ) -> Dictionary:
+    # Treat each payload as the complete canonical loadout. Clear visuals from
+    # the previous payload first so unequip is visible immediately.
+    reset_loadout(avatar_root)
     var result := {}
 
     var equipped: Dictionary = payload.get("equipped", {})
@@ -122,6 +125,7 @@ static func _apply_clothing(
     if slot in [SLOT_OUTFIT, SLOT_TOP]:
         var body := avatar_root.get_node_or_null("Visual/Body") as MeshInstance3D
         if body != null:
+            _remember_clothing_material(body)
             body.material_override = _material(color)
         return
 
@@ -129,12 +133,55 @@ static func _apply_clothing(
     for node in avatar_root.find_children(pattern, "MeshInstance3D", true, false):
         var mesh_node := node as MeshInstance3D
         if mesh_node != null:
+            _remember_clothing_material(mesh_node)
             mesh_node.material_override = _material(color)
+
+
+static func reset_loadout(avatar_root: Node3D) -> void:
+    for socket_name in MiniUtopiaAvatarContract.SOCKET_NAMES:
+        var socket := avatar_root.find_child(
+            socket_name,
+            true,
+            false
+        ) as Node3D
+        if socket != null:
+            _clear_equipment_children(socket)
+
+    _restore_clothing_node(
+        avatar_root.get_node_or_null("Visual/Body") as MeshInstance3D
+    )
+    for pattern in ["Leg*", "Foot*"]:
+        for node in avatar_root.find_children(
+            pattern,
+            "MeshInstance3D",
+            true,
+            false
+        ):
+            _restore_clothing_node(node as MeshInstance3D)
+
+
+static func _restore_clothing_node(node: MeshInstance3D) -> void:
+    if node == null or not node.has_meta("mini_utopia_base_material"):
+        return
+    var stored: Variant = node.get_meta("mini_utopia_base_material")
+    if stored is Material:
+        node.material_override = (stored as Material).duplicate()
+
+
+static func _remember_clothing_material(node: MeshInstance3D) -> void:
+    if node == null or node.has_meta("mini_utopia_base_material"):
+        return
+    if node.material_override != null:
+        node.set_meta(
+            "mini_utopia_base_material",
+            node.material_override.duplicate()
+        )
 
 
 static func _clear_equipment_children(socket: Node3D) -> void:
     for child in socket.get_children():
         if _string_or_empty(child.name).begins_with("Equipment_"):
+            socket.remove_child(child)
             child.queue_free()
 
 

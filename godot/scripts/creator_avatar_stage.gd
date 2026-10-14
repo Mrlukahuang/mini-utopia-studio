@@ -29,6 +29,7 @@ var _ear_l: MeshInstance3D
 var _ear_r: MeshInstance3D
 
 var _appearance: Dictionary = DEFAULT_APPEARANCE.duplicate(true)
+var _equipment_runtime: Dictionary = {"equipped": {}}
 var _dragging := false
 var _last_mouse_position := Vector2.ZERO
 var _camera_distance := 6.2
@@ -127,10 +128,26 @@ func apply_appearance(appearance: Dictionary) -> void:
     _apply_species(String(merged.get("species_head_id", "")))
     _apply_eye_style(String(merged.get("eye_style_id", "")))
     _apply_hair(String(merged.get("hair_style_id", "")))
+    MiniUtopiaEquipmentRuntime.attach_loadout(
+        _avatar_root,
+        _equipment_runtime
+    )
 
 
 func current_appearance() -> Dictionary:
     return _appearance.duplicate(true)
+
+
+func apply_equipment_runtime(payload: Dictionary) -> Dictionary:
+    _equipment_runtime = payload.duplicate(true)
+    return MiniUtopiaEquipmentRuntime.attach_loadout(
+        _avatar_root,
+        _equipment_runtime
+    )
+
+
+func current_equipment_runtime() -> Dictionary:
+    return _equipment_runtime.duplicate(true)
 
 
 func avatar_root_instance_id() -> int:
@@ -302,6 +319,15 @@ func _build_avatar() -> void:
             Color("#BDE3F5")
         )
         _visual.add_child(leg)
+
+    for side in [-1.0, 1.0]:
+        var foot := _box(
+            "FootL" if side < 0.0 else "FootR",
+            Vector3(0.23 * side, 0.08, 0.10),
+            Vector3(0.34, 0.18, 0.52),
+            Color("#F6F1E8")
+        )
+        _visual.add_child(foot)
 
     _ear_l = _sphere(
         "EarL",
