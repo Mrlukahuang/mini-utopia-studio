@@ -39,6 +39,15 @@ func _ready() -> void:
         var family_payload := _current_family_payload()
         if not family_payload.is_empty():
             _build_child_director_controls()
+            if not selection.opened_saved_film.is_empty():
+                var reopened: Dictionary = selection.opened_saved_film
+                var draft: Dictionary = reopened.get("draft", {})
+                saved_film_id = String(reopened.get("film_id", ""))
+                saved_film_revision = String(reopened.get("revision", ""))
+                film_title_input.text = String(
+                    draft.get("display_name", "My Mini Utopia Movie")
+                )
+                film_note_input.text = String(draft.get("private_story_note", ""))
             stage_payload(family_payload)
             return
 
