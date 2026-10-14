@@ -20,6 +20,7 @@ class EquipmentRuntimeItemSpec(BaseModel):
     mesh_asset_id: str | None = None
     animation_class: str | None = None
     rolled_stats: StatBlock = Field(default_factory=StatBlock)
+    visual_recipe: dict[str, str] | None = None
 
 
 class EquipmentRuntimeSpec(BaseModel):

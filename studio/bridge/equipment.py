@@ -64,6 +64,15 @@ class EquipmentBridgeGateway:
                     "mesh_asset_id": definition.mesh_asset_id,
                     "animation_class": definition.animation_class,
                     "equipped": item.item_instance_id in equipped_ids,
+                    "visual_recipe": (
+                        crafted.metadata.get("visual_recipe")
+                        if (
+                            (crafted := self.repository.get_asset(definition.definition_id))
+                            is not None
+                            and crafted.metadata.get("family_crafted_prop") is True
+                            and crafted.metadata.get("family_owner") == self.service.owner_key
+                        ) else None
+                    ),
                 }
             )
 

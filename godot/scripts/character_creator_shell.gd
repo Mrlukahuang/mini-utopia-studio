@@ -74,6 +74,11 @@ var equipment_state: Dictionary = {}
 var _appearance_dirty := false
 var _outfit_choices: VBoxContainer
 var _outfit_mode := false
+var _craft_shape := "star"
+var _craft_slot := "accessory"
+var _craft_color := "#F7B7D2"
+var _craft_accent := "#F2C75C"
+var _craft_name_input: LineEdit
 var _draft_appearance: Dictionary = {}
 var _eye_option_ids: Array[String] = []
 var _hair_option_ids: Array[String] = []
@@ -172,6 +177,8 @@ func _refresh_outfit_choices() -> void:
         _outfit_choices.add_child(help)
         return
 
+    _build_craft_prop_panel()
+
     var slots = equipment_state.get("slots", [])
     var items = equipment_state.get("items", [])
     if typeof(slots) != TYPE_ARRAY or typeof(items) != TYPE_ARRAY:
@@ -221,6 +228,106 @@ func _refresh_outfit_choices() -> void:
                 _on_equipment_choice_pressed.bind(slot, "")
             )
             _outfit_choices.add_child(remove)
+
+
+func _build_craft_prop_panel() -> void:
+    if character_id.is_empty() or not bridge.has_family_session():
+        return
+    var section := VBoxContainer.new()
+    section.name = "MakeNewPropPanel"
+    section.add_theme_constant_override("separation", 8)
+    _outfit_choices.add_child(section)
+
+    var heading := Label.new()
+    heading.text = "✨ Create My Own Prop / 创造道具"
+    heading.add_theme_font_size_override("font_size", 21)
+    section.add_child(heading)
+
+    _craft_name_input = LineEdit.new()
+    _craft_name_input.name = "MyPropName"
+    _craft_name_input.placeholder_text = "Name your creation · 给道具取个名字"
+    _craft_name_input.max_length = 32
+    _craft_name_input.custom_minimum_size.y = 48
+    section.add_child(_craft_name_input)
+
+    var shape_option := OptionButton.new()
+    shape_option.name = "PropShape"
+    shape_option.custom_minimum_size.y = 48
+    for label in ["⭐ Star", "❤️ Heart", "⚪ Ball", "🧊 Box"]:
+        shape_option.add_item(label)
+    shape_option.selected = ["star", "heart", "sphere", "box"].find(_craft_shape)
+    shape_option.item_selected.connect(_on_craft_shape_selected)
+    section.add_child(shape_option)
+
+    var color_option := OptionButton.new()
+    color_option.name = "PropColor"
+    color_option.custom_minimum_size.y = 48
+    for label in ["Pink / 粉色", "Mint / 薄荷绿", "Blue / 天蓝", "Gold / 金色", "Purple / 紫色"]:
+        color_option.add_item(label)
+    var colors := ["#F7B7D2", "#B9E7D0", "#74B9FF", "#F2C75C", "#B79CED"]
+    color_option.selected = maxi(0, colors.find(_craft_color))
+    color_option.item_selected.connect(_on_craft_color_selected)
+    section.add_child(color_option)
+
+    var slot_option := OptionButton.new()
+    slot_option.name = "PropSlot"
+    slot_option.custom_minimum_size.y = 48
+    for label in ["✨ Accessory", "👑 Headwear", "🪄 Hand prop", "🎒 Backpack"]:
+        slot_option.add_item(label)
+    slot_option.selected = maxi(
+        0, ["accessory", "headwear", "weapon_main", "backpack"].find(_craft_slot)
+    )
+    slot_option.item_selected.connect(_on_craft_slot_selected)
+    section.add_child(slot_option)
+
+    var submit := Button.new()
+    submit.name = "CreatePropButton"
+    submit.text = "✨ Create & Save My Prop"
+    submit.custom_minimum_size.y = 58
+    submit.add_theme_font_size_override("font_size", 19)
+    submit.pressed.connect(_on_create_prop_pressed)
+    section.add_child(submit)
+
+
+func _on_craft_shape_selected(index: int) -> void:
+    _craft_shape = ["star", "heart", "sphere", "box"][index]
+
+
+func _on_craft_color_selected(index: int) -> void:
+    _craft_color = [
+        "#F7B7D2", "#B9E7D0", "#74B9FF", "#F2C75C", "#B79CED"
+    ][index]
+
+
+func _on_craft_slot_selected(index: int) -> void:
+    _craft_slot = [
+        "accessory", "headwear", "weapon_main", "backpack"
+    ][index]
+
+
+func _on_create_prop_pressed() -> void:
+    if character_id.is_empty() or not bridge.has_family_session() or bridge.is_busy():
+        _set_status("Connect and save your Hero before making a prop.", true)
+        return
+    if _craft_name_input == null:
+        return
+    var name := _craft_name_input.text.strip_edges()
+    if name.is_empty():
+        _set_status("Give your own prop a name first!", true)
+        return
+    var request := {
+        "schema_version": "1.0",
+        "display_name": name,
+        "shape": _craft_shape,
+        "slot": _craft_slot,
+        "color_hex": _craft_color,
+        "accent_color_hex": _craft_accent,
+    }
+    var error := bridge.craft_family_prop(character_id, request)
+    if error == OK:
+        _set_status("Saving your original creation in your private wardrobe…", false)
+    else:
+        _set_status("Could not save your new prop. Try again.", true)
 
 
 func _on_equipment_choice_pressed(slot: String, item_id: String) -> void:
@@ -617,6 +724,25 @@ func _refresh_color_buttons() -> void:
 
 
 func _on_bridge_success(kind: String, payload: Dictionary) -> void:
+    if kind == "prop:craft":
+        var crafted = payload.get("crafted", {})
+        var owned = payload.get("equipment", {})
+        if (
+            typeof(crafted) != TYPE_DICTIONARY
+            or typeof(owned) != TYPE_DICTIONARY
+            or String(crafted.get("character_id", "")) != character_id
+            or String(owned.get("character_id", "")) != character_id
+        ):
+            _set_status("Your new prop could not be verified.", true)
+            return
+        equipment_state = owned.duplicate(true)
+        _refresh_outfit_choices()
+        var runtime = equipment_state.get("runtime", {})
+        if typeof(runtime) == TYPE_DICTIONARY:
+            avatar_stage.apply_equipment_runtime(runtime)
+        _set_status("New prop saved! Tap Wear to put it on your Hero.", false)
+        return
+
     if kind == "character:get":
         equipment_state.clear()
         _appearance_dirty = false
@@ -698,6 +824,9 @@ func _on_bridge_failure(
     _error_code: String,
     message: String
 ) -> void:
+    if kind == "prop:craft":
+        _set_status("Could not create your prop. Choose a different name or try again.", true)
+        return
     if kind.begins_with("equipment:"):
         play_button.disabled = true
         _set_status("My Stuff could not load. " + message, true)

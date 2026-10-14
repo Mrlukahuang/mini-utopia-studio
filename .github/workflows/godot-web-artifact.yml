@@ -187,6 +187,12 @@ jobs:
           set -euo pipefail
           "$GODOT_BINARY" --headless --path godot --script res://tests/family_child_director_choices_smoke.gd
 
+      - name: Smoke-test child-made prop across Play and Director
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GODOT_BINARY" --headless --path godot --script res://tests/family_crafted_prop_game_director_smoke.gd
+
       - name: Export Web release
         shell: bash
         run: |

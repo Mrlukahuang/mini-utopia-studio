@@ -25,6 +25,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 
 from studio.bridge.characters import CharacterBridgeReader
 from studio.bridge.equipment import EquipmentBridgeGateway
+from studio.family_props import FamilyCraftedProp, craft_family_prop
 from studio.bridge.errors import CharacterRevisionConflict, CharacterWriteValidationError
 from studio.bridge.server import BridgeResponse, MAX_REQUEST_BODY_BYTES
 from studio.core.enums import AssetType, ReviewStatus
@@ -441,6 +442,43 @@ class FamilyApplication:
                     self.reader._contract(asset).model_dump(mode="json"),
                 )
             return BridgeResponse(HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"})
+
+        parts = route.strip("/").split("/")
+        if len(parts) == 3 and parts[0] == "characters" and parts[2] == "crafted-props":
+            character_id = unquote(parts[1])
+            asset = self.repository.get_asset(character_id)
+            if (
+                not character_id.startswith("CHAR_")
+                or "/" in character_id
+                or asset is None
+                or asset.asset_type != AssetType.CHARACTER
+                or asset.status == ReviewStatus.ARCHIVED
+                or asset.metadata.get("family_owner") != owner
+            ):
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            if method != "POST":
+                return BridgeResponse(
+                    HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"}
+                )
+            try:
+                request = FamilyCraftedProp.model_validate(json.loads(body))
+                crafted = craft_family_prop(
+                    self.repository, owner=owner,
+                    character_id=character_id, request=request,
+                )
+            except (ValueError, UnicodeError, ValidationError):
+                return BridgeResponse(
+                    HTTPStatus.BAD_REQUEST, {"error": "invalid_crafted_prop"}
+                )
+            gateway = EquipmentBridgeGateway(
+                self.repository,
+                collection_id="COLL_FAMILY_" + owner, owner_key=owner,
+            )
+            return BridgeResponse(HTTPStatus.CREATED, {
+                "schema_version": "1.0",
+                "crafted": crafted,
+                "equipment": gateway.get_state(character_id),
+            })
 
         parts = route.strip("/").split("/")
         if (
