@@ -109,6 +109,12 @@ jobs:
           set -euo pipefail
           "$GODOT_BINARY" --headless --path godot --script res://tests/creator_touch_gestures_smoke.gd
 
+      - name: Smoke-test family HTTPS session client
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GODOT_BINARY" --headless --path godot --script res://tests/bridge_family_session_smoke.gd
+
       - name: Export Web release
         shell: bash
         run: |
