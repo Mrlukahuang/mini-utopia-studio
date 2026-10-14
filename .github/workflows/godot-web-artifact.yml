@@ -103,6 +103,12 @@ jobs:
           set -euo pipefail
           "$GODOT_BINARY" --headless --path godot --script res://tests/bridge_endpoint_policy_smoke.gd
 
+      - name: Smoke-test iPad Creator touch gestures
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GODOT_BINARY" --headless --path godot --script res://tests/creator_touch_gestures_smoke.gd
+
       - name: Export Web release
         shell: bash
         run: |
