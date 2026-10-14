@@ -16,6 +16,15 @@ func _ready() -> void:
     director_runtime.name = "DirectorShotRuntime"
     add_child(director_runtime)
 
+    var selection := get_node_or_null("/root/FamilySceneState") as MiniUtopiaFamilySceneState
+    if selection != null:
+        var family_payload := MiniUtopiaFamilyDirectorSession.from_play_session(
+            selection.active_play_session()
+        )
+        if not family_payload.is_empty():
+            stage_payload(family_payload)
+            return
+
     var payload := director_runtime.load_default_session()
     if payload.is_empty():
         _show_missing_payload()
@@ -88,6 +97,32 @@ func _build_overlay() -> void:
     panel.custom_minimum_size = Vector2(560.0, 118.0)
     layer.add_child(panel)
 
+    var buttons := HBoxContainer.new()
+    buttons.name = "DirectorControls"
+    buttons.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+    buttons.offset_left = -390.0
+    buttons.offset_right = -20.0
+    buttons.offset_top = 24.0
+    buttons.offset_bottom = 78.0
+    buttons.add_theme_constant_override("separation", 10)
+    layer.add_child(buttons)
+
+    var replay := Button.new()
+    replay.name = "ReplayButton"
+    replay.text = "↻ Replay"
+    replay.custom_minimum_size = Vector2(160.0, 54.0)
+    replay.add_theme_font_size_override("font_size", 20)
+    replay.pressed.connect(_on_replay_pressed)
+    buttons.add_child(replay)
+
+    var home := Button.new()
+    home.name = "BackToVillageButton"
+    home.text = "← Village"
+    home.custom_minimum_size = Vector2(185.0, 54.0)
+    home.add_theme_font_size_override("font_size", 20)
+    home.pressed.connect(_on_back_to_village_pressed)
+    buttons.add_child(home)
+
     var margin := MarginContainer.new()
     margin.name = "StatusMargin"
     margin.add_theme_constant_override("margin_left", 18)
@@ -101,6 +136,16 @@ func _build_overlay() -> void:
     status_label.text = "🎬 Director Stage / 导演模式"
     status_label.add_theme_font_size_override("font_size", 18)
     margin.add_child(status_label)
+
+
+func _on_replay_pressed() -> void:
+    if director_runtime != null:
+        director_runtime.reset_shot()
+
+
+func _on_back_to_village_pressed() -> void:
+    Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+    get_tree().change_scene_to_file("res://scenes/main.tscn")
 
 
 func _show_missing_payload() -> void:

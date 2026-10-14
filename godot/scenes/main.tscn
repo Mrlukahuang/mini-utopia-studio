@@ -64,3 +64,17 @@ offset_bottom = 78.0
 grow_horizontal = 0
 text = "🎨 Create a Hero"
 theme_override_font_sizes/font_size = 20
+
+[node name="OpenDirectorButton" type="Button" parent="HUD"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -242.0
+offset_top = 90.0
+offset_right = -18.0
+offset_bottom = 146.0
+grow_horizontal = 0
+text = "🎬 Shoot a Scene"
+theme_override_font_sizes/font_size = 20
+disabled = true
