@@ -28,6 +28,19 @@ func _ready() -> void:
     bridge.request_failed.connect(_on_bridge_failure)
 
     _build_ui()
+    if OS.has_feature("web"):
+        # On the approved single-origin family host, no child/parent should
+        # have to manually type a backend address. The URL is taken only from
+        # the browser's own origin and still passes HTTPS-only validation.
+        var browser_origin := String(JavaScriptBridge.eval(
+            "window.location.origin", true
+        ))
+        var safe_origin := MiniUtopiaBridgeEndpointPolicy.normalize(
+            browser_origin, true
+        )
+        if not safe_origin.is_empty():
+            api_input.text = safe_origin
+            api_input.editable = false
     var family := _family_state()
     if family != null and family.bind_family_client(bridge):
         _set_connected(true)
