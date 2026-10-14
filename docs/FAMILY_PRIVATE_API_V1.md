@@ -23,6 +23,10 @@ from the unauthenticated desktop-only `studio.bridge.server`.
 | DELETE | `/family/cast-grants/{grant_id}` | Parent-only: revoke a guest actor's consent |
 | GET | `/family/cast-guests` | Current child sees only specifically approved guests |
 | GET | `/family/cast-guests/{grant_id}` | Read-only movie appearance and equipped item snapshot, no private inventory |
+| GET | `/family/films` | List only the child's saved Director drafts |
+| POST | `/family/films` | Create a 15/30s draft of owned actors |
+| GET | `/family/films/{id}` | Read current child's saved film |
+| PUT | `/family/films/{id}` | Revision-checked update |
 | OPTIONS | any | Strict, origin-scoped Web preflight |
 
 Every non-OPTIONS request requires `Authorization: Bearer <child-token>`.
