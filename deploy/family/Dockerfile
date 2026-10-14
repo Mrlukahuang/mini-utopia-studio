@@ -10,7 +10,8 @@ COPY deploy/family/requirements-family.txt /tmp/requirements-family.txt
 RUN pip install --no-cache-dir -r /tmp/requirements-family.txt && \
     groupadd --gid 10001 family && \
     useradd --uid 10001 --gid 10001 --no-create-home family && \
-    mkdir -p /data && chown family:family /data
+    mkdir -p /data /movies && chown family:family /data /movies && \
+    chmod 700 /movies
 
 # Private backend only: no Streamlit UI, users' images, or Godot source.
 COPY studio /app/studio

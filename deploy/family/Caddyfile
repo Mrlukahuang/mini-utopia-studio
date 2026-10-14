@@ -3,7 +3,7 @@
 {$FAMILY_DOMAIN} {
     encode zstd gzip
 
-    @api path /characters* /family/sessions* /family/cast-grants* /family/cast-guests* /family/films* /family/film-reviews
+    @api path /characters* /family/sessions* /family/cast-grants* /family/cast-guests* /family/films* /family/film-reviews /family/movie-releases
     handle @api {
         reverse_proxy 127.0.0.1:8766
     }

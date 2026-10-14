@@ -17,6 +17,7 @@ from typing import Callable
 
 from studio.family_film_render import build_family_film_render_source
 from studio.family_movie_review import current_review_state
+from studio.family_movie_media import approved_fingerprint, media_path, PrivateMovieMediaError
 from studio.repositories.sqlite import SQLiteStudioRepository
 
 
@@ -220,7 +221,12 @@ def main() -> int:
     parser.add_argument("--godot-project", type=Path, required=True)
     parser.add_argument("--film-id", required=True)
     parser.add_argument("--owner", choices=["child_a", "child_b"], required=True)
-    parser.add_argument("--output", type=Path, required=True)
+    destination = parser.add_mutually_exclusive_group(required=True)
+    destination.add_argument("--output", type=Path)
+    destination.add_argument(
+        "--store-root", type=Path,
+        help="Private owner-scoped media root used by Family API downloads",
+    )
     parser.add_argument("--fps", type=int, default=6, choices=[2, 6, 12])
     parser.add_argument("--godot-bin", default="godot")
     parser.add_argument("--ffmpeg-bin", default="ffmpeg")
@@ -230,14 +236,25 @@ def main() -> int:
     if os.environ.get("GITHUB_ACTIONS", "").lower() == "true":
         parser.error("Never run a private child export in public GitHub Actions")
     try:
+        output_path = args.output
+        if args.store_root is not None:
+            fp = approved_fingerprint(
+                SQLiteStudioRepository(args.db), args.owner, args.film_id
+            )
+            if fp is None:
+                raise PrivateMovieError("Parent approval is required for this film")
+            output_path = media_path(
+                args.store_root, owner=args.owner, film_id=args.film_id,
+                fingerprint=fp, create_dirs=True,
+            )
         result = render_private_movie(
             db_path=args.db, project_dir=args.godot_project,
-            film_id=args.film_id, owner=args.owner, output_path=args.output,
+            film_id=args.film_id, owner=args.owner, output_path=output_path,
             godot=args.godot_bin, ffmpeg=args.ffmpeg_bin,
             ffprobe=args.ffprobe_bin, xvfb_run=args.xvfb_run_bin,
             fps=args.fps,
         )
-    except PrivateMovieError as exc:
+    except (PrivateMovieError, PrivateMovieMediaError) as exc:
         parser.error(str(exc))
     print("Saved private MP4:", result["private_path"])
     return 0
