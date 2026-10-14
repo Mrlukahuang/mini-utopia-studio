@@ -19,6 +19,10 @@ from the unauthenticated desktop-only `studio.bridge.server`.
 | PUT | `/characters/{CHAR_ID}/equipment/{slot}` | Equip or unequip the current child's item, using `{"item_instance_id": "ITEM_..."}` or `null` |
 | POST | `/family/sessions` | One-time parent unlock credential exchange: `{"profile_id":"child_a"}` or `child_b`; returns a 30-minute child-scoped bearer token |
 | DELETE | `/family/sessions/current` | Revokes the caller's current short-lived child session |
+| POST | `/family/cast-grants` | Parent-only: authorize one guest actor for a different child for 15 minutes |
+| DELETE | `/family/cast-grants/{grant_id}` | Parent-only: revoke a guest actor's consent |
+| GET | `/family/cast-guests` | Current child sees only specifically approved guests |
+| GET | `/family/cast-guests/{grant_id}` | Read-only movie appearance and equipped item snapshot, no private inventory |
 | OPTIONS | any | Strict, origin-scoped Web preflight |
 
 Every non-OPTIONS request requires `Authorization: Bearer <child-token>`.
