@@ -1,0 +1,49 @@
+name: mini-utopia-family
+
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: deploy/family/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_PATH: /data/studio.db
+      FAMILY_ALLOWED_ORIGINS: https://${FAMILY_DOMAIN:?FAMILY_DOMAIN required}
+      FAMILY_PARENT_UNLOCK_SHA256: ${FAMILY_PARENT_UNLOCK_SHA256:?Parent unlock digest required}
+      FAMILY_CHILD_A_TOKEN_SHA256: ${FAMILY_CHILD_A_TOKEN_SHA256:?Child A digest required}
+      FAMILY_CHILD_B_TOKEN_SHA256: ${FAMILY_CHILD_B_TOKEN_SHA256:?Child B digest required}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - family_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  web:
+    image: caddy:2.9.1-alpine
+    restart: unless-stopped
+    network_mode: "service:api"
+    depends_on:
+      - api
+    environment:
+      FAMILY_DOMAIN: ${FAMILY_DOMAIN:?FAMILY_DOMAIN required}
+    volumes:
+      # Web bundle is the GitHub Actions Godot artifact, not child user data.
+      - ./web:/srv/web:ro
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  family_data:
+  caddy_data:
+  caddy_config:
