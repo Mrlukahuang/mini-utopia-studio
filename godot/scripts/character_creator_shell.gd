@@ -45,6 +45,10 @@ const COLOR_BUTTONS := {
 }
 
 @onready var bridge: MiniUtopiaBridgeClient = $BridgeClient
+@onready var choice_content: VBoxContainer = $RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content
+@onready var choice_scroll: ScrollContainer = $RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll
+@onready var look_tab: Button = $RootMargin/MainColumn/StepTabs/LookStep
+@onready var outfit_tab: Button = $RootMargin/MainColumn/StepTabs/OutfitStep
 @onready var status_label: Label = $RootMargin/MainColumn/StatusBar/StatusLabel
 @onready var character_label: Label = $RootMargin/MainColumn/HeaderRow/CharacterLabel
 @onready var hero_name_input: LineEdit = $RootMargin/MainColumn/HeaderRow/TitleColumn/HeroNameInput
@@ -68,6 +72,8 @@ var character_id := ""
 var loaded_character: Dictionary = {}
 var equipment_state: Dictionary = {}
 var _appearance_dirty := false
+var _outfit_choices: VBoxContainer
+var _outfit_mode := false
 var _draft_appearance: Dictionary = {}
 var _eye_option_ids: Array[String] = []
 var _hair_option_ids: Array[String] = []
@@ -83,6 +89,7 @@ func _ready() -> void:
     bridge.request_failed.connect(_on_bridge_failure)
     _wire_look_controls()
     _wire_animation_controls()
+    _wire_outfit_controls()
 
     _draft_appearance = avatar_stage.current_appearance()
     _refresh_look_controls()
@@ -107,6 +114,117 @@ func _ready() -> void:
             _set_status("Family Cloud not connected yet · preview only.", true)
         else:
             _set_status("Could not start Character load.", true)
+
+
+func _wire_outfit_controls() -> void:
+    _outfit_choices = VBoxContainer.new()
+    _outfit_choices.name = "OutfitChoices"
+    _outfit_choices.visible = false
+    _outfit_choices.add_theme_constant_override("separation", 8)
+    choice_content.add_child(_outfit_choices)
+    look_tab.pressed.connect(_select_creator_tab.bind("look"))
+    outfit_tab.pressed.connect(_select_creator_tab.bind("outfit"))
+
+
+func _select_creator_tab(tab: String) -> void:
+    _outfit_mode = tab == "outfit"
+    if _outfit_choices == null:
+        return
+    for child in choice_content.get_children():
+        if child == _outfit_choices:
+            child.visible = _outfit_mode
+        elif child.name not in ["Heading", "Hint"]:
+            child.visible = not _outfit_mode
+
+    var heading := choice_content.get_node("Heading") as Label
+    var hint := choice_content.get_node("Hint") as Label
+    if _outfit_mode:
+        heading.text = "Dress Your Hero / 我的衣柜"
+        hint.text = "Tap a piece to try it on. Every change is saved."
+        _refresh_outfit_choices()
+    else:
+        heading.text = "Build Your Hero"
+        hint.text = "Tap a choice. Your 3D hero changes instantly."
+    choice_scroll.scroll_vertical = 0
+
+
+func _refresh_outfit_choices() -> void:
+    if _outfit_choices == null:
+        return
+    for child in _outfit_choices.get_children():
+        # Release names immediately; queued nodes otherwise collide with the
+        # new choices on rapid iPad Outfit/Look tab switching.
+        _outfit_choices.remove_child(child)
+        child.queue_free()
+
+    if equipment_state.is_empty():
+        var help := Label.new()
+        help.text = "Save your Hero to open your private wardrobe."
+        help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        _outfit_choices.add_child(help)
+        return
+
+    var slots = equipment_state.get("slots", [])
+    var items = equipment_state.get("items", [])
+    if typeof(slots) != TYPE_ARRAY or typeof(items) != TYPE_ARRAY:
+        return
+
+    for raw_slot in slots:
+        var slot := String(raw_slot)
+        var heading := Label.new()
+        heading.name = "Slot_" + slot
+        heading.text = slot.replace("_", " ").capitalize()
+        heading.add_theme_font_size_override("font_size", 19)
+        _outfit_choices.add_child(heading)
+
+        var currently_equipped := false
+        for raw_item in items:
+            if typeof(raw_item) != TYPE_DICTIONARY:
+                continue
+            var item: Dictionary = raw_item
+            if String(item.get("slot", "")) != slot:
+                continue
+            var item_id := String(item.get("item_instance_id", ""))
+            if item_id.is_empty():
+                continue
+            var picked := bool(item.get("equipped", false))
+            currently_equipped = currently_equipped or picked
+
+            var choice := Button.new()
+            choice.name = "Wear_" + slot + "_" + item_id
+            choice.custom_minimum_size = Vector2(0.0, 48.0)
+            choice.add_theme_font_size_override("font_size", 17)
+            choice.text = (
+                ("✓ Wearing  " if picked else "＋ Wear  ")
+                + String(item.get("display_name", "My Item"))
+            )
+            choice.disabled = picked
+            choice.pressed.connect(
+                _on_equipment_choice_pressed.bind(slot, item_id)
+            )
+            _outfit_choices.add_child(choice)
+
+        if currently_equipped:
+            var remove := Button.new()
+            remove.name = "Remove_" + slot
+            remove.text = "− Take off"
+            remove.custom_minimum_size = Vector2(0.0, 42.0)
+            remove.pressed.connect(
+                _on_equipment_choice_pressed.bind(slot, "")
+            )
+            _outfit_choices.add_child(remove)
+
+
+func _on_equipment_choice_pressed(slot: String, item_id: String) -> void:
+    if character_id.is_empty() or bridge.is_busy():
+        _set_status("Finish the current wardrobe change first.", true)
+        return
+    var id: Variant = null if item_id.is_empty() else item_id
+    var error := bridge.put_equipment_slot(character_id, slot, id)
+    if error == OK:
+        _set_status("Updating your outfit…", false)
+    else:
+        _set_status("Could not change your outfit. Please retry.", true)
 
 
 func activate_family_session(token: String, api_base_url: String) -> bool:
@@ -519,6 +637,7 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
 
     if kind == "equipment:get" or kind.begins_with("equipment:put:"):
         equipment_state = payload.duplicate(true)
+        _refresh_outfit_choices()
         var runtime = payload.get("runtime", {})
         var valid := (
             typeof(runtime) == TYPE_DICTIONARY
