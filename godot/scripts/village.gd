@@ -56,7 +56,7 @@ func _open_family_director() -> void:
 func _open_character_creator() -> void:
     # A child never needs to open the Godot Editor or Streamlit to create.
     Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-    get_tree().change_scene_to_file("res://scenes/character_creator.tscn")
+    get_tree().change_scene_to_file("res://scenes/family_hero_library.tscn")
 
 
 func _process(_delta: float) -> void:
