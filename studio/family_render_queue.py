@@ -9,6 +9,9 @@ automatic re-run of expensive/private jobs).
 from __future__ import annotations
 
 import argparse
+import fcntl
+import stat
+from contextlib import contextmanager
 import json
 import os
 import shutil
@@ -64,6 +67,43 @@ class PrivateFamilyRenderQueue:
             raise PrivateRenderQueueError("Private family database is missing or unsafe")
         with self._connect() as connection:
             connection.executescript(QUEUE_DDL)
+
+    @contextmanager
+    def _worker_lock(self):
+        """Exclusive OS process lock across render and adult crash recovery.
+
+        Never delete/rotate this file while a worker is active: flock locks
+        inodes, not names. SQLite transactions alone cannot protect a
+        renderer once an adult marks an apparently stuck job interrupted.
+        """
+        lock_path = self.db_path.with_name(self.db_path.name + ".render.lock")
+        flags = os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0)
+        flags |= getattr(os, "O_NOFOLLOW", 0)
+        try:
+            fd = os.open(lock_path, flags, 0o600)
+        except OSError as exc:
+            raise PrivateRenderQueueError("Cannot open private worker lock") from None
+        try:
+            info = os.fstat(fd)
+            named = lock_path.stat(follow_symlinks=False)
+            if (
+                not stat.S_ISREG(info.st_mode)
+                or info.st_mode & 0o077
+                or (info.st_dev, info.st_ino) != (named.st_dev, named.st_ino)
+            ):
+                raise PrivateRenderQueueError("Unsafe private worker lock")
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                raise PrivateRenderQueueError(
+                    "Private worker is active; stop it before manual recovery"
+                ) from None
+            try:
+                yield
+            finally:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            os.close(fd)
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path, timeout=5, isolation_level=None)
@@ -249,11 +289,33 @@ class PrivateFamilyRenderQueue:
         ffprobe: str = "ffprobe", xvfb_run: str = "xvfb-run",
         renderer: Callable = render_private_movie,
     ) -> dict | None:
-        """Trusted single-host invocation; not reachable from the child API."""
+        """Hold the process lock through render, final approval, and cleanup."""
+        with self._worker_lock():
+            return self._run_one_locked(
+                project_dir=project_dir, store_root=store_root,
+                godot=godot, ffmpeg=ffmpeg, ffprobe=ffprobe,
+                xvfb_run=xvfb_run, renderer=renderer,
+            )
+
+    def _run_one_locked(
+        self, *, project_dir: Path, store_root: Path,
+        godot: str = "godot", ffmpeg: str = "ffmpeg",
+        ffprobe: str = "ffprobe", xvfb_run: str = "xvfb-run",
+        renderer: Callable = render_private_movie,
+    ) -> dict | None:
+        """Process lock already held; SQLite claim still guards job state."""
         job = self.claim_one()
         if job is None:
             return None
+        output = None
+        created_output = False
         try:
+            # Close the approval race between the pre-transaction claim
+            # check and actual rendering. The worker also checks mid-render.
+            if self._approved(job["owner"], job["film_id"]) != (
+                job["revision"], job["fingerprint"]
+            ):
+                return self._finish(job, "blocked", "approval_changed")
             if shutil.disk_usage(store_root).free < MIN_FREE_BYTES:
                 raise PrivateRenderQueueError("Insufficient private disk space")
             output = media_path(
@@ -306,7 +368,12 @@ class PrivateFamilyRenderQueue:
             return [self._record(row) for row in rows]
 
     def mark_interrupted_failed(self, job_id: str) -> dict:
-        """Adult-only manual recovery; NEVER auto-resume potentially live work."""
+        """Refuse recovery while any actual private renderer still holds lock."""
+        with self._worker_lock():
+            return self._mark_interrupted_failed_locked(job_id)
+
+    def _mark_interrupted_failed_locked(self, job_id: str) -> dict:
+        """Manual recovery only after the old OS process has exited."""
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
