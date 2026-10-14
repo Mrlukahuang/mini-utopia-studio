@@ -60,6 +60,10 @@ def _configured_domain(value: str) -> bool:
         return False
     if domain in ("example.com", "example.net", "example.org"):
         return False
+    if any(domain.endswith("." + reserved) for reserved in (
+        "example.com", "example.net", "example.org"
+    )):
+        return False
     if any(domain.endswith(suffix) for suffix in RESERVED_SUFFIXES):
         return False
     if domain.startswith("example.") or "localhost" in domain:
