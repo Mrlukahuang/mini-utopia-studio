@@ -139,3 +139,83 @@ def test_worker_rejects_wrong_child_public_folder_overwrite_and_bad_rate(tmp_pat
     private.chmod(0o755)
     with pytest.raises(PrivateMovieError, match="chmod 700"):
         render_private_movie(**common)
+
+
+def test_parent_revocation_mid_render_cannot_publish_completed_mp4(tmp_path):
+    db, project, private, film_id, cid = fixture_film(tmp_path)
+    output = private / "never-published.mp4"
+    observed_roots = []
+
+    def parent_revokes_while_godot_runs(argv, *, check, capture_output, text, timeout):
+        if "--path" in argv:
+            workspace = Path(argv[argv.index("--path") + 1])
+            observed_roots.append(workspace)
+            state = workspace / "runtime_state"
+            if "res://scripts/family_movie_prepare.gd" in argv:
+                (state / "shot_capture_request.json").write_text(json.dumps({
+                    "fps": 2, "frame_count": 30,
+                    "director_session": {"character_asset_id": cid}
+                }))
+            elif "res://scripts/shot_frame_capture.gd" in argv:
+                folder = state / "family_movie_frames" / "EP_FAMILY_PREVIEW"
+                folder.mkdir(parents=True)
+                for n in range(30):
+                    (folder / f"frame_{n:05d}.png").write_bytes(b"PNG")
+        if argv[0] == "ffmpeg":
+            Path(argv[-1]).write_bytes(b"\x00\x00\x00\x18ftypisom" + b"0" * 512)
+        if argv[0] == "ffprobe":
+            # A parent has revoked access before the render finishes.
+            revoked = decide_private_film_review(
+                SQLiteStudioRepository(db), owner="child_a",
+                film_id=film_id, revision="1", decision="revoke",
+            )
+            assert revoked["approved_for_private_render"] is False
+        return subprocess.CompletedProcess(
+            argv, 0, stdout="15.0\n" if argv[0] == "ffprobe" else ""
+        )
+
+    with pytest.raises(PrivateMovieError, match="changed during rendering"):
+        render_private_movie(
+            db_path=db, project_dir=project, film_id=film_id,
+            owner="child_a", output_path=output,
+            godot="godot-test", ffmpeg="ffmpeg", ffprobe="ffprobe",
+            xvfb_run="xvfb-run", fps=2, runner=parent_revokes_while_godot_runs,
+        )
+    assert not output.exists(), "Revoked film must never be published"
+    assert observed_roots and all(not root.exists() for root in observed_roots)
+
+
+def test_oversized_render_is_rejected_before_private_release(tmp_path):
+    db, project, private, film_id, cid = fixture_film(tmp_path)
+    output = private / "too-large.mp4"
+
+    def fake_oversized_render(argv, *, check, capture_output, text, timeout):
+        if "--path" in argv:
+            workspace = Path(argv[argv.index("--path") + 1])
+            state = workspace / "runtime_state"
+            if "res://scripts/family_movie_prepare.gd" in argv:
+                (state / "shot_capture_request.json").write_text(json.dumps({
+                    "fps": 2, "frame_count": 30,
+                    "director_session": {"character_asset_id": cid}
+                }))
+            elif "res://scripts/shot_frame_capture.gd" in argv:
+                folder = state / "family_movie_frames" / "EP_FAMILY_PREVIEW"
+                folder.mkdir(parents=True)
+                for n in range(30):
+                    (folder / f"frame_{n:05d}.png").write_bytes(b"PNG")
+        if argv[0] == "ffmpeg":
+            with Path(argv[-1]).open("wb") as movie:
+                movie.write(b"\x00\x00\x00\x18ftypisom")
+                movie.truncate(32 * 1024 * 1024 + 1)
+        return subprocess.CompletedProcess(
+            argv, 0, stdout="15.0\n" if argv[0] == "ffprobe" else ""
+        )
+
+    with pytest.raises(PrivateMovieError, match="32 MiB"):
+        render_private_movie(
+            db_path=db, project_dir=project, film_id=film_id,
+            owner="child_a", output_path=output,
+            godot="godot-test", ffmpeg="ffmpeg", ffprobe="ffprobe",
+            xvfb_run="xvfb-run", fps=2, runner=fake_oversized_render,
+        )
+    assert not output.exists()

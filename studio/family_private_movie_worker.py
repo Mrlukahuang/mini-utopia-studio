@@ -17,7 +17,9 @@ from typing import Callable
 
 from studio.family_film_render import build_family_film_render_source
 from studio.family_movie_review import current_review_state
-from studio.family_movie_media import approved_fingerprint, media_path, PrivateMovieMediaError
+from studio.family_movie_media import (
+    MAX_PRIVATE_MP4_BYTES, PrivateMovieMediaError, approved_fingerprint, media_path,
+)
 from studio.repositories.sqlite import SQLiteStudioRepository
 
 
@@ -106,6 +108,7 @@ def render_private_movie(
     seconds = int(source["director_choices"]["duration_seconds"])
     if seconds not in (15, 30):
         raise PrivateMovieError("Invalid family film duration")
+    reviewed_source = json.loads(json.dumps(source))  # immutable snapshot for race check
     source["fps"] = fps
     source["width"] = 640
     source["height"] = 360
@@ -190,6 +193,30 @@ def render_private_movie(
             raise PrivateMovieError("Cannot verify private MP4 length") from exc
         if abs(actual_seconds - seconds) > 0.6:
             raise PrivateMovieError("Private movie duration mismatch")
+        if staging.stat().st_size > MAX_PRIVATE_MP4_BYTES:
+            raise PrivateMovieError("Private MP4 exceeds the 32 MiB download limit")
+
+        # Rendering is slow: an adult may revoke approval, the child may
+        # re-edit the film, or an owned Hero may change while Godot runs.
+        # Re-open SQLite after encoding and fail closed BEFORE publishing any
+        # completed bytes. No long-running subprocess retains an approval.
+        latest = SQLiteStudioRepository(Path(db_path))
+        fresh_review = current_review_state(
+            latest, owner=owner, film_id=film_id
+        )
+        fresh_source = build_family_film_render_source(
+            latest, owner=owner, film_id=film_id
+        )
+        if (
+            fresh_review is None
+            or not fresh_review["approved_for_private_render"]
+            or fresh_source is None
+            or fresh_source != reviewed_source
+            or fresh_review["revision"] != source["source_revision"]
+        ):
+            raise PrivateMovieError(
+                "Film or parent approval changed during rendering; no movie saved"
+            )
 
         # Exclusive creation: existing files are never overwritten. No child
         # media is kept in source checkout or Github Actions artifacts.
