@@ -579,8 +579,30 @@ func _on_back_pressed() -> void:
 
 
 func _on_save_pressed() -> void:
-    if character_id.is_empty() or loaded_character.is_empty():
-        _set_status("Nothing to save yet.", true)
+    var name := hero_name_input.text.strip_edges()
+    if name.is_empty():
+        _set_status("Please give your hero a name first.", true)
+        return
+
+    if character_id.is_empty():
+        if not bridge.has_family_session():
+            _set_status("Parent Cloud sign-in is required to save.", true)
+            return
+        save_button.disabled = true
+        _set_status("Creating your hero…", false)
+        var create_error := bridge.create_character({
+            "schema_version": "1.0",
+            "display_name": name,
+            "description": "",
+            "profile": {"avatar": _draft_appearance.duplicate(true)},
+        })
+        if create_error != OK:
+            save_button.disabled = false
+            _set_status("Could not begin creating your hero.", true)
+        return
+
+    if loaded_character.is_empty():
+        _set_status("Please load your hero before saving changes.", true)
         return
 
     save_button.disabled = true
@@ -591,9 +613,7 @@ func _on_save_pressed() -> void:
             loaded_character.get("schema_version", "1.0")
         ),
         "revision": String(loaded_character.get("revision", "")),
-        "display_name": String(
-            loaded_character.get("display_name", character_id)
-        ),
+        "display_name": name,
         "description": String(loaded_character.get("description", "")),
         "profile": loaded_character.get("profile", {}),
     }
@@ -601,7 +621,6 @@ func _on_save_pressed() -> void:
     if error != OK:
         save_button.disabled = false
         _set_status("Could not start Save. Please try again.", true)
-
 
 func _set_status(message: String, is_error: bool) -> void:
     status_label.text = message
