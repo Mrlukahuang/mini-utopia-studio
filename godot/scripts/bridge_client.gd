@@ -243,6 +243,17 @@ func put_character(
     )
 
 
+func craft_family_prop(character_id: String, recipe: Dictionary) -> int:
+    if not has_family_session() or not character_id.begins_with("CHAR_"):
+        return ERR_UNCONFIGURED
+    return _start_request(
+        "prop:craft",
+        "/characters/" + character_id.uri_encode() + "/crafted-props",
+        HTTPClient.METHOD_POST,
+        recipe
+    )
+
+
 func get_equipment(character_id: String) -> int:
     return _start_request(
         "equipment:get",
