@@ -1,0 +1,25 @@
+# Caddy + Python share a single Docker network namespace.
+# Only Caddy owns the public ports; Python binds to 127.0.0.1:8766.
+{$FAMILY_DOMAIN} {
+    encode zstd gzip
+
+    @api path /characters* /family/sessions*
+    handle @api {
+        reverse_proxy 127.0.0.1:8766
+    }
+
+    handle {
+        root * /srv/web
+        file_server
+        # Explicitly forbid directory traversal/remote file serving.
+        header X-Content-Type-Options nosniff
+        header Referrer-Policy no-referrer
+        header X-Frame-Options DENY
+    }
+
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "no-referrer"
+    }
+}
