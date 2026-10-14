@@ -28,6 +28,7 @@ from studio.bridge.equipment import EquipmentBridgeGateway
 from studio.family_props import FamilyCraftedProp, craft_family_prop
 from studio.family_films import FamilyFilmDraft, cast_is_owned, film_contract, save_film_draft
 from studio.family_film_render import build_family_film_render_source
+from studio.family_movie_review import current_review_state, decide_private_film_review
 from studio.bridge.errors import CharacterRevisionConflict, CharacterWriteValidationError
 from studio.bridge.server import BridgeResponse, MAX_REQUEST_BODY_BYTES
 from studio.core.enums import AssetType, ReviewStatus
@@ -381,6 +382,46 @@ class FamilyApplication:
             return self._issue_child_session(authorization, body)
         if route == "/family/sessions/current" and method == "DELETE":
             return self._revoke_child_session(authorization)
+        if route == "/family/film-reviews":
+            if method != "POST":
+                return BridgeResponse(
+                    HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"}
+                )
+            denied = self._require_parent(authorization)
+            if denied is not None:
+                return denied
+            try:
+                data = json.loads(body)
+            except (UnicodeError, ValueError):
+                return BridgeResponse(
+                    HTTPStatus.BAD_REQUEST, {"error": "invalid_film_review"}
+                )
+            if (
+                not isinstance(data, dict)
+                or set(data) != {"profile_id", "film_id", "revision", "decision"}
+                or any(not isinstance(value, str) for value in data.values())
+                or data["profile_id"] not in self.token_hashes
+                or not re.fullmatch(r"FILM_[A-Za-z0-9_-]{3,96}", data["film_id"])
+                or not re.fullmatch(r"[0-9]{1,12}", data["revision"])
+                or data["decision"] not in ("approve", "revoke")
+            ):
+                return BridgeResponse(
+                    HTTPStatus.BAD_REQUEST, {"error": "invalid_film_review"}
+                )
+            with self._session_lock:
+                try:
+                    review = decide_private_film_review(
+                        self.repository,
+                        owner=data["profile_id"], film_id=data["film_id"],
+                        revision=data["revision"], decision=data["decision"],
+                    )
+                except ValueError:
+                    return BridgeResponse(
+                        HTTPStatus.CONFLICT, {"error": "revision_conflict"}
+                    )
+            if review is None:
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            return BridgeResponse(HTTPStatus.OK, review)
         if route == "/family/cast-grants":
             if method != "POST":
                 return BridgeResponse(HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"})
@@ -433,6 +474,22 @@ class FamilyApplication:
                     })
                 saved = save_film_draft(self.repository, owner, draft)
             return BridgeResponse(HTTPStatus.CREATED, saved)
+
+        if route.endswith("/review") and route.startswith("/family/films/"):
+            film_id = unquote(route[len("/family/films/"):-len("/review")])
+            if not re.fullmatch(r"FILM_[A-Za-z0-9_-]{3,96}", film_id):
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            if method != "GET":
+                return BridgeResponse(
+                    HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"}
+                )
+            with self._session_lock:
+                review = current_review_state(
+                    self.repository, owner=owner, film_id=film_id,
+                )
+            if review is None:
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            return BridgeResponse(HTTPStatus.OK, review)
 
         if route.endswith("/render-source") and route.startswith("/family/films/"):
             film_id = unquote(
