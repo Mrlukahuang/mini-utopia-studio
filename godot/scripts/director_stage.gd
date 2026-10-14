@@ -91,6 +91,29 @@ func _build_child_director_controls() -> void:
         child_choice_buttons[key] = button
     _refresh_choice_labels()
 
+    film_title_input = LineEdit.new()
+    film_title_input.name = "MyFilmTitle"
+    film_title_input.text = "My Mini Utopia Movie"
+    film_title_input.placeholder_text = "Name your movie"
+    film_title_input.max_length = 64
+    film_title_input.custom_minimum_size = Vector2(238, 50)
+    controls.add_child(film_title_input)
+
+    film_note_input = LineEdit.new()
+    film_note_input.name = "MyFilmNote"
+    film_note_input.placeholder_text = "Your story idea"
+    film_note_input.max_length = 280
+    film_note_input.custom_minimum_size = Vector2(238, 48)
+    controls.add_child(film_note_input)
+
+    save_film_button = Button.new()
+    save_film_button.name = "SaveMyMovieButton"
+    save_film_button.text = "Save My Movie"
+    save_film_button.custom_minimum_size = Vector2(238, 56)
+    save_film_button.disabled = not film_bridge.has_family_session()
+    save_film_button.pressed.connect(_on_save_private_film_pressed)
+    controls.add_child(save_film_button)
+
 
 func _refresh_choice_labels() -> void:
     var family := get_node_or_null("/root/FamilySceneState") as MiniUtopiaFamilySceneState
