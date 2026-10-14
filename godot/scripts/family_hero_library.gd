@@ -713,7 +713,7 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             _cancel_parent_movie_review()
             _set_status("Film changed. Parent must review again.", true)
             return
-        var ready: bool = payload.get("ready", false) == true
+        var ready: bool = payload.get("released_to_child", false) == true
         _set_status(
             "Parent released this checked MP4 to its owning child."
             if ready else "Parent stopped private MP4 downloads.",
