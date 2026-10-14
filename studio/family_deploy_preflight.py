@@ -7,6 +7,7 @@ safe; TLS, DNS and Mac/iPad Safari MUST still be verified by an adult.
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import os
 import re
@@ -21,7 +22,9 @@ EXPECTED_DIGESTS = (
 )
 REQUIRED_WEB = ("index.html", "index.js", "index.wasm", "index.pck")
 REQUIRED_PACKAGE = ("compose.yaml", "Caddyfile", "Dockerfile")
-RESERVED_SUFFIXES = (".example", ".invalid", ".test", ".localhost", ".local")
+LAN_NETWORKS = tuple(ipaddress.ip_network(net) for net in (
+    "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
+))
 
 
 def _private_directory(path: Path) -> bool:
@@ -50,25 +53,13 @@ def _private_file(path: Path) -> bool:
     )
 
 
-def _configured_domain(value: str) -> bool:
-    domain = value.strip().lower()
-    if len(domain) > 253 or not re.fullmatch(
-        r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
-        r"(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+",
-        domain,
-    ):
+def _configured_private_lan_ip(value: str) -> bool:
+    """Permit RFC1918 IPv4 only: no public, unspecified or loopback listener."""
+    try:
+        ip = ipaddress.IPv4Address(value.strip())
+    except ipaddress.AddressValueError:
         return False
-    if domain in ("example.com", "example.net", "example.org"):
-        return False
-    if any(domain.endswith("." + reserved) for reserved in (
-        "example.com", "example.net", "example.org"
-    )):
-        return False
-    if any(domain.endswith(suffix) for suffix in RESERVED_SUFFIXES):
-        return False
-    if domain.startswith("example.") or "localhost" in domain:
-        return False
-    return True
+    return any(ip in private for private in LAN_NETWORKS)
 
 
 def audit_family_host_package(root: Path) -> dict:
@@ -119,8 +110,8 @@ def audit_family_host_package(root: Path) -> dict:
             if not re.fullmatch(r"[A-Z][A-Z0-9_]*", key):
                 issues.append("private_env_invalid_line")
             pairs[key] = value
-        if not _configured_domain(pairs.get("FAMILY_DOMAIN", "")):
-            issues.append("family_domain_not_configured")
+        if not _configured_private_lan_ip(pairs.get("FAMILY_LAN_IP", "")):
+            issues.append("family_lan_ip_not_configured")
         digests = [pairs.get(key, "") for key in EXPECTED_DIGESTS]
         if not all(re.fullmatch(r"[a-fA-F0-9]{64}", item) for item in digests):
             issues.append("missing_or_invalid_secret_digest")

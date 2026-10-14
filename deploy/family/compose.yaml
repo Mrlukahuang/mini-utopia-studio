@@ -9,17 +9,16 @@ services:
     environment:
       DATABASE_PATH: /data/studio.db
       FAMILY_PRIVATE_MOVIES_ROOT: /movies
-      FAMILY_ALLOWED_ORIGINS: https://${FAMILY_DOMAIN:?FAMILY_DOMAIN required}
+      FAMILY_ALLOWED_ORIGINS: https://${FAMILY_LAN_IP:-127.0.0.1}
       FAMILY_PARENT_UNLOCK_SHA256: ${FAMILY_PARENT_UNLOCK_SHA256:?Parent unlock digest required}
       FAMILY_CHILD_A_TOKEN_SHA256: ${FAMILY_CHILD_A_TOKEN_SHA256:?Child A digest required}
       FAMILY_CHILD_B_TOKEN_SHA256: ${FAMILY_CHILD_B_TOKEN_SHA256:?Child B digest required}
+    # Only the selected private LAN IPv4. Loopback is the safe CI fallback.
+    # No public HTTP:80 and no HTTP/3 UDP exposed.
     ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
+      - "${FAMILY_LAN_IP:-127.0.0.1}:443:443/tcp"
     volumes:
       - family_data:/data
-      # Adult-owned 0700 private MP4 directory; never served by Caddy static files.
       - ./private-movies:/movies:ro
     read_only: true
     tmpfs:
@@ -36,11 +35,11 @@ services:
     depends_on:
       - api
     environment:
-      FAMILY_DOMAIN: ${FAMILY_DOMAIN:?FAMILY_DOMAIN required}
+      FAMILY_LAN_IP: ${FAMILY_LAN_IP:-127.0.0.1}
     volumes:
-      # Web bundle is the GitHub Actions Godot artifact, not child user data.
       - ./web:/srv/web:ro
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Persistent CA identity and certificates; never export root.key.
       - caddy_data:/data
       - caddy_config:/config
     security_opt:

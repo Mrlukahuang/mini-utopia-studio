@@ -22,7 +22,7 @@ def package(tmp_path):
     digest_parent = "c" * 64
     env = root / ".env"
     env.write_text(
-        "FAMILY_DOMAIN=family.valid-domain.nz\n"
+        "FAMILY_LAN_IP=192.168.1.50\n"
         f"FAMILY_PARENT_UNLOCK_SHA256={digest_parent}\n"
         f"FAMILY_CHILD_A_TOKEN_SHA256={digest_a}\n"
         f"FAMILY_CHILD_B_TOKEN_SHA256={digest_b}\n",
@@ -47,18 +47,18 @@ def test_safe_host_passes_but_does_not_claim_tls_or_device_acceptance(tmp_path):
     assert "a" * 64 not in result_text
     assert "b" * 64 not in result_text
     assert "c" * 64 not in result_text
-    assert "family.valid-domain.nz" not in result_text
+    assert "192.168.1.50" not in result_text
 
 
-def test_placeholder_domain_and_reused_keys_fail_closed(tmp_path):
+def test_public_ip_and_reused_keys_fail_closed(tmp_path):
     root = package(tmp_path)
     env = root / ".env"
     data = env.read_text().replace(
-        "family.valid-domain.nz", "family.example.org"
+        "192.168.1.50", "8.8.8.8"
     ).replace("b" * 64, "a" * 64)
     env.write_text(data)
     issues = audit_family_host_package(root)["issues"]
-    assert "family_domain_not_configured" in issues
+    assert "family_lan_ip_not_configured" in issues
     assert "reused_child_or_parent_secret_digest" in issues
 
 
@@ -81,7 +81,7 @@ def test_env_permissions_and_missing_digest_are_rejected(tmp_path):
         assert "private_env_missing_or_exposed" in audit_family_host_package(root)["issues"]
     env.chmod(0o600)
     env.write_text(
-        "FAMILY_DOMAIN=family.valid-domain.nz\n"
+        "FAMILY_LAN_IP=192.168.1.50\n"
         "FAMILY_PARENT_UNLOCK_SHA256=REPLACE_ME\n"
         "FAMILY_CHILD_A_TOKEN_SHA256=" + "a" * 64 + "\n"
         "FAMILY_CHILD_B_TOKEN_SHA256=" + "b" * 64 + "\n"
@@ -113,8 +113,19 @@ def test_does_not_follow_sensitive_symlinks(tmp_path):
 def test_duplicate_env_variable_does_not_echo_secret(tmp_path):
     root = package(tmp_path)
     env = root / ".env"
-    env.write_text(env.read_text() + "FAMILY_DOMAIN=secret-note.invalid\n")
+    env.write_text(env.read_text() + "FAMILY_LAN_IP=8.8.4.4\n")
     result = audit_family_host_package(root)
     assert not result["local_preflight_passed"]
     assert "duplicate_environment_key" in result["issues"]
-    assert "secret-note" not in json.dumps(result)
+    assert "8.8.4.4" not in json.dumps(result)
+
+
+def test_public_and_wildcard_bind_ips_are_rejected(tmp_path):
+    root = package(tmp_path)
+    env = root / ".env"
+    good = env.read_text()
+    for bad in ("0.0.0.0", "127.0.0.1", "8.8.8.8", "REPLACE_WITH_PRIVATE_LAN_IPV4"):
+        env.write_text(good.replace("192.168.1.50", bad))
+        assert "family_lan_ip_not_configured" in audit_family_host_package(root)["issues"]
+    env.write_text(good)
+    assert audit_family_host_package(root)["local_preflight_passed"]

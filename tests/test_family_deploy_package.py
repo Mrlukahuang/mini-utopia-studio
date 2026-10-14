@@ -22,7 +22,9 @@ def test_private_https_proxy_is_only_public_entrypoint():
     assert "127.0.0.1:8766" in caddy
     assert "FAMILY_ALLOWED_ORIGINS: https://" in compose
     assert "FAMILY_PARENT_UNLOCK_SHA256" in compose
-    assert "443:443" in compose and "80:80" in compose
+    assert '${FAMILY_LAN_IP:-127.0.0.1}:443:443/tcp' in compose
+    assert "80:80" not in compose and "443:443/udp" not in compose
+    assert "tls internal" in caddy
     assert "family_data:/data" in compose
     assert "read_only: true" in compose
     assert "COPY studio /app/studio" in dockerfile
@@ -36,7 +38,7 @@ def test_private_https_proxy_is_only_public_entrypoint():
 def test_deploy_example_does_not_ship_secrets():
     sample = (DEPLOY / ".env.example").read_text()
     assert "REPLACE_WITH" in sample
-    assert "FAMILY_DOMAIN" in sample
+    assert "FAMILY_LAN_IP" in sample and "FAMILY_DOMAIN" not in sample
     assert not (DEPLOY / ".env").exists()
     ignored = (DEPLOY / ".gitignore").read_text()
     assert ".env" in ignored and "web/" in ignored and "backups/" in ignored

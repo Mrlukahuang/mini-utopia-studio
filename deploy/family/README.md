@@ -1,57 +1,54 @@
-# Mini Utopia — private Mac + iPad HTTPS hosting package
+# Mini Utopia — LAN-only HTTPS on adult-owned MacBook (A-006)
 
-**Prepared, not deployed.** This directory is a template for an adult-owned,
-private domain/host. Do not publish the static Godot build on GitHub Pages and
-do not use the public repository to store a child's creations or database.
+**Prepared, not deployed.** Home Wi-Fi only, no purchased domain, no router
+port forwarding, no internet-facing ports or real child materials in Git/CI.
 
 ## Architecture
 
 ```text
-Mac/iPad Safari
-  https://FAMILY_DOMAIN/
-    ├── Godot Web (built privately by GitHub Actions; mounted read-only)
-    └── HTTPS API /characters*, /family/sessions*
-          Caddy TLS → 127.0.0.1:8766 (Docker shared network namespace)
-                           ↓
-              studio.family_api (no Streamlit, no AI providers)
-                           ↓
-              persistent named volume family_data/studio.db
+Mac/iPad Safari --trusted HTTPS--> MacBook's private IPv4:443/tcp
+    -> Docker port published only on FAMILY_LAN_IP
+    -> Caddy "tls internal" (persistent private CA in caddy_data)
+       ├── Godot Web artifact in ./web (read-only)
+       └── family API -> 127.0.0.1:8766 -> SQLite family_data
 ```
 
-Python binds **only** `127.0.0.1:8766` even inside its container. Caddy
-shares that namespace and is the only service accepting public HTTPS. The
-child receives a 30-minute per-profile token after the parent enters their
-private unlock secret; only its digest is held on the server. The Godot Web
-library detects its own HTTPS origin so the parent doesn't need to type the
-API address. This is private-by-default hosting, *not* public multiplayer or
-public content sharing.
+## First real Mac + iPad deployment (adult-operated)
 
-## Adult-only configuration required before any real child uses it
+1. Keep the Mac plugged in, awake and lid open. Set one fixed RFC1918 Wi-Fi
+   IPv4 (example 192.168.1.50) and confirm it does not overlap another DHCP
+   lease. Connect iPad and Mac to the same home Wi-Fi, not an isolated guest LAN.
+2. Install Docker Desktop for Apple Silicon, start the engine and clone the
+   reviewed repository. Download a successful **Godot Web Build** artifact from
+   GitHub Actions and extract index.html/index.js/index.wasm/index.pck into
+   deploy/family/web/ on the Mac. Never commit web/ or real assets.
+3. Copy .env.example to .env, set FAMILY_LAN_IP to the actual Mac Wi-Fi IP.
+   Generate three separate 32-byte+ secrets on the Mac and write **only their
+   SHA-256 hex digests** to .env (mode 0600). Store the original parent unlock
+   in a LOCAL password manager. Legacy child raw secrets are server-only.
+4. Create private-movies/ (mode 0700) locally, run read-only
+   `python3 -m studio.family_deploy_preflight --deploy-dir deploy/family`,
+   and verify `local_preflight_passed=true`. Confirm Compose contains only
+   private-IP host binding with
+   `docker compose --env-file deploy/family/.env -f deploy/family/compose.yaml config`.
+5. Start containers with
+   `docker compose --env-file deploy/family/.env -f deploy/family/compose.yaml up -d --build`.
+   No public DNS or host port 80 mapping. Persist named volumes caddy_data and
+   family_data; never delete them during routine updates.
+6. Export **only** the Caddy public root cert using
+   `docker compose -f deploy/family/compose.yaml cp web:/data/caddy/pki/authorities/local/root.crt ./mini-utopia-root.crt`.
+   Install this public CA into each privately managed iPad and Mac trust store;
+   on iPad enable full trust under Settings > General > About > Certificate
+   Trust Settings. Never extract, copy or share root.key.
+7. Visit `https://MAC_PRIVATE_IP/` on Mac + iPad Safari. Verify no TLS
+   warning and separate Child A/B login. `window.isSecureContext` must be
+   true for future W2 microphone APIs (W2 recording is not implemented yet).
+   CI does not replace live Mac/iPad acceptance.
 
-1. Own/control a private HTTPS domain and Docker host, and point domain DNS
-   to that host. HTTPS automatic certificate issuance requires the host to
-   be reachable on ports 80 and 443.
-2. Download the GitHub Actions **Godot Web Build** artifact (no user content)
-   from a reviewed `main` commit and unpack its `index.html`, `index.js`,
-   `index.wasm`, `index.pck` and associated files to
-   `deploy/family/web/` **on the private host**. Do not commit that folder.
-3. Copy `.env.example` to `.env` locally and replace the example domain.
-   Generate **three separate 32-byte or longer random secrets** on the
-   private host, one parent unlock, two legacy server-only child secrets:
-   `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
-   Hash each using `hashlib.sha256`, and put **only hex SHA-256 digests**
-   into the three environment keys. Keep raw parent unlock secret in a
-   secure password manager, never in Git/PR/CI or the exported Web app.
-   The legacy child raw secrets must **never** be distributed to browsers.
-   Restrict .env file permissions, e.g. `chmod 600 .env`.
-4. Run `docker compose --env-file .env -f compose.yaml config --quiet`
-   then `docker compose --env-file .env -f compose.yaml up -d --build`.
-   TLS certificates are managed by Caddy; the Python API stores its SQLite
-   data on the separate persistent `family_data` volume.
-5. Visit `https://FAMILY_DOMAIN/` on Mac Safari and iPad Safari. The parent
-   selects Child A/B, enters their parent unlock **once**, and receives the
-   short-lived child session. Children's names, equipment, or films never
-   enter the repository or GitHub Actions.
+The MacBook lid should remain **open** when hosting; "prevent automatic sleep
+with display off" does not override normal lid-closing sleep. The current
+Compose starts Web/API only; production MP4 rendering with Linux/Xvfb on
+Apple Silicon has not been validated by physical device testing.
 
 ## Data recovery and backup
 
@@ -241,19 +238,18 @@ python -m studio.family_deploy_preflight --deploy-dir deploy/family
 \`\`\`
 
 The check is read-only. It validates that a private \`.env\` exists with
-restrictive permissions, a non-placeholder HTTPS domain is configured,
+restrictive permissions, a configured RFC1918 LAN IPv4 is present,
 three separate SHA-256 credential digests are present, the Godot Web export
 contains \`index.html\`, \`index.js\`, \`index.wasm\`, and \`index.pck\`,
 and the MP4 storage root is protected against other users and symlinks.
 The Docker/Caddy package files must also exist.
 
 Output is structured JSON containing **only check names and error codes**.
-It deliberately never prints the domain, any digest, secret, movie details,
+It deliberately never prints the LAN IP, any digest, secret, movie details,
 or contents of the Web export. A failing check returns exit status 1.
 Running the preflight does not create a cloud account, open firewall ports,
 deploy a container or upload family material.
 
-**Important:** passing this offline check does **not** prove that public
-DNS, Caddy certificate issuance, a real child's session, Safari/WebGL,
+**Important:** passing this offline check does **not** prove that Caddy internal-CA issuance and trust, a real child's session, Safari/WebGL,
 Mac/iPad touch controls, or private MP4 saving actually work. Those require
 a separately authorized adult host and a real-device acceptance test.

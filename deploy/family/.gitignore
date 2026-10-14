@@ -5,3 +5,5 @@ web/
 *.db-wal
 backups/
 private-movies/
+# Locally exported Caddy public CA cert (provision only to own devices)
+*.crt
