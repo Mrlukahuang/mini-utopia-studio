@@ -95,6 +95,11 @@ static func _procedural_fallback(
     root.name = "Equipment_" + slot
     socket.add_child(root)
 
+    var recipe = item.get("visual_recipe", {})
+    if typeof(recipe) == TYPE_DICTIONARY and not recipe.is_empty():
+        if _build_crafted_prop(root, recipe):
+            return root
+
     var color := _rarity_color(_string_or_empty(item.get("rarity", "green")))
 
     match slot:
@@ -114,6 +119,81 @@ static func _procedural_fallback(
             pass
 
     return root
+
+
+## Safe handcrafted props use only built-in primitive meshes. No arbitrary
+## external models, shaders, scripts, child uploads or file URLs are executed.
+static func _build_crafted_prop(root: Node3D, recipe: Dictionary) -> bool:
+    var shape := String(recipe.get("shape", ""))
+    if shape not in ["star", "sphere", "box", "heart"]:
+        return false
+    var color_hex := String(recipe.get("color_hex", ""))
+    var accent_hex := String(recipe.get("accent_color_hex", ""))
+    if not color_hex.is_valid_html_color() or not accent_hex.is_valid_html_color():
+        return false
+    var primary := Color(color_hex)
+    var accent := Color(accent_hex)
+    var core := MeshInstance3D.new()
+    core.name = "CraftedCore"
+    var base: Mesh
+    match shape:
+        "box":
+            var cube := BoxMesh.new()
+            cube.size = Vector3(0.30, 0.30, 0.30)
+            base = cube
+        "sphere":
+            var ball := SphereMesh.new()
+            ball.radius = 0.22
+            ball.height = 0.44
+            base = ball
+        "heart":
+            var heart_base := SphereMesh.new()
+            heart_base.radius = 0.21
+            heart_base.height = 0.34
+            base = heart_base
+        "star":
+            var star_base := SphereMesh.new()
+            star_base.radius = 0.19
+            star_base.height = 0.38
+            base = star_base
+    core.mesh = base
+    core.material_override = _material(primary)
+    root.add_child(core)
+
+    if shape == "star":
+        for index in range(5):
+            var tip := MeshInstance3D.new()
+            tip.name = "StarTip" + str(index)
+            var tip_mesh := SphereMesh.new()
+            tip_mesh.radius = 0.10
+            tip_mesh.height = 0.24
+            tip.mesh = tip_mesh
+            var angle := float(index) * TAU / 5.0
+            tip.position = Vector3(sin(angle), cos(angle), 0.0) * 0.25
+            tip.material_override = _material(accent)
+            root.add_child(tip)
+    elif shape == "heart":
+        for side in [-1.0, 1.0]:
+            var lobe := MeshInstance3D.new()
+            lobe.name = "HeartLobe"
+            var lobe_mesh := SphereMesh.new()
+            lobe_mesh.radius = 0.15
+            lobe_mesh.height = 0.30
+            lobe.mesh = lobe_mesh
+            lobe.position = Vector3(0.12 * side, 0.13, 0.0)
+            lobe.material_override = _material(accent)
+            root.add_child(lobe)
+    else:
+        var jewel := MeshInstance3D.new()
+        jewel.name = "CraftedJewel"
+        var jewel_mesh := SphereMesh.new()
+        jewel_mesh.radius = 0.10
+        jewel_mesh.height = 0.17
+        jewel.mesh = jewel_mesh
+        jewel.position = Vector3(0, 0.15, 0.18)
+        jewel.material_override = _material(accent)
+        root.add_child(jewel)
+    return true
 
 
 static func _apply_clothing(
