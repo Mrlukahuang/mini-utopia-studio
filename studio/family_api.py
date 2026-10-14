@@ -26,6 +26,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 from studio.bridge.characters import CharacterBridgeReader
 from studio.bridge.equipment import EquipmentBridgeGateway
 from studio.family_props import FamilyCraftedProp, craft_family_prop
+from studio.family_films import FamilyFilmDraft, cast_is_owned, film_contract, save_film_draft
 from studio.bridge.errors import CharacterRevisionConflict, CharacterWriteValidationError
 from studio.bridge.server import BridgeResponse, MAX_REQUEST_BODY_BYTES
 from studio.core.enums import AssetType, ReviewStatus
@@ -396,6 +397,82 @@ class FamilyApplication:
             return BridgeResponse(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
 
         route = urlsplit(path).path
+        if route == "/family/films":
+            if method == "GET":
+                films = [
+                    film_contract(asset)
+                    for asset in self.repository.list_assets(AssetType.FILM)
+                    if asset.metadata.get("family_owner") == owner
+                    and asset.status != ReviewStatus.ARCHIVED
+                    and "family_film_draft" in asset.metadata
+                ]
+                return BridgeResponse(HTTPStatus.OK, {
+                    "schema_version": "1.0", "films": films,
+                })
+            if method != "POST":
+                return BridgeResponse(HTTPStatus.METHOD_NOT_ALLOWED, {
+                    "error": "method_not_allowed",
+                })
+            try:
+                draft = FamilyFilmDraft.model_validate(json.loads(body))
+            except (ValueError, UnicodeError, ValidationError):
+                return BridgeResponse(HTTPStatus.BAD_REQUEST, {
+                    "error": "invalid_film_draft",
+                })
+            if not cast_is_owned(self.repository, owner, draft):
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            with self._session_lock:
+                count = sum(
+                    1 for asset in self.repository.list_assets(AssetType.FILM)
+                    if asset.metadata.get("family_owner") == owner
+                )
+                if count >= 20:
+                    return BridgeResponse(HTTPStatus.CONFLICT, {
+                        "error": "film_draft_limit",
+                    })
+                saved = save_film_draft(self.repository, owner, draft)
+            return BridgeResponse(HTTPStatus.CREATED, saved)
+
+        if route.startswith("/family/films/"):
+            film_id = unquote(route[len("/family/films/"):])
+            if not film_id.startswith("FILM_") or "/" in film_id:
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            with self._session_lock:
+                asset = self.repository.get_asset(film_id)
+                if (
+                    asset is None or asset.asset_type != AssetType.FILM
+                    or asset.status == ReviewStatus.ARCHIVED
+                    or asset.metadata.get("family_owner") != owner
+                    or "family_film_draft" not in asset.metadata
+                ):
+                    return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+                if method == "GET":
+                    return BridgeResponse(HTTPStatus.OK, film_contract(asset))
+                if method != "PUT":
+                    return BridgeResponse(HTTPStatus.METHOD_NOT_ALLOWED, {
+                        "error": "method_not_allowed",
+                    })
+                try:
+                    data = json.loads(body)
+                    if not isinstance(data, dict) or set(data) != {"revision", "draft"}:
+                        raise ValueError("Expected revision and draft")
+                    if not isinstance(data["revision"], str):
+                        raise ValueError("Expected revision string")
+                    draft = FamilyFilmDraft.model_validate(data["draft"])
+                except (ValueError, UnicodeError, ValidationError):
+                    return BridgeResponse(HTTPStatus.BAD_REQUEST, {
+                        "error": "invalid_film_draft",
+                    })
+                if data["revision"] != str(asset.version):
+                    return BridgeResponse(HTTPStatus.CONFLICT, {
+                        "error": "revision_conflict", "current_revision": str(asset.version),
+                    })
+                if not cast_is_owned(self.repository, owner, draft):
+                    return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+                return BridgeResponse(
+                    HTTPStatus.OK, save_film_draft(self.repository, owner, draft, asset)
+                )
+
         if route == "/family/cast-guests":
             if method != "GET":
                 return BridgeResponse(HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"})
