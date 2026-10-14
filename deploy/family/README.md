@@ -229,3 +229,31 @@ there is no guarantee of physical secure erasure on SSDs. Before production,
 adults still need scheduled encrypted off-host backups and a separate
 approved restore rehearsal on an isolated host. Do not restore over a live
 SQLite DB or export a copy into Git, CI artifacts or a shared folder.
+
+
+## Local pre-deployment safety check (no network or accounts created)
+
+After an adult has configured the private host, but **before** starting any
+containers, run the following from the trusted repository directory:
+
+\`\`\`bash
+python -m studio.family_deploy_preflight --deploy-dir deploy/family
+\`\`\`
+
+The check is read-only. It validates that a private \`.env\` exists with
+restrictive permissions, a non-placeholder HTTPS domain is configured,
+three separate SHA-256 credential digests are present, the Godot Web export
+contains \`index.html\`, \`index.js\`, \`index.wasm\`, and \`index.pck\`,
+and the MP4 storage root is protected against other users and symlinks.
+The Docker/Caddy package files must also exist.
+
+Output is structured JSON containing **only check names and error codes**.
+It deliberately never prints the domain, any digest, secret, movie details,
+or contents of the Web export. A failing check returns exit status 1.
+Running the preflight does not create a cloud account, open firewall ports,
+deploy a container or upload family material.
+
+**Important:** passing this offline check does **not** prove that public
+DNS, Caddy certificate issuance, a real child's session, Safari/WebGL,
+Mac/iPad touch controls, or private MP4 saving actually work. Those require
+a separately authorized adult host and a real-device acceptance test.
