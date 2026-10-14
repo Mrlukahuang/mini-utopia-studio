@@ -51,3 +51,42 @@ def write_receipt(
         stream.write(json.dumps(record, sort_keys=True, separators=(",", ":")))
     receipt.chmod(0o600)
     return receipt
+
+
+def verify_receipt(
+    movie: Path, *, owner: str, film_id: str, revision: str,
+    fingerprint: str,
+) -> bool:
+    """Fail closed if the MP4 or its exact approved snapshot has changed."""
+    import os
+
+    receipt = receipt_path(movie)
+    try:
+        if movie.is_symlink() or receipt.is_symlink():
+            return False
+        if not movie.is_file() or not receipt.is_file():
+            return False
+        if receipt.stat().st_size > 2048:
+            return False
+        if os.name == "posix":
+            for file in (movie, receipt):
+                if file.stat().st_uid != os.getuid() or file.stat().st_mode & 0o077:
+                    return False
+        record = json.loads(receipt.read_text(encoding="utf-8"))
+        digest, size = movie_digest(movie)
+        return (
+            isinstance(record, dict)
+            and set(record) == {
+                "schema_version", "owner", "film_id", "revision",
+                "fingerprint", "sha256", "bytes",
+            }
+            and record["schema_version"] == "1.0"
+            and record["owner"] == owner
+            and record["film_id"] == film_id
+            and record["revision"] == revision
+            and record["fingerprint"] == fingerprint
+            and record["sha256"] == digest
+            and record["bytes"] == size
+        )
+    except (OSError, ValueError, TypeError, UnicodeError):
+        return False
