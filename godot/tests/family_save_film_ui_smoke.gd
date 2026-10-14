@@ -39,6 +39,7 @@ func _initialize() -> void:
     family.director_shot_choices["camera"] = "close"
     family.director_shot_choices["action"] = "celebrate"
     family.director_shot_choices["duration_seconds"] = 30
+    family.director_shot_choices["caption_preset"] = "adventure"
     var draft: Dictionary = stage._private_film_draft()
     if draft.get("character_id") != "CHAR_SAVE_A":
         _fail("primary character ID was lost")
@@ -48,6 +49,9 @@ func _initialize() -> void:
         return
     if draft.get("duration_seconds") != 30 or draft.get("camera") != "close":
         _fail("child choices did not reach private draft")
+        return
+    if draft.get("caption_preset") != "adventure":
+        _fail("kid-safe subtitle choice did not reach canonical film draft")
         return
     if draft.get("private_story_note") != "A story in the clouds":
         _fail("story note was not preserved")
