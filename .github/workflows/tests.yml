@@ -415,3 +415,67 @@ jobs:
           assert capture["director_session"]["play_session"]["equipment"]["equipped"]["headwear"]["item_instance_id"] == "ITEM_TEST_FILM_CROWN"
           print("family_movie_15s_smoke: PASS · real 15s MP4 from same Hero + crown")
           PY
+
+      - name: Smoke-test two saved Heroes in one real 15-second MP4
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          # Synthetic test material; NEVER render real children's data on CI.
+          path = Path("godot/runtime_state/family_movie_export_request.json")
+          request = json.loads(path.read_text(encoding="utf-8"))
+          request["second_character"] = {
+              "schema_version": "1.0",
+              "character_id": "CHAR_TEST_FAMILY_FILM_GUEST",
+              "display_name": "CI Mint Cat",
+              "profile": {"avatar": {
+                  "rig_family": "humanoid_kaykit_v1",
+                  "body_type": "slim",
+                  "species_head_id": "species_head_cat_v1",
+                  "surface_color_hex": "#B9E7D0",
+                  "hair_style_id": "hair_none"
+              }}
+          }
+          request["second_equipment_runtime"] = {
+              "character_asset_id": "CHAR_TEST_FAMILY_FILM_GUEST",
+              "equipped": {
+                  "headwear": {
+                      "item_instance_id": "ITEM_GUEST_TEST_CROWN",
+                      "display_name": "Mint Crown",
+                      "rarity": "purple"
+                  }
+              },
+              "final_stats": {"hp": 100, "atk": 10, "defense": 8}
+          }
+          path.write_text(json.dumps(request), encoding="utf-8")
+          PY
+          /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://scripts/family_movie_prepare.gd
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          capture = json.loads(Path("godot/runtime_state/shot_capture_request.json").read_text())
+          film = capture["director_session"]
+          assert film["character_asset_id"] == "CHAR_TEST_FAMILY_FILM"
+          assert film["second_character_asset_id"] == "CHAR_TEST_FAMILY_FILM_GUEST"
+          assert film["second_play_session"]["equipment"]["equipped"]["headwear"]["item_instance_id"] == "ITEM_GUEST_TEST_CROWN"
+          assert film["play_session"]["equipment"]["equipped"]["headwear"]["item_instance_id"] == "ITEM_TEST_FILM_CROWN"
+          assert film["shot"]["asset_ids"][:2] == ["CHAR_TEST_FAMILY_FILM", "CHAR_TEST_FAMILY_FILM_GUEST"]
+          assert capture["frame_count"] == 30
+          print("two_family_heroes_capture_contract: PASS")
+          PY
+          xvfb-run -a /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --path godot --rendering-method gl_compatibility --resolution 480x270 --script res://scripts/shot_frame_capture.gd
+          test "$(find godot/runtime_state/family_movie_frames/EP_FAMILY_PREVIEW -name 'frame_*.png' | wc -l)" -eq 30
+          ffmpeg -hide_banner -loglevel error -y -framerate 2 -i godot/runtime_state/family_movie_frames/EP_FAMILY_PREVIEW/frame_%05d.png -c:v libx264 -pix_fmt yuv420p -movflags +faststart godot/runtime_state/family_movies/two_heroes_test_15s.mp4
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+          movie = Path("godot/runtime_state/family_movies/two_heroes_test_15s.mp4")
+          assert movie.exists() and movie.stat().st_size > 256
+          duration = float(subprocess.check_output([
+              "ffprobe", "-v", "error", "-show_entries", "format=duration",
+              "-of", "default=noprint_wrappers=1:nokey=1", str(movie)
+          ], text=True).strip())
+          assert 14.5 <= duration <= 15.5, duration
+          print("two_family_heroes_mp4: PASS · 15 seconds, both canonical Heroes")
+          PY

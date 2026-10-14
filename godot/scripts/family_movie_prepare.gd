@@ -37,6 +37,38 @@ func _initialize() -> void:
         play["equipment"] = equipped.duplicate(true)
 
     var director := MiniUtopiaFamilyDirectorSession.from_play_session(play)
+    if request.has("second_character"):
+        # The private worker must fetch BOTH Characters and Equipment under
+        # the SAME child-owner token (or an explicit parent-approved cast
+        # grant) before invoking this script. Never expose raw request uploads
+        # as a public rendering endpoint.
+        var second_contract = request.get("second_character", null)
+        if typeof(second_contract) != TYPE_DICTIONARY:
+            _fail("second Character must be a canonical object")
+            return
+        var second_play := MiniUtopiaFamilyCharacterPlayAdapter.play_session_for(
+            second_contract
+        )
+        if second_play.is_empty():
+            _fail("second Character is not a valid canonical saved Hero")
+            return
+
+        var second_equipped = request.get("second_equipment_runtime", null)
+        if (
+            typeof(second_equipped) != TYPE_DICTIONARY
+            or String(second_equipped.get("character_asset_id", "")) != String(
+                second_play.get("character_asset_id", "")
+            )
+            or typeof(second_equipped.get("equipped", null)) != TYPE_DICTIONARY
+            or typeof(second_equipped.get("final_stats", null)) != TYPE_DICTIONARY
+        ):
+            _fail("refusing second Character's mismatched or missing equipment")
+            return
+        second_play["equipment"] = second_equipped.duplicate(true)
+        director = MiniUtopiaFamilyDirectorSession.from_two_play_sessions(
+            play, second_play
+        )
+
     if director.is_empty():
         _fail("unable to construct shared Director session")
         return
