@@ -16,6 +16,7 @@ import re
 import secrets
 import threading
 import time
+from pathlib import Path
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Literal, Mapping
@@ -29,6 +30,10 @@ from studio.family_props import FamilyCraftedProp, craft_family_prop
 from studio.family_films import FamilyFilmDraft, cast_is_owned, film_contract, save_film_draft
 from studio.family_film_render import build_family_film_render_source
 from studio.family_movie_review import current_review_state, decide_private_film_review
+from studio.family_movie_media import (
+    PrivateMovieMediaError, release_status, set_parent_release,
+    download_released_media,
+)
 from studio.bridge.errors import CharacterRevisionConflict, CharacterWriteValidationError
 from studio.bridge.server import BridgeResponse, MAX_REQUEST_BODY_BYTES
 from studio.core.enums import AssetType, ReviewStatus
@@ -76,6 +81,7 @@ class FamilyApplication:
         token_hashes: Mapping[str, str],
         allowed_origins: tuple[str, ...],
         parent_unlock_hash: str | None = None,
+        private_movie_root: Path | None = None,
     ) -> None:
         if len(token_hashes) < 2:
             raise ValueError("At least two separately authenticated profiles required")
@@ -101,6 +107,9 @@ class FamilyApplication:
         self.allowed_origins = frozenset(allowed_origins)
         self.parent_unlock_hash = (
             parent_unlock_hash.lower() if parent_unlock_hash else None
+        )
+        self.private_movie_root = (
+            Path(private_movie_root) if private_movie_root is not None else None
         )
         self._session_lock = threading.RLock()
         # Only token SHA-256 digests are retained on the server, not raw tokens.
