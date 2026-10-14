@@ -34,6 +34,13 @@ var movie_list: VBoxContainer
 var _movie_restore: Dictionary = {}
 var _movie_phase := ""
 var _movie_cast_id := ""
+var _pending_review_film_id := ""
+var _review_film: Dictionary = {}
+var parent_movie_panel: VBoxContainer
+var parent_movie_summary: Label
+var parent_movie_secret: LineEdit
+var parent_movie_approve: Button
+var parent_movie_revoke: Button
 
 
 func _ready() -> void:
@@ -190,6 +197,40 @@ func _build_ui() -> void:
     share_revoke.pressed.connect(_on_parent_revoke_submit)
     adult_share_panel.add_child(share_revoke)
 
+    parent_movie_panel = VBoxContainer.new()
+    parent_movie_panel.name = "ParentMovieReviewPanel"
+    parent_movie_panel.visible = false
+    parent_movie_panel.add_theme_constant_override("separation", 8)
+    column.add_child(parent_movie_panel)
+
+    parent_movie_summary = Label.new()
+    parent_movie_summary.name = "FilmDetailsToReview"
+    parent_movie_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    parent_movie_summary.add_theme_font_size_override("font_size", 18)
+    parent_movie_panel.add_child(parent_movie_summary)
+
+    parent_movie_secret = LineEdit.new()
+    parent_movie_secret.name = "ParentFilmReviewSecret"
+    parent_movie_secret.secret = true
+    parent_movie_secret.max_length = 256
+    parent_movie_secret.placeholder_text = "Parent unlock · never saved"
+    parent_movie_secret.custom_minimum_size.y = 52
+    parent_movie_panel.add_child(parent_movie_secret)
+
+    parent_movie_approve = Button.new()
+    parent_movie_approve.name = "ApprovePrivateRenderButton"
+    parent_movie_approve.text = "👨‍👩‍👧 Parent: Approve private movie render"
+    parent_movie_approve.custom_minimum_size.y = 54
+    parent_movie_approve.pressed.connect(_on_parent_film_approve_pressed)
+    parent_movie_panel.add_child(parent_movie_approve)
+
+    parent_movie_revoke = Button.new()
+    parent_movie_revoke.name = "RevokePrivateRenderButton"
+    parent_movie_revoke.text = "Parent: Revoke movie render permission"
+    parent_movie_revoke.custom_minimum_size.y = 54
+    parent_movie_revoke.pressed.connect(_on_parent_film_revoke_pressed)
+    parent_movie_panel.add_child(parent_movie_revoke)
+
     connection_panel = VBoxContainer.new()
     connection_panel.name = "ParentConnection"
     connection_panel.add_theme_constant_override("separation", 8)
@@ -263,6 +304,7 @@ func _set_connected(connected: bool) -> void:
     guests_refresh_button.disabled = not connected
     movies_button.disabled = not connected
     if not connected:
+        _cancel_parent_movie_review()
         _cancel_movie_restore()
         _clear_movie_list()
         shoot_button.disabled = true
@@ -481,7 +523,133 @@ func _consume_movie_restore(kind: String, payload: Dictionary) -> bool:
     return false
 
 
+func _cancel_parent_movie_review() -> void:
+    _pending_review_film_id = ""
+    _review_film.clear()
+    if parent_movie_panel != null:
+        parent_movie_panel.visible = false
+    if parent_movie_secret != null:
+        parent_movie_secret.clear()
+    if parent_movie_approve != null:
+        parent_movie_approve.disabled = false
+    if parent_movie_revoke != null:
+        parent_movie_revoke.disabled = false
+
+
+func _on_parent_review_movie_pressed(film_id: String) -> void:
+    var family := _family_state()
+    if (
+        family == null or family.current_profile_id().is_empty()
+        or not bridge.has_family_session() or bridge.is_busy()
+        or not _movie_phase.is_empty()
+        or not film_id.begins_with("FILM_") or "/" in film_id
+    ):
+        _set_status("Unlock your account before reviewing your movie.", true)
+        return
+    _cancel_parent_movie_review()
+    _pending_review_film_id = film_id
+    if bridge.get_family_film(film_id) != OK:
+        _cancel_parent_movie_review()
+        _set_status("Parent review could not reload this private film.", true)
+        return
+    _set_status("Checking the latest film before showing it to parent…", false)
+
+
+func _display_parent_movie_details(record: Dictionary) -> void:
+    var draft: Dictionary = record.get("draft", {})
+    parent_movie_summary.text = (
+        "👨‍👩‍👧 Parent film review — PRIVATE RENDER ONLY"
+        + "\nTitle: " + String(draft.get("display_name", "Movie"))
+        + "\nLead actor ID: " + String(draft.get("character_id", ""))
+        + "\nSecond actor ID: " + str(draft.get("second_character_id", "") if draft.get("second_character_id", null) != null else "None")
+        + "\nCamera: " + String(draft.get("camera", ""))
+        + " · Action: " + String(draft.get("action", ""))
+        + " · Length: " + str(draft.get("duration_seconds", 15)) + "s"
+        + "\nStory: " + String(draft.get("private_story_note", ""))
+        + "\nReview version: " + String(record.get("revision", ""))
+        + "\nAny later edits or wardrobe changes require a NEW approval."
+    )
+    parent_movie_panel.visible = true
+    parent_movie_secret.clear()
+
+
+func _parent_movie_decision(decision: String) -> void:
+    var family := _family_state()
+    if (
+        family == null or family.current_profile_id().is_empty()
+        or not family.has_family_connection()
+        or _review_film.is_empty()
+        or bridge.is_busy()
+    ):
+        _set_status("Choose your private film to review again.", true)
+        return
+    var secret := parent_movie_secret.text.strip_edges()
+    parent_movie_secret.clear()
+    var error := bridge.parent_review_film(
+        secret, family.current_profile_id(),
+        String(_review_film.get("film_id", "")),
+        String(_review_film.get("revision", "")),
+        decision
+    )
+    secret = ""
+    if error != OK:
+        _set_status("Parent approval request could not start.", true)
+        return
+    parent_movie_approve.disabled = true
+    parent_movie_revoke.disabled = true
+    _set_status("Checking this exact film version with parent unlock…", false)
+
+
+func _on_parent_film_approve_pressed() -> void:
+    _parent_movie_decision("approve")
+
+
+func _on_parent_film_revoke_pressed() -> void:
+    _parent_movie_decision("revoke")
+
+
 func _on_bridge_success(kind: String, payload: Dictionary) -> void:
+    if kind == "films:get" and not _pending_review_film_id.is_empty():
+        var expected_id := _pending_review_film_id
+        _pending_review_film_id = ""
+        var draft = payload.get("draft", {})
+        if (
+            not bridge.has_family_session()
+            or String(payload.get("film_id", "")) != expected_id
+            or String(payload.get("revision", "")).is_empty()
+            or typeof(draft) != TYPE_DICTIONARY
+            or not String(draft.get("character_id", "")).begins_with("CHAR_")
+        ):
+            _cancel_parent_movie_review()
+            _set_status("Private film could not be verified for review.", true)
+            return
+        _review_film = payload.duplicate(true)
+        _display_parent_movie_details(_review_film)
+        _set_status("Parent can now review the current film and choose a decision.", false)
+        return
+
+    if kind.begins_with("family:film-review:"):
+        parent_movie_approve.disabled = false
+        parent_movie_revoke.disabled = false
+        if (
+            _review_film.is_empty()
+            or String(payload.get("film_id", "")) != String(
+                _review_film.get("film_id", "")
+            )
+            or String(payload.get("revision", "")) != String(
+                _review_film.get("revision", "")
+            )
+        ):
+            _cancel_parent_movie_review()
+            _set_status("Movie review response did not match selected film.", true)
+            return
+        var approved: bool = payload.get("approved_for_private_render", false) == true
+        _set_status(
+            "Parent approved this exact version for PRIVATE MP4 rendering."
+            if approved else "Private film render approval revoked.", false
+        )
+        return
+
     if kind == "films:list":
         _clear_movie_list()
         var films = payload.get("films", [])
@@ -510,6 +678,14 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             button.add_theme_font_size_override("font_size", 18)
             button.pressed.connect(_on_saved_movie_pressed.bind(id))
             movie_list.add_child(button)
+            var review_button := Button.new()
+            review_button.name = "Review_" + id
+            review_button.text = "👨‍👩‍👧 Parent: Review / Allow private MP4"
+            review_button.custom_minimum_size.y = 54
+            review_button.pressed.connect(
+                _on_parent_review_movie_pressed.bind(id)
+            )
+            movie_list.add_child(review_button)
         _set_status(str(films.size()) + " private movie(s) saved.", false)
         return
     if _consume_movie_restore(kind, payload):
@@ -733,6 +909,19 @@ func _clear_hero_list() -> void:
 
 
 func _on_bridge_failure(kind: String, status_code: int, _code: String, _message: String) -> void:
+    if kind == "films:get" and not _pending_review_film_id.is_empty():
+        _cancel_parent_movie_review()
+        _set_status("This film is not currently available to this child.", true)
+        return
+    if kind.begins_with("family:film-review:"):
+        parent_movie_approve.disabled = false
+        parent_movie_revoke.disabled = false
+        _set_status(
+            "Movie changed; reload and review it again."
+            if status_code == 409
+            else "Parent approval denied or unavailable.", true
+        )
+        return
     if kind == "films:list":
         _clear_movie_list()
         _set_status("Your private movies could not be loaded.", true)

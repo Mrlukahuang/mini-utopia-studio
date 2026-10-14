@@ -206,6 +206,57 @@ func parent_cast_consent(
     return error
 
 
+func parent_review_film(
+    parent_token: String, profile_id: String,
+    film_id: String, revision: String, decision: String
+) -> int:
+    if _request == null or not base_url.begins_with("https://"):
+        return ERR_UNCONFIGURED
+    if is_busy():
+        return ERR_BUSY
+    if (
+        profile_id not in ["child_a", "child_b"]
+        or not film_id.begins_with("FILM_")
+        or "/" in film_id
+        or not revision.is_valid_int()
+        or int(revision) < 1
+        or decision not in ["approve", "revoke"]
+    ):
+        return ERR_INVALID_PARAMETER
+    if parent_token.length() < 32 or parent_token.length() > 256:
+        return ERR_INVALID_PARAMETER
+    for character in parent_token:
+        if not TOKEN_ALPHABET.contains(character):
+            return ERR_INVALID_PARAMETER
+    var headers := PackedStringArray([
+        "Accept: application/json",
+        "Content-Type: application/json",
+        "Authorization: Bearer " + parent_token
+    ])
+    _active_kind = "family:film-review:" + decision
+    var error := _request.request(
+        base_url + "/family/film-reviews", headers,
+        HTTPClient.METHOD_POST, JSON.stringify({
+            "profile_id": profile_id,
+            "film_id": film_id,
+            "revision": revision,
+            "decision": decision
+        })
+    )
+    if error != OK:
+        _active_kind = ""
+    return error
+
+
+func get_family_film_review(film_id: String) -> int:
+    if not film_id.begins_with("FILM_") or "/" in film_id:
+        return ERR_INVALID_PARAMETER
+    return _start_request(
+        "films:review", "/family/films/" + film_id.uri_encode() + "/review",
+        HTTPClient.METHOD_GET
+    )
+
+
 func list_family_films() -> int:
     return _start_request("films:list", "/family/films", HTTPClient.METHOD_GET)
 
