@@ -13,7 +13,7 @@ func _initialize() -> void:
     var original := library.bridge
     library.remove_child(original)
     original.free()
-    var stub := (load("res://tests/film_restore_stub.gd") as GDScript).new() as MiniUtopiaBridgeClient
+    var stub = (load("res://tests/film_restore_stub.gd") as GDScript).new()
     stub.name = "FilmBridgeStub"
     library.add_child(stub)
     library.bridge = stub
@@ -98,7 +98,7 @@ func _initialize() -> void:
         return
 
     await process_frame
-    var scene := current_scene
+    var scene = current_scene
     if scene == null or scene.saved_film_id != FILM_ID:
         _fail("film ID not passed to Director to edit, rather than duplicate")
         return
