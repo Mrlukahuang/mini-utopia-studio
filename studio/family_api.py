@@ -54,6 +54,8 @@ class FamilyCharacterCreate(BaseModel):
 SESSION_TTL_SECONDS = 1800
 PARENT_FAILURE_WINDOW_SECONDS = 60
 PARENT_FAILURE_LIMIT = 5
+CAST_GRANT_TTL_SECONDS = 900
+CAST_GRANT_LIMIT = 16
 
 
 class FamilyApplication:
@@ -100,6 +102,7 @@ class FamilyApplication:
         # Only token SHA-256 digests are retained on the server, not raw tokens.
         self._sessions: dict[str, tuple[str, float]] = {}
         self._parent_failures: list[float] = []
+        self._cast_grants: dict[str, tuple[str, str, str, float]] = {}
 
     @staticmethod
     def _valid_origin(origin: str) -> bool:
@@ -142,7 +145,7 @@ class FamilyApplication:
                 return None
             return owner
 
-    def _issue_child_session(self, authorization: str, body: bytes) -> BridgeResponse:
+    def _require_parent(self, authorization: str) -> BridgeResponse | None:
         if self.parent_unlock_hash is None:
             return BridgeResponse(
                 HTTPStatus.SERVICE_UNAVAILABLE, {"error": "parent_login_not_configured"}
@@ -170,6 +173,13 @@ class FamilyApplication:
                 self._parent_failures.append(now)
             return BridgeResponse(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
 
+        return None
+
+    def _issue_child_session(self, authorization: str, body: bytes) -> BridgeResponse:
+        denied = self._require_parent(authorization)
+        if denied is not None:
+            return denied
+
         try:
             requested = json.loads(body)
         except (UnicodeError, ValueError):
@@ -188,6 +198,7 @@ class FamilyApplication:
 
         token = secrets.token_urlsafe(32)
         token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        now = time.monotonic()
         with self._session_lock:
             self._sessions = {
                 key: item for key, item in self._sessions.items()
@@ -207,6 +218,127 @@ class FamilyApplication:
             "token_type": "Bearer",
             "expires_in_seconds": SESSION_TTL_SECONDS,
             "profile_id": requested["profile_id"],
+        })
+
+    def _issue_cast_grant(self, authorization: str, body: bytes) -> BridgeResponse:
+        denied = self._require_parent(authorization)
+        if denied is not None:
+            return denied
+        try:
+            data = json.loads(body)
+        except (UnicodeError, ValueError):
+            return BridgeResponse(HTTPStatus.BAD_REQUEST, {"error": "invalid_cast_grant"})
+        expected = {"viewer_profile_id", "source_profile_id", "character_id"}
+        if not isinstance(data, dict) or set(data) != expected or any(
+            not isinstance(value, str) for value in data.values()
+        ):
+            return BridgeResponse(HTTPStatus.BAD_REQUEST, {"error": "invalid_cast_grant"})
+        viewer = data["viewer_profile_id"]
+        source = data["source_profile_id"]
+        cid = data["character_id"]
+        if (
+            viewer not in self.token_hashes
+            or source not in self.token_hashes
+            or viewer == source
+            or not re.fullmatch(r"CHAR_[A-Za-z0-9_-]{3,96}", cid)
+        ):
+            return BridgeResponse(HTTPStatus.BAD_REQUEST, {"error": "invalid_cast_grant"})
+        asset = self.repository.get_asset(cid)
+        if (
+            asset is None
+            or asset.asset_type != AssetType.CHARACTER
+            or asset.status == ReviewStatus.ARCHIVED
+            or asset.metadata.get("family_owner") != source
+        ):
+            return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+        now = time.monotonic()
+        grant_id = "CAST_" + secrets.token_urlsafe(24)
+        with self._session_lock:
+            self._cast_grants = {
+                key: entry for key, entry in self._cast_grants.items()
+                if entry[3] > now
+            }
+            if len(self._cast_grants) >= CAST_GRANT_LIMIT:
+                oldest = min(self._cast_grants, key=lambda key: self._cast_grants[key][3])
+                del self._cast_grants[oldest]
+            self._cast_grants[grant_id] = (
+                viewer, source, cid, now + CAST_GRANT_TTL_SECONDS
+            )
+        return BridgeResponse(HTTPStatus.CREATED, {
+            "schema_version": "1.0", "grant_id": grant_id,
+            "viewer_profile_id": viewer, "source_profile_id": source,
+            "character_id": cid, "expires_in_seconds": CAST_GRANT_TTL_SECONDS,
+        })
+
+    def _revoke_cast_grant(self, authorization: str, grant_id: str) -> BridgeResponse:
+        denied = self._require_parent(authorization)
+        if denied is not None:
+            return denied
+        with self._session_lock:
+            if self._cast_grants.pop(grant_id, None) is None:
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+        return BridgeResponse(HTTPStatus.NO_CONTENT, {})
+
+    def _list_cast_guests(self, viewer: str) -> BridgeResponse:
+        now = time.monotonic()
+        with self._session_lock:
+            matches = [
+                (grant_id, source, cid, expires)
+                for grant_id, (owner, source, cid, expires) in self._cast_grants.items()
+                if owner == viewer and expires > now
+            ]
+        guests = []
+        for grant_id, source, cid, expires in matches:
+            asset = self.repository.get_asset(cid)
+            if (
+                asset is None
+                or asset.asset_type != AssetType.CHARACTER
+                or asset.status == ReviewStatus.ARCHIVED
+                or asset.metadata.get("family_owner") != source
+            ):
+                continue
+            guests.append({
+                "grant_id": grant_id, "character_id": cid,
+                "display_name": asset.display_name,
+                "expires_in_seconds": max(0, int(expires - now)),
+            })
+        return BridgeResponse(HTTPStatus.OK, {
+            "schema_version": "1.0", "guests": guests,
+        })
+
+    def _get_cast_guest(self, viewer: str, grant_id: str) -> BridgeResponse:
+        now = time.monotonic()
+        with self._session_lock:
+            grant = self._cast_grants.get(grant_id)
+            if grant is None or grant[0] != viewer or grant[3] <= now:
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            _, source, cid, _expires = grant
+        asset = self.repository.get_asset(cid)
+        if (
+            asset is None
+            or asset.asset_type != AssetType.CHARACTER
+            or asset.status == ReviewStatus.ARCHIVED
+            or asset.metadata.get("family_owner") != source
+        ):
+            return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+        contract = self.reader._contract(asset).model_dump(mode="json")
+        # Grant covers acting appearance + equipped items, not biography,
+        # revisions, private notes, or the sibling's full wardrobe inventory.
+        limited = {
+            "schema_version": "1.0",
+            "character_id": cid,
+            "display_name": contract["display_name"],
+            "profile": {"avatar": contract["profile"]["avatar"]},
+        }
+        gateway = EquipmentBridgeGateway(
+            self.repository,
+            collection_id="COLL_FAMILY_" + source,
+            owner_key=source,
+        )
+        runtime = gateway.get_state(cid)["runtime"]
+        return BridgeResponse(HTTPStatus.OK, {
+            "schema_version": "1.0", "grant_id": grant_id,
+            "character": limited, "equipment_runtime": runtime,
         })
 
     def _revoke_child_session(self, authorization: str) -> BridgeResponse:
@@ -246,12 +378,34 @@ class FamilyApplication:
             return self._issue_child_session(authorization, body)
         if route == "/family/sessions/current" and method == "DELETE":
             return self._revoke_child_session(authorization)
+        if route == "/family/cast-grants":
+            if method != "POST":
+                return BridgeResponse(HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"})
+            return self._issue_cast_grant(authorization, body)
+        if route.startswith("/family/cast-grants/"):
+            if method != "DELETE":
+                return BridgeResponse(HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"})
+            grant_id = unquote(route[len("/family/cast-grants/"):])
+            if not re.fullmatch(r"CAST_[A-Za-z0-9_-]{20,64}", grant_id):
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            return self._revoke_cast_grant(authorization, grant_id)
 
         owner = self.authenticate(authorization)
         if owner is None:
             return BridgeResponse(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
 
         route = urlsplit(path).path
+        if route == "/family/cast-guests":
+            if method != "GET":
+                return BridgeResponse(HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"})
+            return self._list_cast_guests(owner)
+        if route.startswith("/family/cast-guests/"):
+            if method != "GET":
+                return BridgeResponse(HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"})
+            grant_id = unquote(route[len("/family/cast-guests/"):])
+            if not re.fullmatch(r"CAST_[A-Za-z0-9_-]{20,64}", grant_id):
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            return self._get_cast_guest(owner, grant_id)
         if route == "/characters":
             if method == "GET":
                 results = []
