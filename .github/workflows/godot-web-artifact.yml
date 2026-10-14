@@ -74,6 +74,17 @@ jobs:
             test -s "$TEMPLATE_DIR/web_nothreads_${kind}.zip"
           done
 
+      - name: Register Godot export template version
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$TEMPLATE_DIR"
+          printf '%s\n' '4.7.2.stable' > "$TEMPLATE_DIR/version.txt"
+          for kind in release debug; do
+            test -s "$TEMPLATE_DIR/web_nothreads_${kind}.zip"
+            unzip -t "$TEMPLATE_DIR/web_nothreads_${kind}.zip" | tail -n 1
+          done
+
       - name: Prepare asset imports
         shell: bash
         run: |
