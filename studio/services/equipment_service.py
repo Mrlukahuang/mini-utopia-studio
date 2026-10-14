@@ -146,8 +146,16 @@ STARTER_ITEM_RECIPES = (
 
 
 class EquipmentService:
-    def __init__(self, repository: StudioRepository):
+    def __init__(
+        self,
+        repository: StudioRepository,
+        *,
+        collection_id: str = DEFAULT_COLLECTION_ID,
+        owner_key: str = "default_creator",
+    ):
         self.repository = repository
+        self.collection_id = collection_id
+        self.owner_key = owner_key
 
     def ensure_default_definitions(self) -> dict[str, EquipmentDefinition]:
         existing_assets = {
@@ -230,10 +238,17 @@ class EquipmentService:
         return definition
 
     def get_collection(self) -> CreatorCollection:
-        collection = self.repository.get_collection(DEFAULT_COLLECTION_ID)
+        collection = self.repository.get_collection(self.collection_id)
         if collection is None:
-            collection = CreatorCollection(collection_id=DEFAULT_COLLECTION_ID)
+            collection = CreatorCollection(
+                collection_id=self.collection_id,
+                owner_key=self.owner_key,
+            )
             self.repository.save_collection(collection)
+        elif collection.owner_key != self.owner_key:
+            # Refuse to borrow another child's inventory even if an ID is
+            # misconfigured. The legacy default collection is unaffected.
+            raise ValueError("Equipment collection owner mismatch.")
         return collection
 
     def ensure_starter_collection(self) -> CreatorCollection:

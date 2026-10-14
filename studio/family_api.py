@@ -21,6 +21,7 @@ from urllib.parse import unquote, urlsplit
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from studio.bridge.characters import CharacterBridgeReader
+from studio.bridge.equipment import EquipmentBridgeGateway
 from studio.bridge.errors import CharacterRevisionConflict, CharacterWriteValidationError
 from studio.bridge.server import BridgeResponse, MAX_REQUEST_BODY_BYTES
 from studio.core.enums import AssetType, ReviewStatus
@@ -165,6 +166,62 @@ class FamilyApplication:
                     self.reader._contract(asset).model_dump(mode="json"),
                 )
             return BridgeResponse(HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"})
+
+        parts = route.strip("/").split("/")
+        if (
+            len(parts) in (3, 4)
+            and parts[0] == "characters"
+            and parts[2] == "equipment"
+        ):
+            character_id = unquote(parts[1])
+            if not character_id or "/" in character_id:
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            asset = self.repository.get_asset(character_id)
+            if (
+                asset is None
+                or asset.asset_type != AssetType.CHARACTER
+                or asset.metadata.get("family_owner") != owner
+            ):
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+
+            # Family inventories are separate canonical CreatorCollections.
+            # Do not expose the desktop's shared COLL_DEFAULT to children.
+            gateway = EquipmentBridgeGateway(
+                self.repository,
+                collection_id="COLL_FAMILY_" + owner,
+                owner_key=owner,
+            )
+            if len(parts) == 3:
+                if method != "GET":
+                    return BridgeResponse(
+                        HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"}
+                    )
+                return BridgeResponse(HTTPStatus.OK, gateway.get_state(character_id))
+
+            if method != "PUT":
+                return BridgeResponse(
+                    HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"}
+                )
+            slot = unquote(parts[3])
+            if not slot or "/" in slot:
+                return BridgeResponse(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            try:
+                data = json.loads(body)
+                if (
+                    not isinstance(data, dict)
+                    or set(data) != {"item_instance_id"}
+                    or (
+                        data["item_instance_id"] is not None
+                        and not isinstance(data["item_instance_id"], str)
+                    )
+                ):
+                    raise ValueError("item_instance_id required")
+                state = gateway.set_slot(character_id, slot, data["item_instance_id"])
+            except (ValueError, UnicodeError):
+                return BridgeResponse(HTTPStatus.BAD_REQUEST, {
+                    "error": "invalid_equipment_update",
+                })
+            return BridgeResponse(HTTPStatus.OK, state)
 
         if route.startswith("/characters/"):
             character_id = unquote(route[len("/characters/"):])
