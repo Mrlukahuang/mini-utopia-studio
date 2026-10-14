@@ -244,3 +244,83 @@ def test_database_restart_does_not_silently_restart_abandoned_render(tmp_path):
     assert restarted.mark_interrupted_failed(queued["job_id"])["status"] == "failed"
     assert restarted.retry_failed(queued["job_id"])["status"] == "queued"
     assert restarted.claim_one()["attempts"] == 2
+
+
+@pytest.mark.parametrize(
+    "failure_mode",
+    ("partial_then_raise", "valid_then_raise", "invalid_success", "missing_success"),
+)
+def test_failed_render_removes_new_private_media_and_allows_manual_retry(
+    tmp_path, failure_mode
+):
+    db, media, app, make_film = create_fixture(tmp_path)
+    film = make_film()
+    approve(app, film)
+    queue = PrivateFamilyRenderQueue(db)
+    queued = queue.enqueue(owner="child_a", film_id=film["film_id"])
+
+    from studio.family_movie_media import media_path
+
+    path = media_path(
+        media, owner="child_a", film_id=film["film_id"],
+        fingerprint=queued["fingerprint"], create_dirs=True,
+    )
+
+    def broken_render(**kwargs):
+        if failure_mode != "missing_success":
+            payload = VIDEO if failure_mode == "valid_then_raise" else b"partial"
+            kwargs["output_path"].write_bytes(payload)
+            kwargs["output_path"].chmod(0o600)
+        if failure_mode.endswith("_raise"):
+            raise RuntimeError("Private child story must not leak to queue logs")
+
+    failed = queue.run_one(
+        project_dir=tmp_path, store_root=media, renderer=broken_render,
+    )
+    assert failed["status"] == "failed"
+    assert failed["error_code"] == "render_failed"
+    assert not path.exists(), "An incomplete movie must not poison the next retry"
+    assert "Private child story" not in json.dumps(queue.list_jobs())
+    assert queue.run_one(
+        project_dir=tmp_path, store_root=media, renderer=broken_render,
+    ) is None, "Never retry failed rendering without an adult action"
+
+    retry = queue.retry_failed(queued["job_id"])
+    assert retry["status"] == "queued"
+
+    def good_render(**kwargs):
+        kwargs["output_path"].write_bytes(VIDEO)
+        kwargs["output_path"].chmod(0o600)
+
+    completed = queue.run_one(
+        project_dir=tmp_path, store_root=media, renderer=good_render,
+    )
+    assert completed["status"] == "completed"
+    assert completed["attempts"] == 2
+    assert path.read_bytes() == VIDEO
+
+
+def test_existing_verified_parent_render_is_reused_without_overwrite(tmp_path):
+    db, media, app, make_film = create_fixture(tmp_path)
+    film = make_film()
+    approve(app, film)
+    queue = PrivateFamilyRenderQueue(db)
+    queued = queue.enqueue(owner="child_a", film_id=film["film_id"])
+
+    from studio.family_movie_media import media_path
+
+    path = media_path(
+        media, owner="child_a", film_id=film["film_id"],
+        fingerprint=queued["fingerprint"], create_dirs=True,
+    )
+    path.write_bytes(VIDEO)
+    path.chmod(0o600)
+
+    def never_render(**kwargs):
+        raise AssertionError("Already verified MP4 must not be rendered again")
+
+    result = queue.run_one(
+        project_dir=tmp_path, store_root=media, renderer=never_render,
+    )
+    assert result["status"] == "completed"
+    assert path.read_bytes() == VIDEO
