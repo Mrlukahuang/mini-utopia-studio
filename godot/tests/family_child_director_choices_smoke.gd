@@ -27,6 +27,31 @@ func _initialize() -> void:
     root.add_child(stage)
     await process_frame
 
+    # Sound helper is opt-in, initiated by a real user tap in the eventual
+    # W2-01b UI; this smoke confirms it never autoplays or accepts a path.
+    var sound := MiniUtopiaFamilyMusicPreview.new()
+    sound.name = "SyntheticMusicPreview"
+    stage.add_child(sound)
+    if sound.autoplay or sound.stream != null:
+        _fail("W2 audio must be off until a direct child tap")
+        return
+    if sound.choose_on_user_tap("../../private_child_recording.wav"):
+        _fail("music preview accepted a non-catalog path")
+        return
+    if sound.stream != null:
+        _fail("unknown music ID leaked a player stream")
+        return
+    if not sound.choose_on_user_tap("sunny_meadow") or sound.stream == null:
+        _fail("first bundled music WAV did not load on direct tap")
+        return
+    if sound.volume_db > -6.0:
+        _fail("music preview did not apply safe initial volume")
+        return
+    if not sound.choose_on_user_tap("none") or sound.stream != null:
+        _fail("music off choice did not stop and clear audio")
+        return
+    sound.clear_preview()
+
     var controls := stage.get_node_or_null(
         "DirectorStageOverlay/KidDirectorChoices"
     ) as VBoxContainer
