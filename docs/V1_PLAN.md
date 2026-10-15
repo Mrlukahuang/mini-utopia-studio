@@ -198,7 +198,7 @@ CC0 套件：KayKit / Kenney / Quaternius
 4. 素材：Lane C 需要新角色或部件素材时，告诉 Lane A 入库，自己不直接往 `godot/assets/kaykit/` 放文件。
 5. 共享文件：`docs/V1_PLAN.md` 只更新自己那一行的状态；`godot/THIRD_PARTY_NOTICES.md` 只追加、不改别人写的内容。合并前先 rebase 最新 main。
 6. 谁都不改：`AGENTS.md`、`AMEND.md`、`tools/scope_guard.py`、`.github/workflows/`。需要改时交给负责人。
-7. 每天 15 个 PR 的合并上限由三条通道共用。PR 标题用任务 ID 开头（V1-W15-01/02/03）。
+7. 每条通道每天各自最多合并 15 个 PR（互不占用，见 AMEND A-011）。全力推进，不需要保守。PR 标题用任务 ID 开头（V1-W15-01/02/03）。
 8. 每个 PR 都要附上 1180×820 iPad 截图；自己通道完成后，在 PR 里通知负责人。
 
 **W1 家长设备预检（非孩子试玩记录，不能替代 §7）：** Mac Safari 与 iPhone Safari/Chrome 已在家庭 HTTPS 下加载游戏，直接 POST Child B 的家庭 API 返回 HTTP 201；Godot 家长解锁页面显示 `Parent unlock could not start` / `Parent unlock denied`。项目负责人明确要求允许 8 位家长口令。记录为 V1-W1-03 的单项阻断修复；真 iPad 验收及粘贴体验后续独立记录。
