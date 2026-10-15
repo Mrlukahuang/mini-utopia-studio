@@ -81,6 +81,20 @@ func _initialize() -> void:
     if chooser == null or not chooser.visible:
         _fail("who-is-playing page must be the first Hero Library view")
         return
+    # The pastel overlay itself may be translucent, but the underlying
+    # library must never bleed through. Closing it restores the same content.
+    var library_content := library.get_node_or_null("Margin") as Control
+    if library_content == null or library_content.visible:
+        _fail("library content shows through who-is-playing chooser")
+        return
+    chooser.hide()
+    if not library_content.visible:
+        _fail("library content stays hidden after leaving chooser")
+        return
+    chooser.show()
+    if library_content.visible:
+        _fail("library content leaked after reopening chooser")
+        return
     if child_a == null or child_b == null:
         _fail("missing two child profile cards")
         return
