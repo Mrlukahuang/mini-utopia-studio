@@ -155,11 +155,14 @@ func _initialize() -> void:
         _fail("NPC did not create a private, initially hidden greeting bubble")
         return
     player.global_position = npc.global_position + Vector3(0.0, 1.0, 2.1)
+    # LOD intentionally wakes sleeping NPCs only every 0.25 seconds.
+    await create_timer(0.38).timeout
     await physics_frame
     if not greeting.visible or not bubble.visible:
         _fail("approaching a villager did not reveal the greeting")
         return
     player.global_position = Vector3(0.0, 1.0, 34.0)
+    await create_timer(0.38).timeout
     await physics_frame
     if bubble.visible:
         _fail("villager greeting stayed open after player left")
