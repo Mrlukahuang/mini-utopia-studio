@@ -34,6 +34,16 @@ func _initialize() -> void:
     if button.pressed.get_connections().is_empty() or button.disabled:
         _fail("movie save is not wired to a scoped family session")
         return
+    var voice_button := stage.get_node_or_null(
+        "DirectorStageOverlay/KidDirectorChoices/RecordShotVoiceButton"
+    ) as Button
+    if voice_button == null or voice_button.custom_minimum_size.y < 48:
+        _fail("touch recording button missing")
+        return
+    if not voice_button.disabled or stage.voice_recorder.start_on_user_tap():
+        _fail("must save film first and never invoke desktop microphone")
+        return
+
     stage.film_title_input.text = "Our Adventure"
     stage.film_note_input.text = "A story in the clouds"
     family.director_shot_choices["camera"] = "close"
@@ -67,6 +77,15 @@ func _initialize() -> void:
     })
     if stage.saved_film_id != "FILM_TEST_SAVED" or stage.saved_film_revision != "1":
         _fail("canonical saved film ID was replaced")
+        return
+    if voice_button.disabled:
+        _fail("record button was not enabled after private save")
+        return
+    stage._on_film_bridge_success("films:voice:0", {
+        "film_id":"FILM_TEST_SAVED", "revision":"3"
+    })
+    if stage.saved_film_revision != "3":
+        _fail("voice recording did not advance current film revision")
         return
     stage._on_film_bridge_success("films:put", {
         "film_id":"FILM_TEST_SAVED", "revision":"2"

@@ -1,8 +1,7 @@
-"""Private 10-second shot-voice metadata/filename policy for W2-02a.
+"""Ten-second per-shot voice contract and private immutable audio storage.
 
-No child audio, token, or filename is accepted by this module. Future upload
-endpoints must prove ownership using their existing child-scoped session and
-probe the actual binary with FFprobe before applying these checks.
+Real recordings stay outside Git, Web assets and CI. Only a child-scoped
+FamilyApplication caller may save, and the adult worker may read after review.
 """
 from __future__ import annotations
 
@@ -86,3 +85,148 @@ def validate_probed_voice(
     if not (0.0 < duration <= MAX_VOICE_SECONDS + 0.05):
         raise PrivateVoicePolicyError("Voice exceeds ten-second limit")
     return duration
+
+
+# Current Director template has one continuous 15/30-second shot. Other indexes
+# remain reserved until a real multi-shot timeline exists; never invent timings.
+def _private_voice_dir(root: Path, owner: str, film_id: str, *, create: bool) -> Path:
+    import os
+    import stat
+    voice_path_relative(owner=owner, film_id=film_id, shot_index=0, media_type="audio/mp4")
+    root = Path(root)
+    if not root.is_absolute():
+        raise PrivateVoicePolicyError("Private voice root must be absolute")
+    folders = (root, root / owner, root / owner / film_id)
+    for folder in folders:
+        if folder.is_symlink():
+            raise PrivateVoicePolicyError("Symlinked private voice directory")
+        if create:
+            folder.mkdir(mode=0o700, exist_ok=True)
+        if not folder.is_dir():
+            raise PrivateVoicePolicyError("Private voice folder unavailable")
+        mode = folder.stat()
+        if not stat.S_ISDIR(mode.st_mode) or (
+            os.name == "posix" and (mode.st_uid != os.getuid() or mode.st_mode & 0o077)
+        ):
+            raise PrivateVoicePolicyError("Private voice folder must be owner-only")
+    return folders[-1]
+
+
+def _clip_path(root: Path, owner: str, film_id: str, clip: dict, *, create=False) -> Path:
+    import re
+    if not isinstance(clip, dict):
+        raise PrivateVoicePolicyError("Invalid saved voice metadata")
+    sha = clip.get("sha256")
+    mime = clip.get("media_type")
+    if not isinstance(sha, str) or not re.fullmatch(r"[a-f0-9]{64}", sha):
+        raise PrivateVoicePolicyError("Invalid saved voice checksum")
+    relative = voice_path_relative(
+        owner=owner, film_id=film_id, shot_index=0, media_type=mime
+    )
+    folder = _private_voice_dir(root, owner, film_id, create=create)
+    return folder / (relative.stem + "_" + sha + relative.suffix)
+
+
+def save_private_shot_voice(
+    repository, *, voice_root: Path, owner: str, film_id: str,
+    shot_index: int, media_type: str, blob: bytes,
+    runner=None, ffprobe: str = "ffprobe",
+) -> dict:
+    """Probe uploaded binary before an immutable 0600 save and film revision bump."""
+    import hashlib
+    import json
+    import subprocess
+    import tempfile
+    from studio.core.enums import AssetType, ReviewStatus
+    from studio.models.asset import now_utc
+
+    if shot_index != 0:
+        raise PrivateVoicePolicyError("Current movie has only one shot")
+    relative = voice_path_relative(
+        owner=owner, film_id=film_id, shot_index=shot_index, media_type=media_type
+    )
+    asset = repository.get_asset(film_id)
+    if (
+        asset is None or asset.asset_type != AssetType.FILM
+        or asset.status == ReviewStatus.ARCHIVED
+        or asset.metadata.get("family_owner") != owner
+        or "family_film_draft" not in asset.metadata
+    ):
+        raise PrivateVoicePolicyError("Owned film not found")
+    if not isinstance(blob, bytes) or not (0 < len(blob) <= MAX_VOICE_BYTES):
+        raise PrivateVoicePolicyError("Voice exceeds private size limit")
+    folder = _private_voice_dir(voice_root, owner, film_id, create=True)
+    with tempfile.NamedTemporaryFile(
+        mode="wb", prefix=".voice-probe-", suffix=relative.suffix, dir=folder
+    ) as temp:
+        temp.write(blob)
+        temp.flush()
+        try:
+            outcome = (runner or subprocess.run)(
+                [ffprobe, "-v", "error", "-show_streams", "-show_format",
+                 "-of", "json", temp.name],
+                check=True, capture_output=True, text=True, timeout=12,
+            )
+            duration = validate_probed_voice(
+                media_type=media_type, byte_count=len(blob),
+                probe=json.loads(outcome.stdout),
+            )
+        except (OSError, subprocess.SubprocessError, ValueError, TypeError) as exc:
+            raise PrivateVoicePolicyError("Private voice failed media verification") from exc
+
+    digest = hashlib.sha256(blob).hexdigest()
+    clip = {"sha256": digest, "media_type": media_type, "duration": round(duration, 3)}
+    dest = _clip_path(voice_root, owner, film_id, clip)
+    if dest.is_symlink():
+        raise PrivateVoicePolicyError("Symlinked private voice file")
+    try:
+        with dest.open("xb") as output:
+            output.write(blob)
+        dest.chmod(0o600)
+    except FileExistsError:
+        # Repeating the same request is safe. Never overwrite prior recordings.
+        if read_private_shot_voice(
+            voice_root, owner=owner, film_id=film_id, clip=clip
+        ) != blob:
+            raise PrivateVoicePolicyError("Existing voice is not verified")
+
+    existing = asset.metadata.get("family_voice_clips", {})
+    if isinstance(existing, dict) and existing.get("0") == clip:
+        return {"film_id": film_id, "revision": str(asset.version),
+                "shot_index": 0, "duration_seconds": clip["duration"]}
+    if not isinstance(existing, dict):
+        raise PrivateVoicePolicyError("Invalid private film voice metadata")
+    asset.metadata["family_voice_clips"] = {**existing, "0": clip}
+    asset.version += 1  # Immediately invalidates any old parental approval.
+    asset.updated_at = now_utc()
+    repository.save_asset(asset)
+    return {"film_id": film_id, "revision": str(asset.version),
+            "shot_index": 0, "duration_seconds": clip["duration"]}
+
+
+def read_private_shot_voice(
+    voice_root: Path, *, owner: str, film_id: str, clip: dict,
+) -> bytes:
+    """Trusted renderer verifies the pinned bytes, not a child-supplied path."""
+    import hashlib
+    import os
+    import stat
+    path = _clip_path(voice_root, owner, film_id, clip)
+    try:
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        try:
+            st = os.fstat(fd)
+            if (not stat.S_ISREG(st.st_mode) or st.st_size > MAX_VOICE_BYTES
+                or st.st_size <= 0 or (os.name == "posix" and (
+                    st.st_uid != os.getuid() or st.st_mode & 0o077
+                ))):
+                raise PrivateVoicePolicyError("Unsafe private voice file")
+            with os.fdopen(fd, "rb", closefd=False) as audio:
+                blob = audio.read(MAX_VOICE_BYTES + 1)
+        finally:
+            os.close(fd)
+    except OSError as exc:
+        raise PrivateVoicePolicyError("Private voice not available") from exc
+    if hashlib.sha256(blob).hexdigest() != clip["sha256"]:
+        raise PrivateVoicePolicyError("Private voice checksum mismatch")
+    return blob

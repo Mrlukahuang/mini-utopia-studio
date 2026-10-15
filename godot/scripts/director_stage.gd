@@ -7,6 +7,8 @@ var film_bridge: MiniUtopiaBridgeClient
 var film_title_input: LineEdit
 var film_note_input: LineEdit
 var save_film_button: Button
+var record_voice_button: Button
+var voice_recorder: MiniUtopiaFamilyVoiceRecorder
 var saved_film_id := ""
 var saved_film_revision := ""
 var fallback_world_environment: WorldEnvironment
@@ -30,6 +32,12 @@ func _ready() -> void:
     if family_state != null:
         family_state.bind_family_client(film_bridge)
 
+    voice_recorder = MiniUtopiaFamilyVoiceRecorder.new()
+    voice_recorder.name = "PrivateShotVoiceRecorder"
+    add_child(voice_recorder)
+    voice_recorder.voice_ready.connect(_on_voice_ready)
+    voice_recorder.voice_failed.connect(_on_voice_failed)
+
     director_runtime = MiniUtopiaDirectorShotRuntime.new()
     director_runtime.name = "DirectorShotRuntime"
     add_child(director_runtime)
@@ -49,6 +57,7 @@ func _ready() -> void:
                 )
                 film_note_input.text = String(draft.get("private_story_note", ""))
                 _refresh_choice_labels()
+                _refresh_record_button()
             stage_payload(family_payload)
             return
 
@@ -123,6 +132,26 @@ func _build_child_director_controls() -> void:
     save_film_button.disabled = not film_bridge.has_family_session()
     save_film_button.pressed.connect(_on_save_private_film_pressed)
     controls.add_child(save_film_button)
+
+    record_voice_button = Button.new()
+    record_voice_button.name = "RecordShotVoiceButton"
+    record_voice_button.text = "🎙️ Record 9s Voice"
+    record_voice_button.custom_minimum_size = Vector2(238, 54)
+    record_voice_button.add_theme_font_size_override("font_size", 18)
+    record_voice_button.pressed.connect(_on_voice_tapped)
+    controls.add_child(record_voice_button)
+    _refresh_record_button()
+
+
+func _refresh_record_button() -> void:
+    if record_voice_button == null:
+        return
+    record_voice_button.disabled = (
+        saved_film_id.is_empty() or film_bridge == null
+        or not film_bridge.has_family_session()
+        or film_bridge.is_busy()
+        or (voice_recorder != null and voice_recorder.recording)
+    )
 
 
 func _refresh_choice_labels() -> void:
@@ -336,7 +365,38 @@ func _on_save_private_film_pressed() -> void:
     status_label.text = "Saving your film privately…"
 
 
+func _on_voice_tapped() -> void:
+    if saved_film_id.is_empty() or film_bridge == null or film_bridge.is_busy():
+        return
+    if not voice_recorder.start_on_user_tap():
+        status_label.text = "Voice recording needs iPad Safari and trusted HTTPS."
+        return
+    _refresh_record_button()
+    status_label.text = "🎙️ Recording one sentence (up to 9 seconds)…"
+
+
+func _on_voice_ready(media_type: String, audio: PackedByteArray) -> void:
+    if film_bridge == null or film_bridge.upload_private_film_voice(
+        saved_film_id, audio, media_type
+    ) != OK:
+        status_label.text = "Could not upload private voice. Try recording again."
+    else:
+        status_label.text = "Saving your voice privately…"
+    _refresh_record_button()
+
+
+func _on_voice_failed() -> void:
+    status_label.text = "Microphone unavailable or recording rejected."
+    _refresh_record_button()
+
+
 func _on_film_bridge_success(kind: String, payload: Dictionary) -> void:
+    if kind == "films:voice:0":
+        saved_film_revision = String(payload.get("revision", ""))
+        status_label.text = "💖 Voice saved privately. Parent review is needed again."
+        _refresh_record_button()
+        return
+
     if kind not in ["films:post", "films:put"]:
         return
     var id := String(payload.get("film_id", ""))
@@ -348,6 +408,7 @@ func _on_film_bridge_success(kind: String, payload: Dictionary) -> void:
     saved_film_id = id
     saved_film_revision = revision
     save_film_button.disabled = false
+    _refresh_record_button()
     status_label.text = "💖 Movie saved to your private Family Cloud!"
     var family := get_node_or_null("/root/FamilySceneState") as MiniUtopiaFamilySceneState
     if family != null and family.second_cast_is_parent_guest:
@@ -357,6 +418,10 @@ func _on_film_bridge_success(kind: String, payload: Dictionary) -> void:
 func _on_film_bridge_failure(
     kind: String, status_code: int, _code: String, _message: String
 ) -> void:
+    if kind == "films:voice:0":
+        status_label.text = "Voice not saved. Check Safari microphone and try again."
+        _refresh_record_button()
+        return
     if kind not in ["films:post", "films:put"]:
         return
     save_film_button.disabled = false
