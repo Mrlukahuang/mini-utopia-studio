@@ -18,15 +18,22 @@ func _initialize() -> void:
         _fail("official KayKit Knight.glb contains no humanoid Skeleton3D")
         return
     var animation_names: Array = rig_info.get("animations", [])
-    for action in ["idle", "walk", "run", "jump"]:
-        var found := false
-        for animation_name in animation_names:
-            if String(animation_name).to_lower().contains(action):
-                found = true
-                break
-        if not found:
-            _fail("official KayKit Knight.glb missing " + action + " animation")
+    # Real source clip names, verified against the Godot-imported official GLB.
+    for clip_name in ["Idle", "Walking_A", "Running_A", "Jump_Full_Short"]:
+        if not animation_names.has(clip_name):
+            _fail("official KayKit Knight.glb missing clip " + clip_name)
             return
+    for item_name in ["sword_1handed", "shield_round", "staff", "wand"]:
+        var item_path := "res://assets/kaykit/adventurers/" + item_name + ".gltf"
+        var item_scene := load(item_path) as PackedScene
+        if item_scene == null:
+            _fail("KayKit equipment failed Godot import: " + item_name)
+            return
+        var item := item_scene.instantiate()
+        if item == null:
+            _fail("KayKit equipment could not instantiate: " + item_name)
+            return
+        item.free()
 
     var packed := load("res://scenes/character_creator.tscn") as PackedScene
     if packed == null:
@@ -105,6 +112,10 @@ func _inspect_kaykit_actor(node: Node, info: Dictionary) -> void:
         if skeleton.get_bone_count() > int(info.get("bones", 0)):
             info["bones"] = skeleton.get_bone_count()
             info["skeleton"] = String(skeleton.name)
+            var bones: Array[String] = []
+            for bone_idx in range(skeleton.get_bone_count()):
+                bones.append(String(skeleton.get_bone_name(bone_idx)))
+            info["bone_names"] = bones
     if node is AnimationPlayer:
         var player := node as AnimationPlayer
         var names: Array = info.get("animations", [])
