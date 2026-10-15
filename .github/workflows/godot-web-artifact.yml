@@ -374,7 +374,7 @@ jobs:
           # Capture the initial two-player chooser before injecting a synthetic
           # owner-scoped session into the other two isolated CI exports.
           for state in chooser empty hero; do
-            sed -i -E 's|var _ci_visual_state := "(chooser\|empty\|hero)"|var _ci_visual_state := "'"$state"'"|' godot/scripts/family_hero_library.gd
+            sed -i 's|var _ci_visual_state := "[^"]*"|var _ci_visual_state := "'"$state"'"|' godot/scripts/family_hero_library.gd
             "$GODOT_BINARY" --headless --path godot --editor --quit
             mkdir -p "$GITHUB_WORKSPACE/dist/library-$state-visual"
             "$GODOT_BINARY" --headless --path godot --export-release "Web" \
