@@ -94,12 +94,14 @@ func _build_profile_picker() -> void:
     add_child(profile_picker)
 
     var margin := MarginContainer.new()
+    margin.name = "Margin"
     margin.set_anchors_preset(Control.PRESET_FULL_RECT)
     for side in ["left", "top", "right", "bottom"]:
         margin.add_theme_constant_override("margin_" + side, 28)
     profile_picker.add_child(margin)
 
     var column := VBoxContainer.new()
+    column.name = "Column"
     column.add_theme_constant_override("separation", 16)
     margin.add_child(column)
 
