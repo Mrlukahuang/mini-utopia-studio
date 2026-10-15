@@ -178,10 +178,28 @@ CC0 套件：KayKit / Kenney / Quaternius
 
 ```text
 当前：W1.5 视觉与可玩性冲刺（AMEND A-010，方向锁定）
-可领取（按顺序）：V1-W15-01 展示村子 → V1-W15-02 UI 换风格 → V1-W15-03 建角色进村
 暂停：W2 全部（#386 不合并）
+三个 Codex 并行，各自只做自己的通道（Lane），只改自己负责的文件
 完成 W1.5 三项后：通知负责人用 iPad 复测，负责人认可后才能恢复 W2
 ```
+
+### 8.1 并行通道与文件所有权（W1.5 期间生效）
+
+| 通道 | 任务 | 只能改这些文件 |
+|---|---|---|
+| **Lane A 村子** | V1-W15-01 展示村子（#394 进行中） | `godot/scripts/village.gd`、`kaykit_village_npc.gd`、`camera_rig.gd`、`player.gd`、`touch_controls.gd`、`newbie_village*.gd`、`godot/scenes/newbie_village*.tscn`、`godot/scenes/player.tscn`、**`godot/assets/kaykit/**`（所有新 3D 素材统一由 Lane A 入库）**、`tools/` 下的素材准备脚本、`godot/tests/village_*`、`godot/tests/lane_a_*` |
+| **Lane B UI 风格** | V1-W15-02 UI 换风格 | `godot/ui/theme/**`（新建：全局 Theme、StyleBox、配色）、`godot/assets/ui/**`（新建：Logo 副本、图标、按钮贴图）、`godot/assets/fonts/**`（标题字体）、`godot/project.godot` 里的 theme 配置、`godot/scenes/main.tscn`（首页）、`godot/scenes/director_stage.tscn`、`godot/scripts/director_stage.gd`（只改界面部分）、`godot/tests/lane_b_*` |
+| **Lane C 建角色进村** | V1-W15-03 建角色 → 进村 | `godot/scenes/character_creator.tscn`、`godot/scenes/family_hero_library.tscn`、`godot/scripts/character_creator_shell.gd`、`creator_avatar_stage.gd`、`creator_avatar_catalog.gd`、`kaykit_avatar_v1.gd`、`family_hero_library.gd`、`bridge_client.gd`、`family_character_play_adapter.gd`、`hero_runtime_loader.gd`、`creator_play_runtime.gd`、`studio/family_api.py`（只在必要时）、`godot/tests/creator_*`、`godot/tests/lane_c_*` |
+
+**共同规则：**
+1. 不在自己通道里的文件**一律不改**。确实需要改别人的文件时，在 PR 描述里写"需要 Lane X 配合：___"，然后停下等对方处理，不要自己动手。
+2. **Lane B 负责定义外观，Lane A 和 Lane C 负责使用。** Lane B 把风格做成 Godot 全局 Theme（`project.godot` 里的 theme），所有 Control 节点自动继承。Lane A 和 Lane C 不在自己的文件里写死颜色、字体或 StyleBox；已有的写死样式在各自文件里删掉，让全局 Theme 生效。
+3. 村子 HUD（`village.gd` 里的界面）由 Lane A 改，等 Lane B 的 Theme 合并后，Lane A 只做"套用 Theme"的小改动。
+4. 素材：Lane C 需要新角色或部件素材时，告诉 Lane A 入库，自己不直接往 `godot/assets/kaykit/` 放文件。
+5. 共享文件：`docs/V1_PLAN.md` 只更新自己那一行的状态；`godot/THIRD_PARTY_NOTICES.md` 只追加、不改别人写的内容。合并前先 rebase 最新 main。
+6. 谁都不改：`AGENTS.md`、`AMEND.md`、`tools/scope_guard.py`、`.github/workflows/`。需要改时交给负责人。
+7. 每天 15 个 PR 的合并上限由三条通道共用。PR 标题用任务 ID 开头（V1-W15-01/02/03）。
+8. 每个 PR 都要附上 1180×820 iPad 截图；自己通道完成后，在 PR 里通知负责人。
 
 **W1 家长设备预检（非孩子试玩记录，不能替代 §7）：** Mac Safari 与 iPhone Safari/Chrome 已在家庭 HTTPS 下加载游戏，直接 POST Child B 的家庭 API 返回 HTTP 201；Godot 家长解锁页面显示 `Parent unlock could not start` / `Parent unlock denied`。项目负责人明确要求允许 8 位家长口令。记录为 V1-W1-03 的单项阻断修复；真 iPad 验收及粘贴体验后续独立记录。
 
