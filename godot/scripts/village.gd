@@ -121,6 +121,92 @@ func _apply_shared_theme_to_hud() -> void:
         help.text = "创造英雄 · 探索村庄 · 拍一部小电影"
 
 
+
+func _install_performance_badge() -> void:
+    var hud := get_node_or_null("HUD") as CanvasLayer
+    if hud == null:
+        return
+    _perf_badge = Label.new()
+    _perf_badge.name = "LaneAPerformanceBadge"
+    _perf_badge.position = Vector2(460, 9)
+    _perf_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    _perf_badge.text = "FPS -- | Draw --"
+    _perf_badge.visible = false
+    hud.add_child(_perf_badge)
+
+
+func _input(event: InputEvent) -> void:
+    # Hidden until a deliberate 1.2s hold on the existing top-left Logo.
+    # Both touchscreen and desktop use the same non-invasive diagnostic.
+    if event is InputEventScreenTouch:
+        var touch := event as InputEventScreenTouch
+        if touch.pressed and touch.position.x < 160.0 and touch.position.y < 164.0:
+            _perf_pressing = true
+            _perf_toggled_this_hold = false
+            _perf_hold_elapsed = 0.0
+        elif not touch.pressed:
+            _perf_pressing = false
+    elif event is InputEventMouseButton:
+        var mouse := event as InputEventMouseButton
+        if mouse.button_index == MOUSE_BUTTON_LEFT:
+            if mouse.pressed and mouse.position.x < 160.0 and mouse.position.y < 164.0:
+                _perf_pressing = true
+                _perf_toggled_this_hold = false
+                _perf_hold_elapsed = 0.0
+            elif not mouse.pressed:
+                _perf_pressing = false
+
+
+func _toggle_performance_badge() -> void:
+    if _perf_badge != null:
+        _perf_badge.visible = not _perf_badge.visible
+
+
+func _tick_performance_badge(delta: float) -> void:
+    if _perf_pressing and not _perf_toggled_this_hold:
+        _perf_hold_elapsed += delta
+        if _perf_hold_elapsed >= 1.2:
+            _perf_toggled_this_hold = true
+            _toggle_performance_badge()
+    if _perf_badge == null or not _perf_badge.visible:
+        return
+    _fps_elapsed += delta
+    if _fps_elapsed < 0.5:
+        return
+    _fps_elapsed = 0.0
+    var frames := float(Performance.get_monitor(Performance.TIME_FPS))
+    var draw := int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
+    _perf_badge.text = "FPS %.0f  |  Draw %s" % [frames, str(draw) if draw > 0 else "--"]
+
+
+func _update_villager_lod() -> void:
+    var player := get_node_or_null("Player") as Node3D
+    var cam := get_viewport().get_camera_3d()
+    if player == null or cam == null:
+        return
+    for npc in _villagers:
+        if not is_instance_valid(npc):
+            continue
+        var distance_to_child := npc.global_position.distance_to(player.global_position)
+        var on_screen := cam.is_position_in_frustum(npc.global_position + Vector3.UP)
+        npc.set_performance_lod(distance_to_child, on_screen)
+
+
+func _set_overview_visibility() -> void:
+    var camera_rig := get_node_or_null("CameraRig")
+    if camera_rig == null:
+        return
+    var overhead: bool = camera_rig.get("distance") > 20.0
+    if overhead == _overview_was_on:
+        return
+    _overview_was_on = overhead
+    # Keep the CI's overhead whole-village image complete; normal iPad camera
+    # can cheaply clip distant batches behind a little pastel fog.
+    for batch in _static_batches:
+        if is_instance_valid(batch):
+            batch.visibility_range_end = 0.0 if overhead else 65.0
+
+
 func _exit_tree() -> void:
     if _village_previous_web_fps >= 0:
         Engine.max_fps = _village_previous_web_fps
