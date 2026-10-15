@@ -13,7 +13,7 @@ var second_cast_equipment: Dictionary = {}
 var second_cast_is_parent_guest := false
 var director_shot_choices: Dictionary = {
     "action": "walk", "camera": "follow", "duration_seconds": 15,
-    "caption_preset": "none", "music_id": "none"
+    "caption_preset": "none"
 }
 var pending_character_id := ""
 var opened_saved_film: Dictionary = {}
@@ -215,8 +215,10 @@ func restore_owned_film(film: Dictionary) -> bool:
         return false
     director_shot_choices = {
         "camera": camera, "action": action, "duration_seconds": seconds,
-        "caption_preset": caption_preset, "music_id": music_id
+        "caption_preset": caption_preset
     }
+    if music_id != "none":
+        director_shot_choices["music_id"] = music_id
     opened_saved_film = film.duplicate(true)
     return true
 
@@ -224,7 +226,7 @@ func restore_owned_film(film: Dictionary) -> bool:
 func clear_selection() -> void:
     director_shot_choices = {
         "action": "walk", "camera": "follow", "duration_seconds": 15,
-        "caption_preset": "none", "music_id": "none"
+        "caption_preset": "none"
     }
     opened_saved_film.clear()
     active_character.clear()

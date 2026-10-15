@@ -117,7 +117,7 @@ func _initialize() -> void:
         return
 
     family.disconnect_family()
-    if family.director_shot_choices["duration_seconds"] != 15 or family.director_shot_choices.get("caption_preset") != "none" or family.director_shot_choices.get("music_id") != "none":
+    if family.director_shot_choices["duration_seconds"] != 15 or family.director_shot_choices.get("caption_preset") != "none" or family.director_shot_choices.get("music_id", "none") != "none":
         _fail("child choices leaked to the next profile after logout")
         return
 

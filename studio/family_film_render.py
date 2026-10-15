@@ -81,10 +81,12 @@ def build_family_film_render_source(
             "action": draft.action,
             "duration_seconds": draft.duration_seconds,
             "caption_preset": draft.caption_preset,
-            "music_id": draft.music_id,
         },
         "fps": 2, "width": 480, "height": 270,
     }
+    # Existing silent films retain the exact v1 render contract.
+    if draft.music_id != "none":
+        result["director_choices"]["music_id"] = draft.music_id
     if draft.second_character_id is not None:
         second = render_actor(draft.second_character_id)
         if second is None:

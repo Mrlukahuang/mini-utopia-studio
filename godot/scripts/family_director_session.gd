@@ -223,6 +223,8 @@ static func with_child_choices(
     result["camera"] = camera
     result["child_director_choices"] = {
         "action": action, "camera": lens, "duration_seconds": seconds,
-        "caption_preset": caption_preset, "music_id": music_id
+        "caption_preset": caption_preset
     }
+    if music_id != "none":
+        result["child_director_choices"]["music_id"] = music_id
     return result
