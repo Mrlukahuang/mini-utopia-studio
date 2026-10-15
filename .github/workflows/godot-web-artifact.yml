@@ -229,6 +229,46 @@ jobs:
           test -s dist/web/index.pck
           test -s dist/web/index.js
 
+      # A-008: CI-only Creator screenshot build. Do not change the regular
+      # Web artifact, route around parent approval, or publish a family URL.
+      - name: Export isolated Creator visual-check Web build
+        shell: bash
+        run: |
+          set -euo pipefail
+          sed -i 's|run/main_scene="res://scenes/main.tscn"|run/main_scene="res://scenes/character_creator.tscn"|' godot/project.godot
+          grep -Fx 'run/main_scene="res://scenes/character_creator.tscn"' godot/project.godot
+          mkdir -p "$GITHUB_WORKSPACE/dist/creator-visual"
+          "$GODOT_BINARY" --headless --path godot --export-release "Web" \
+            "$GITHUB_WORKSPACE/dist/creator-visual/index.html"
+          test -s dist/creator-visual/index.pck
+          test -s dist/creator-visual/index.wasm
+
+      - name: Install pinned Playwright Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --prefix /tmp/mini-utopia-playwright --no-audit --no-fund playwright@1.56.1
+          /tmp/mini-utopia-playwright/node_modules/.bin/playwright install --with-deps chromium
+
+      - name: Capture Creator on two iPad landscape viewports
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/visual-evidence
+          python3 -m http.server 8765 --bind 127.0.0.1 --directory dist/creator-visual >/tmp/mini-utopia-http.log 2>&1 &
+          node tools/playwright_creator_visual.cjs
+          test -s dist/visual-evidence/creator-1180x820.png
+          test -s dist/visual-evidence/creator-1366x1024.png
+
+      - name: Publish iPad Creator visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: creator-ipad-playwright-${{ github.sha }}
+          path: dist/visual-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Publish private build artifact for Mac/iPad review
         uses: actions/upload-artifact@v4
         with:
