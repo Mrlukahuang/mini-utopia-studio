@@ -315,6 +315,123 @@ jobs:
           test -s dist/visual-evidence/village-1366x1024.png
           test -s dist/visual-evidence/director-1366x1024.png
 
+      # Governance-only evidence: isolated synthetic library builds. Never use
+      # household credentials or export this fixture in the production Web PCK.
+      - name: Export isolated empty and populated Hero Library visual builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          sed -i 's|run/main_scene="res://scenes/director_stage.tscn"|run/main_scene="res://scenes/family_hero_library.tscn"|' godot/project.godot
+          grep -Fx 'run/main_scene="res://scenes/family_hero_library.tscn"' godot/project.godot
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("godot/scripts/family_hero_library.gd")
+          source = path.read_text()
+          anchor = 'func _family_state() -> MiniUtopiaFamilySceneState:'
+          assert source.count(anchor) == 1
+          # CI-only injectable fixture: session is synthetic and never sent to a host.
+          fixture = '''
+          var _ci_visual_state := "chooser"
+
+          func _ci_library_fixture() -> void:
+              if _ci_visual_state == "chooser":
+                  return
+              var family := _family_state()
+              if family == null:
+                  return
+              if not family.connect_family(
+                  "https://family.invalid",
+                  "CI_FAKE_NON_SECRET_0123456789abcdefghij",
+                  "child_a"
+              ):
+                  return
+              if not family.bind_family_client(bridge):
+                  return
+              _set_connected(true)
+              var heroes: Array = []
+              if _ci_visual_state == "hero":
+                  heroes.append({
+                      "character_id": "CHAR_CI_SYNTHETIC",
+                      "display_name": "小星星 Star",
+                      "profile": {"avatar": {}}
+                  })
+              _on_bridge_success("characters:list", {
+                  "schema_version": "1.0", "characters": heroes
+              })
+              # The new Lane C first-touch chooser must not cover the
+              # library-content evidence once it lands on main.
+              var chooser := get_node_or_null("WhoIsPlaying") as Control
+              if chooser != null:
+                  chooser.hide()
+
+          '''
+          source = source.replace(anchor, fixture + anchor, 1)
+          ready_end = '        _set_status("想保存新角色？请家长先点「家长入口」。", false)'
+          assert source.count(ready_end) == 1
+          source = source.replace(ready_end, ready_end + '\n    call_deferred("_ci_library_fixture")', 1)
+          path.write_text(source)
+          PY
+          # Capture the initial two-player chooser before injecting a synthetic
+          # owner-scoped session into the other two isolated CI exports.
+          for state in chooser empty hero; do
+            sed -i -E 's|var _ci_visual_state := "(chooser\|empty\|hero)"|var _ci_visual_state := "'"$state"'"|' godot/scripts/family_hero_library.gd
+            "$GODOT_BINARY" --headless --path godot --editor --quit
+            mkdir -p "$GITHUB_WORKSPACE/dist/library-$state-visual"
+            "$GODOT_BINARY" --headless --path godot --export-release "Web" \
+              "$GITHUB_WORKSPACE/dist/library-$state-visual/index.html"
+            test -s "dist/library-$state-visual/index.pck"
+          done
+
+      - name: Screenshot Who Is Playing and Hero Library at 1180x820
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8768 --bind 127.0.0.1 --directory dist/library-empty-visual >/tmp/mini-utopia-library-empty.log 2>&1 &
+          python3 -m http.server 8769 --bind 127.0.0.1 --directory dist/library-hero-visual >/tmp/mini-utopia-library-hero.log 2>&1 &
+          python3 -m http.server 8770 --bind 127.0.0.1 --directory dist/library-chooser-visual >/tmp/mini-utopia-chooser.log 2>&1 &
+          node <<'JS'
+          const {chromium} = require('/tmp/mini-utopia-playwright/node_modules/playwright');
+          const fs = require('node:fs');
+          (async () => {
+            const browser = await chromium.launch({
+              headless: true,
+              args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--no-sandbox']
+            });
+            try {
+              for (const [state, port] of [['who-is-playing', 8770], ['empty', 8768], ['with-hero', 8769]]) {
+                const context = await browser.newContext({
+                  viewport: {width: 1180, height: 820},
+                  deviceScaleFactor: 1, isMobile: true, hasTouch: true
+                });
+                const page = await context.newPage();
+                const errors = [];
+                page.on('pageerror', e => errors.push(e.message));
+                await page.goto('http://127.0.0.1:' + port + '/', {
+                  waitUntil: 'load', timeout: 120000
+                });
+                await page.locator('canvas').first().waitFor({
+                  state: 'visible', timeout: 120000
+                });
+                await page.waitForFunction(
+                  () => document.getElementById('status') === null,
+                  null, {timeout: 120000}
+                );
+                await page.waitForTimeout(5000);
+                const file = 'dist/visual-evidence/' + (state === 'who-is-playing' ? state : 'library-' + state) + '-1180x820.png';
+                await page.screenshot({path: file, fullPage: false, timeout: 90000});
+                if (fs.statSync(file).size < 12000 || errors.length) {
+                  throw Error('Invalid library screenshot ' + state + ': ' + errors.join('; '));
+                }
+                console.log('Captured isolated, synthetic library: ' + file);
+                await context.close();
+              }
+            } finally { await browser.close(); }
+          })().catch(e => {console.error(e); process.exitCode = 1;});
+          JS
+          test -s dist/visual-evidence/who-is-playing-1180x820.png
+          test -s dist/visual-evidence/library-empty-1180x820.png
+          test -s dist/visual-evidence/library-with-hero-1180x820.png
+
       - name: Publish iPad Creator visual evidence
         if: always()
         uses: actions/upload-artifact@v4
