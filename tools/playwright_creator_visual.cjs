@@ -16,9 +16,8 @@ async function main() {
     throw new Error('Unsupported visual scene');
   }
   const port = Number(process.env.MINI_UTOPIA_VISUAL_PORT || 8765);
-  const sizes = scene === 'creator'
-    ? [[1180, 820], [1366, 1024]]
-    : [[1366, 1024]];
+  // W1.5 scenes all require real exported Web screenshots at 1180×820.
+  const sizes = [[1180, 820], [1366, 1024]];
   const out = path.resolve('dist/visual-evidence');
   fs.mkdirSync(out, {recursive: true});
   const browser = await chromium.launch({
@@ -62,6 +61,34 @@ async function main() {
         throw new Error('Godot browser JavaScript error: ' + pageErrors.join(' | '));
       }
       console.log('Captured real Godot Web ' + scene + ' screenshot:', filename);
+      if (scene === 'village' && width === 1180) {
+        // Keyboard F9 switches only the real Godot CameraRig to a long
+        // overhead view: the screenshot must contain the entire village,
+        // not a close top-of-head selfie produced by a short touch drag.
+        await page.locator('canvas').first().focus();
+        const t0 = Date.now();
+        await page.keyboard.press('F9');
+        await page.waitForTimeout(3000);
+        // The previous failure occurred in the WebGL compositor (not fonts):
+        // Playwright loaded fonts but timed out after 30 seconds when capturing
+        // this second frame with SwiftShader. Capture only the iPad viewport,
+        // allow an explicit WebGL readback budget, and log precise diagnostics.
+        const canvasStatus = await page.locator('canvas').first().evaluate(
+          node => ({width: node.width, height: node.height})
+        );
+        console.log('Godot Web overview camera requested; canvas:', canvasStatus,
+                    'settle_ms:', Date.now() - t0);
+        const overview = path.join(out, 'village-topdown-1180x820.png');
+        await page.screenshot({
+          path: overview, fullPage: false, animations: 'disabled', timeout: 90000
+        });
+        console.log('Godot Web overhead capture duration_ms:', Date.now() - t0);
+        if (fs.statSync(overview).size < 12000) {
+          throw new Error('KayKit village overhead screenshot is invalid');
+        }
+        console.log('Captured live Godot village overhead:', overview);
+      }
+
       await context.close();
     }
   } finally {

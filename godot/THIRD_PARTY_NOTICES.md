@@ -33,3 +33,10 @@ Creator: Kay Lousberg. Official source: https://github.com/KayKit-Game-Assets/Ka
 Original pack: https://kaylousberg.itch.io/kaykit-adventurers
 License: CC0 1.0 Universal, original `LICENSE.txt` copied unchanged to `res://assets/kaykit/adventurers/LICENSE.txt`.
 Only these original files from `addons/kaykit_character_pack_adventures/Assets/gltf/` are included: sword_1handed, shield_round, staff, wand with paired binary sidecars and knight/mage texture atlases. Original official `Characters/gltf/Knight.glb` also included unchanged (3,659,532 bytes; source Git blob `717b56ca2b5ff5392679774725201ba03a3eefab`), with its Rig_Medium skeleton and bundled animations. Godot import, runtime Skeleton3D/AnimationPlayer checks and Web bundle must pass before PR3 completion.
+
+
+## KayKit Medieval Hexagon Pack 1.0 — selected village homes (A-010 / W1.5)
+Creator: Kay Lousberg. Official source: https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0
+License: CC0 1.0 Universal; original LICENSE.txt preserved unchanged as res://assets/kaykit/medieval/LICENSE.txt.
+Only eight official low-poly medieval houses, building_home_A and building_home_B in blue, green, red, and yellow, are included with original glTF/.bin pairs and the original hexagons_medieval.png shared texture atlas. All Git blobs match official originals. They are instantiated as 20 houses with physical StaticBody3D blockers; the original upstream pack is not copied wholesale.
+Fifteen visible villagers reuse the original KayKit Knight animation/skeleton asset already licensed above, with five distinct modular toy hats/head styles and three coat colors, instead of claiming fifteen separate upstream character models. Each villager and the player have a CharacterBody3D capsule collider.
