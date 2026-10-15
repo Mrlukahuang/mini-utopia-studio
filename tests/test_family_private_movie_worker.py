@@ -219,3 +219,75 @@ def test_oversized_render_is_rejected_before_private_release(tmp_path):
             xvfb_run="xvfb-run", fps=2, runner=fake_oversized_render,
         )
     assert not output.exists()
+
+
+def test_background_music_uses_whitelisted_wav_and_requires_actual_aac(tmp_path, monkeypatch):
+    from studio import family_private_movie_worker as module
+    db, project, private, film_id, cid = fixture_film(tmp_path)
+    original_source = module.build_family_film_render_source
+
+    # CI uses only a synthetic catalog WAV, not a child's audio or private film.
+    wav = project / "assets" / "audio" / "cc0_music" / "sunny_meadow.wav"
+    wav.parent.mkdir(parents=True)
+    wav.write_bytes(b"RIFF" + b"\0" * 64)
+
+    def selected_music_source(repository, *, owner, film_id):
+        source = original_source(repository, owner=owner, film_id=film_id)
+        if source is not None:
+            source["director_choices"]["music_id"] = "sunny_meadow"
+        return source
+
+    monkeypatch.setattr(module, "build_family_film_render_source", selected_music_source)
+    audio_commands = []
+
+    def synthetic_render(argv, *, check, capture_output, text, timeout):
+        if "--path" in argv:
+            workspace = Path(argv[argv.index("--path") + 1])
+            state = workspace / "runtime_state"
+            if "res://scripts/family_movie_prepare.gd" in argv:
+                (state / "shot_capture_request.json").write_text(json.dumps({
+                    "fps": 2, "frame_count": 30,
+                    "director_session": {"character_asset_id": cid}
+                }))
+            elif "res://scripts/shot_frame_capture.gd" in argv:
+                frames = state / "family_movie_frames" / "EP_FAMILY_PREVIEW"
+                frames.mkdir(parents=True)
+                for i in range(30):
+                    (frames / f"frame_{i:05d}.png").write_bytes(b"PNG")
+        if argv[0] == "ffmpeg":
+            audio_commands.append(argv)
+            assert "-stream_loop" in argv and "-c:a" in argv
+            assert "sunny_meadow.wav" in " ".join(argv)
+            Path(argv[-1]).write_bytes(b"\x00\x00\x00\x18ftypisom" + b"0" * 900)
+        if argv[0] == "ffprobe":
+            codec = "stream=codec_name" in argv
+            return subprocess.CompletedProcess(
+                argv, 0, stdout="aac\n" if codec else "15.0\n"
+            )
+        return subprocess.CompletedProcess(argv, 0, stdout="")
+
+    output = private / "music.mp4"
+    result = render_private_movie(
+        db_path=db, project_dir=project, film_id=film_id,
+        owner="child_a", output_path=output, fps=2,
+        runner=synthetic_render,
+    )
+    assert result["duration_seconds"] == 15
+    assert len(audio_commands) == 1
+    assert output.is_file() and output.stat().st_mode & 0o077 == 0
+
+    # A missing AAC track must block publishing even when FFmpeg returns 0.
+    output.unlink()
+    def no_audio(argv, **kwargs):
+        result = synthetic_render(argv, **kwargs)
+        if argv[0] == "ffprobe" and "stream=codec_name" in argv:
+            return subprocess.CompletedProcess(argv, 0, stdout="")
+        return result
+
+    with pytest.raises(PrivateMovieError, match="AAC"):
+        render_private_movie(
+            db_path=db, project_dir=project, film_id=film_id,
+            owner="child_a", output_path=output, fps=2,
+            runner=no_audio,
+        )
+    assert not output.exists()
