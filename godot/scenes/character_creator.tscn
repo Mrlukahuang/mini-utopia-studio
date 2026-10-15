@@ -68,6 +68,11 @@ placeholder_text = "Name your Hero / 给角色起名字"
 max_length = 120
 caret_blink = true
 
+[node name="HelpNameButton" type="Button" parent="RootMargin/MainColumn/HeaderRow"]
+custom_minimum_size = Vector2(148, 48)
+layout_mode = 2
+text = "✨ 帮我起名"
+
 [node name="CharacterLabel" type="Label" parent="RootMargin/MainColumn/HeaderRow"]
 layout_mode = 2
 size_flags_vertical = 4
@@ -137,6 +142,11 @@ text = "Build Your Hero"
 layout_mode = 2
 text = "Tap a choice. Your 3D hero changes instantly."
 autowrap_mode = 2
+
+[node name="RandomLookButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+text = "🎲 随机一下 / Surprise me!"
 
 [node name="BodyLabel" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
@@ -348,6 +358,46 @@ custom_minimum_size = Vector2(82, 44)
 toggle_mode = true
 layout_mode = 2
 text = "Gold"
+
+[node name="PearlButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
+custom_minimum_size = Vector2(82, 44)
+toggle_mode = true
+layout_mode = 2
+text = "Pearl"
+
+[node name="RobotBlueButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
+custom_minimum_size = Vector2(82, 44)
+toggle_mode = true
+layout_mode = 2
+text = "Robot Blue"
+
+[node name="HandStyleLabel" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
+layout_mode = 2
+text = "✨ 手持道具造型 / Hand styles"
+
+[node name="HandStyleGrid" type="GridContainer" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
+layout_mode = 2
+columns = 2
+
+[node name="SwordStyleButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/HandStyleGrid"]
+custom_minimum_size = Vector2(130, 48)
+layout_mode = 2
+text = "🗡 星星剑"
+
+[node name="ShieldStyleButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/HandStyleGrid"]
+custom_minimum_size = Vector2(130, 48)
+layout_mode = 2
+text = "🛡 小盾牌"
+
+[node name="StaffStyleButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/HandStyleGrid"]
+custom_minimum_size = Vector2(130, 48)
+layout_mode = 2
+text = "✨ 魔法杖"
+
+[node name="WandStyleButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/HandStyleGrid"]
+custom_minimum_size = Vector2(130, 48)
+layout_mode = 2
+text = "🪄 小魔棒"
 
 [node name="PreviewPanel" type="Panel" parent="RootMargin/MainColumn/CreatorBody"]
 layout_mode = 2

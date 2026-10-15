@@ -49,6 +49,53 @@ static func mount(root: Node3D, appearance: Dictionary) -> AnimationPlayer:
     return animation
 
 
+static func hand_skin(appearance: Dictionary) -> String:
+    var tags = appearance.get("compatible_tags", [])
+    if typeof(tags) != TYPE_ARRAY:
+        return ""
+    for tag in tags:
+        var value := String(tag).trim_prefix("kaykit_style_")
+        if WEAPONS.has(value):
+            return value
+    return ""
+
+
+static func apply_hand_skin(root: Node3D, appearance: Dictionary, equipment: Dictionary) -> void:
+    var style := hand_skin(appearance)
+    if style.is_empty():
+        return
+    var equipped = equipment.get("equipped", {})
+    if typeof(equipped) != TYPE_DICTIONARY:
+        return
+    var slot := "weapon_offhand" if style == "shield_round" else "weapon_main"
+    if not equipped.has(slot):
+        return
+    var owned_item = equipped.get(slot, {})
+    if typeof(owned_item) != TYPE_DICTIONARY:
+        return
+    var crafted = owned_item.get("visual_recipe", {})
+    if typeof(crafted) == TYPE_DICTIONARY and not crafted.is_empty():
+        return
+    var socket_name := (
+        MiniUtopiaAvatarContract.SOCKET_WEAPON_L
+        if slot == "weapon_offhand"
+        else MiniUtopiaAvatarContract.SOCKET_WEAPON_R
+    )
+    var socket := mounted_weapon_socket(root, socket_name)
+    if socket == null:
+        return
+    var previous := socket.get_node_or_null("Equipment_" + slot)
+    if previous != null:
+        socket.remove_child(previous)
+        previous.free()
+    var packed := load(String(WEAPONS[style])) as PackedScene
+    if packed != null:
+        var model := packed.instantiate() as Node3D
+        if model != null:
+            model.name = "Equipment_" + slot
+            socket.add_child(model)
+
+
 static func play(animation: AnimationPlayer, semantic: String) -> void:
     if animation == null:
         return

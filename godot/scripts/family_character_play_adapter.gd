@@ -36,6 +36,7 @@ static func play_session_for(contract: Dictionary) -> Dictionary:
         "eye_color_hex": String(appearance.get("eye_color_hex", "#7A5238")),
         "hair_style_id": String(appearance.get("hair_style_id", "hair_none")),
         "hair_color_hex": String(appearance.get("hair_color_hex", "#5B4036")),
+        "compatible_tags": appearance.get("compatible_tags", ["humanoid"]),
     }
     return {
         "schema_version": "1.0",
