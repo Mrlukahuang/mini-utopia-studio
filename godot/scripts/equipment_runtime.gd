@@ -68,6 +68,12 @@ static func _attach_item(
     item: Dictionary
 ) -> Node3D:
     var mesh_asset_id := _string_or_empty(item.get("mesh_asset_id", ""))
+    # Preserve existing child's uniquely saved crafted prop recipe; four
+    # KayKit primitives are the only *packaged* weapons, not a replacement
+    # for already-owned custom items.
+    var recipe = item.get("visual_recipe", {})
+    if typeof(recipe) == TYPE_DICTIONARY and not recipe.is_empty():
+        return _procedural_fallback(socket, slot, item)
     if (
         socket.get_parent() is BoneAttachment3D
         and slot in [SLOT_WEAPON_MAIN, SLOT_WEAPON_OFFHAND]
