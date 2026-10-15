@@ -231,7 +231,7 @@ func _initialize() -> void:
     var runtime := MiniUtopiaCreatorPlayRuntime.new()
     world_stub.add_child(runtime)
     runtime.apply_to_player(dummy)
-    if not is_equal_approx(dummy.position.z, 23.0) or not is_zero_approx(dummy.rotation.y):
+    if not is_equal_approx(dummy.position.z, 23.0) or not is_equal_approx(dummy.rotation.y, PI):
         _fail("village entrance spawn is incorrect")
         return
     world_stub.queue_free()
