@@ -26,7 +26,7 @@ func apply_to_player(player: CharacterBody3D) -> Dictionary:
     # This applies to the actual village scene, not Director actors.
     if player.get_parent() != null and player.get_parent().name == "MiniUtopiaWorld":
         player.position = Vector3(0.0, 1.2, 23.0)
-        player.rotation.y = 0.0
+        player.rotation.y = PI
         player.set("_spawn_position", player.global_position)
     # The selected, server-saved family Hero always takes priority over the
     # checked-in demo fixture. The same adapter also feeds Director staging.
