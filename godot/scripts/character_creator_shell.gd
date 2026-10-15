@@ -379,6 +379,12 @@ func _on_hero_name_changed(_value: String) -> void:
         )
     if character_id.is_empty():
         save_button.disabled = not (has_name and bridge.has_family_session())
+        if not has_name:
+            _set_status("Give your hero a name before saving.", false)
+        elif not bridge.has_family_session():
+            _set_status("Name ready · ask your parent to unlock Family Cloud.", false)
+        else:
+            _set_status("Hero named · tap Save to create your private Hero.", false)
     elif not loaded_character.is_empty():
         save_button.disabled = not has_name
 
@@ -814,8 +820,24 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         loaded_character = payload.duplicate(true)
         _appearance_dirty = false
         save_button.disabled = false
-        play_button.disabled = equipment_state.is_empty()
-        _set_status("Saved! Your hero is safe in Mini Utopia. 💖", false)
+        # The previous gate only checked whether the equipment dict was
+        # non-empty. A stale/foreign child's cached wardrobe could therefore
+        # enable Play even though select_equipment() would reject it. Require
+        # the *same* verified owner-scoped runtime as equipment:get.
+        var saved_runtime = equipment_state.get("runtime", {})
+        var owned_equipment := (
+            typeof(saved_runtime) == TYPE_DICTIONARY
+            and String(saved_runtime.get("character_asset_id", "")) == character_id
+            and typeof(saved_runtime.get("equipped", null)) == TYPE_DICTIONARY
+            and typeof(saved_runtime.get("final_stats", null)) == TYPE_DICTIONARY
+        )
+        play_button.disabled = not owned_equipment
+        _set_status(
+            "Saved! Tap Play to enter your village. 💖"
+            if owned_equipment
+            else "Hero saved · reload your own clothes before Play.",
+            false
+        )
 
 
 func _on_bridge_failure(

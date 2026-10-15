@@ -49,11 +49,14 @@ func _initialize() -> void:
     var save_button := scene.get_node(
         "RootMargin/MainColumn/FooterRow/SaveButton"
     ) as Button
+    var play_button := scene.get_node(
+        "RootMargin/MainColumn/FooterRow/PlayButton"
+    ) as Button
     var stage := scene.get_node(
         "RootMargin/MainColumn/CreatorBody/PreviewPanel/AvatarStage"
     ) as MiniUtopiaCreatorAvatarStage
     var bridge := scene.get_node("BridgeClient") as MiniUtopiaBridgeClient
-    if name_input == null or save_button == null or stage == null:
+    if name_input == null or save_button == null or play_button == null or stage == null:
         _fail("child naming controls missing")
         return
 
@@ -99,8 +102,59 @@ func _initialize() -> void:
     if stage.avatar_root_instance_id() != avatar_identity:
         _fail("saving recreated 3D AvatarRoot")
         return
+    if not play_button.disabled:
+        _fail("saved Hero could play before its owner-scoped gear loaded")
+        return
 
-    print("creator_new_hero_smoke: PASS · name, private auth, canonical ID")
+    # The server response is synthetic; no real child account/secret or
+    # network bypass is used. Invalid equipment is never permitted to Play.
+    var foreign_runtime := {
+        "character_asset_id": "CHAR_OTHER_CHILD",
+        "equipped": {}, "final_stats": {}
+    }
+    bridge.request_succeeded.emit("equipment:get", {"runtime": foreign_runtime})
+    if not play_button.disabled:
+        _fail("another child's wardrobe enabled Play")
+        return
+    var owned_runtime := {
+        "character_asset_id": "CHAR_DEMO_LILY",
+        "equipped": {}, "final_stats": {}
+    }
+    bridge.request_succeeded.emit("equipment:get", {"runtime": owned_runtime})
+    if play_button.disabled:
+        _fail("saved Hero and matching gear did not enable Play")
+        return
+
+    # Simulate an optimistic stale-equipment cache after PUT. A successful
+    # save must never enable Play for a different child-owned wardrobe.
+    scene.equipment_state = {"runtime": foreign_runtime}
+    bridge.request_succeeded.emit("character:put", scene.loaded_character)
+    if not play_button.disabled:
+        _fail("character PUT enabled Play for foreign equipment")
+        return
+    bridge.request_succeeded.emit("equipment:get", {"runtime": owned_runtime})
+    if play_button.disabled:
+        _fail("Play did not recover once own equipment was verified")
+        return
+
+    # Press the actual Creator Play handler and verify its two private
+    # selections before Godot changes scenes on the following frame.
+    scene._on_play_pressed()
+    var selection := root.get_node_or_null("FamilySceneState") as MiniUtopiaFamilySceneState
+    if selection == null or String(
+        selection.active_character.get("character_id", "")
+    ) != "CHAR_DEMO_LILY":
+        _fail("Play did not select the server-saved canonical Hero")
+        return
+    if String(selection.active_equipment.get("character_asset_id", "")) != "CHAR_DEMO_LILY":
+        _fail("Play did not select only the saved Hero's own equipment")
+        return
+    var village_session := selection.active_play_session()
+    if String(village_session.get("character_asset_id", "")) != "CHAR_DEMO_LILY":
+        _fail("Village did not receive the saved Hero identity")
+        return
+
+    print("creator_new_hero_smoke: PASS · parent gate → name → save → owned gear → Play")
     quit(0)
 
 
