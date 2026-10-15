@@ -18,6 +18,7 @@ class FamilyFilmDraft(BaseModel):
     duration_seconds: Literal[15, 30] = 15
     # Whitelisted dialogue only: the private_story_note never enters MP4.
     caption_preset: Literal["none", "hello", "adventure", "hooray"] = "none"
+    music_id: Literal["none", "sunny_meadow", "cloud_parade", "moonlit_garden"] = "none"
     private_story_note: str = Field(default="", max_length=280)
 
     @field_validator("display_name")

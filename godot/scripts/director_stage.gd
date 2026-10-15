@@ -91,7 +91,7 @@ func _build_child_director_controls() -> void:
     title.text = "🎥 My Movie / 我来当导演"
     title.add_theme_font_size_override("font_size", 21)
     controls.add_child(title)
-    for key in ["camera", "action", "duration_seconds", "caption_preset"]:
+    for key in ["camera", "action", "duration_seconds", "caption_preset", "music_id"]:
         var button := Button.new()
         button.name = "Choice_" + key
         button.custom_minimum_size = Vector2(238, 54)
@@ -144,6 +144,12 @@ func _refresh_choice_labels() -> void:
         var preset_id := String(choices.get("caption_preset", "none"))
         var caption := MiniUtopiaFamilyDirectorSession.caption_text(preset_id)
         caption_button.text = "💬 Subtitle: " + (caption if not caption.is_empty() else "Off")
+    var music_button: Button = child_choice_buttons.get("music_id")
+    if music_button != null:
+        var music_id := String(choices.get("music_id", "none"))
+        music_button.text = "🎵 Music: " + String(
+            MiniUtopiaFamilyDirectorSession.MUSIC_TITLES.get(music_id, "Off")
+        )
 
 
 func _cycle_child_choice(key: String) -> void:
@@ -160,6 +166,8 @@ func _cycle_child_choice(key: String) -> void:
             options = [15, 30]
         "caption_preset":
             options = ["none", "hello", "adventure", "hooray"]
+        "music_id":
+            options = ["none", "sunny_meadow", "cloud_parade", "moonlit_garden"]
         _:
             return
     var old_value = family.director_shot_choices.get(key, options[0])
@@ -311,6 +319,7 @@ func _private_film_draft() -> Dictionary:
         "action": String(family.director_shot_choices.get("action", "walk")),
         "duration_seconds": int(family.director_shot_choices.get("duration_seconds", 15)),
         "caption_preset": String(family.director_shot_choices.get("caption_preset", "none")),
+        "music_id": String(family.director_shot_choices.get("music_id", "none")),
         "private_story_note": film_note_input.text.strip_edges()
     }
 

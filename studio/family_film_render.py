@@ -81,6 +81,7 @@ def build_family_film_render_source(
             "action": draft.action,
             "duration_seconds": draft.duration_seconds,
             "caption_preset": draft.caption_preset,
+            "music_id": draft.music_id,
         },
         "fps": 2, "width": 480, "height": 270,
     }

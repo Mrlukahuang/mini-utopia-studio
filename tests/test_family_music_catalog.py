@@ -33,3 +33,18 @@ def test_music_id_rejects_arbitrary_paths(music_id):
 
 def test_none_is_silent_and_has_no_file():
     assert music_file(ROOT, "none") is None
+
+
+
+def test_music_id_allowed_by_private_film_draft():
+    from pydantic import ValidationError
+    from studio.family_films import FamilyFilmDraft
+
+    base = {"display_name": "Synthetic short film", "character_id": "CHAR_TEST123"}
+    for choice in ("none", "sunny_meadow", "cloud_parade", "moonlit_garden"):
+        draft = FamilyFilmDraft.model_validate({**base, "music_id": choice})
+        assert draft.music_id == choice
+    assert FamilyFilmDraft.model_validate(base).music_id == "none"
+    for choice in ("/etc/passwd", "../private/voice.wav", "https://example.org/song.wav"):
+        with pytest.raises(ValidationError):
+            FamilyFilmDraft.model_validate({**base, "music_id": choice})
