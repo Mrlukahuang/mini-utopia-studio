@@ -4,6 +4,18 @@ extends SceneTree
 ## and must never enable cloud writes before an adult session is supplied.
 
 func _initialize() -> void:
+    # PR3 resources must be genuinely usable in the same CI Web build.
+    var kaykit_rig := load("res://assets/kaykit/adventurers/Knight.glb") as PackedScene
+    if kaykit_rig == null:
+        _fail("official KayKit Knight.glb was not imported")
+        return
+    var actor := kaykit_rig.instantiate()
+    var has_skeleton := _contains_kaykit_skeleton(actor)
+    actor.free()
+    if not has_skeleton:
+        _fail("official KayKit Knight.glb contains no humanoid Skeleton3D")
+        return
+
     var packed := load("res://scenes/character_creator.tscn") as PackedScene
     if packed == null:
         _fail("Creator scene missing")
@@ -73,3 +85,12 @@ func _initialize() -> void:
 func _fail(message: String) -> void:
     push_error("creator_new_hero_smoke: FAIL · " + message)
     quit(1)
+
+
+func _contains_kaykit_skeleton(node: Node) -> bool:
+    if node is Skeleton3D and (node as Skeleton3D).get_bone_count() >= 15:
+        return true
+    for child in node.get_children():
+        if _contains_kaykit_skeleton(child):
+            return true
+    return false
