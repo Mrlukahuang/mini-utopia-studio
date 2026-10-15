@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://scripts/village.gd" id="1_village"]
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="2_player"]
@@ -12,6 +12,8 @@
 [ext_resource type="FontVariation" path="res://assets/fonts/Fredoka-UI.tres" id="8_title_font"]
 
 [ext_resource type="Texture2D" path="res://assets/ui/home_ambient.svg" id="9_home_ambient"]
+
+[ext_resource type="Script" path="res://ui/theme/scene_fade.gd" id="10_scene_fade"]
 
 [node name="MiniUtopiaWorld" type="Node3D"]
 script = ExtResource("1_village")
@@ -87,6 +89,9 @@ offset_right = 400.0
 offset_bottom = 224.0
 text = "Create  •  Explore  •  Make a movie"
 theme_override_font_sizes/font_size = 16
+
+[node name="SceneFade" type="CanvasLayer" parent="."]
+script = ExtResource("10_scene_fade")
 
 [node name="TouchControls" type="CanvasLayer" parent="."]
 layer = 20
