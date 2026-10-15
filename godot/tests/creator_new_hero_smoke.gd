@@ -24,7 +24,7 @@ func _initialize() -> void:
             _fail("official KayKit Knight.glb missing clip " + clip_name)
             return
     for item_name in ["sword_1handed", "shield_round", "staff", "wand"]:
-        var item_path := "res://assets/kaykit/adventurers/" + item_name + ".gltf"
+        var item_path: String = "res://assets/kaykit/adventurers/" + String(item_name) + ".gltf"
         var item_scene := load(item_path) as PackedScene
         if item_scene == null:
             _fail("KayKit equipment failed Godot import: " + item_name)
