@@ -57,6 +57,7 @@ func _ready() -> void:
                 )
                 film_note_input.text = String(draft.get("private_story_note", ""))
                 _refresh_choice_labels()
+                _refresh_record_button()
             stage_payload(family_payload)
             return
 
