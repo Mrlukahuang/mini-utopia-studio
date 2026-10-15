@@ -16,6 +16,9 @@ const ROUTE_LENGTH := 4.5
 const GREETING_DISTANCE := 3.6
 const AVOID_DISTANCE := 1.35
 static var _shared_bubble_texture: Texture2D
+var _cached_neighbors: Array[Node3D] = []
+var _lod_animation_on := true
+var _lod_physics_on := true
 
 
 func configure(appearance: Dictionary, start: Vector3) -> void:
@@ -149,6 +152,33 @@ func _make_greeting() -> void:
     add_child(greeting_bubble)
 
 
+# Lane A calls this at a low frequency from the village (not every NPC's
+# physics tick). The collision body stays alive even when logic is asleep.
+func configure_neighbors(others: Array[Node3D]) -> void:
+    _cached_neighbors = others
+
+
+func set_performance_lod(distance_to_player: float, in_camera: bool) -> void:
+    # Greeting distance is allowed to wake logic even outside the camera:
+    # a child approaching from behind must still get the hello bubble.
+    var animate: bool = in_camera and distance_to_player <= 15.0
+    var think: bool = distance_to_player <= GREETING_DISTANCE or animate
+    if animate != _lod_animation_on:
+        _lod_animation_on = animate
+        if animation_player != null:
+            animation_player.active = animate
+    if think != _lod_physics_on:
+        _lod_physics_on = think
+        set_physics_process(think)
+        if not think:
+            velocity = Vector3.ZERO
+            moving = false
+            if greeting_bubble != null:
+                greeting_bubble.visible = false
+            if greeting_backdrop != null:
+                greeting_backdrop.visible = false
+
+
 func _physics_process(delta: float) -> void:
     elapsed += delta
     if not is_on_floor():
@@ -182,10 +212,10 @@ func _physics_process(delta: float) -> void:
         if moving:
             # Actual CharacterBody3D physics prevents crossing houses/props.
             blocked = test_move(global_transform, direction * WALK_SPEED * delta * 2.0)
-            for villager in get_tree().get_nodes_in_group("kaykit_village_npc"):
-                if villager == self or not (villager is Node3D):
+            for villager in _cached_neighbors:
+                if villager == self or not is_instance_valid(villager):
                     continue
-                var offset: Vector3 = (villager as Node3D).global_position - global_position
+                var offset: Vector3 = villager.global_position - global_position
                 offset.y = 0.0
                 if offset.length_squared() < AVOID_DISTANCE * AVOID_DISTANCE and offset.dot(direction) > 0.0:
                     blocked = true
@@ -199,6 +229,8 @@ func _physics_process(delta: float) -> void:
             rotation.y = lerp_angle(rotation.y, atan2(0.0, route_direction), minf(delta * 7.0, 1.0))
 
     move_and_slide()
+    if not _lod_animation_on:
+        return
     MiniUtopiaKaykitAvatarV1.play(
         animation_player, "Walk" if moving and Vector2(velocity.x, velocity.z).length() > 0.05 else "Idle"
     )
