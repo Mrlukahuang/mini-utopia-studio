@@ -27,9 +27,6 @@ func _initialize() -> void:
         _fail("Creator animation preview should start at Idle")
         return
 
-    var stage := scene.get_node(
-        "RootMargin/MainColumn/CreatorBody/PreviewPanel/AvatarStage"
-    ) as Control
     var hint := scene.get_node(
         "RootMargin/MainColumn/CreatorBody/PreviewPanel/StageHint"
     ) as Control
