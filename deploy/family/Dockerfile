@@ -7,7 +7,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 COPY deploy/family/requirements-family.txt /tmp/requirements-family.txt
-RUN pip install --no-cache-dir -r /tmp/requirements-family.txt && \
+# FFprobe validates actual private audio bytes before accepting a clip.
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && \
+    rm -rf /var/lib/apt/lists/* && \
+    pip install --no-cache-dir -r /tmp/requirements-family.txt && \
     groupadd --gid 10001 family && \
     useradd --uid 10001 --gid 10001 --no-create-home family && \
     mkdir -p /data /movies && chown family:family /data /movies && \
