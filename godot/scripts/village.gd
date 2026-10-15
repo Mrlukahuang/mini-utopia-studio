@@ -11,6 +11,14 @@ const KAYKIT_HOUSES := [
     preload("res://assets/kaykit/medieval/building_home_B_red.gltf"),
     preload("res://assets/kaykit/medieval/building_home_A_yellow.gltf"),
     preload("res://assets/kaykit/medieval/building_home_B_yellow.gltf"),
+    preload("res://assets/kaykit/medieval/building_tavern_blue.gltf"),
+    preload("res://assets/kaykit/medieval/building_church_blue.gltf"),
+    preload("res://assets/kaykit/medieval/building_market_blue.gltf"),
+    preload("res://assets/kaykit/medieval/building_windmill_blue.gltf"),
+    preload("res://assets/kaykit/medieval/building_blacksmith_blue.gltf"),
+    preload("res://assets/kaykit/medieval/building_tower_A_blue.gltf"),
+    preload("res://assets/kaykit/medieval/building_lumbermill_blue.gltf"),
+    preload("res://assets/kaykit/medieval/building_well_blue.gltf"),
 ]
 
 var _village_previous_web_fps := -1
@@ -277,6 +285,7 @@ func _build_kaykit_houses() -> void:
                 push_error("KayKit building failed to load: " + str(plot_index))
                 continue
             visual.name = "OfficialKayKitBuilding"
+            house.set_meta("kaykit_source_model", plot_index % KAYKIT_HOUSES.size())
             visual.scale = Vector3.ONE * 4.8
             visual.rotation_degrees.y = 180.0 if x < 0.0 else 0.0
             house.add_child(visual)
@@ -286,10 +295,16 @@ func _build_kaykit_houses() -> void:
             # home A: 3.81 x 4.46 x 4.10 m; home B: 4.20 x 6.14 x 5.27 m.
             # Both collider types cover the complete visible building, including
             # the taller B roof and its deeper front/back walls.
-            var is_home_b: bool = plot_index % 2 == 1
+            var type_index: int = plot_index % KAYKIT_HOUSES.size()
+            var is_home_b: bool = type_index in [1, 3, 5, 7]
             collision.position.y = 3.15 if is_home_b else 2.30
             var shape := BoxShape3D.new()
-            shape.size = Vector3(4.5, 6.3, 5.6) if is_home_b else Vector3(4.2, 4.6, 4.4)
+            if type_index >= 8:
+                # Full-height blockers for the real market, windmill and tower meshes.
+                shape.size = Vector3(7.8, 11.0, 7.8)
+                collision.position.y = 5.5
+            else:
+                shape.size = Vector3(4.5, 6.3, 5.6) if is_home_b else Vector3(4.2, 4.6, 4.4)
             collision.shape = shape
             house.add_child(collision)
             plot_index += 1

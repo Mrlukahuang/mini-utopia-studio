@@ -40,3 +40,8 @@ Creator: Kay Lousberg. Official source: https://github.com/KayKit-Game-Assets/Ka
 License: CC0 1.0 Universal; original LICENSE.txt preserved unchanged as res://assets/kaykit/medieval/LICENSE.txt.
 Only eight official low-poly medieval houses, building_home_A and building_home_B in blue, green, red, and yellow, are included with original glTF/.bin pairs and the original hexagons_medieval.png shared texture atlas. All Git blobs match official originals. They are instantiated as 20 houses with physical StaticBody3D blockers; the original upstream pack is not copied wholesale.
 Fifteen visible villagers reuse the original KayKit Knight animation/skeleton asset already licensed above, with five distinct modular toy hats/head styles and three coat colors, instead of claiming fifteen separate upstream character models. Each villager and the player have a CharacterBody3D capsule collider.
+
+
+## KayKit Medieval Hexagon — eight more authentic architecture meshes (V1-W15-01 / Lane A)
+Official source: https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0
+Creator: Kay Lousberg; license: CC0 1.0 Universal (existing unchanged `godot/assets/kaykit/medieval/LICENSE.txt`). Exact source-verified glTF and paired binary Git blobs: **tavern, church, market, windmill, blacksmith, tower_A, lumbermill, well**. Reuses official `hexagons_medieval.png` atlas. Along with the two existing home shapes, the village offers ten distinct base architectural meshes in twenty plots. Curated resources stay under A-010's 150MB ceiling.
