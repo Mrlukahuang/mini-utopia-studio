@@ -101,8 +101,17 @@ func _build_ui() -> void:
     column.add_theme_constant_override("separation", 12)
     margin.add_child(column)
 
+    var brand := TextureRect.new()
+    brand.name = "LibraryLogo"
+    brand.texture = load("res://assets/ui/mini_utopia_logo_horizontal.png")
+    brand.custom_minimum_size = Vector2(280, 72)
+    brand.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+    brand.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+    brand.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    column.add_child(brand)
+
     var title := Label.new()
-    title.text = "✨ My Heroes / 我的角色"
+    title.text = "✨ 我的英雄 / My Heroes"
     column.add_child(title)
 
     var subtitle := Label.new()
@@ -1121,10 +1130,40 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         var name := String(hero.get("display_name", "My Hero"))
         var button := Button.new()
         button.name = "Hero_" + character_id
-        button.text = "✦ " + name + "     ✎ Edit / Dress"
-        button.custom_minimum_size.y = 64
+        button.text = ""
+        button.custom_minimum_size.y = 164
         button.pressed.connect(_on_hero_pressed.bind(character_id))
         hero_list.add_child(button)
+
+        # Real 3D miniature of the saved avatar, rendered via SubViewport.
+        var portrait := MiniUtopiaCreatorAvatarStage.new()
+        portrait.name = "Portrait3D"
+        portrait.anchor_top = 0.0
+        portrait.anchor_bottom = 1.0
+        portrait.offset_left = 12.0
+        portrait.offset_top = 8.0
+        portrait.offset_right = 154.0
+        portrait.offset_bottom = -8.0
+        button.add_child(portrait)
+        portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        var profile = hero.get("profile", {})
+        if typeof(profile) == TYPE_DICTIONARY:
+            var appearance = profile.get("avatar", {})
+            if typeof(appearance) == TYPE_DICTIONARY:
+                portrait.apply_appearance(appearance)
+
+        var hero_name := Label.new()
+        hero_name.name = "HeroName"
+        hero_name.text = "⭐ " + name + "\n✨ 点我换装 / Edit My Hero"
+        hero_name.anchor_left = 0.0
+        hero_name.anchor_right = 1.0
+        hero_name.offset_left = 172.0
+        hero_name.offset_right = -16.0
+        hero_name.offset_top = 48.0
+        hero_name.offset_bottom = 136.0
+        hero_name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        hero_name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        button.add_child(hero_name)
 
         var family := _family_state()
         if (
@@ -1152,10 +1191,17 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             cast_button.pressed.connect(_on_cast_pressed.bind(character_id))
             hero_list.add_child(cast_button)
 
+    if heroes.is_empty():
+        var first_hero := Button.new()
+        first_hero.name = "CreateFirstHeroButton"
+        first_hero.text = "🌈 创建我的英雄\nCreate My Hero ✨"
+        first_hero.custom_minimum_size.y = 148
+        first_hero.disabled = not bridge.has_family_session()
+        first_hero.pressed.connect(_on_new_pressed)
+        hero_list.add_child(first_hero)
     var message := (
-        "No saved Heroes yet. Tap ＋ New Hero to create one!"
-        if heroes.is_empty()
-        else str(heroes.size()) + " saved Hero(es) · tap one to edit."
+        "让我们做出第一个小英雄！" if heroes.is_empty()
+        else "找到你的英雄啦！选一个继续冒险 ✨"
     )
     _set_status(message, false)
 

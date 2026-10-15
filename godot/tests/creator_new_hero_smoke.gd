@@ -79,7 +79,61 @@ func _initialize() -> void:
     if library.api_input.visible or library.token_input.visible:
         _fail("parent login controls remained visible on the child page")
         return
+    # Reuse the existing owner-scoped list contract for real 3D cards.
+    var family_for_card := root.get_node("FamilySceneState") as MiniUtopiaFamilySceneState
+    var synthetic_token := "synthetic_hero_card_token_0123456789abcdef"
+    if not family_for_card.connect_family("https://family.example", synthetic_token):
+        _fail("synthetic portrait session failed")
+        return
+    if not family_for_card.bind_family_client(library.bridge):
+        _fail("portrait session could not bind")
+        return
+    library._set_connected(true)
+    library._on_bridge_success("characters:list", {
+        "schema_version": "1.0",
+        "characters": [{
+            "character_id": "CHAR_PORTRAIT_TEST",
+            "display_name": "Lily",
+            "profile": {"avatar": stage.current_appearance()},
+        }],
+    })
+    var portrait_button := library.hero_list.get_node_or_null("Hero_CHAR_PORTRAIT_TEST") as Button
+    if portrait_button == null or portrait_button.custom_minimum_size.y < 120:
+        _fail("big hero card missing")
+        return
+    var portrait := portrait_button.get_node_or_null("Portrait3D") as MiniUtopiaCreatorAvatarStage
+    if portrait == null or portrait.avatar_root().get_node_or_null("KayKitBody") == null:
+        _fail("KayKit 3D SubViewport portrait missing")
+        return
+    library._on_bridge_success("characters:list", {
+        "schema_version": "1.0", "characters": []
+    })
+    if library.hero_list.get_node_or_null("CreateFirstHeroButton") == null:
+        _fail("empty library has no create hero action")
+        return
+    family_for_card.disconnect_family()
     library.queue_free()
+
+    var name_button := scene.get_node("RootMargin/MainColumn/HeaderRow/HelpNameButton") as Button
+    var random_button := scene.get_node(
+        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/RandomLookButton"
+    ) as Button
+    if name_button == null or random_button == null:
+        _fail("child-friendly Creator actions missing")
+        return
+    scene._on_help_name_pressed()
+    if not scene.hero_name_input.text.contains(" "):
+        _fail("name suggestion should include Chinese and English")
+        return
+    scene._on_random_look_pressed()
+    if not scene._appearance_dirty:
+        _fail("random look must be explicitly saved")
+        return
+    if MiniUtopiaKaykitAvatarV1.hand_skin({
+        "compatible_tags": ["humanoid", "kaykit_style_staff"]
+    }) != "staff":
+        _fail("KayKit hand style not carried with avatar")
+        return
 
     name_input.text = "Lily"
     scene._on_hero_name_changed(name_input.text)
@@ -167,6 +221,20 @@ func _initialize() -> void:
     if play_button.disabled:
         _fail("Play did not recover once own equipment was verified")
         return
+
+    # Spawn position is owned by CreatorPlayRuntime, never village.gd.
+    var world_stub := Node3D.new()
+    world_stub.name = "MiniUtopiaWorld"
+    root.add_child(world_stub)
+    var dummy := CharacterBody3D.new()
+    world_stub.add_child(dummy)
+    var runtime := MiniUtopiaCreatorPlayRuntime.new()
+    world_stub.add_child(runtime)
+    runtime.apply_to_player(dummy)
+    if not is_equal_approx(dummy.position.z, 23.0) or not is_equal_approx(dummy.rotation.y, PI):
+        _fail("village entrance spawn is incorrect")
+        return
+    world_stub.queue_free()
 
     # Press the actual Creator Play handler and verify its two private
     # selections before Godot changes scenes on the following frame.

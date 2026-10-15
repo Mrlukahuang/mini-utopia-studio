@@ -29,6 +29,17 @@ const ANIMATION_BUTTONS := {
     "JumpButton": "Jump",
 }
 
+const FRIENDLY_NAMES := [
+    "小星星 Star", "露露 Lulu", "彩虹 Rainbow",
+    "米米 Mimi", "泡泡 Bubbles", "豆豆 Dodo",
+    "闪闪 Sparkle", "诺诺 Nono",
+]
+const HAND_STYLES := {
+    "SwordStyleButton": "sword_1handed",
+    "ShieldStyleButton": "shield_round",
+    "StaffStyleButton": "staff",
+    "WandStyleButton": "wand",
+}
 const COLOR_BUTTONS := {
     "CreamButton": "#F6F1E8",
     "WarmButton": "#F2C7A5",
@@ -42,6 +53,8 @@ const COLOR_BUTTONS := {
     "SkyButton": "#BDE3F5",
     "PeachButton": "#F5C1B8",
     "GoldButton": "#F2C75C",
+    "PearlButton": "#E8ECEF",
+    "RobotBlueButton": "#A9CFE8",
 }
 
 @onready var bridge: MiniUtopiaBridgeClient = $BridgeClient
@@ -52,6 +65,9 @@ const COLOR_BUTTONS := {
 @onready var status_label: Label = $RootMargin/MainColumn/StatusBar/StatusLabel
 @onready var character_label: Label = $RootMargin/MainColumn/HeaderRow/CharacterLabel
 @onready var hero_name_input: LineEdit = $RootMargin/MainColumn/HeaderRow/TitleColumn/HeroNameInput
+@onready var help_name_button: Button = $RootMargin/MainColumn/HeaderRow/HelpNameButton
+@onready var random_look_button: Button = $RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/RandomLookButton
+@onready var hand_style_grid: GridContainer = $RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/HandStyleGrid
 @onready var back_button: Button = $RootMargin/MainColumn/FooterRow/BackButton
 @onready var save_button: Button = $RootMargin/MainColumn/FooterRow/SaveButton
 @onready var play_button: Button = $RootMargin/MainColumn/FooterRow/PlayButton
@@ -90,6 +106,11 @@ func _ready() -> void:
     save_button.pressed.connect(_on_save_pressed)
     play_button.pressed.connect(_on_play_pressed)
     hero_name_input.text_changed.connect(_on_hero_name_changed)
+    help_name_button.pressed.connect(_on_help_name_pressed)
+    random_look_button.pressed.connect(_on_random_look_pressed)
+    for button_name in HAND_STYLES:
+        var button := hand_style_grid.get_node(button_name) as Button
+        button.pressed.connect(_on_hand_style_pressed.bind(String(HAND_STYLES[button_name])))
     bridge.request_succeeded.connect(_on_bridge_success)
     bridge.request_failed.connect(_on_bridge_failure)
     _wire_look_controls()
@@ -467,6 +488,57 @@ func _refresh_animation_buttons() -> void:
         button.button_pressed = (
             String(ANIMATION_BUTTONS[button_name]) == current
         )
+
+
+func _on_help_name_pressed() -> void:
+    hero_name_input.text = String(FRIENDLY_NAMES.pick_random())
+    _on_hero_name_changed(hero_name_input.text)
+
+
+func _on_random_look_pressed() -> void:
+    var species := String(MiniUtopiaCreatorAvatarCatalog.SPECIES_OPTIONS.keys().pick_random())
+    var allowed_surfaces := MiniUtopiaCreatorAvatarCatalog.allowed_surface_ids(species)
+    var allowed_eyes := MiniUtopiaCreatorAvatarCatalog.allowed_eye_ids(species)
+    var allowed_hair := MiniUtopiaCreatorAvatarCatalog.allowed_hair_ids(species)
+    var colors := COLOR_BUTTONS.values()
+    _draft_appearance["species_head_id"] = species
+    _draft_appearance["body_type"] = String(MiniUtopiaCreatorAvatarCatalog.BODY_OPTIONS.keys().pick_random())
+    _draft_appearance["surface_type"] = String(allowed_surfaces.pick_random())
+    _draft_appearance["eye_style_id"] = String(allowed_eyes.pick_random())
+    _draft_appearance["hair_style_id"] = String(allowed_hair.pick_random())
+    _draft_appearance["surface_color_hex"] = String(colors.pick_random())
+    _draft_appearance["eye_color_hex"] = String(colors.pick_random())
+    _draft_appearance["hair_color_hex"] = String(colors.pick_random())
+    _commit_live_appearance("🎲 新造型！喜欢就保存吧。")
+
+
+func _on_hand_style_pressed(style: String) -> void:
+    if not MiniUtopiaKaykitAvatarV1.WEAPONS.has(style):
+        return
+    var slot := "weapon_offhand" if style == "shield_round" else "weapon_main"
+    var items = equipment_state.get("items", [])
+    if typeof(items) != TYPE_ARRAY or character_id.is_empty() or bridge.is_busy():
+        _set_status("先保存你的英雄，再来选手持道具吧！", false)
+        return
+    # Four CC0 models, but never invent inventory: staff/wand are skins
+    # of the child's genuinely owned starter main-hand weapon.
+    for raw in items:
+        if typeof(raw) != TYPE_DICTIONARY:
+            continue
+        var item: Dictionary = raw
+        if String(item.get("slot", "")) != slot:
+            continue
+        var item_id := String(item.get("item_instance_id", ""))
+        if item_id.is_empty():
+            continue
+        var tags: Array = _draft_appearance.get("compatible_tags", ["humanoid"])
+        tags = tags.filter(func(tag): return not String(tag).begins_with("kaykit_style_"))
+        tags.append("kaykit_style_" + style)
+        _draft_appearance["compatible_tags"] = tags
+        _commit_live_appearance("✨ 装备外观已选择，记得保存！")
+        _on_equipment_choice_pressed(slot, item_id)
+        return
+    _set_status("这件道具还不在你的衣柜里。", true)
 
 
 func _on_body_selected(body_type: String) -> void:
