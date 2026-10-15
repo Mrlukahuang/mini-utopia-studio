@@ -1,0 +1,28 @@
+[gd_resource type="FontVariation" load_steps=23 format=3]
+
+[ext_resource type="FontFile" path="res://assets/fonts/noto-sans-sc-latin-400-normal.woff2" id="1_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/noto-sans-sc-110-400-normal.woff2" id="2_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/noto-sans-sc-111-400-normal.woff2" id="3_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/noto-sans-sc-112-400-normal.woff2" id="4_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/noto-sans-sc-113-400-normal.woff2" id="5_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/noto-sans-sc-114-400-normal.woff2" id="6_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/noto-sans-sc-115-400-normal.woff2" id="7_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/noto-sans-sc-116-400-normal.woff2" id="8_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/noto-sans-sc-117-400-normal.woff2" id="9_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/noto-sans-sc-118-400-normal.woff2" id="10_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/noto-sans-sc-119-400-normal.woff2" id="11_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/noto-sans-sc-86-400-normal.woff2" id="12_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/noto-sans-sc-87-400-normal.woff2" id="13_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/noto-sans-sc-88-400-normal.woff2" id="14_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/noto-sans-sc-105-400-normal.woff2" id="15_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/noto-emoji-2-400-normal.woff2" id="16_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/noto-emoji-3-400-normal.woff2" id="17_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/noto-emoji-4-400-normal.woff2" id="18_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/noto-emoji-5-400-normal.woff2" id="19_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/noto-emoji-7-400-normal.woff2" id="20_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/noto-emoji-8-400-normal.woff2" id="21_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/noto-emoji-9-400-normal.woff2" id="22_font"]
+
+[resource]
+base_font = ExtResource("1_font")
+fallbacks = Array[Font]([ExtResource("2_font"), ExtResource("3_font"), ExtResource("4_font"), ExtResource("5_font"), ExtResource("6_font"), ExtResource("7_font"), ExtResource("8_font"), ExtResource("9_font"), ExtResource("10_font"), ExtResource("11_font"), ExtResource("12_font"), ExtResource("13_font"), ExtResource("14_font"), ExtResource("15_font"), ExtResource("16_font"), ExtResource("17_font"), ExtResource("18_font"), ExtResource("19_font"), ExtResource("20_font"), ExtResource("21_font"), ExtResource("22_font")])
