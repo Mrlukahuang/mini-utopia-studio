@@ -100,7 +100,7 @@ func _build_child_director_controls() -> void:
     controls.add_theme_constant_override("separation", 8)
     overlay.add_child(controls)
     var title := Label.new()
-    title.text = "🎥 My Movie / 我来当导演"
+    title.text = "My Movie / 我来当导演"
     title.add_theme_font_override("font", preload("res://assets/fonts/Fredoka-UI.tres"))
     title.add_theme_font_size_override("font_size", 25)
     controls.add_child(title)
@@ -111,6 +111,11 @@ func _build_child_director_controls() -> void:
         button.add_theme_font_size_override("font_size", 18)
         button.pressed.connect(_cycle_child_choice.bind(key))
         controls.add_child(button)
+        match key:
+            "camera": button.icon = preload("res://assets/ui/icons/camera.svg")
+            "action": button.icon = preload("res://assets/ui/icons/action.svg")
+            "duration_seconds": button.icon = preload("res://assets/ui/icons/length.svg")
+            "caption_preset": button.icon = preload("res://assets/ui/icons/subtitle.svg")
         child_choice_buttons[key] = button
     _refresh_choice_labels()
 
@@ -139,7 +144,8 @@ func _build_child_director_controls() -> void:
 
     record_voice_button = Button.new()
     record_voice_button.name = "RecordShotVoiceButton"
-    record_voice_button.text = "🎙️ Record 9s Voice"
+    record_voice_button.text = "Record 9s Voice"
+    record_voice_button.icon = preload("res://assets/ui/icons/voice.svg")
     record_voice_button.custom_minimum_size = Vector2(267, 54)
     record_voice_button.add_theme_font_size_override("font_size", 18)
     record_voice_button.pressed.connect(_on_voice_tapped)
@@ -168,15 +174,15 @@ func _refresh_choice_labels() -> void:
     var length_button: Button = child_choice_buttons.get("duration_seconds")
     var caption_button: Button = child_choice_buttons.get("caption_preset")
     if camera_button != null:
-        camera_button.text = "📷 Camera: " + String(choices.get("camera", "follow")).capitalize()
+        camera_button.text = "Camera: " + String(choices.get("camera", "follow")).capitalize()
     if action_button != null:
-        action_button.text = "🎭 Action: " + String(choices.get("action", "walk")).capitalize()
+        action_button.text = "Action: " + String(choices.get("action", "walk")).capitalize()
     if length_button != null:
-        length_button.text = "⏱️ Length: " + str(int(choices.get("duration_seconds", 15))) + "s"
+        length_button.text = "Length: " + str(int(choices.get("duration_seconds", 15))) + "s"
     if caption_button != null:
         var preset_id := String(choices.get("caption_preset", "none"))
         var caption := MiniUtopiaFamilyDirectorSession.caption_text(preset_id)
-        caption_button.text = "💬 Subtitle: " + (caption if not caption.is_empty() else "Off")
+        caption_button.text = "Subtitle: " + (caption if not caption.is_empty() else "Off")
 
 
 func _cycle_child_choice(key: String) -> void:

@@ -13,7 +13,7 @@ func _initialize() -> void:
     if button == null:
         _fail("child-facing Create Hero entrypoint is missing")
         return
-    if button.text != "🎨 Create a Hero":
+    if button.text != "Create a Hero":
         _fail("Create Hero label is not child-facing")
         return
     if button.pressed.get_connections().is_empty():
