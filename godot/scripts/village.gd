@@ -202,6 +202,9 @@ func _set_overview_visibility() -> void:
     _overview_was_on = overhead
     # Keep the CI's overhead whole-village image complete; normal iPad camera
     # can cheaply clip distant batches behind a little pastel fog.
+    var active_camera := get_viewport().get_camera_3d()
+    if active_camera != null and OS.has_feature("web"):
+        active_camera.far = 160.0 if overhead else 85.0
     for batch in _static_batches:
         if is_instance_valid(batch):
             batch.visibility_range_end = 0.0 if overhead else 65.0
