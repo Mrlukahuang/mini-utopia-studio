@@ -190,6 +190,19 @@ func _build_profile_picker() -> void:
     bottom_space.size_flags_vertical = Control.SIZE_EXPAND_FILL
     column.add_child(bottom_space)
 
+    # The global pastel Panel theme is translucent. Hide the underlying
+    # library content while this first-touch chooser is visible so labels,
+    # toolbar buttons and parent forms cannot show through its background.
+    # Keep the original library Background visible for Theme consistency.
+    profile_picker.visibility_changed.connect(_sync_player_picker_visibility)
+    _sync_player_picker_visibility()
+
+
+func _sync_player_picker_visibility() -> void:
+    var library_content := get_node_or_null("Margin") as Control
+    if library_content != null:
+        library_content.visible = not profile_picker.visible
+
 
 func _on_player_card_pressed(profile_id: String) -> void:
     if profile_id not in ["child_a", "child_b"]:
