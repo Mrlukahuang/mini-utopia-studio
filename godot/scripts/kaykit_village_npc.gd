@@ -8,8 +8,14 @@ var home := Vector3.ZERO
 var animation_player: AnimationPlayer
 var elapsed := 0.0
 var moving := false
-const WALK_SPEED := 0.85
-const WANDER_RADIUS := 1.6
+var greeting_bubble: Label3D
+var greeting_backdrop: Sprite3D
+var route_direction := 1.0
+const WALK_SPEED := 1.0
+const ROUTE_LENGTH := 4.5
+const GREETING_DISTANCE := 3.6
+const AVOID_DISTANCE := 1.35
+static var _shared_bubble_texture: Texture2D
 
 
 func configure(appearance: Dictionary, start: Vector3) -> void:
@@ -38,6 +44,7 @@ func _ready() -> void:
     # five distinct toy hat silhouettes in three clearly visible colors.
     # Unlike a hidden head-bone color, these survive the Knight helmet.
     _decorate_villager()
+    _make_greeting()
     if animation_player == null:
         push_error("Official KayKit villager model did not load: " + name)
 
@@ -104,6 +111,44 @@ func _piece(part_name: String, mesh: Mesh, location: Vector3, tint: Color) -> vo
     mat.roughness = 0.88
     node.material_override = mat
     add_child(node)
+# Draw the same low-cost speech bubble texture for all 15 NPCs. 3D labels
+# explicitly load Noto Sans SC so Safari shows Chinese instead of squares.
+func _make_greeting() -> void:
+    if _shared_bubble_texture == null:
+        var picture := Image.create(200, 96, false, Image.FORMAT_RGBA8)
+        picture.fill(Color.TRANSPARENT)
+        for y in range(96):
+            for x in range(200):
+                var dx: int = maxi(17 - x, 0) + maxi(x - 182, 0)
+                var dy: int = maxi(15 - y, 0) + maxi(y - 72, 0)
+                var inside: bool = dx * dx + dy * dy <= 17 * 17
+                if inside or (y > 72 and y < 91 and x >= 88 and x <= 104 - int((y - 72) * 0.33)):
+                    picture.set_pixel(x, y, Color("#FFF4DC"))
+        _shared_bubble_texture = ImageTexture.create_from_image(picture)
+    greeting_backdrop = Sprite3D.new()
+    greeting_backdrop.name = "GreetingBubble"
+    greeting_backdrop.texture = _shared_bubble_texture
+    greeting_backdrop.pixel_size = 0.0075
+    greeting_backdrop.position = Vector3(0, 2.76, 0)
+    greeting_backdrop.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+    greeting_backdrop.no_depth_test = false
+    greeting_backdrop.visible = false
+    add_child(greeting_backdrop)
+
+    greeting_bubble = Label3D.new()
+    greeting_bubble.name = "GreetingText"
+    greeting_bubble.text = "你好！"
+    greeting_bubble.font = load("res://assets/fonts/NotoSansSC-UI.tres") as Font
+    greeting_bubble.font_size = 49
+    greeting_bubble.pixel_size = 0.0075
+    greeting_bubble.outline_size = 0
+    greeting_bubble.modulate = Color("#2D3150")
+    greeting_bubble.position = Vector3(0, 2.82, 0.03)
+    greeting_bubble.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+    greeting_bubble.visible = false
+    add_child(greeting_bubble)
+
+
 func _physics_process(delta: float) -> void:
     elapsed += delta
     if not is_on_floor():
@@ -111,28 +156,47 @@ func _physics_process(delta: float) -> void:
     else:
         velocity.y = -0.1
 
-    # Quiet two-second strolling bouts alternate with idle. The low speed and
-    # fixed neighbourhood keep children from being surrounded by fast actors.
-    var phase := fposmod(elapsed + float(get_index()) * 1.7, 10.0)
-    moving = phase > 3.0 and phase < 7.0
-    if moving:
-        var bearing := float(get_index()) * 2.39996
-        var target := home + Vector3(cos(bearing) * WANDER_RADIUS, 0, sin(bearing) * WANDER_RADIUS)
-        if phase > 5.0:
-            target = home
-        var offset := target - global_position
-        offset.y = 0.0
-        if offset.length() > 0.18:
-            velocity.x = offset.normalized().x * WALK_SPEED
-            velocity.z = offset.normalized().z * WALK_SPEED
-            rotation.y = lerp_angle(rotation.y, atan2(velocity.x, velocity.z), minf(delta * 7.0, 1.0))
-        else:
-            velocity.x = 0.0
-            velocity.z = 0.0
-            moving = false
+    var player := get_parent().get_node_or_null("Player") as Node3D
+    var nearby := player != null and global_position.distance_to(player.global_position) < GREETING_DISTANCE
+    greeting_bubble.visible = nearby
+    greeting_backdrop.visible = nearby
+
+    if nearby:
+        # Pause and turn toward the approaching child; no forced interaction.
+        var to_player: Vector3 = player.global_position - global_position
+        to_player.y = 0.0
+        if to_player.length_squared() > 0.04:
+            rotation.y = lerp_angle(rotation.y, atan2(to_player.x, to_player.z), minf(delta * 6.0, 1.0))
+        velocity.x = move_toward(velocity.x, 0.0, delta * 8.0)
+        velocity.z = move_toward(velocity.z, 0.0, delta * 8.0)
+        moving = false
     else:
-        velocity.x = move_toward(velocity.x, 0.0, 3.0 * delta)
-        velocity.z = move_toward(velocity.z, 0.0, 3.0 * delta)
+        # Walk up/down a safe roadside lane; never target a building plot.
+        # Each villager has a different idle phase to avoid marching in sync.
+        var phase := fposmod(elapsed + float(get_index()) * 1.7, 10.0)
+        moving = phase > 2.0 and phase < 7.0
+        if absf(global_position.z - home.z) >= ROUTE_LENGTH:
+            route_direction = -1.0 if global_position.z > home.z else 1.0
+        var direction := Vector3(0.0, 0.0, route_direction)
+        var blocked := false
+        if moving:
+            # Actual CharacterBody3D physics prevents crossing houses/props.
+            blocked = test_move(global_transform, direction * WALK_SPEED * delta * 2.0)
+            for villager in get_tree().get_nodes_in_group("kaykit_village_npc"):
+                if villager == self or not (villager is Node3D):
+                    continue
+                var offset: Vector3 = (villager as Node3D).global_position - global_position
+                offset.y = 0.0
+                if offset.length_squared() < AVOID_DISTANCE * AVOID_DISTANCE and offset.dot(direction) > 0.0:
+                    blocked = true
+                    break
+        if blocked:
+            route_direction = -route_direction
+            moving = false
+        velocity.x = move_toward(velocity.x, 0.0, delta * 5.0)
+        velocity.z = move_toward(velocity.z, route_direction * WALK_SPEED if moving else 0.0, delta * 3.0)
+        if moving:
+            rotation.y = lerp_angle(rotation.y, atan2(0.0, route_direction), minf(delta * 7.0, 1.0))
 
     move_and_slide()
     MiniUtopiaKaykitAvatarV1.play(
