@@ -145,7 +145,7 @@ func _initialize() -> void:
     # Editing an existing Hero must include the new look in the canonical PUT,
     # without changing unrelated profile fields or the server revision.
     scene._draft_appearance["body_type"] = "chubby"
-    var updated := scene._character_update_payload("Lily New Look")
+    var updated: Dictionary = scene._character_update_payload("Lily New Look")
     if String(updated.get("display_name", "")) != "Lily New Look":
         _fail("Hero rename was not included in the saved payload")
         return
