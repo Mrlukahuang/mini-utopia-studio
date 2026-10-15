@@ -10,9 +10,9 @@ func _ready() -> void:
     veil.name = "PastelFade"
     veil.color = Color("#FFF1E6")
     veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
-    veil.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     veil.modulate.a = 0.0
     add_child(veil)
+    veil.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     call_deferred("_install_at_root")
 
 
