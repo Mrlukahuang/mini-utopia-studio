@@ -27,3 +27,9 @@ Source: https://github.com/fontsource/font-files/tree/main/fonts/google/noto-emo
 Upstream source: https://github.com/google/fonts/tree/main/ofl/notoemoji
 Font family: Noto Emoji, regular (400), selected WOFF2 subsets 2–5 and 7–9. Used solely for UI labels containing emoji; **does not add a second Chinese UI font**.
 License: SIL Open Font License 1.1 (OFL-1.1), **not CC0**. Full terms: `res://assets/fonts/OFL-NotoEmoji.txt`.
+
+## KayKit Adventurers v1.0 (official selected equipment; A-008)
+Creator: Kay Lousberg. Official source: https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0
+Original pack: https://kaylousberg.itch.io/kaykit-adventurers
+License: CC0 1.0 Universal, original `LICENSE.txt` copied unchanged to `res://assets/kaykit/adventurers/LICENSE.txt`.
+Only these original files from `addons/kaykit_character_pack_adventures/Assets/gltf/` are included: sword_1handed, shield_round, staff, wand with paired binary sidecars and knight/mage texture atlases. **The animated character GLB and Rig_Medium are not yet included in this draft. PR3 must remain draft until the official animated character is committed and Web export verified.**
