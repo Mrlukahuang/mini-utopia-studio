@@ -191,6 +191,9 @@ def save_private_shot_voice(
             raise PrivateVoicePolicyError("Existing voice is not verified")
 
     existing = asset.metadata.get("family_voice_clips", {})
+    if isinstance(existing, dict) and existing.get("0") == clip:
+        return {"film_id": film_id, "revision": str(asset.version),
+                "shot_index": 0, "duration_seconds": clip["duration"]}
     if not isinstance(existing, dict):
         raise PrivateVoicePolicyError("Invalid private film voice metadata")
     asset.metadata["family_voice_clips"] = {**existing, "0": clip}
