@@ -22,6 +22,20 @@ const KAYKIT_HOUSES := [
 ]
 
 var _village_previous_web_fps := -1
+var _previous_scale := 1.0
+var _previous_msaa := Viewport.MSAA_DISABLED
+var _static_visuals: Array[Dictionary] = []
+var _static_batches: Array[MultiMeshInstance3D] = []
+var _mesh_pool: Dictionary = {}
+var _mat_pool: Dictionary = {}
+var _villagers: Array[Node3D] = []
+var _lod_elapsed := 0.0
+var _fps_elapsed := 0.0
+var _perf_hold_elapsed := 0.0
+var _perf_pressing := false
+var _perf_toggled_this_hold := false
+var _perf_badge: Label
+var _overview_was_on := false
 var gate_unlocked := false
 var gate_label: Label3D
 
@@ -47,13 +61,19 @@ var palette = {
 }
 
 func _ready() -> void:
-    # On iPad and software-rendered WebGL (CI SwiftShader), the uncapped 3D
-    # village can monopolize the compositor and stall Playwright screenshots.
-    # Preserve the original engine setting for other scenes; never throttle
-    # Creator or Director, and keep responsive 30 fps village touch control.
+    # A 30 FPS cap guaranteed <=30 even on powerful iPads. Allow 60, while
+    # using lower-cost Web rendering. Restore all global settings on exit.
     if OS.has_feature("web"):
         _village_previous_web_fps = Engine.max_fps
-        Engine.max_fps = 30 if Engine.max_fps <= 0 else mini(30, Engine.max_fps)
+        Engine.max_fps = 60
+        var viewport := get_viewport()
+        _previous_scale = viewport.scaling_3d_scale
+        _previous_msaa = viewport.msaa_3d
+        viewport.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+        viewport.scaling_3d_scale = 0.75
+        viewport.msaa_3d = Viewport.MSAA_DISABLED
+        viewport.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED
+        RenderingServer.directional_shadow_atlas_set_size(1024, true)
     _setup_environment()
     _build_ground()
     _build_path()
@@ -62,6 +82,9 @@ func _ready() -> void:
     _build_kaykit_villagers()
     _build_storybook_dressing()
     _build_locked_gate()
+    _batch_static_visuals()
+    _install_performance_badge()
+    _update_villager_lod()
     _apply_shared_theme_to_hud()
     var creator_button := get_node_or_null("HUD/OpenCreatorButton") as Button
     if creator_button != null:
@@ -98,9 +121,101 @@ func _apply_shared_theme_to_hud() -> void:
         help.text = "创造英雄 · 探索村庄 · 拍一部小电影"
 
 
+
+func _install_performance_badge() -> void:
+    var hud := get_node_or_null("HUD") as CanvasLayer
+    if hud == null:
+        return
+    _perf_badge = Label.new()
+    _perf_badge.name = "LaneAPerformanceBadge"
+    _perf_badge.position = Vector2(460, 9)
+    _perf_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    _perf_badge.text = "FPS -- | Draw --"
+    _perf_badge.visible = false
+    hud.add_child(_perf_badge)
+
+
+func _input(event: InputEvent) -> void:
+    # Hidden until a deliberate 1.2s hold on the existing top-left Logo.
+    # Both touchscreen and desktop use the same non-invasive diagnostic.
+    if event is InputEventScreenTouch:
+        var touch := event as InputEventScreenTouch
+        if touch.pressed and touch.position.x < 160.0 and touch.position.y < 164.0:
+            _perf_pressing = true
+            _perf_toggled_this_hold = false
+            _perf_hold_elapsed = 0.0
+        elif not touch.pressed:
+            _perf_pressing = false
+    elif event is InputEventMouseButton:
+        var mouse := event as InputEventMouseButton
+        if mouse.button_index == MOUSE_BUTTON_LEFT:
+            if mouse.pressed and mouse.position.x < 160.0 and mouse.position.y < 164.0:
+                _perf_pressing = true
+                _perf_toggled_this_hold = false
+                _perf_hold_elapsed = 0.0
+            elif not mouse.pressed:
+                _perf_pressing = false
+
+
+func _toggle_performance_badge() -> void:
+    if _perf_badge != null:
+        _perf_badge.visible = not _perf_badge.visible
+
+
+func _tick_performance_badge(delta: float) -> void:
+    if _perf_pressing and not _perf_toggled_this_hold:
+        _perf_hold_elapsed += delta
+        if _perf_hold_elapsed >= 1.2:
+            _perf_toggled_this_hold = true
+            _toggle_performance_badge()
+    if _perf_badge == null or not _perf_badge.visible:
+        return
+    _fps_elapsed += delta
+    if _fps_elapsed < 0.5:
+        return
+    _fps_elapsed = 0.0
+    var frames := float(Performance.get_monitor(Performance.TIME_FPS))
+    var draw := int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
+    _perf_badge.text = "FPS %.0f  |  Draw %s" % [frames, str(draw) if draw > 0 else "--"]
+
+
+func _update_villager_lod() -> void:
+    var player := get_node_or_null("Player") as Node3D
+    var cam := get_viewport().get_camera_3d()
+    if player == null or cam == null:
+        return
+    for npc in _villagers:
+        if not is_instance_valid(npc):
+            continue
+        var distance_to_child := npc.global_position.distance_to(player.global_position)
+        var on_screen := cam.is_position_in_frustum(npc.global_position + Vector3.UP)
+        npc.set_performance_lod(distance_to_child, on_screen)
+
+
+func _set_overview_visibility() -> void:
+    var camera_rig := get_node_or_null("CameraRig")
+    if camera_rig == null:
+        return
+    var overhead: bool = camera_rig.get("distance") > 20.0
+    if overhead == _overview_was_on:
+        return
+    _overview_was_on = overhead
+    # Keep the CI's overhead whole-village image complete; normal iPad camera
+    # can cheaply clip distant batches behind a little pastel fog.
+    var active_camera := get_viewport().get_camera_3d()
+    if active_camera != null and OS.has_feature("web"):
+        active_camera.far = 160.0 if overhead else 85.0
+    for batch in _static_batches:
+        if is_instance_valid(batch):
+            batch.visibility_range_end = 0.0 if overhead else 65.0
+
+
 func _exit_tree() -> void:
     if _village_previous_web_fps >= 0:
         Engine.max_fps = _village_previous_web_fps
+        get_viewport().scaling_3d_scale = _previous_scale
+        get_viewport().msaa_3d = _previous_msaa
+        RenderingServer.directional_shadow_atlas_set_size(2048, true)
 
 
 func _open_family_director() -> void:
@@ -117,7 +232,15 @@ func _open_character_creator() -> void:
     get_tree().change_scene_to_file("res://scenes/family_hero_library.tscn")
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+    # Fifteen bones/collision actors are examined once per 0.25s, not every
+    # actor scanning every other actor on each physics tick.
+    _lod_elapsed += delta
+    if _lod_elapsed >= 0.25:
+        _lod_elapsed = 0.0
+        _update_villager_lod()
+    _tick_performance_badge(delta)
+    _set_overview_visibility()
     if gate_unlocked or gate_label == null:
         return
 
@@ -148,20 +271,104 @@ func _unlock_gate() -> void:
         gate_label.text = "✨ ZONE 01 UNLOCKED\nCloud Whale District"
 
 func _mat(color: Color, roughness := 0.86) -> StandardMaterial3D:
+    # Reuse material RID across hundreds of grass props/tree crowns.
+    var key := color.to_html() + "_" + str(roughness)
+    if _mat_pool.has(key):
+        return _mat_pool[key] as StandardMaterial3D
     var m := StandardMaterial3D.new()
     m.albedo_color = color
     m.roughness = roughness
+    _mat_pool[key] = m
     return m
 
+
+func _shared_mesh(kind: String, dimensions: Vector3) -> Mesh:
+    var key := kind + "/" + str(dimensions)
+    if _mesh_pool.has(key):
+        return _mesh_pool[key] as Mesh
+    var mesh: Mesh
+    match kind:
+        "box":
+            var cube := BoxMesh.new()
+            cube.size = dimensions
+            mesh = cube
+        "sphere":
+            var ball := SphereMesh.new()
+            ball.radius = dimensions.x
+            ball.height = dimensions.y
+            mesh = ball
+        "cylinder":
+            var column := CylinderMesh.new()
+            column.top_radius = dimensions.x
+            column.bottom_radius = dimensions.x * 1.08
+            column.height = dimensions.y
+            mesh = column
+    _mesh_pool[key] = mesh
+    return mesh
+
+
+func _register_static(node: MeshInstance3D, casts_shadow: bool = false) -> void:
+    _static_visuals.append({"mesh": node, "shadow": casts_shadow})
+
+
+func _batch_static_visuals() -> void:
+    var groups: Dictionary = {}
+    for entry in _static_visuals:
+        var source := entry["mesh"] as MeshInstance3D
+        if not is_instance_valid(source) or source.mesh == null or not source.visible:
+            continue
+        var transform := global_transform.affine_inverse() * source.global_transform
+        var center := transform.origin
+        var cluster := Vector2i(floori(center.x / 42.0), floori(center.z / 42.0))
+        var material_id := 0
+        if source.material_override != null:
+            material_id = source.material_override.get_instance_id()
+        var shadows: bool = entry["shadow"]
+        var key := str(source.mesh.get_instance_id()) + "/" + str(material_id) + "/" + str(cluster) + "/" + str(shadows)
+        if not groups.has(key):
+            groups[key] = {
+                "mesh": source.mesh,
+                "material": source.material_override,
+                "shadows": shadows,
+                "transforms": [],
+            }
+        var transforms: Array = groups[key]["transforms"]
+        transforms.append(transform)
+        source.visible = false
+
+    for key in groups:
+        var entry: Dictionary = groups[key]
+        var transforms: Array = entry["transforms"]
+        var multi := MultiMesh.new()
+        multi.transform_format = MultiMesh.TRANSFORM_3D
+        multi.mesh = entry["mesh"] as Mesh
+        multi.instance_count = transforms.size()
+        for i in range(transforms.size()):
+            multi.set_instance_transform(i, transforms[i])
+        var batch := MultiMeshInstance3D.new()
+        batch.name = "StaticBatch"
+        batch.multimesh = multi
+        batch.material_override = entry["material"] as Material
+        if not entry["shadows"]:
+            batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+        batch.visibility_range_end = 65.0
+        batch.visibility_range_end_margin = 5.0
+        batch.add_to_group("lane_a_static_batch")
+        add_child(batch)
+        _static_batches.append(batch)
+    print("lane_a_perf: original_static_mesh_nodes=%d batched_drawable_clusters=%d" % [_static_visuals.size(), _static_batches.size()])
+    _static_visuals.clear()
+
 func _box(name: String, pos: Vector3, size: Vector3, color: Color, collision := false) -> MeshInstance3D:
-    var mesh := BoxMesh.new()
-    mesh.size = size
+    var mesh := _shared_mesh("box", size)
     var node := MeshInstance3D.new()
     node.name = name
     node.mesh = mesh
     node.material_override = _mat(color)
     node.position = pos
     add_child(node)
+    if name != "LockedBarrier":
+        _register_static(node)
     if collision:
         var body := StaticBody3D.new()
         body.name = name + "Collision"
@@ -175,9 +382,7 @@ func _box(name: String, pos: Vector3, size: Vector3, color: Color, collision := 
     return node
 
 func _sphere(name: String, pos: Vector3, radius: float, color: Color, squash := Vector3.ONE) -> MeshInstance3D:
-    var mesh := SphereMesh.new()
-    mesh.radius = radius
-    mesh.height = radius * 2.0
+    var mesh := _shared_mesh("sphere", Vector3(radius, radius * 2.0, 0.0))
     var node := MeshInstance3D.new()
     node.name = name
     node.mesh = mesh
@@ -185,13 +390,11 @@ func _sphere(name: String, pos: Vector3, radius: float, color: Color, squash := 
     node.position = pos
     node.scale = squash
     add_child(node)
+    _register_static(node)
     return node
 
 func _cylinder(name: String, pos: Vector3, radius: float, height: float, color: Color, collision := false) -> MeshInstance3D:
-    var mesh := CylinderMesh.new()
-    mesh.top_radius = radius
-    mesh.bottom_radius = radius * 1.08
-    mesh.height = height
+    var mesh := _shared_mesh("cylinder", Vector3(radius, height, 0.0))
     var node := MeshInstance3D.new()
     node.name = name
     node.mesh = mesh
@@ -222,7 +425,11 @@ func _setup_environment() -> void:
     env.fog_enabled = true
     env.fog_light_color = Color("#B8CFCA")
     env.fog_light_energy = 0.34
-    env.fog_density = 0.004
+    env.fog_density = 0.012 if OS.has_feature("web") else 0.004
+    env.ssao_enabled = false
+    env.glow_enabled = false
+    env.ssil_enabled = false
+    env.ssr_enabled = false
     world_env.environment = env
     add_child(world_env)
 
@@ -235,7 +442,8 @@ func _setup_environment() -> void:
     # buildings and 15 skinned KayKit villagers. Keep physical shadows.
     if OS.has_feature("web"):
         sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
-    sun.shadow_opacity = 0.8
+    sun.directional_shadow_max_distance = 38.0 if OS.has_feature("web") else 75.0
+    sun.shadow_opacity = 0.65
     add_child(sun)
 
 func _build_ground() -> void:
@@ -289,6 +497,8 @@ func _build_kaykit_houses() -> void:
             visual.scale = Vector3.ONE * 4.8
             visual.rotation_degrees.y = 180.0 if x < 0.0 else 0.0
             house.add_child(visual)
+            for mesh_node in visual.find_children("*", "MeshInstance3D", true, false):
+                _register_static(mesh_node as MeshInstance3D, true)
             var collision := CollisionShape3D.new()
             collision.name = "CollisionShape3D"
             # Official KayKit glTF mesh extents after the 4.8x instance scale:
@@ -335,6 +545,9 @@ func _build_kaykit_villagers() -> void:
         var npc := MiniUtopiaKaykitVillageNPC.new()
         npc.configure(look, Vector3(x, 0.15, z))
         add_child(npc)
+        _villagers.append(npc)
+    for actor in _villagers:
+        actor.configure_neighbors(_villagers)
 
 
 func _cottage(origin: Vector3, accent: Color) -> void:

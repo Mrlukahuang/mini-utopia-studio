@@ -45,6 +45,34 @@ func _initialize() -> void:
         _fail("different colors do not count as ten different KayKit building shapes")
         return
 
+    # Actual official GLTF surfaces remain in scene nodes, but their drawing
+    # is done by grouped MultiMeshes; physics blocks remain independent.
+    var rendered_batches := get_nodes_in_group("lane_a_static_batch")
+    if rendered_batches.size() < 8:
+        _fail("static architecture was not turned into real MultiMesh draw batches")
+        return
+    var disabled_original_meshes := 0
+    for house in houses:
+        var official := house.get_node_or_null("OfficialKayKitBuilding") as Node3D
+        for part in official.find_children("*", "MeshInstance3D", true, false):
+            if not (part as MeshInstance3D).visible:
+                disabled_original_meshes += 1
+    if disabled_original_meshes < 20:
+        _fail("unbatched building meshes still render separately")
+        return
+    var perf := scene.get_node_or_null("HUD/LaneAPerformanceBadge") as Label
+    if perf == null or perf.visible:
+        _fail("FPS diagnostic must be hidden until long press")
+        return
+    scene.call("_toggle_performance_badge")
+    if not perf.visible or not perf.text.contains("FPS"):
+        _fail("long-hold FPS diagnostic toggle is not connected")
+        return
+    scene.call("_toggle_performance_badge")
+    if perf.visible:
+        _fail("FPS diagnostic cannot be hidden again")
+        return
+
     var villagers := get_nodes_in_group("kaykit_village_npc")
     if villagers.size() < 15:
         _fail("required fifteen animated KayKit villagers not present")
@@ -127,14 +155,28 @@ func _initialize() -> void:
         _fail("NPC did not create a private, initially hidden greeting bubble")
         return
     player.global_position = npc.global_position + Vector3(0.0, 1.0, 2.1)
+    # LOD intentionally wakes sleeping NPCs only every 0.25 seconds.
+    await create_timer(0.38).timeout
     await physics_frame
     if not greeting.visible or not bubble.visible:
         _fail("approaching a villager did not reveal the greeting")
         return
     player.global_position = Vector3(0.0, 1.0, 34.0)
+    await create_timer(0.38).timeout
     await physics_frame
     if bubble.visible:
         _fail("villager greeting stayed open after player left")
+        return
+
+    # Distant NPC bodies keep capsules blocking players; animation and
+    # physics thinking sleep until the camera/player approaches.
+    npc.set_performance_lod(30.0, false)
+    if npc.is_physics_processing() or npc.animation_player.active:
+        _fail("far NPC still runs full physics or skeletal animation")
+        return
+    npc.set_performance_lod(2.0, true)
+    if not npc.is_physics_processing() or not npc.animation_player.active:
+        _fail("near NPC failed to wake after distance-based LOD")
         return
 
     print("village_creator_entrypoint_smoke: PASS · 20 KayKit houses / 15 animated collider NPCs")

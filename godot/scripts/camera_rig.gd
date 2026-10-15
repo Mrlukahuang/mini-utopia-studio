@@ -24,7 +24,8 @@ func _unhandled_input(event: InputEvent) -> void:
         yaw = 0.0
         # Software WebGL screenshot capture competes with an uncapped game loop.
         # Limit frames only in this opt-in CI overview; normal play is unchanged.
-        Engine.max_fps = 12 if distance > 20.0 else 0
+        if OS.has_feature("web"):
+            Engine.max_fps = 12 if distance > 20.0 else 60
         return
     if event is InputEventScreenDrag:
         # D-pad/buttons consume their own touches; drag on the free right half
