@@ -11,6 +11,21 @@ func _initialize() -> void:
     root.add_child(scene)
     await process_frame
 
+    # A-008 Chinese and emoji glyphs must resolve through the global project
+    # FontVariation; tests must not depend on installed host system fonts.
+    var font_path := "res://assets/fonts/NotoSansSC-UI.tres"
+    if String(ProjectSettings.get_setting("gui/theme/custom_font", "")) != font_path:
+        _fail("project-wide Chinese font not configured")
+        return
+    var default_ui_font := load(font_path) as Font
+    if default_ui_font == null:
+        _fail("Chinese UI font missing")
+        return
+    for glyph in "给角色起名字体型质感眼睛发颜我的衣柜创造道具取个粉薄荷绿天蓝金紫表面头电影大宝二来当导演模式新手村":
+        if not default_ui_font.has_char(glyph.unicode_at(0)):
+            _fail("missing Chinese UI glyph U+%04X" % glyph.unicode_at(0))
+            return
+
     if scene.name != "CharacterCreator":
         _fail("unexpected root node name")
         return
