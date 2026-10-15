@@ -54,6 +54,7 @@ func _ready() -> void:
     _build_kaykit_villagers()
     _build_storybook_dressing()
     _build_locked_gate()
+    _apply_shared_theme_to_hud()
     var creator_button := get_node_or_null("HUD/OpenCreatorButton") as Button
     if creator_button != null:
         creator_button.pressed.connect(_open_character_creator)
@@ -65,6 +66,28 @@ func _ready() -> void:
             selection == null or selection.active_play_session().is_empty()
         )
         director_button.pressed.connect(_open_family_director)
+
+
+# Lane B owns project-wide Theme and the HUD scene; Lane A only removes
+# legacy local overrides so the shared pastel buttons/labels inherit it.
+# Deliberately do not invent palette colors, fonts or StyleBoxes here.
+func _apply_shared_theme_to_hud() -> void:
+    for node_path in [
+        "HUD/Panel/Title", "HUD/Panel/Help",
+        "HUD/OpenCreatorButton", "HUD/OpenDirectorButton",
+    ]:
+        var control := get_node_or_null(node_path) as Control
+        if control == null:
+            continue
+        control.remove_theme_font_override("font")
+        control.remove_theme_font_size_override("font_size")
+        control.remove_theme_color_override("font_color")
+    var title := get_node_or_null("HUD/Panel/Title") as Label
+    if title != null:
+        title.text = "欢迎来到迷你乌托邦！"
+    var help := get_node_or_null("HUD/Panel/Help") as Label
+    if help != null:
+        help.text = "创造英雄 · 探索村庄 · 拍一部小电影"
 
 
 func _exit_tree() -> void:
