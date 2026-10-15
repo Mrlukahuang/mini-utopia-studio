@@ -65,7 +65,7 @@ const COLOR_BUTTONS := {
 @onready var color_grid: GridContainer = $RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid
 @onready var animation_controls: HBoxContainer = $RootMargin/MainColumn/CreatorBody/PreviewPanel/AnimationControls
 @onready var zoom_out_button: Button = $RootMargin/MainColumn/CreatorBody/PreviewPanel/ZoomControls/ZoomOutButton
-@onready var reset_button: Button = $RootMargin/MainColumn/CreatorBody/PreviewPanel/ZoomControls/ResetButton
+@onready var reset_button: Button = $RootMargin/MainColumn/CreatorBody/PreviewPanel/AnimationControls/ResetButton
 @onready var zoom_in_button: Button = $RootMargin/MainColumn/CreatorBody/PreviewPanel/ZoomControls/ZoomInButton
 
 var character_id := ""

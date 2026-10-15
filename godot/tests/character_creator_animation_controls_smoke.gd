@@ -27,6 +27,24 @@ func _initialize() -> void:
         _fail("Creator animation preview should start at Idle")
         return
 
+    var stage := scene.get_node(
+        "RootMargin/MainColumn/CreatorBody/PreviewPanel/AvatarStage"
+    ) as Control
+    var hint := scene.get_node(
+        "RootMargin/MainColumn/CreatorBody/PreviewPanel/StageHint"
+    ) as Control
+    if stage.get_global_rect().intersects(controls.get_global_rect()):
+        _fail("animation buttons overlap the 3D preview")
+        return
+    if hint.get_global_rect().intersects(controls.get_global_rect()):
+        _fail("animation controls overlap the preview hint")
+        return
+    for button_name in ["IdleButton", "ResetButton", "WalkButton", "RunButton", "JumpButton"]:
+        var item := controls.get_node(button_name) as Button
+        if item == null or item.size.x < 100.0 or item.size.y < 44.0:
+            _fail("iPad animation button too small: " + button_name)
+            return
+
     (controls.get_node("WalkButton") as Button).pressed.emit()
     stage.advance_preview_for_test(0.25)
     if stage.current_preview_animation() != "Walk":
