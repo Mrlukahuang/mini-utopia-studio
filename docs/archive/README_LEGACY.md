@@ -1,7 +1,3 @@
-> 归档说明：此文件是 V1-W1-04 之前 README.md 的完整历史文本。已过时，不能作为当前开发/部署依据。
-
----
-
 > **⚠️ 当前阶段：v1 冲刺（2026-10-15 起）**
 > 所有开发（人类和 AI 代理）请先读 [`AGENTS.md`](AGENTS.md) → [`docs/V1_PLAN.md`](docs/V1_PLAN.md) → [`AMEND.md`](AMEND.md)。
 > 本 README 下方的旧章节可能已过时，不能作为任务依据。
