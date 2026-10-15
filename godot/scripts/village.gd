@@ -353,6 +353,7 @@ func _batch_static_visuals() -> void:
             batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
         batch.visibility_range_end = 65.0
         batch.visibility_range_end_margin = 5.0
+        batch.add_to_group("lane_a_static_batch")
         add_child(batch)
         _static_batches.append(batch)
     print("lane_a_perf: original_static_mesh_nodes=%d batched_drawable_clusters=%d" % [_static_visuals.size(), _static_batches.size()])
