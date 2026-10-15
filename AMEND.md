@@ -28,6 +28,17 @@
 
 ## 条目
 
+### A-012 截图步骤不再需要人工合并
+- 状态：APPROVED（项目负责人于 2026-10-16 聊天授权 Claude 审查后批准）
+- 日期：2026-10-16
+- 提出者：Claude（审查）
+- 变更内容：
+  1. 代理可以在自己的 PR 里修改 `.github/workflows/godot-web-artifact.yml` 中**导出截图专用构建、Playwright 截图、上传截图 artifact** 的步骤，CI 全绿后自己合并。
+  2. 仍然禁止代理修改：测试步骤（smoke test / pytest）、正式 Web 导出和 `mini-utopia-web-*` 上传步骤、触发条件（on:）、权限（permissions）、其他 workflow 文件、`scope_guard.py`。删除或跳过任何已有检查一律不允许。
+  3. 截图构建中切换启动场景时，统一用正则替换整行 `run/main_scene=`，不再依赖某个固定的旧场景名（本 PR 已修正现有三处）。
+- 原因：截图流程的小改动多次卡在人工合并上，阻塞 #405、#415。
+- 影响：AGENTS.md §9.2 第 1 条；godot-web-artifact.yml。
+
 ### A-011 并行通道各自 15 个 PR，全力推进
 - 状态：APPROVED（项目负责人于 2026-10-16 聊天批准）
 - 日期：2026-10-16
