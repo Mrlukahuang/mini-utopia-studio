@@ -390,8 +390,10 @@ func _refresh_parent_entry() -> void:
                 widget.visible = _parent_controls_open
     if movie_list != null:
         for widget in movie_list.get_children():
-            if widget.name.begins_with("Review_"):
+            if widget.name.begins_with("Review_") or widget.name.begins_with("Download_"):
                 widget.visible = _parent_controls_open
+            elif widget.name.begins_with("SaveMovie_"):
+                widget.visible = not _parent_controls_open
     if not _parent_controls_open:
         if adult_share_panel != null:
             adult_share_panel.hide()
@@ -843,7 +845,10 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             return
         button.disabled = false
         button.text = "💾 Save MP4 to this iPad / Mac"
-        _set_status("Movie ready! Tap the Save MP4 button now.", false)
+        var child_button := movie_list.get_node_or_null("SaveMovie_" + id) as Button
+        if child_button != null:
+            child_button.text = "💾 现在保存我的电影"
+        _set_status("电影准备好啦！再点一次保存。", false)
         return
 
     if kind == "films:get" and not _pending_review_film_id.is_empty():
@@ -931,6 +936,14 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
                 _on_film_download_pressed.bind(id)
             )
             movie_list.add_child(save_movie_button)
+            save_movie_button.visible = _parent_controls_open
+            var child_save_button := Button.new()
+            child_save_button.name = "SaveMovie_" + id
+            child_save_button.text = "💾 保存我的电影"
+            child_save_button.custom_minimum_size.y = 56
+            child_save_button.pressed.connect(_on_film_download_pressed.bind(id))
+            movie_list.add_child(child_save_button)
+            child_save_button.visible = not _parent_controls_open
         _set_status(str(films.size()) + " private movie(s) saved.", false)
         return
     if _consume_movie_restore(kind, payload):
@@ -1171,6 +1184,11 @@ func _on_bridge_failure(kind: String, status_code: int, _code: String, _message:
                 if button != null:
                     button.disabled = false
                     button.text = "⬇ Prepare private MP4 (parent release required)"
+            elif String(entry.name).begins_with("SaveMovie_"):
+                var child_button := entry as Button
+                if child_button != null:
+                    child_button.disabled = false
+                    child_button.text = "💾 保存我的电影"
         _set_status(
             "Parent must approve the finished MP4 before you can save it."
             if status_code in [403, 404]
@@ -1440,4 +1458,6 @@ func _set_status(message: String, error: bool) -> void:
             if lower.contains(hidden_word):
                 safe_message = "请家长打开「家长入口」帮忙。"
                 break
+    if not _parent_controls_open:
+        safe_message = safe_message.replace("MP4", "电影").replace("mp4", "电影")
     status_label.text = ("💡 " if error else "") + safe_message

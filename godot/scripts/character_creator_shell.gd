@@ -457,7 +457,7 @@ func _wire_animation_controls() -> void:
 func _on_animation_selected(animation_name: String) -> void:
     avatar_stage.play_preview_animation(animation_name)
     _refresh_animation_buttons()
-    _set_status(animation_name + " preview · instant Godot runtime.", false)
+    _set_status("✨ " + animation_name + "！角色动起来啦。", false)
 
 
 func _refresh_animation_buttons() -> void:
