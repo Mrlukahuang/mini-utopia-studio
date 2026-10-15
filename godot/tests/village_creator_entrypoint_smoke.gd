@@ -29,7 +29,9 @@ func _initialize() -> void:
     if houses.size() < 20:
         _fail("required twenty KayKit buildings not visible in live village")
         return
+    var shapes_by_source := {}
     for house in houses:
+        shapes_by_source[int(house.get_meta("kaykit_source_model", -1))] = true
         var body := house as StaticBody3D
         if body == null or body.get_node_or_null("OfficialKayKitBuilding") == null:
             _fail("house does not contain official KayKit mesh")
@@ -38,6 +40,10 @@ func _initialize() -> void:
         if shape == null or shape.shape == null or shape.disabled:
             _fail("KayKit house is missing a blocking collider")
             return
+
+    if shapes_by_source.size() < 10:
+        _fail("different colors do not count as ten different KayKit building shapes")
+        return
 
     var villagers := get_nodes_in_group("kaykit_village_npc")
     if villagers.size() < 15:
