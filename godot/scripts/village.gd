@@ -319,7 +319,7 @@ func _batch_static_visuals() -> void:
             continue
         var transform := global_transform.affine_inverse() * source.global_transform
         var center := transform.origin
-        var cluster := Vector2i(floori(center.x / 18.0), floori(center.z / 18.0))
+        var cluster := Vector2i(floori(center.x / 42.0), floori(center.z / 42.0))
         var material_id := 0
         if source.material_override != null:
             material_id = source.material_override.get_instance_id()
