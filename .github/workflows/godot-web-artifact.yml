@@ -260,11 +260,41 @@ jobs:
           test -s dist/visual-evidence/creator-1180x820.png
           test -s dist/visual-evidence/creator-1366x1024.png
 
+      # A-009: new source-only CI exports for visual evidence. They use
+      # checked-in synthetic session fixtures and never capture family data.
+      - name: Export isolated Village and Director visual-check builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          sed -i 's|run/main_scene="res://scenes/character_creator.tscn"|run/main_scene="res://scenes/main.tscn"|' godot/project.godot
+          grep -Fx 'run/main_scene="res://scenes/main.tscn"' godot/project.godot
+          mkdir -p "$GITHUB_WORKSPACE/dist/village-visual"
+          "$GODOT_BINARY" --headless --path godot --export-release "Web" \
+            "$GITHUB_WORKSPACE/dist/village-visual/index.html"
+          test -s dist/village-visual/index.pck
+          sed -i 's|run/main_scene="res://scenes/main.tscn"|run/main_scene="res://scenes/director_stage.tscn"|' godot/project.godot
+          grep -Fx 'run/main_scene="res://scenes/director_stage.tscn"' godot/project.godot
+          mkdir -p "$GITHUB_WORKSPACE/dist/director-visual"
+          "$GODOT_BINARY" --headless --path godot --export-release "Web" \
+            "$GITHUB_WORKSPACE/dist/director-visual/index.html"
+          test -s dist/director-visual/index.pck
+
+      - name: Capture Village and Director on iPad landscape
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8766 --bind 127.0.0.1 --directory dist/village-visual >/tmp/mini-utopia-village-http.log 2>&1 &
+          python3 -m http.server 8767 --bind 127.0.0.1 --directory dist/director-visual >/tmp/mini-utopia-director-http.log 2>&1 &
+          MINI_UTOPIA_VISUAL_SCENE=village MINI_UTOPIA_VISUAL_PORT=8766 node tools/playwright_creator_visual.cjs
+          MINI_UTOPIA_VISUAL_SCENE=director MINI_UTOPIA_VISUAL_PORT=8767 node tools/playwright_creator_visual.cjs
+          test -s dist/visual-evidence/village-1366x1024.png
+          test -s dist/visual-evidence/director-1366x1024.png
+
       - name: Publish iPad Creator visual evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: creator-ipad-playwright-${{ github.sha }}
+          name: family-ipad-three-scenes-${{ github.sha }}
           path: dist/visual-evidence/
           if-no-files-found: warn
           retention-days: 14
