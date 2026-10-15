@@ -10,11 +10,23 @@ func _initialize() -> void:
         _fail("official KayKit Knight.glb was not imported")
         return
     var actor := kaykit_rig.instantiate()
-    var has_skeleton := _contains_kaykit_skeleton(actor)
+    var rig_info := {"bones": 0, "skeleton": "", "animations": []}
+    _inspect_kaykit_actor(actor, rig_info)
     actor.free()
-    if not has_skeleton:
+    print("Official KayKit Knight rig: ", rig_info)
+    if int(rig_info.get("bones", 0)) < 15:
         _fail("official KayKit Knight.glb contains no humanoid Skeleton3D")
         return
+    var animation_names: Array = rig_info.get("animations", [])
+    for action in ["idle", "walk", "run", "jump"]:
+        var found := false
+        for animation_name in animation_names:
+            if String(animation_name).to_lower().contains(action):
+                found = true
+                break
+        if not found:
+            _fail("official KayKit Knight.glb missing " + action + " animation")
+            return
 
     var packed := load("res://scenes/character_creator.tscn") as PackedScene
     if packed == null:
@@ -87,10 +99,17 @@ func _fail(message: String) -> void:
     quit(1)
 
 
-func _contains_kaykit_skeleton(node: Node) -> bool:
-    if node is Skeleton3D and (node as Skeleton3D).get_bone_count() >= 15:
-        return true
+func _inspect_kaykit_actor(node: Node, info: Dictionary) -> void:
+    if node is Skeleton3D:
+        var skeleton := node as Skeleton3D
+        if skeleton.get_bone_count() > int(info.get("bones", 0)):
+            info["bones"] = skeleton.get_bone_count()
+            info["skeleton"] = String(skeleton.name)
+    if node is AnimationPlayer:
+        var player := node as AnimationPlayer
+        var names: Array = info.get("animations", [])
+        for animation_name in player.get_animation_list():
+            names.append(String(animation_name))
+        info["animations"] = names
     for child in node.get_children():
-        if _contains_kaykit_skeleton(child):
-            return true
-    return false
+        _inspect_kaykit_actor(child, info)
