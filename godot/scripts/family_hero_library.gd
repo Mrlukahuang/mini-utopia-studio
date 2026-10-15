@@ -482,6 +482,7 @@ func _build_ui() -> void:
 
     var scroll := ScrollContainer.new()
     scroll.name = "HeroScroll"
+    scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
     scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
     column.add_child(scroll)
 
@@ -491,6 +492,7 @@ func _build_ui() -> void:
     hero_list.add_theme_constant_override("separation", 12)
     var list_stack := VBoxContainer.new()
     list_stack.name = "LibraryListStack"
+    list_stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     list_stack.add_theme_constant_override("separation", 16)
     scroll.add_child(list_stack)
     list_stack.add_child(hero_list)
@@ -1286,7 +1288,8 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         var button := Button.new()
         button.name = "Hero_" + character_id
         button.text = ""
-        button.custom_minimum_size.y = 164
+        button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        button.custom_minimum_size = Vector2(720, 164)
         button.pressed.connect(_on_hero_pressed.bind(character_id))
         hero_list.add_child(button)
 
