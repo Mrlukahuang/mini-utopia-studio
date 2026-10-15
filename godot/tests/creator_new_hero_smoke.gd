@@ -64,6 +64,23 @@ func _initialize() -> void:
     if stage.avatar_root().get_node_or_null("KayKitBody") == null:
         _fail("Creator screenshot uses fallback instead of real KayKit")
         return
+    # Parent-only widgets must not appear on a child's library screen.
+    var library := load("res://scenes/family_hero_library.tscn").instantiate() as MiniUtopiaFamilyHeroLibrary
+    root.add_child(library)
+    await process_frame
+    if library.api_input.visible or library.token_input.visible:
+        _fail("child library exposes technical login inputs")
+        return
+    library._toggle_parent_entry()
+    if not library.api_input.visible or not library.token_input.visible:
+        _fail("parent entry did not reveal adult login controls")
+        return
+    library._toggle_parent_entry()
+    if library.api_input.visible or library.token_input.visible:
+        _fail("parent login controls remained visible on the child page")
+        return
+    library.queue_free()
+
     name_input.text = "Lily"
     scene._on_hero_name_changed(name_input.text)
     if not save_button.disabled:
@@ -123,6 +140,20 @@ func _initialize() -> void:
     bridge.request_succeeded.emit("equipment:get", {"runtime": owned_runtime})
     if play_button.disabled:
         _fail("saved Hero and matching gear did not enable Play")
+        return
+
+    # Editing an existing Hero must include the new look in the canonical PUT,
+    # without changing unrelated profile fields or the server revision.
+    scene._draft_appearance["body_type"] = "chubby"
+    var updated: Dictionary = scene._character_update_payload("Lily New Look")
+    if String(updated.get("display_name", "")) != "Lily New Look":
+        _fail("Hero rename was not included in the saved payload")
+        return
+    if String(updated.get("profile", {}).get("avatar", {}).get("body_type", "")) != "chubby":
+        _fail("edited avatar did not persist in the Character PUT payload")
+        return
+    if String(updated.get("revision", "")) != "2026-10-14T00:00:00+00:00":
+        _fail("save dropped the canonical revision")
         return
 
     # Simulate an optimistic stale-equipment cache after PUT. A successful

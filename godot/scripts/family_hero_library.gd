@@ -10,6 +10,8 @@ var bridge: MiniUtopiaBridgeClient
 var status_label: Label
 var hero_list: VBoxContainer
 var connection_panel: VBoxContainer
+var parent_entry_button: Button
+var _parent_controls_open := false
 var api_input: LineEdit
 var token_input: LineEdit
 var paste_secret_button: Button
@@ -74,7 +76,7 @@ func _ready() -> void:
         _refresh_characters()
     else:
         _set_connected(false)
-        _set_status("Parent: connect your private Family Cloud to load saved Heroes.", false)
+        _set_status("想保存新角色？请家长先点「家长入口」。", false)
 
 
 func _family_state() -> MiniUtopiaFamilySceneState:
@@ -82,9 +84,8 @@ func _family_state() -> MiniUtopiaFamilySceneState:
 
 
 func _build_ui() -> void:
-    var background := ColorRect.new()
+    var background := Panel.new()
     background.name = "Background"
-    background.color = Color("#F8F2FC")
     background.set_anchors_preset(Control.PRESET_FULL_RECT)
     add_child(background)
 
@@ -102,12 +103,10 @@ func _build_ui() -> void:
 
     var title := Label.new()
     title.text = "✨ My Heroes / 我的角色"
-    title.add_theme_font_size_override("font_size", 30)
     column.add_child(title)
 
     var subtitle := Label.new()
     subtitle.text = "Choose one to dress, play, or film. Every hero stays yours."
-    subtitle.add_theme_font_size_override("font_size", 17)
     column.add_child(subtitle)
 
     var toolbar := HBoxContainer.new()
@@ -164,7 +163,14 @@ func _build_ui() -> void:
     logout_button.text = "Parent: Disconnect"
     logout_button.custom_minimum_size = Vector2(210, 52)
     logout_button.pressed.connect(_on_disconnect_pressed)
-    toolbar.add_child(logout_button)
+    # Parent-only actions live in the parent area, not the child's toolbar.
+
+    parent_entry_button = Button.new()
+    parent_entry_button.name = "ParentEntryButton"
+    parent_entry_button.text = "👨‍👩‍👧 家长入口"
+    parent_entry_button.custom_minimum_size = Vector2(150, 52)
+    parent_entry_button.pressed.connect(_toggle_parent_entry)
+    toolbar.add_child(parent_entry_button)
 
     adult_share_panel = VBoxContainer.new()
     adult_share_panel.name = "ParentFilmConsent"
@@ -210,7 +216,6 @@ func _build_ui() -> void:
     parent_movie_summary = Label.new()
     parent_movie_summary.name = "FilmDetailsToReview"
     parent_movie_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    parent_movie_summary.add_theme_font_size_override("font_size", 18)
     parent_movie_panel.add_child(parent_movie_summary)
 
     parent_movie_secret = LineEdit.new()
@@ -305,11 +310,11 @@ func _build_ui() -> void:
     connect_button.custom_minimum_size.y = 52
     connect_button.pressed.connect(_on_connect_pressed)
     connection_panel.add_child(connect_button)
+    connection_panel.add_child(logout_button)
 
     status_label = Label.new()
     status_label.name = "LibraryStatus"
     status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    status_label.add_theme_font_size_override("font_size", 17)
     column.add_child(status_label)
 
     var scroll := ScrollContainer.new()
@@ -331,6 +336,7 @@ func _build_ui() -> void:
     movie_list.name = "MovieList"
     movie_list.add_theme_constant_override("separation", 10)
     list_stack.add_child(movie_list)
+    _refresh_parent_entry()
 
 
 func _set_connected(connected: bool) -> void:
@@ -354,6 +360,45 @@ func _set_connected(connected: bool) -> void:
         _pending_cast_character_id = ""
     else:
         _refresh_cast_button()
+    _refresh_parent_entry()
+
+
+func _toggle_parent_entry() -> void:
+    _parent_controls_open = not _parent_controls_open
+    _refresh_parent_entry()
+
+
+func _refresh_parent_entry() -> void:
+    # The parent form can exist for old smoke tests and in-memory sessions,
+    # but its endpoint/password widgets are never exposed on the child screen.
+    if connection_panel != null:
+        var connected := bridge.has_family_session()
+        connection_panel.visible = not connected or _parent_controls_open
+        for widget in connection_panel.get_children():
+            if widget is Control:
+                widget.visible = (
+                    _parent_controls_open
+                    and (widget == logout_button if connected else widget != logout_button)
+                )
+    if parent_entry_button != null:
+        parent_entry_button.text = (
+            "← 返回我的角色" if _parent_controls_open else "👨‍👩‍👧 家长入口"
+        )
+    if hero_list != null:
+        for widget in hero_list.get_children():
+            if widget.name.begins_with("Share_"):
+                widget.visible = _parent_controls_open
+    if movie_list != null:
+        for widget in movie_list.get_children():
+            if widget.name.begins_with("Review_") or widget.name.begins_with("Download_"):
+                widget.visible = _parent_controls_open
+            elif widget.name.begins_with("SaveMovie_"):
+                widget.visible = not _parent_controls_open
+    if not _parent_controls_open:
+        if adult_share_panel != null:
+            adult_share_panel.hide()
+        if parent_movie_panel != null:
+            parent_movie_panel.hide()
 
 
 func _on_paste_parent_unlock() -> void:
@@ -800,7 +845,10 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             return
         button.disabled = false
         button.text = "💾 Save MP4 to this iPad / Mac"
-        _set_status("Movie ready! Tap the Save MP4 button now.", false)
+        var child_button := movie_list.get_node_or_null("SaveMovie_" + id) as Button
+        if child_button != null:
+            child_button.text = "💾 现在保存我的电影"
+        _set_status("电影准备好啦！再点一次保存。", false)
         return
 
     if kind == "films:get" and not _pending_review_film_id.is_empty():
@@ -856,7 +904,6 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             return
         var heading := Label.new()
         heading.text = "🎞 My Movies / 我的电影"
-        heading.add_theme_font_size_override("font_size", 23)
         movie_list.add_child(heading)
         for entry in films:
             if typeof(entry) != TYPE_DICTIONARY:
@@ -869,7 +916,6 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             button.name = "Film_" + id
             button.text = "🎬 " + String(draft.get("display_name", "My Film")) + " · Continue"
             button.custom_minimum_size.y = 62
-            button.add_theme_font_size_override("font_size", 18)
             button.pressed.connect(_on_saved_movie_pressed.bind(id))
             movie_list.add_child(button)
             var review_button := Button.new()
@@ -880,6 +926,7 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
                 _on_parent_review_movie_pressed.bind(id)
             )
             movie_list.add_child(review_button)
+            review_button.visible = _parent_controls_open
 
             var save_movie_button := Button.new()
             save_movie_button.name = "Download_" + id
@@ -889,6 +936,14 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
                 _on_film_download_pressed.bind(id)
             )
             movie_list.add_child(save_movie_button)
+            save_movie_button.visible = _parent_controls_open
+            var child_save_button := Button.new()
+            child_save_button.name = "SaveMovie_" + id
+            child_save_button.text = "💾 保存我的电影"
+            child_save_button.custom_minimum_size.y = 56
+            child_save_button.pressed.connect(_on_film_download_pressed.bind(id))
+            movie_list.add_child(child_save_button)
+            child_save_button.visible = not _parent_controls_open
         _set_status(str(films.size()) + " private movie(s) saved.", false)
         return
     if _consume_movie_restore(kind, payload):
@@ -917,6 +972,7 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             _set_status("Parent approval failed. Please try again.", true)
             return
         api_input.clear()
+        _parent_controls_open = false
         _set_connected(true)
         _refresh_characters()
         return
@@ -1067,7 +1123,6 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         button.name = "Hero_" + character_id
         button.text = "✦ " + name + "     ✎ Edit / Dress"
         button.custom_minimum_size.y = 64
-        button.add_theme_font_size_override("font_size", 21)
         button.pressed.connect(_on_hero_pressed.bind(character_id))
         hero_list.add_child(button)
 
@@ -1083,6 +1138,7 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             share.custom_minimum_size.y = 52
             share.pressed.connect(_on_share_candidate.bind(character_id))
             hero_list.add_child(share)
+            share.visible = _parent_controls_open
 
         var primary := (
             String(family.active_character.get("character_id", ""))
@@ -1093,7 +1149,6 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             cast_button.name = "Cast_" + character_id
             cast_button.text = "🎬 Invite " + name + " into my film"
             cast_button.custom_minimum_size.y = 58
-            cast_button.add_theme_font_size_override("font_size", 18)
             cast_button.pressed.connect(_on_cast_pressed.bind(character_id))
             hero_list.add_child(cast_button)
 
@@ -1129,6 +1184,11 @@ func _on_bridge_failure(kind: String, status_code: int, _code: String, _message:
                 if button != null:
                     button.disabled = false
                     button.text = "⬇ Prepare private MP4 (parent release required)"
+            elif String(entry.name).begins_with("SaveMovie_"):
+                var child_button := entry as Button
+                if child_button != null:
+                    child_button.disabled = false
+                    child_button.text = "💾 保存我的电影"
         _set_status(
             "Parent must approve the finished MP4 before you can save it."
             if status_code in [403, 404]
@@ -1377,8 +1437,9 @@ func _on_disconnect_pressed() -> void:
         family.disconnect_family()
     bridge.clear_family_session()
     _clear_hero_list()
+    _parent_controls_open = false
     _set_connected(false)
-    _set_status("Disconnected · your Heroes remain safe in your private account.", false)
+    _set_status("你已返回欢迎页，可以请家长再来帮忙。", false)
 
 
 func _on_back_pressed() -> void:
@@ -1387,5 +1448,16 @@ func _on_back_pressed() -> void:
 
 
 func _set_status(message: String, error: bool) -> void:
-    status_label.text = message
-    status_label.modulate = Color("#B5485D") if error else Color("#4F4868")
+    var safe_message := message
+    if not _parent_controls_open:
+        var lower := message.to_lower()
+        for hidden_word in [
+            "url", "token", "secret", "session", "bridge",
+            "family cloud", "https://", "http://", "localhost", "endpoint",
+        ]:
+            if lower.contains(hidden_word):
+                safe_message = "请家长打开「家长入口」帮忙。"
+                break
+    if not _parent_controls_open:
+        safe_message = safe_message.replace("MP4", "电影").replace("mp4", "电影")
+    status_label.text = ("💡 " if error else "") + safe_message
