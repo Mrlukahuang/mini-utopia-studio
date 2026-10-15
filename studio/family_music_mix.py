@@ -55,10 +55,9 @@ def private_movie_ffmpeg_args(
             or not track.is_relative_to(allowed_root)
         ):
             raise FamilyMusicMixError("Packaged CC0 music file missing")
-        command.extend([
-            "-stream_loop", "-1", "-i", str(track),
-            "-map", "0:v:0", "-map", "1:a:0",
-        ])
+        command.extend(["-stream_loop", "-1", "-i", str(track)])
+        if voice_file is None:
+            command.extend(["-map", "0:v:0", "-map", "1:a:0"])
     if voice_file is not None:
         # The trusted private renderer verified this immutable local file.
         # It is not a path from the browser or a child-authored film draft.
