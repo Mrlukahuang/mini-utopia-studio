@@ -274,6 +274,31 @@ jobs:
           test -s dist/village-visual/index.pck
           sed -i 's|run/main_scene="res://scenes/main.tscn"|run/main_scene="res://scenes/director_stage.tscn"|' godot/project.godot
           grep -Fx 'run/main_scene="res://scenes/director_stage.tscn"' godot/project.godot
+          # The Director requires a validated play session; provide a
+          # deterministic SYNTHETIC fixture only for this isolated CI export.
+          # The production Web artifact was exported earlier and is unchanged.
+          mkdir -p godot/runtime_state
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          play = json.loads(Path("godot/config/runtime/creator_play_session_example.json").read_text())
+          director = {
+              "schema_version": "1.0",
+              "director_session_id": "DIR_CI_FAKE",
+              "episode_id": "EP_CI_FAKE",
+              "scene_id": "SCENE_CI_FAKE",
+              "shot_id": "SHOT_CI_FAKE",
+              "world_asset_id": "LOC_NEWBIE_VILLAGE",
+              "duration_seconds": 15.0,
+              "animation_intent": "walk",
+              "play_session": play,
+              "shot": {},
+              "camera": {"position": [0.0, 4.2, 7.8], "look_at": [0.0, 1.1, 0.0], "fov": 52.0},
+          }
+          Path("godot/runtime_state/director_shot_session.json").write_text(json.dumps(director))
+          PY
+          # Non-imported JSON fixtures must be explicitly included in PCK.
+          sed -i 's|include_filter=""|include_filter="runtime_state/*.json"|' godot/export_presets.cfg
           mkdir -p "$GITHUB_WORKSPACE/dist/director-visual"
           "$GODOT_BINARY" --headless --path godot --export-release "Web" \
             "$GITHUB_WORKSPACE/dist/director-visual/index.html"
