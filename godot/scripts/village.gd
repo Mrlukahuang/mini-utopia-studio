@@ -1,5 +1,19 @@
 extends Node3D
 
+# Eight imported, unmodified CC0 KayKit houses; instances repeat in four
+# real streets. Preloads guarantee inclusion in the exported Web PCK.
+const KAYKIT_HOUSES := [
+    preload("res://assets/kaykit/medieval/building_home_A_blue.gltf"),
+    preload("res://assets/kaykit/medieval/building_home_B_blue.gltf"),
+    preload("res://assets/kaykit/medieval/building_home_A_green.gltf"),
+    preload("res://assets/kaykit/medieval/building_home_B_green.gltf"),
+    preload("res://assets/kaykit/medieval/building_home_A_red.gltf"),
+    preload("res://assets/kaykit/medieval/building_home_B_red.gltf"),
+    preload("res://assets/kaykit/medieval/building_home_A_yellow.gltf"),
+    preload("res://assets/kaykit/medieval/building_home_B_yellow.gltf"),
+]
+
+var _village_previous_web_fps := -1
 var gate_unlocked := false
 var gate_label: Label3D
 
@@ -25,11 +39,19 @@ var palette = {
 }
 
 func _ready() -> void:
+    # On iPad and software-rendered WebGL (CI SwiftShader), the uncapped 3D
+    # village can monopolize the compositor and stall Playwright screenshots.
+    # Preserve the original engine setting for other scenes; never throttle
+    # Creator or Director, and keep responsive 30 fps village touch control.
+    if OS.has_feature("web"):
+        _village_previous_web_fps = Engine.max_fps
+        Engine.max_fps = 30 if Engine.max_fps <= 0 else mini(30, Engine.max_fps)
     _setup_environment()
     _build_ground()
     _build_path()
     _build_village()
     _build_forest()
+    _build_kaykit_villagers()
     _build_storybook_dressing()
     _build_locked_gate()
     var creator_button := get_node_or_null("HUD/OpenCreatorButton") as Button
@@ -43,6 +65,11 @@ func _ready() -> void:
             selection == null or selection.active_play_session().is_empty()
         )
         director_button.pressed.connect(_open_family_director)
+
+
+func _exit_tree() -> void:
+    if _village_previous_web_fps >= 0:
+        Engine.max_fps = _village_previous_web_fps
 
 
 func _open_family_director() -> void:
@@ -173,6 +200,10 @@ func _setup_environment() -> void:
     sun.light_color = Color("#F7D6A5")
     sun.light_energy = 0.72
     sun.shadow_enabled = true
+    # One shadow frustum on Web avoids multiplying the draw cost of 20 real
+    # buildings and 15 skinned KayKit villagers. Keep physical shadows.
+    if OS.has_feature("web"):
+        sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
     sun.shadow_opacity = 0.8
     add_child(sun)
 
@@ -198,16 +229,75 @@ func _build_path() -> void:
         )
 
 func _build_village() -> void:
-    _cottage(Vector3(-7,0,-5), palette.pink)
-    _cottage(Vector3(7,0,-8), palette.mint)
-    _cottage(Vector3(-10,0,-15), palette.lavender)
-    _cottage(Vector3(10,0,-18), palette.cream)
+    _build_kaykit_houses()
 
     _cylinder("FountainBase", Vector3(0,0.25,-10), 2.2, 0.5, palette.stone, true)
     _cylinder("FountainStem", Vector3(0,1.0,-10), 0.35, 1.5, palette.cream)
     _sphere("FountainBubble", Vector3(0,2.0,-10), 0.7, Color("#72B7C9"))
-    _mushroom(Vector3(-4.2,0,-11.5), 1.15, palette.mushroom_red)
-    _mushroom(Vector3(4.1,0,-12.0), 0.85, palette.mushroom_orange)
+    _mushroom(Vector3(-4.2,0,-11.5), 0.65, palette.mushroom_red)
+    _mushroom(Vector3(4.1,0,-12.0), 0.55, palette.mushroom_orange)
+
+func _build_kaykit_houses() -> void:
+    # Twenty real KayKit buildings with walkable 6–10m gaps around the
+    # existing central stone path. All use StaticBody3D, not decorative meshes
+    # or post-hoc collision counts. Never place a house at the player spawn.
+    var plot_index := 0
+    for z in [-26.0, -18.0, -10.0, -2.0, 6.0]:
+        for x in [-23.0, -15.0, 15.0, 23.0]:
+            var house := StaticBody3D.new()
+            house.name = "KayKitHouse%02d" % plot_index
+            house.position = Vector3(x, 0.0, z)
+            house.add_to_group("kaykit_village_house")
+            add_child(house)
+            var visual := (KAYKIT_HOUSES[plot_index % KAYKIT_HOUSES.size()] as PackedScene).instantiate() as Node3D
+            if visual == null:
+                push_error("KayKit building failed to load: " + str(plot_index))
+                continue
+            visual.name = "OfficialKayKitBuilding"
+            visual.scale = Vector3.ONE * 4.8
+            visual.rotation_degrees.y = 180.0 if x < 0.0 else 0.0
+            house.add_child(visual)
+            var collision := CollisionShape3D.new()
+            collision.name = "CollisionShape3D"
+            # Official KayKit glTF mesh extents after the 4.8x instance scale:
+            # home A: 3.81 x 4.46 x 4.10 m; home B: 4.20 x 6.14 x 5.27 m.
+            # Both collider types cover the complete visible building, including
+            # the taller B roof and its deeper front/back walls.
+            var is_home_b: bool = plot_index % 2 == 1
+            collision.position.y = 3.15 if is_home_b else 2.30
+            var shape := BoxShape3D.new()
+            shape.size = Vector3(4.5, 6.3, 5.6) if is_home_b else Vector3(4.2, 4.6, 4.4)
+            collision.shape = shape
+            house.add_child(collision)
+            plot_index += 1
+
+
+func _build_kaykit_villagers() -> void:
+    # Fifteen separate, visible KayKit-rig villagers, not impostor billboards.
+    # Five creator species heads x three clear pastel palettes, each with a
+    # stable unique look ID. All are physics actors that block the player.
+    var species := [
+        "species_head_human_v1", "species_head_cat_v1",
+        "species_head_sheep_v1", "species_head_robot_v1",
+        "species_head_cloud_v1",
+    ]
+    var colors := ["#F7B7D2", "#B9E7D0", "#D7C2F3"]
+    for i in range(15):
+        var x: float = float([-6.8, -4.0, 4.0, 6.8][i % 4])
+        var z: float = 16.0 - float(int(i / 4)) * 9.0 - float(i % 4) * 0.8
+        var look := {
+            "look_id": "KayKitVillager%02d" % i,
+            "species_head_id": species[i % 5],
+            "surface_color_hex": colors[int(i / 5)],
+            "eye_color_hex": "#2D3150",
+            "body_type": "standard" if i % 2 == 0 else "slim",
+            "role_palette": colors[int(i / 5)],
+            "hat_style": i % 5,
+        }
+        var npc := MiniUtopiaKaykitVillageNPC.new()
+        npc.configure(look, Vector3(x, 0.15, z))
+        add_child(npc)
+
 
 func _cottage(origin: Vector3, accent: Color) -> void:
     _box("Cottage", origin + Vector3(0,1.5,0), Vector3(4.4,3.0,3.6), palette.cream, true)
@@ -220,13 +310,14 @@ func _cottage(origin: Vector3, accent: Color) -> void:
     _cylinder("Chimney", origin + Vector3(1.35,4.1,-0.6), 0.35, 1.8, palette.wood)
 
 func _build_forest() -> void:
+    # Keep the trees outside house footprints and the player's paths.
     var points = [
-        Vector3(-16,0,7), Vector3(-20,0,1), Vector3(-18,0,-9),
-        Vector3(16,0,5), Vector3(20,0,-3), Vector3(18,0,-13),
-        Vector3(-15,0,-25), Vector3(15,0,-27), Vector3(25,0,12),
-        Vector3(-27,0,13), Vector3(-27,0,-4), Vector3(27,0,-7),
-        Vector3(-23,0,25), Vector3(20,0,27), Vector3(6,0,25),
-        Vector3(-7,0,27)
+        Vector3(-31,0,-28), Vector3(-31,0,-16), Vector3(-31,0,-4),
+        Vector3(-31,0,8), Vector3(-31,0,20), Vector3(-31,0,30),
+        Vector3(31,0,-28), Vector3(31,0,-16), Vector3(31,0,-4),
+        Vector3(31,0,8), Vector3(31,0,20), Vector3(31,0,30),
+        Vector3(-12,0,26), Vector3(12,0,26), Vector3(-4,0,30),
+        Vector3(4,0,30)
     ]
     for i in points.size():
         _tree(points[i], i % 2 == 0)
