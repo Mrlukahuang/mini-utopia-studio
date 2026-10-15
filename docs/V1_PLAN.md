@@ -164,7 +164,7 @@ CC0 套件：KayKit / Kenney / Quaternius
 ```text
 当前周：W1
 可领取：V1-W1-01、V1-W1-02（需人类执行）、V1-W1-04
-V1-W1-03 A-008 iPad 试玩阻断：① UI 中文方框（PR #373 已合并，✅ CI 字体通过；真机待验收）；② Creator 动画按钮竖条遮挡预览（PR #374 🟡 两档 Web 截图复核中）；③ KayKit 原始模型/动画/装备未入 Web 包；④ Creator/游戏仍用占位火柴人；⑤ New Hero Save/Play 灰色（先确认是否只是角色未命名）。每个缺陷一个 PR，顺序固定，CI 必须有 1180×820 与 1366×1024 Playwright Web 截图。
+V1-W1-03 A-008 iPad 试玩阻断：① UI 中文方框（PR #373 已合并，✅ CI 字体通过；真机待验收）；② Creator 动画按钮竖条遮挡预览（PR #374 已合并，✅ 两档 Playwright Web 截图无按钮遮挡；真机待验收）；③ KayKit 原始模型/动画/装备未入 Web 包（PR #375 🟡 官方 Knight.glb/41骨骼/76动画及4件装备已在CI验证，主线合并待验收）；④ Creator/游戏仍用占位火柴人；⑤ New Hero Save/Play 灰色（先确认是否只是角色未命名）。每个缺陷一个 PR，顺序固定，CI 必须有 1180×820 与 1366×1024 Playwright Web 截图。
 V1-W1-03 家长 2026-10-15 已报告具体阻断：Mac Safari/iPhone 登录时无法粘贴长口令，手输短密码被 Godot 客户端拒绝；本次只处理“8 位家长口令被客户端长度校验拒绝”，另一个粘贴问题不在此 PR
 ```
 

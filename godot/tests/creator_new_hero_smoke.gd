@@ -4,6 +4,37 @@ extends SceneTree
 ## and must never enable cloud writes before an adult session is supplied.
 
 func _initialize() -> void:
+    # PR3 resources must be genuinely usable in the same CI Web build.
+    var kaykit_rig := load("res://assets/kaykit/adventurers/Knight.glb") as PackedScene
+    if kaykit_rig == null:
+        _fail("official KayKit Knight.glb was not imported")
+        return
+    var actor := kaykit_rig.instantiate()
+    var rig_info := {"bones": 0, "skeleton": "", "animations": []}
+    _inspect_kaykit_actor(actor, rig_info)
+    actor.free()
+    print("Official KayKit Knight rig: ", rig_info)
+    if int(rig_info.get("bones", 0)) < 15:
+        _fail("official KayKit Knight.glb contains no humanoid Skeleton3D")
+        return
+    var animation_names: Array = rig_info.get("animations", [])
+    # Real source clip names, verified against the Godot-imported official GLB.
+    for clip_name in ["Idle", "Walking_A", "Running_A", "Jump_Full_Short"]:
+        if not animation_names.has(clip_name):
+            _fail("official KayKit Knight.glb missing clip " + clip_name)
+            return
+    for item_name in ["sword_1handed", "shield_round", "staff", "wand"]:
+        var item_path: String = "res://assets/kaykit/adventurers/" + String(item_name) + ".gltf"
+        var item_scene := load(item_path) as PackedScene
+        if item_scene == null:
+            _fail("KayKit equipment failed Godot import: " + item_name)
+            return
+        var item := item_scene.instantiate()
+        if item == null:
+            _fail("KayKit equipment could not instantiate: " + item_name)
+            return
+        item.free()
+
     var packed := load("res://scenes/character_creator.tscn") as PackedScene
     if packed == null:
         _fail("Creator scene missing")
@@ -73,3 +104,23 @@ func _initialize() -> void:
 func _fail(message: String) -> void:
     push_error("creator_new_hero_smoke: FAIL · " + message)
     quit(1)
+
+
+func _inspect_kaykit_actor(node: Node, info: Dictionary) -> void:
+    if node is Skeleton3D:
+        var skeleton := node as Skeleton3D
+        if skeleton.get_bone_count() > int(info.get("bones", 0)):
+            info["bones"] = skeleton.get_bone_count()
+            info["skeleton"] = String(skeleton.name)
+            var bones: Array[String] = []
+            for bone_idx in range(skeleton.get_bone_count()):
+                bones.append(String(skeleton.get_bone_name(bone_idx)))
+            info["bone_names"] = bones
+    if node is AnimationPlayer:
+        var player := node as AnimationPlayer
+        var names: Array = info.get("animations", [])
+        for animation_name in player.get_animation_list():
+            names.append(String(animation_name))
+        info["animations"] = names
+    for child in node.get_children():
+        _inspect_kaykit_actor(child, info)
