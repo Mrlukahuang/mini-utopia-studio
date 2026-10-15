@@ -64,10 +64,38 @@ func _initialize() -> void:
     if stage.avatar_root().get_node_or_null("KayKitBody") == null:
         _fail("Creator screenshot uses fallback instead of real KayKit")
         return
+    # First-touch selection has two themed, real SubViewport KayKit cards.
+    # Clicking without an adult-issued session cannot expose either child's
+    # library or parent-only token inputs.
     # Parent-only widgets must not appear on a child's library screen.
     var library := load("res://scenes/family_hero_library.tscn").instantiate() as MiniUtopiaFamilyHeroLibrary
     root.add_child(library)
     await process_frame
+    var chooser := library.get_node_or_null("WhoIsPlaying") as Panel
+    var child_a := library.get_node_or_null(
+        "WhoIsPlaying/Margin/Column/PlayerCards/PlayerChildA"
+    ) as Button
+    var child_b := library.get_node_or_null(
+        "WhoIsPlaying/Margin/Column/PlayerCards/PlayerChildB"
+    ) as Button
+    if chooser == null or not chooser.visible:
+        _fail("who-is-playing page must be the first Hero Library view")
+        return
+    if child_a == null or child_b == null:
+        _fail("missing two child profile cards")
+        return
+    for card in [child_a, child_b]:
+        if card.custom_minimum_size.y < 300:
+            _fail("player card is too small for iPad")
+            return
+        var avatar := card.get_node_or_null("Portrait3D") as MiniUtopiaCreatorAvatarStage
+        if avatar == null or avatar.avatar_root().get_node_or_null("KayKitBody") == null:
+            _fail("who-is-playing card needs a real 3D KayKit avatar")
+            return
+    library._on_player_card_pressed("child_b")
+    if not chooser.visible or library.profile_choice.get_selected_id() != 1:
+        _fail("unauthorized child switched profiles without adult")
+        return
     if library.api_input.visible or library.token_input.visible:
         _fail("child library exposes technical login inputs")
         return

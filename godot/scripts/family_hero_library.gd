@@ -11,6 +11,11 @@ var status_label: Label
 var hero_list: VBoxContainer
 var connection_panel: VBoxContainer
 var parent_entry_button: Button
+var profile_picker: Panel
+var picker_message: Label
+var _profile_portraits: Dictionary = {}
+var _profile_labels: Dictionary = {}
+var _selected_profile := ""
 var _parent_controls_open := false
 var api_input: LineEdit
 var token_input: LineEdit
@@ -57,6 +62,7 @@ func _ready() -> void:
     bridge.request_failed.connect(_on_bridge_failure)
 
     _build_ui()
+    _build_profile_picker()
     if OS.has_feature("web"):
         # On the approved single-origin family host, no child/parent should
         # have to manually type a backend address. The URL is taken only from
@@ -77,6 +83,154 @@ func _ready() -> void:
     else:
         _set_connected(false)
         _set_status("想保存新角色？请家长先点「家长入口」。", false)
+
+
+# Lane C first-touch player choice, within its owned Hero Library scene.
+# Real private avatar details appear only after owner-scoped session retrieval.
+func _build_profile_picker() -> void:
+    profile_picker = Panel.new()
+    profile_picker.name = "WhoIsPlaying"
+    profile_picker.set_anchors_preset(Control.PRESET_FULL_RECT)
+    add_child(profile_picker)
+
+    var margin := MarginContainer.new()
+    margin.name = "Margin"
+    margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+    for side in ["left", "top", "right", "bottom"]:
+        margin.add_theme_constant_override("margin_" + side, 28)
+    profile_picker.add_child(margin)
+
+    var column := VBoxContainer.new()
+    column.name = "Column"
+    column.add_theme_constant_override("separation", 16)
+    margin.add_child(column)
+
+    var header := HBoxContainer.new()
+    column.add_child(header)
+    var logo := TextureRect.new()
+    logo.texture = load("res://assets/ui/mini_utopia_logo_horizontal.png")
+    logo.custom_minimum_size = Vector2(270, 74)
+    logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+    logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+    logo.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    header.add_child(logo)
+
+    var parent_corner := Button.new()
+    parent_corner.name = "ParentCornerButton"
+    parent_corner.text = "👨‍👩‍👧 家长入口"
+    parent_corner.custom_minimum_size = Vector2(152, 56)
+    parent_corner.pressed.connect(_open_parent_from_picker)
+    header.add_child(parent_corner)
+
+    var top_space := Control.new()
+    top_space.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    column.add_child(top_space)
+    var title := Label.new()
+    title.name = "ChoosePlayerTitle"
+    title.text = "✨ 谁在玩？"
+    title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    column.add_child(title)
+    var hint := Label.new()
+    hint.text = "选自己的头像，开始今天的冒险！"
+    hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    column.add_child(hint)
+
+    var cards := HBoxContainer.new()
+    cards.name = "PlayerCards"
+    cards.alignment = BoxContainer.ALIGNMENT_CENTER
+    cards.add_theme_constant_override("separation", 24)
+    column.add_child(cards)
+    for profile_id in ["child_a", "child_b"]:
+        var card := Button.new()
+        card.name = "PlayerChildA" if profile_id == "child_a" else "PlayerChildB"
+        card.custom_minimum_size = Vector2(335, 345)
+        card.text = ""
+        card.pressed.connect(_on_player_card_pressed.bind(profile_id))
+        cards.add_child(card)
+
+        var portrait := MiniUtopiaCreatorAvatarStage.new()
+        portrait.name = "Portrait3D"
+        portrait.anchor_left = 0.0
+        portrait.anchor_right = 1.0
+        portrait.anchor_bottom = 1.0
+        portrait.offset_left = 22
+        portrait.offset_right = -22
+        portrait.offset_top = 16
+        portrait.offset_bottom = -87
+        card.add_child(portrait)
+        portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        _profile_portraits[profile_id] = portrait
+
+        var name := Label.new()
+        name.name = "PlayerLabel"
+        name.anchor_left = 0.0
+        name.anchor_right = 1.0
+        name.anchor_top = 1.0
+        name.anchor_bottom = 1.0
+        name.offset_left = 12
+        name.offset_right = -12
+        name.offset_top = -82
+        name.offset_bottom = -8
+        name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+        name.text = (
+            ("Child A / 大宝" if profile_id == "child_a" else "Child B / 二宝")
+            + "\n🌈 我的英雄"
+        )
+        name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        card.add_child(name)
+        _profile_labels[profile_id] = name
+
+    picker_message = Label.new()
+    picker_message.name = "PlayerChoiceMessage"
+    picker_message.text = ""
+    picker_message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    column.add_child(picker_message)
+    var bottom_space := Control.new()
+    bottom_space.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    column.add_child(bottom_space)
+
+
+func _on_player_card_pressed(profile_id: String) -> void:
+    if profile_id not in ["child_a", "child_b"]:
+        return
+    _selected_profile = profile_id
+    profile_choice.select(0 if profile_id == "child_a" else 1)
+    var family := _family_state()
+    if (
+        family != null
+        and family.has_family_connection()
+        and family.current_profile_id() == profile_id
+        and bridge.has_family_session()
+    ):
+        profile_picker.hide()
+        _parent_controls_open = false
+        _refresh_parent_entry()
+        _refresh_characters()
+        return
+    picker_message.text = "请家长点右上角「家长入口」，帮你打开自己的小世界 💕"
+
+
+func _open_parent_from_picker() -> void:
+    # Never reuse Child A's session to open Child B or vice versa.
+    var family := _family_state()
+    if family != null and family.has_family_connection():
+        if family.current_profile_id() != _selected_profile:
+            family.disconnect_family()
+            bridge.clear_family_session()
+            _clear_hero_list()
+            _set_connected(false)
+    profile_picker.hide()
+    _parent_controls_open = true
+    _refresh_parent_entry()
+    _set_status("请家长选择孩子并解锁，完成后交给孩子。", false)
+
+
+func _show_player_picker() -> void:
+    _parent_controls_open = false
+    _refresh_parent_entry()
+    picker_message.text = ""
+    profile_picker.show()
 
 
 func _family_state() -> MiniUtopiaFamilySceneState:
@@ -328,6 +482,7 @@ func _build_ui() -> void:
 
     var scroll := ScrollContainer.new()
     scroll.name = "HeroScroll"
+    scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
     scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
     column.add_child(scroll)
 
@@ -337,6 +492,7 @@ func _build_ui() -> void:
     hero_list.add_theme_constant_override("separation", 12)
     var list_stack := VBoxContainer.new()
     list_stack.name = "LibraryListStack"
+    list_stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     list_stack.add_theme_constant_override("separation", 16)
     scroll.add_child(list_stack)
     list_stack.add_child(hero_list)
@@ -983,6 +1139,7 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         api_input.clear()
         _parent_controls_open = false
         _set_connected(true)
+        profile_picker.hide()
         _refresh_characters()
         return
 
@@ -1131,7 +1288,8 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         var button := Button.new()
         button.name = "Hero_" + character_id
         button.text = ""
-        button.custom_minimum_size.y = 164
+        button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        button.custom_minimum_size = Vector2(720, 164)
         button.pressed.connect(_on_hero_pressed.bind(character_id))
         hero_list.add_child(button)
 
@@ -1204,6 +1362,27 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         else "找到你的英雄啦！选一个继续冒险 ✨"
     )
     _set_status(message, false)
+    # Only the owner-scoped list updates the selected card. Do not persist
+    # the sibling's name or appearance outside the current authorized session.
+    var current_family := _family_state()
+    var current_id := (
+        current_family.current_profile_id() if current_family != null else ""
+    )
+    if current_id in ["child_a", "child_b"]:
+        var caption := _profile_labels.get(current_id) as Label
+        var preview := _profile_portraits.get(current_id) as MiniUtopiaCreatorAvatarStage
+        if caption != null:
+            caption.text = (
+                ("Child A / 大宝" if current_id == "child_a" else "Child B / 二宝")
+                + ("\n⭐ " + String(heroes[0].get("display_name", "My Hero"))
+                    if not heroes.is_empty() else "\n🌈 创建我的英雄")
+            )
+        if preview != null and not heroes.is_empty():
+            var hero_profile = heroes[0].get("profile", {})
+            if typeof(hero_profile) == TYPE_DICTIONARY:
+                var appearance = hero_profile.get("avatar", {})
+                if typeof(appearance) == TYPE_DICTIONARY:
+                    preview.apply_appearance(appearance)
 
 
 func _clear_hero_list() -> void:
@@ -1486,6 +1665,7 @@ func _on_disconnect_pressed() -> void:
     _parent_controls_open = false
     _set_connected(false)
     _set_status("你已返回欢迎页，可以请家长再来帮忙。", false)
+    _show_player_picker()
 
 
 func _on_back_pressed() -> void:

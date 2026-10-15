@@ -244,7 +244,7 @@ func _refresh_outfit_choices() -> void:
             var remove := Button.new()
             remove.name = "Remove_" + slot
             remove.text = "− Take off"
-            remove.custom_minimum_size = Vector2(0.0, 42.0)
+            remove.custom_minimum_size = Vector2(0.0, 48.0)
             remove.pressed.connect(
                 _on_equipment_choice_pressed.bind(slot, "")
             )
