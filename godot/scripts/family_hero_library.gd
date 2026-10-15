@@ -163,7 +163,7 @@ func _build_ui() -> void:
     logout_button.text = "Parent: Disconnect"
     logout_button.custom_minimum_size = Vector2(210, 52)
     logout_button.pressed.connect(_on_disconnect_pressed)
-    toolbar.add_child(logout_button)
+    # Parent-only actions live in the parent area, not the child's toolbar.
 
     parent_entry_button = Button.new()
     parent_entry_button.name = "ParentEntryButton"
@@ -310,6 +310,7 @@ func _build_ui() -> void:
     connect_button.custom_minimum_size.y = 52
     connect_button.pressed.connect(_on_connect_pressed)
     connection_panel.add_child(connect_button)
+    connection_panel.add_child(logout_button)
 
     status_label = Label.new()
     status_label.name = "LibraryStatus"
@@ -371,11 +372,14 @@ func _refresh_parent_entry() -> void:
     # The parent form can exist for old smoke tests and in-memory sessions,
     # but its endpoint/password widgets are never exposed on the child screen.
     if connection_panel != null:
+        var connected := bridge.has_family_session()
+        connection_panel.visible = not connected or _parent_controls_open
         for widget in connection_panel.get_children():
             if widget is Control:
-                widget.visible = _parent_controls_open
-    if logout_button != null:
-        logout_button.visible = _parent_controls_open and bridge.has_family_session()
+                widget.visible = (
+                    _parent_controls_open
+                    and (widget == logout_button if connected else widget != logout_button)
+                )
     if parent_entry_button != null:
         parent_entry_button.text = (
             "← 返回我的角色" if _parent_controls_open else "👨‍👩‍👧 家长入口"
