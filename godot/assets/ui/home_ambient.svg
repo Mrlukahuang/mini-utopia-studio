@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+<defs>
+<linearGradient id="wash" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#ffe3ee" stop-opacity=".26"/>
+<stop offset=".52" stop-color="#e8e0ff" stop-opacity=".05"/>
+<stop offset="1" stop-color="#d9f3ff" stop-opacity=".24"/>
+</linearGradient>
+</defs>
+<rect width="1280" height="720" fill="url(#wash)"/>
+<g opacity=".65">
+<rect x="470" y="34" width="58" height="58" rx="17" fill="#fee7a9" transform="rotate(13 499 63)"/>
+<rect x="558" y="76" width="34" height="34" rx="10" fill="#decaff" transform="rotate(-15 575 93)"/>
+<rect x="1102" y="225" width="66" height="66" rx="19" fill="#bfead5" transform="rotate(21 1135 258)"/>
+<rect x="1205" y="352" width="38" height="38" rx="13" fill="#ffcae2" transform="rotate(-14 1224 371)"/>
+<rect x="85" y="590" width="62" height="62" rx="21" fill="#c6dffc" transform="rotate(18 116 621)"/>
+<rect x="230" y="652" width="31" height="31" rx="10" fill="#c5e9d9" transform="rotate(-10 245 667)"/>
+</g>
+<g fill="#fff" opacity=".56">
+<path d="M700 95c-22 0-35-13-35-29 0-15 12-26 28-27 8-23 31-38 57-30 18 5 29 18 32 33 21-2 38 12 38 28 0 16-16 25-34 25Z"/>
+<path d="M914 632c-24 0-36-12-36-27s12-26 29-27c9-23 35-33 56-21 11 6 18 16 20 25 20 0 34 11 34 25 0 15-15 25-31 25Z"/>
+</g>
+</svg>
