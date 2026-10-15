@@ -90,7 +90,7 @@ CC0 套件：KayKit / Kenney / Quaternius
 | V1-W1-01 | 部署到家庭服务器，Mac + iPad 都能打开 | iPad Safari 通过 HTTPS 打开游戏，能登录孩子档案 | ⬜ |
 | V1-W1-02 | 按 §6 清单完成第一次真机试玩，记录到 §7 | §7 至少 1 条完整记录 | ⬜ |
 | V1-W1-03 | 修复试玩中**阻断闭环**的问题（每个问题一个 PR） | 闭环能从头走到尾 | 🟡 |
-| V1-W1-04 | 重写 README：只保留项目介绍、当前架构、本地运行、文档地图，旧内容移到 `docs/archive/README_LEGACY.md` | README < 200 行，与 §2 一致 | ⬜ |
+| V1-W1-04 | 重写 README：只保留项目介绍、当前架构、本地运行、文档地图，旧内容移到 `docs/archive/README_LEGACY.md` | README < 200 行，与 §2 一致 | ✅ 51 行 README + 历史归档，CI 已通过 |
 
 **不做：** 任何新功能、性能优化、安全加固。
 
