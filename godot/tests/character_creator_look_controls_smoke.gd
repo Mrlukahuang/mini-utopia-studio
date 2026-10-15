@@ -74,7 +74,7 @@ func _initialize() -> void:
         "RootMargin/MainColumn/CreatorBody/PreviewPanel/ZoomControls/ZoomInButton"
     ) as Button
     var reset := scene.get_node(
-        "RootMargin/MainColumn/CreatorBody/PreviewPanel/ZoomControls/ResetButton"
+        "RootMargin/MainColumn/CreatorBody/PreviewPanel/AnimationControls/ResetButton"
     ) as Button
 
     var before_zoom := stage.camera_distance()
