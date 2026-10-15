@@ -268,20 +268,103 @@ func _unlock_gate() -> void:
         gate_label.text = "✨ ZONE 01 UNLOCKED\nCloud Whale District"
 
 func _mat(color: Color, roughness := 0.86) -> StandardMaterial3D:
+    # Reuse material RID across hundreds of grass props/tree crowns.
+    var key := color.to_html() + "_" + str(roughness)
+    if _mat_pool.has(key):
+        return _mat_pool[key] as StandardMaterial3D
     var m := StandardMaterial3D.new()
     m.albedo_color = color
     m.roughness = roughness
+    _mat_pool[key] = m
     return m
 
+
+func _shared_mesh(kind: String, dimensions: Vector3) -> Mesh:
+    var key := kind + "/" + str(dimensions)
+    if _mesh_pool.has(key):
+        return _mesh_pool[key] as Mesh
+    var mesh: Mesh
+    match kind:
+        "box":
+            var cube := BoxMesh.new()
+            cube.size = dimensions
+            mesh = cube
+        "sphere":
+            var ball := SphereMesh.new()
+            ball.radius = dimensions.x
+            ball.height = dimensions.y
+            mesh = ball
+        "cylinder":
+            var column := CylinderMesh.new()
+            column.top_radius = dimensions.x
+            column.bottom_radius = dimensions.x * 1.08
+            column.height = dimensions.y
+            mesh = column
+    _mesh_pool[key] = mesh
+    return mesh
+
+
+func _register_static(node: MeshInstance3D, casts_shadow: bool = false) -> void:
+    _static_visuals.append({"mesh": node, "shadow": casts_shadow})
+
+
+func _batch_static_visuals() -> void:
+    var groups: Dictionary = {}
+    for entry in _static_visuals:
+        var source := entry["mesh"] as MeshInstance3D
+        if not is_instance_valid(source) or source.mesh == null or not source.visible:
+            continue
+        var transform := global_transform.affine_inverse() * source.global_transform
+        var center := transform.origin
+        var cluster := Vector2i(floori(center.x / 18.0), floori(center.z / 18.0))
+        var material_id := 0
+        if source.material_override != null:
+            material_id = source.material_override.get_instance_id()
+        var shadows: bool = entry["shadow"]
+        var key := str(source.mesh.get_instance_id()) + "/" + str(material_id) + "/" + str(cluster) + "/" + str(shadows)
+        if not groups.has(key):
+            groups[key] = {
+                "mesh": source.mesh,
+                "material": source.material_override,
+                "shadows": shadows,
+                "transforms": [],
+            }
+        var transforms: Array = groups[key]["transforms"]
+        transforms.append(transform)
+        source.visible = false
+
+    for key in groups:
+        var entry: Dictionary = groups[key]
+        var transforms: Array = entry["transforms"]
+        var multi := MultiMesh.new()
+        multi.transform_format = MultiMesh.TRANSFORM_3D
+        multi.mesh = entry["mesh"] as Mesh
+        multi.instance_count = transforms.size()
+        for i in range(transforms.size()):
+            multi.set_instance_transform(i, transforms[i])
+        var batch := MultiMeshInstance3D.new()
+        batch.name = "StaticBatch"
+        batch.multimesh = multi
+        batch.material_override = entry["material"] as Material
+        if not entry["shadows"]:
+            batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+        batch.visibility_range_end = 65.0
+        batch.visibility_range_end_margin = 5.0
+        add_child(batch)
+        _static_batches.append(batch)
+    print("lane_a_perf: original_static_mesh_nodes=%d batched_drawable_clusters=%d" % [_static_visuals.size(), _static_batches.size()])
+    _static_visuals.clear()
+
 func _box(name: String, pos: Vector3, size: Vector3, color: Color, collision := false) -> MeshInstance3D:
-    var mesh := BoxMesh.new()
-    mesh.size = size
+    var mesh := _shared_mesh("box", size)
     var node := MeshInstance3D.new()
     node.name = name
     node.mesh = mesh
     node.material_override = _mat(color)
     node.position = pos
     add_child(node)
+    if name != "LockedBarrier":
+        _register_static(node)
     if collision:
         var body := StaticBody3D.new()
         body.name = name + "Collision"
@@ -295,9 +378,7 @@ func _box(name: String, pos: Vector3, size: Vector3, color: Color, collision := 
     return node
 
 func _sphere(name: String, pos: Vector3, radius: float, color: Color, squash := Vector3.ONE) -> MeshInstance3D:
-    var mesh := SphereMesh.new()
-    mesh.radius = radius
-    mesh.height = radius * 2.0
+    var mesh := _shared_mesh("sphere", Vector3(radius, radius * 2.0, 0.0))
     var node := MeshInstance3D.new()
     node.name = name
     node.mesh = mesh
@@ -305,13 +386,11 @@ func _sphere(name: String, pos: Vector3, radius: float, color: Color, squash := 
     node.position = pos
     node.scale = squash
     add_child(node)
+    _register_static(node)
     return node
 
 func _cylinder(name: String, pos: Vector3, radius: float, height: float, color: Color, collision := false) -> MeshInstance3D:
-    var mesh := CylinderMesh.new()
-    mesh.top_radius = radius
-    mesh.bottom_radius = radius * 1.08
-    mesh.height = height
+    var mesh := _shared_mesh("cylinder", Vector3(radius, height, 0.0))
     var node := MeshInstance3D.new()
     node.name = name
     node.mesh = mesh
@@ -414,6 +493,8 @@ func _build_kaykit_houses() -> void:
             visual.scale = Vector3.ONE * 4.8
             visual.rotation_degrees.y = 180.0 if x < 0.0 else 0.0
             house.add_child(visual)
+            for mesh_node in visual.find_children("*", "MeshInstance3D", true, false):
+                _register_static(mesh_node as MeshInstance3D, true)
             var collision := CollisionShape3D.new()
             collision.name = "CollisionShape3D"
             # Official KayKit glTF mesh extents after the 4.8x instance scale:
@@ -460,6 +541,9 @@ func _build_kaykit_villagers() -> void:
         var npc := MiniUtopiaKaykitVillageNPC.new()
         npc.configure(look, Vector3(x, 0.15, z))
         add_child(npc)
+        _villagers.append(npc)
+    for actor in _villagers:
+        actor.configure_neighbors(_villagers)
 
 
 func _cottage(origin: Vector3, accent: Color) -> void:
