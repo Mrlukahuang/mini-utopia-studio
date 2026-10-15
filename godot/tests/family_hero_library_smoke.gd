@@ -42,6 +42,15 @@ func _initialize() -> void:
     if not library.token_input.secret:
         _fail("token field is not obscured")
         return
+    var paste := library.connection_panel.get_node_or_null("PasteParentUnlock") as Button
+    if paste == null or paste.custom_minimum_size.y < 44.0:
+        _fail("iPad parent unlock paste action is missing")
+        return
+    library._accept_parent_secret_paste(TEST_TOKEN_A)
+    if library.token_input.text != TEST_TOKEN_A or not library.token_input.secret:
+        _fail("parent paste did not reach the masked field")
+        return
+    library.token_input.clear()
     if not library.new_button.disabled or not library.refresh_button.disabled:
         _fail("unconnected child can request private data")
         return
