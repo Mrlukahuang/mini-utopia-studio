@@ -11,6 +11,7 @@ var _arm_r: Node3D
 var _leg_l: Node3D
 var _leg_r: Node3D
 var _elapsed := 0.0
+var _kaykit_animation: AnimationPlayer
 var _attack_pose_remaining := 0.0
 var _reaction_pose_remaining := 0.0
 var _celebrate_pose_remaining := 0.0
@@ -45,6 +46,8 @@ func apply_payload_to_player(
     var character: Dictionary = payload.get("character", {})
     _apply_character(character)
     _ensure_runtime_sockets()
+    _kaykit_animation = MiniUtopiaKaykitAvatarV1.mount(_player, character)
+    MiniUtopiaKaykitAvatarV1.play(_kaykit_animation, "Idle")
 
     var equipment: Dictionary = payload.get("equipment", {})
     var attached := MiniUtopiaEquipmentRuntime.attach_loadout(
@@ -140,6 +143,12 @@ func update_motion(
         player_velocity.x,
         player_velocity.z
     ).length()
+    var movement := "Idle"
+    if not on_floor:
+        movement = "Jump"
+    elif horizontal_speed > 0.15:
+        movement = "Run" if running else "Walk"
+    MiniUtopiaKaykitAvatarV1.play(_kaykit_animation, movement)
 
     _arm_l.rotation = Vector3.ZERO
     _arm_r.rotation = Vector3.ZERO

@@ -63,9 +63,14 @@ func _initialize() -> void:
     if head_mat == null or head_mat.albedo_color.to_html(false) != "f7b7d2":
         _fail("game did not retain pink wool color")
         return
-    var ear := player.get_node_or_null("Visual/EarL") as MeshInstance3D
-    if ear == null or not ear.visible:
-        _fail("sheep ears were not rendered in the playable world")
+    var game_rig := player.get_node_or_null("KayKitBody") as Node3D
+    var game_head := player.find_child("KayKitHeadOverlay", true, false) as BoneAttachment3D
+    if game_rig == null or not game_rig.visible or game_head == null:
+        _fail("Village did not mount KayKit rig with saved Sheep head")
+        return
+    var game_ear := game_head.get_node_or_null("SpeciesEarL") as MeshInstance3D
+    if game_ear == null or not game_ear.visible:
+        _fail("Village Sheep overlay missing visible ears")
         return
 
     # Movie scenes consume exactly the same runtime payload. Do not
@@ -96,10 +101,22 @@ func _initialize() -> void:
     if director.actor.get_meta("mini_utopia_character_asset_id", "") != "CHAR_TEST_SHEEP":
         _fail("Director lost the shared saved Character ID")
         return
-    var film_head := director.actor.get_node("Visual/Head") as MeshInstance3D
-    var film_mat := film_head.material_override as StandardMaterial3D
+    var film_rig := director.actor.get_node_or_null("KayKitBody") as Node3D
+    var film_head := director.actor.find_child(
+        "KayKitHeadOverlay", true, false
+    ) as BoneAttachment3D
+    if film_rig == null or not film_rig.visible or film_head == null:
+        _fail("Director did not mount the same KayKit Sheep appearance")
+        return
+    var film_shell := film_head.get_node("SpeciesShell") as MeshInstance3D
+    var film_mat := film_shell.material_override as StandardMaterial3D
     if film_mat == null or film_mat.albedo_color.to_html(false) != "f7b7d2":
-        _fail("Director lost the canonical pink surface color")
+        _fail("Director lost the canonical pink Sheep head surface color")
+        return
+    var game_shell := game_head.get_node("SpeciesShell") as MeshInstance3D
+    var game_mat := game_shell.material_override as StandardMaterial3D
+    if game_mat == null or game_mat.albedo_color != film_mat.albedo_color:
+        _fail("Village and Director saved Hero heads differ")
         return
 
     selection.clear_selection()

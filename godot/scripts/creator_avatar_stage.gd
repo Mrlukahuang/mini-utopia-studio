@@ -36,6 +36,7 @@ var _last_mouse_position := Vector2.ZERO
 var _touch_positions: Dictionary = {}
 var _camera_distance := 6.2
 var _preview_animation := "Idle"
+var _kaykit_animation: AnimationPlayer
 var _preview_time := 0.0
 
 
@@ -130,6 +131,8 @@ func apply_appearance(appearance: Dictionary) -> void:
     _apply_species(String(merged.get("species_head_id", "")))
     _apply_eye_style(String(merged.get("eye_style_id", "")))
     _apply_hair(String(merged.get("hair_style_id", "")))
+    _kaykit_animation = MiniUtopiaKaykitAvatarV1.mount(_avatar_root, merged)
+    MiniUtopiaKaykitAvatarV1.play(_kaykit_animation, _preview_animation)
     MiniUtopiaEquipmentRuntime.attach_loadout(
         _avatar_root,
         _equipment_runtime
@@ -467,6 +470,7 @@ func _apply_preview_pose() -> void:
         return
 
     _reset_preview_pose()
+    MiniUtopiaKaykitAvatarV1.play(_kaykit_animation, _preview_animation)
 
     var arm_l := _visual.get_node_or_null("ArmL") as MeshInstance3D
     var arm_r := _visual.get_node_or_null("ArmR") as MeshInstance3D

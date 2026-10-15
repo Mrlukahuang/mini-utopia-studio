@@ -45,11 +45,11 @@ static func attach_loadout(
             continue
         # Hand sockets may live under animated arm/bone nodes while body
         # sockets may remain under the root Sockets container.
-        var socket := avatar_root.find_child(
-            socket_name,
-            true,
-            false
-        ) as Node3D
+        var socket := MiniUtopiaKaykitAvatarV1.mounted_weapon_socket(
+            avatar_root, socket_name
+        )
+        if socket == null:
+            socket = avatar_root.find_child(socket_name, true, false) as Node3D
         if socket == null:
             push_warning("EQ-02: Missing socket " + socket_name)
             continue
@@ -68,6 +68,34 @@ static func _attach_item(
     item: Dictionary
 ) -> Node3D:
     var mesh_asset_id := _string_or_empty(item.get("mesh_asset_id", ""))
+    # Preserve existing child's uniquely saved crafted prop recipe; four
+    # KayKit primitives are the only *packaged* weapons, not a replacement
+    # for already-owned custom items.
+    var recipe = item.get("visual_recipe", {})
+    if typeof(recipe) == TYPE_DICTIONARY and not recipe.is_empty():
+        return _procedural_fallback(socket, slot, item)
+    if (
+        socket.get_parent() is BoneAttachment3D
+        and slot in [SLOT_WEAPON_MAIN, SLOT_WEAPON_OFFHAND]
+    ):
+        # Only A-008's four original CC0 equipment files may render on the
+        # KayKit hand bones. Never load an arbitrary client-supplied path.
+        var requested := (
+            mesh_asset_id + " " + _string_or_empty(item.get("display_name", ""))
+        ).to_lower()
+        var kit_item := "shield_round" if slot == SLOT_WEAPON_OFFHAND else "sword_1handed"
+        if slot == SLOT_WEAPON_MAIN and requested.contains("staff"):
+            kit_item = "staff"
+        elif slot == SLOT_WEAPON_MAIN and requested.contains("wand"):
+            kit_item = "wand"
+        var kit_path := String(MiniUtopiaKaykitAvatarV1.WEAPONS[kit_item])
+        var packed := load(kit_path) as PackedScene
+        if packed != null:
+            var model := packed.instantiate() as Node3D
+            if model != null:
+                model.name = "Equipment_" + slot
+                socket.add_child(model)
+                return model
     if not mesh_asset_id.is_empty() and AssetVaultRuntime.is_installed():
         var entry := AssetVaultRuntime.entry_by_id(mesh_asset_id)
         if not entry.is_empty():
@@ -219,11 +247,11 @@ static func _apply_clothing(
 
 static func reset_loadout(avatar_root: Node3D) -> void:
     for socket_name in MiniUtopiaAvatarContract.SOCKET_NAMES:
-        var socket := avatar_root.find_child(
-            socket_name,
-            true,
-            false
-        ) as Node3D
+        var socket := MiniUtopiaKaykitAvatarV1.mounted_weapon_socket(
+            avatar_root, socket_name
+        )
+        if socket == null:
+            socket = avatar_root.find_child(socket_name, true, false) as Node3D
         if socket != null:
             _clear_equipment_children(socket)
 
