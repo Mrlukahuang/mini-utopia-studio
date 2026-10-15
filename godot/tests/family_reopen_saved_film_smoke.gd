@@ -83,7 +83,7 @@ func _initialize() -> void:
         return
     if family.director_shot_choices != {
         "action": "celebrate", "camera": "close", "duration_seconds": 30,
-        "caption_preset": "hello"
+        "caption_preset": "hello", "music_id": "cloud_parade"
     }:
         _fail("saved camera, movement or duration were lost")
         return
@@ -140,6 +140,7 @@ func _draft() -> Dictionary:
         "second_character_id": "CHAR_OWN_CAT",
         "camera": "close", "action": "celebrate",
         "duration_seconds": 30, "caption_preset": "hello",
+        "music_id": "cloud_parade",
         "private_story_note": "The two heroes celebrate"
     }
 

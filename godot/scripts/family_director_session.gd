@@ -9,6 +9,13 @@ const DURATION_SECONDS := 15.0
 
 # Immutable kid-safe captions. No raw story notes, uploaded text or commands
 # cross the rendering boundary. Live Director and captured MP4 share this map.
+const MUSIC_TITLES := {
+    "none": "Off",
+    "sunny_meadow": "Sunny Meadow",
+    "cloud_parade": "Cloud Parade",
+    "moonlit_garden": "Moonlit Garden",
+}
+
 const CAPTION_PRESETS := {
     "none": "",
     "hello": "Hello, friend!",
@@ -170,6 +177,9 @@ static func with_child_choices(
     var caption_preset := String(choices.get("caption_preset", "none"))
     if not CAPTION_PRESETS.has(caption_preset):
         caption_preset = "none"
+    var music_id := String(choices.get("music_id", "none"))
+    if not MUSIC_TITLES.has(music_id):
+        music_id = "none"
     var shot: Dictionary = result.get("shot", {})
     var blocking: Dictionary = shot.get("blocking", {})
     var second: Dictionary = shot.get("second_blocking", {})
@@ -215,4 +225,6 @@ static func with_child_choices(
         "action": action, "camera": lens, "duration_seconds": seconds,
         "caption_preset": caption_preset
     }
+    if music_id != "none":
+        result["child_director_choices"]["music_id"] = music_id
     return result
