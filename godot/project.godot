@@ -10,6 +10,7 @@ config/features=PackedStringArray("4.7", "GL Compatibility")
 FamilySceneState="*res://scripts/family_scene_state.gd"
 
 [gui]
+theme/custom="res://ui/theme/mini_utopia_theme.tres"
 theme/custom_font="res://assets/fonts/NotoSansSC-UI.tres"
 
 [display]

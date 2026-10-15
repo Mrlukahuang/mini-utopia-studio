@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/village.gd" id="1_village"]
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="2_player"]
@@ -6,6 +6,10 @@
 [ext_resource type="Script" path="res://scripts/hero_zone.gd" id="4_zone"]
 
 [ext_resource type="Script" path="res://scripts/touch_controls.gd" id="5_touch"]
+
+[ext_resource type="Texture2D" path="res://assets/ui/mini_utopia_logo_badge.webp" id="6_logo_badge"]
+[ext_resource type="Texture2D" path="res://assets/ui/mini_utopia_logo_horizontal.png" id="7_logo_horizontal"]
+[ext_resource type="FontVariation" path="res://assets/fonts/Fredoka-UI.tres" id="8_title_font"]
 
 [node name="MiniUtopiaWorld" type="Node3D"]
 script = ExtResource("1_village")
@@ -27,26 +31,50 @@ script = ExtResource("4_zone")
 
 [node name="HUD" type="CanvasLayer" parent="."]
 
-[node name="Panel" type="ColorRect" parent="HUD"]
+[node name="Panel" type="Panel" parent="HUD"]
+layout_mode = 1
 offset_left = 20.0
 offset_top = 20.0
-offset_right = 430.0
-offset_bottom = 116.0
-color = Color(0.08, 0.06, 0.08, 0.72)
+offset_right = 438.0
+offset_bottom = 252.0
+mouse_filter = 2
+
+[node name="LogoBadge" type="TextureRect" parent="HUD/Panel"]
+offset_left = 10.0
+offset_top = 10.0
+offset_right = 125.0
+offset_bottom = 125.0
+mouse_filter = 2
+texture = ExtResource("6_logo_badge")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LogoWordmark" type="TextureRect" parent="HUD/Panel"]
+offset_left = 130.0
+offset_top = 14.0
+offset_right = 402.0
+offset_bottom = 111.0
+mouse_filter = 2
+texture = ExtResource("7_logo_horizontal")
+expand_mode = 1
+stretch_mode = 5
 
 [node name="Title" type="Label" parent="HUD/Panel"]
-offset_left = 16.0
-offset_top = 12.0
-offset_right = 390.0
-offset_bottom = 38.0
-text = "Mini Utopia · Newbie Village"
+offset_left = 22.0
+offset_top = 114.0
+offset_right = 386.0
+offset_bottom = 145.0
+text = "Dream it. Play it."
+theme_override_fonts/font = ExtResource("8_title_font")
+theme_override_font_sizes/font_size = 25
 
 [node name="Help" type="Label" parent="HUD/Panel"]
-offset_left = 16.0
-offset_top = 42.0
-offset_right = 390.0
-offset_bottom = 82.0
-text = "WASD / Arrows · Move   Shift · Run   Space · Jump\nMouse · Look   E · Unlock gate   Esc · Release mouse"
+offset_left = 22.0
+offset_top = 146.0
+offset_right = 400.0
+offset_bottom = 224.0
+text = "Create  •  Explore  •  Make a movie"
+theme_override_font_sizes/font_size = 16
 
 [node name="TouchControls" type="CanvasLayer" parent="."]
 layer = 20
@@ -58,9 +86,9 @@ anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
 offset_left = -242.0
-offset_top = 22.0
+offset_top = 24.0
 offset_right = -18.0
-offset_bottom = 78.0
+offset_bottom = 88.0
 grow_horizontal = 0
 text = "🎨 Create a Hero"
 theme_override_font_sizes/font_size = 20
@@ -71,9 +99,9 @@ anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
 offset_left = -242.0
-offset_top = 90.0
+offset_top = 102.0
 offset_right = -18.0
-offset_bottom = 146.0
+offset_bottom = 166.0
 grow_horizontal = 0
 text = "🎬 Shoot a Scene"
 theme_override_font_sizes/font_size = 20

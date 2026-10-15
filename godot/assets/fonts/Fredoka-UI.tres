@@ -1,0 +1,11 @@
+; Fredoka display typeface, SIL OFL-1.1; Noto Sans SC supplies Hanzi and emoji.
+; Upstream: https://github.com/google/fonts/tree/main/ofl/fredoka
+; License: res://assets/fonts/OFL-Fredoka.txt
+[gd_resource type="FontVariation" load_steps=3 format=3]
+
+[ext_resource type="FontFile" path="res://assets/fonts/Fredoka-Display.ttf" id="1_fredoka"]
+[ext_resource type="FontVariation" path="res://assets/fonts/NotoSansSC-UI.tres" id="2_cjk"]
+
+[resource]
+base_font = ExtResource("1_fredoka")
+fallbacks = Array[Font]([ExtResource("2_cjk")])
