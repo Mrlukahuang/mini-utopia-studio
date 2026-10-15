@@ -23,6 +23,7 @@ def private_movie_ffmpeg_args(
     fps: int,
     duration_seconds: int,
     ffmpeg: str = "ffmpeg",
+    voice_file: Path | None = None,
 ) -> list[str]:
     """Prepare an AAC/music or silent MP4 command using the exact pinned WAV.
 
@@ -58,12 +59,25 @@ def private_movie_ffmpeg_args(
             "-stream_loop", "-1", "-i", str(track),
             "-map", "0:v:0", "-map", "1:a:0",
         ])
+    if voice_file is not None:
+        # The trusted private renderer verified this immutable local file.
+        # It is not a path from the browser or a child-authored film draft.
+        command.extend(["-i", str(voice_file)])
+        if selected is not None:
+            command.extend([
+                "-filter_complex",
+                "[1:a]volume=0.35[bg];[bg][2:a]amix="
+                "inputs=2:duration=first:dropout_transition=0[a]",
+                "-map", "0:v:0", "-map", "[a]",
+            ])
+        else:
+            command.extend(["-map", "0:v:0", "-map", "1:a:0"])
     command.extend([
         "-t", str(duration_seconds),
         "-c:v", "libx264", "-threads", "2", "-preset", "ultrafast",
         "-crf", "28", "-pix_fmt", "yuv420p",
     ])
-    if selected is not None:
+    if selected is not None or voice_file is not None:
         command.extend(["-c:a", "aac", "-b:a", "128k"])
     command.extend(["-movflags", "+faststart", str(destination)])
     return command
