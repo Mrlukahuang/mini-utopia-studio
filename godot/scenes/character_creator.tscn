@@ -88,21 +88,25 @@ layout_mode = 2
 theme_override_constants/separation = 8
 
 [node name="LookStep" type="Button" parent="RootMargin/MainColumn/StepTabs"]
+custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "1 · Look"
 
 [node name="PersonalityStep" type="Button" parent="RootMargin/MainColumn/StepTabs"]
+custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "2 · Personality"
 
 [node name="OutfitStep" type="Button" parent="RootMargin/MainColumn/StepTabs"]
+custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "3 · Outfit"
 
 [node name="ReadyStep" type="Button" parent="RootMargin/MainColumn/StepTabs"]
+custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "4 · Ready"
@@ -113,7 +117,7 @@ size_flags_vertical = 3
 theme_override_constants/separation = 18
 
 [node name="ChoicePanel" type="PanelContainer" parent="RootMargin/MainColumn/CreatorBody"]
-custom_minimum_size = Vector2(310, 0)
+custom_minimum_size = Vector2(330, 0)
 layout_mode = 2
 
 [node name="Margin" type="MarginContainer" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel"]
@@ -157,21 +161,21 @@ layout_mode = 2
 theme_override_constants/separation = 6
 
 [node name="SlimButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/BodyRow"]
-custom_minimum_size = Vector2(0, 34)
+custom_minimum_size = Vector2(0, 44)
 toggle_mode = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Slim"
 
 [node name="StandardButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/BodyRow"]
-custom_minimum_size = Vector2(0, 34)
+custom_minimum_size = Vector2(0, 44)
 toggle_mode = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Standard"
 
 [node name="ChubbyButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/BodyRow"]
-custom_minimum_size = Vector2(0, 34)
+custom_minimum_size = Vector2(0, 44)
 toggle_mode = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -189,31 +193,31 @@ theme_override_constants/h_separation = 6
 theme_override_constants/v_separation = 6
 
 [node name="HumanButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SpeciesGrid"]
-custom_minimum_size = Vector2(126, 34)
+custom_minimum_size = Vector2(126, 44)
 toggle_mode = true
 layout_mode = 2
 text = "Human"
 
 [node name="SheepButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SpeciesGrid"]
-custom_minimum_size = Vector2(126, 34)
+custom_minimum_size = Vector2(126, 44)
 toggle_mode = true
 layout_mode = 2
 text = "Sheep"
 
 [node name="RobotButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SpeciesGrid"]
-custom_minimum_size = Vector2(126, 34)
+custom_minimum_size = Vector2(126, 44)
 toggle_mode = true
 layout_mode = 2
 text = "Robot"
 
 [node name="CatButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SpeciesGrid"]
-custom_minimum_size = Vector2(126, 34)
+custom_minimum_size = Vector2(126, 44)
 toggle_mode = true
 layout_mode = 2
 text = "Cat"
 
 [node name="CloudButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SpeciesGrid"]
-custom_minimum_size = Vector2(126, 34)
+custom_minimum_size = Vector2(126, 44)
 toggle_mode = true
 layout_mode = 2
 text = "Cloud"
@@ -364,15 +368,19 @@ toggle_mode = true
 layout_mode = 2
 text = "Gold"
 
-[node name="PreviewPanel" type="PanelContainer" parent="RootMargin/MainColumn/CreatorBody"]
+[node name="PreviewPanel" type="Panel" parent="RootMargin/MainColumn/CreatorBody"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
 [node name="AvatarStage" type="SubViewportContainer" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_bottom = -118.0
+grow_horizontal = 2
+grow_vertical = 2
 stretch = true
 script = ExtResource("3_stage")
 
@@ -381,25 +389,20 @@ layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -220.0
+offset_left = -150.0
 offset_top = 12.0
 offset_right = -12.0
-offset_bottom = 48.0
+offset_bottom = 62.0
 grow_horizontal = 0
 theme_override_constants/separation = 6
 
 [node name="ZoomOutButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/ZoomControls"]
-custom_minimum_size = Vector2(56, 36)
+custom_minimum_size = Vector2(60, 48)
 layout_mode = 2
 text = "−"
 
-[node name="ResetButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/ZoomControls"]
-custom_minimum_size = Vector2(88, 36)
-layout_mode = 2
-text = "Reset"
-
 [node name="ZoomInButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/ZoomControls"]
-custom_minimum_size = Vector2(56, 36)
+custom_minimum_size = Vector2(60, 48)
 layout_mode = 2
 text = "+"
 
@@ -409,34 +412,39 @@ anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -226.0
-offset_top = -88.0
-offset_right = 226.0
-offset_bottom = -48.0
+offset_left = -282.0
+offset_top = -68.0
+offset_right = 282.0
+offset_bottom = -12.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_constants/separation = 6
 
 [node name="IdleButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/AnimationControls"]
-custom_minimum_size = Vector2(108, 38)
+custom_minimum_size = Vector2(104, 48)
 toggle_mode = true
 layout_mode = 2
 text = "Idle"
 
+[node name="ResetButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/AnimationControls"]
+custom_minimum_size = Vector2(104, 48)
+layout_mode = 2
+text = "Reset"
+
 [node name="WalkButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/AnimationControls"]
-custom_minimum_size = Vector2(108, 38)
+custom_minimum_size = Vector2(104, 48)
 toggle_mode = true
 layout_mode = 2
 text = "Walk"
 
 [node name="RunButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/AnimationControls"]
-custom_minimum_size = Vector2(108, 38)
+custom_minimum_size = Vector2(104, 48)
 toggle_mode = true
 layout_mode = 2
 text = "Run"
 
 [node name="JumpButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/AnimationControls"]
-custom_minimum_size = Vector2(108, 38)
+custom_minimum_size = Vector2(104, 48)
 toggle_mode = true
 layout_mode = 2
 text = "Jump"
@@ -447,9 +455,9 @@ anchors_preset = 12
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 14.0
-offset_top = -38.0
+offset_top = -112.0
 offset_right = -14.0
-offset_bottom = -10.0
+offset_bottom = -88.0
 grow_horizontal = 2
 grow_vertical = 0
 mouse_filter = 2
