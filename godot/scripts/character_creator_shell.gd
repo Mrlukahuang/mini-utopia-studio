@@ -105,7 +105,7 @@ func _ready() -> void:
         if character_id.is_empty() and not family.pending_character_id.is_empty():
             character_id = family.pending_character_id
         if not family.bind_family_client(bridge):
-            _set_status("Parent session is unavailable. Reopen My Heroes.", true)
+            _set_status("请家长到「我的角色」帮忙解锁。", true)
             save_button.disabled = true
             return
     _set_status("Connecting to Mini Utopia…", false)
@@ -119,7 +119,7 @@ func _ready() -> void:
         save_button.disabled = true
         return
 
-    character_label.text = character_id
+    character_label.text = "正在打开角色…"
     save_button.disabled = true
     var error := bridge.get_character(character_id)
     if error != OK:
@@ -844,14 +844,14 @@ func _on_bridge_failure(
     kind: String,
     status_code: int,
     _error_code: String,
-    message: String
+    _message: String
 ) -> void:
     if kind == "prop:craft":
         _set_status("Could not create your prop. Choose a different name or try again.", true)
         return
     if kind.begins_with("equipment:"):
         play_button.disabled = true
-        _set_status("My Stuff could not load. " + message, true)
+        _set_status("装扮暂时没打开，请稍后重试。", true)
         return
 
     save_button.disabled = true
@@ -868,12 +868,12 @@ func _on_bridge_failure(
                 if OS.has_feature("web")
                 else " Start the Mini Utopia Bridge and try again."
             )
-            _set_status(message + help, true)
+            _set_status("角色暂时没打开，请返回重试。", true)
         return
 
     if kind == "character:post":
         save_button.disabled = false
-        _set_status("Could not create your hero. " + message, true)
+        _set_status("角色还没保存成功，请重试。", true)
         return
 
     if kind == "character:put":
@@ -883,7 +883,7 @@ func _on_bridge_failure(
                 true
             )
         else:
-            _set_status("Save failed. " + message, true)
+            _set_status("保存没有成功，请再试一次。", true)
 
 
 func _on_play_pressed() -> void:
@@ -954,22 +954,41 @@ func _on_save_pressed() -> void:
     save_button.disabled = true
     _set_status("Saving your hero…", false)
 
-    var payload := {
-        "schema_version": String(
-            loaded_character.get("schema_version", "1.0")
-        ),
-        "revision": String(loaded_character.get("revision", "")),
-        "display_name": name,
-        "description": String(loaded_character.get("description", "")),
-        "profile": loaded_character.get("profile", {}),
-    }
-    var error := bridge.put_character(character_id, payload)
+    var error := bridge.put_character(
+        character_id, _character_update_payload(name)
+    )
     if error != OK:
         save_button.disabled = false
         _set_status("Could not start Save. Please try again.", true)
 
+## Keep the server-owned Character identity and revision, but persist the
+## child's CURRENT avatar choices rather than resending the old profile.
+func _character_update_payload(name: String) -> Dictionary:
+    var profile: Dictionary = loaded_character.get("profile", {}).duplicate(true)
+    profile["avatar"] = _draft_appearance.duplicate(true)
+    return {
+        "schema_version": String(loaded_character.get("schema_version", "1.0")),
+        "revision": String(loaded_character.get("revision", "")),
+        "display_name": name,
+        "description": String(loaded_character.get("description", "")),
+        "profile": profile,
+    }
+
+
 func _set_status(message: String, is_error: bool) -> void:
-    status_label.text = message
-    status_label.modulate = (
-        Color("#B5485D") if is_error else Color("#4F4868")
-    )
+    # All Creator messages are child-facing; never render backend details or
+    # a raw failed-request body (which could include technical identifiers).
+    var safe_message := message
+    var lower := message.to_lower()
+    for hidden_word in [
+        "url", "token", "secret", "session", "bridge",
+        "family cloud", "https://", "http://", "localhost", "backend", "server",
+    ]:
+        if lower.contains(hidden_word):
+            safe_message = (
+                "暂时没成功，再试一次吧。"
+                if bridge.has_family_session()
+                else "请家长打开「我的角色」里的「家长入口」帮忙。"
+            )
+            break
+    status_label.text = ("💡 " if is_error else "") + safe_message
