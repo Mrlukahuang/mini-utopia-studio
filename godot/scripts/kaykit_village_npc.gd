@@ -43,6 +43,12 @@ func _ready() -> void:
 
     animation_player = MiniUtopiaKaykitAvatarV1.mount(self, look)
     MiniUtopiaKaykitAvatarV1.play(animation_player, "Idle")
+    # The 15 moving rigs retain collision and animations, but never render
+    # shadow maps; only the single village sun and static architecture do.
+    var source_body := get_node_or_null("KayKitBody") as Node3D
+    if source_body != null:
+        for mesh in source_body.find_children("*", "GeometryInstance3D", true, false):
+            (mesh as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
     # In addition to the official KayKit animated rig, 15 villagers have
     # five distinct toy hat silhouettes in three clearly visible colors.
     # Unlike a hidden head-bone color, these survive the Knight helmet.
@@ -113,6 +119,7 @@ func _piece(part_name: String, mesh: Mesh, location: Vector3, tint: Color) -> vo
     mat.albedo_color = tint
     mat.roughness = 0.88
     node.material_override = mat
+    node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
     add_child(node)
 # Draw the same low-cost speech bubble texture for all 15 NPCs. 3D labels
 # explicitly load Noto Sans SC so Safari shows Chinese instead of squares.
