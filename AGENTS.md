@@ -147,7 +147,7 @@ pytest -q                       # Python 测试
 
 ### 9.2 必须停下来叫人（一个都不能跳过）
 
-1. **授权类**：新的 AMEND 提案、需要把 AMEND 改成 APPROVED、修改 `AGENTS.md` / `AMEND.md` / `tools/scope_guard.py` / `.github/workflows/`
+1. **授权类**：新的 AMEND 提案、需要把 AMEND 改成 APPROVED、修改 `AGENTS.md` / `AMEND.md` / `tools/scope_guard.py` / `.github/workflows/`（例外：A-012 允许代理自行修改 `godot-web-artifact.yml` 中的**截图 / 视觉证据步骤**）
 2. **花钱**：任何付费 API 调用或测试，单个任务累计预估 **超过 1 美元**（低于 1 美元可以直接做，但要在 PR 描述里写明花费）
 3. **不可逆或高风险**：删除数据、对公网开放端口、处理密钥或真实儿童数据、在你的 Mac 或 iPad 上需要人工操作的步骤
 4. **卡住**：CI 修了 2 轮还是红的；同一个问题出现第 3 次；需求不清楚，或者会触碰 §2 禁止事项
