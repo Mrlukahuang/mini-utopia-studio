@@ -58,6 +58,9 @@ func _initialize() -> void:
         return
 
     var avatar_identity := stage.avatar_root_instance_id()
+    if stage.avatar_root().get_node_or_null("KayKitBody") == null:
+        _fail("Creator screenshot uses fallback instead of real KayKit")
+        return
     name_input.text = "Lily"
     scene._on_hero_name_changed(name_input.text)
     if not save_button.disabled:

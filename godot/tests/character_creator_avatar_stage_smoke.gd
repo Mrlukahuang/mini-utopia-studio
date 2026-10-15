@@ -37,6 +37,12 @@ func _initialize() -> void:
     stage.apply_appearance(slim)
 
     var root_node := stage.avatar_root()
+    if root_node.get_node_or_null("KayKitBody") == null:
+        _fail("Creator kept procedural model instead of official KayKit")
+        return
+    if root_node.find_child("KayKitHeadOverlay", true, false) == null:
+        _fail("Cat selection showed a plain knight instead of a Cat head")
+        return
     var body := root_node.get_node("Visual/Body") as MeshInstance3D
     var slim_width := body.scale.x
     if abs(slim_width - 0.84) > 0.001:
