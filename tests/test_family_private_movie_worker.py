@@ -229,7 +229,7 @@ def test_background_music_uses_whitelisted_wav_and_requires_actual_aac(tmp_path,
     # CI uses only a synthetic catalog WAV, not a child's audio or private film.
     wav = project / "assets" / "audio" / "cc0_music" / "sunny_meadow.wav"
     wav.parent.mkdir(parents=True)
-    wav.write_bytes(b"RIFF" + b"\\0" * 64)
+    wav.write_bytes(b"RIFF" + b"\0" * 64)
 
     def selected_music_source(repository, *, owner, film_id):
         source = original_source(repository, owner=owner, film_id=film_id)
@@ -258,11 +258,11 @@ def test_background_music_uses_whitelisted_wav_and_requires_actual_aac(tmp_path,
             audio_commands.append(argv)
             assert "-stream_loop" in argv and "-c:a" in argv
             assert "sunny_meadow.wav" in " ".join(argv)
-            Path(argv[-1]).write_bytes(b"\\x00\\x00\\x00\\x18ftypisom" + b"0" * 900)
+            Path(argv[-1]).write_bytes(b"\x00\x00\x00\x18ftypisom" + b"0" * 900)
         if argv[0] == "ffprobe":
             codec = "stream=codec_name" in argv
             return subprocess.CompletedProcess(
-                argv, 0, stdout="aac\\n" if codec else "15.0\\n"
+                argv, 0, stdout="aac\n" if codec else "15.0\n"
             )
         return subprocess.CompletedProcess(argv, 0, stdout="")
 
