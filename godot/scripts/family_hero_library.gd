@@ -12,6 +12,8 @@ var hero_list: VBoxContainer
 var connection_panel: VBoxContainer
 var api_input: LineEdit
 var token_input: LineEdit
+var paste_secret_button: Button
+var _browser_paste_callback: JavaScriptObject
 var profile_choice: OptionButton
 var _pending_profile_id := ""
 var connect_button: Button
@@ -288,6 +290,15 @@ func _build_ui() -> void:
     token_input.max_length = 256
     connection_panel.add_child(token_input)
 
+    # A real iPad Safari browser cannot long-press the Godot canvas to open
+    # the native paste menu. Provide an explicit parent-only clipboard gesture.
+    paste_secret_button = Button.new()
+    paste_secret_button.name = "PasteParentUnlock"
+    paste_secret_button.text = "📋 Paste parent unlock / 粘贴家长口令"
+    paste_secret_button.custom_minimum_size.y = 52
+    paste_secret_button.pressed.connect(_on_paste_parent_unlock)
+    connection_panel.add_child(paste_secret_button)
+
     connect_button = Button.new()
     connect_button.name = "ConnectButton"
     connect_button.text = "Parent: Unlock a 30-minute child session"
@@ -343,6 +354,62 @@ func _set_connected(connected: bool) -> void:
         _pending_cast_character_id = ""
     else:
         _refresh_cast_button()
+
+
+func _on_paste_parent_unlock() -> void:
+    # Only a direct parent button press initiates a browser clipboard read.
+    # Never log the secret or store it in URL, disk, localStorage or a file.
+    if OS.has_feature("web"):
+        if _browser_paste_callback == null:
+            _browser_paste_callback = JavaScriptBridge.create_callback(
+                _on_web_secret_pasted
+            )
+            JavaScriptBridge.get_interface("window").miniUtopiaPasteUnlock = (
+                _browser_paste_callback
+            )
+        JavaScriptBridge.eval("""
+            (function () {
+                const target = window.miniUtopiaPasteUnlock;
+                if (!navigator.clipboard || !navigator.clipboard.readText) {
+                    target('');
+                    return;
+                }
+                navigator.clipboard.readText()
+                    .then(text => target(text))
+                    .catch(() => target(''));
+            })();
+        """)
+        return
+    # Native Mac editor smoke fallback; clipboard API still requires a tap.
+    _accept_parent_secret_paste(DisplayServer.clipboard_get())
+
+
+func _on_web_secret_pasted(args: Array) -> void:
+    if args.is_empty():
+        _accept_parent_secret_paste("")
+    else:
+        _accept_parent_secret_paste(String(args[0]))
+
+
+func _accept_parent_secret_paste(secret_text: String) -> void:
+    if not connection_panel.visible:
+        return
+    if secret_text.is_empty():
+        _set_status(
+            "Paste not permitted. Copy the parent unlock, then tap Paste again.",
+            true
+        )
+        return
+    # Existing max_length and password masking remain active, and the
+    # server still decides whether the code is valid.
+    token_input.text = secret_text.left(token_input.max_length)
+    _set_status("Parent unlock pasted. Tap Unlock to connect.", false)
+
+
+func _exit_tree() -> void:
+    if OS.has_feature("web") and _browser_paste_callback != null:
+        JavaScriptBridge.eval("delete window.miniUtopiaPasteUnlock")
+        _browser_paste_callback = null
 
 
 func _on_connect_pressed() -> void:
