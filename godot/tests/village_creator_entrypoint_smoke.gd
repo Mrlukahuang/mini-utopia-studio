@@ -112,6 +112,25 @@ func _initialize() -> void:
         _fail("actual physics ray passed through roaming KayKit NPC")
         return
 
+    # The bubble is a real 3D child-only Chinese greeting, not a debug label.
+    # Moving a synthetic player nearby should reveal it; leaving hides it.
+    var npc := villagers[0] as CharacterBody3D
+    var greeting := npc.get_node_or_null("GreetingText") as Label3D
+    var bubble := npc.get_node_or_null("GreetingBubble") as Sprite3D
+    if greeting == null or greeting.text != "你好！" or bubble == null or bubble.visible:
+        _fail("NPC did not create a private, initially hidden greeting bubble")
+        return
+    player.global_position = npc.global_position + Vector3(0.0, 1.0, 2.1)
+    await physics_frame
+    if not greeting.visible or not bubble.visible:
+        _fail("approaching a villager did not reveal the greeting")
+        return
+    player.global_position = Vector3(0.0, 1.0, 34.0)
+    await physics_frame
+    if bubble.visible:
+        _fail("villager greeting stayed open after player left")
+        return
+
     print("village_creator_entrypoint_smoke: PASS · 20 KayKit houses / 15 animated collider NPCs")
     quit(0)
 
