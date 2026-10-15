@@ -20,14 +20,20 @@ func _initialize() -> void:
         _fail("Knight.glb is missing a real humanoid Skeleton3D")
         actor.free()
         return
+    for bone_name in ["handslot.r", "handslot.l"]:
+        if skeletons[0].find_bone(bone_name) < 0:
+            _fail("Knight.glb missing official hand slot bone " + bone_name)
+            actor.free()
+            return
     var animation_names: Array[String] = []
     for player in players:
         for animation_name in player.get_animation_list():
             animation_names.append(String(animation_name).to_lower())
     actor.free()
-    if animation_names.size() < 4:
-        _fail("Knight.glb has no usable bundled animations")
-        return
+    for clip_name in ["idle", "walking_a", "running_a", "jump_full_short"]:
+        if not animation_names.has(clip_name):
+            _fail("Knight.glb missing imported animation " + clip_name)
+            return
     print("KayKit Knight validated: Skeleton3D and animations: ", animation_names)
 
     for item_name in ["sword_1handed", "shield_round", "staff", "wand"]:
