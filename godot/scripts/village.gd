@@ -22,6 +22,20 @@ const KAYKIT_HOUSES := [
 ]
 
 var _village_previous_web_fps := -1
+var _previous_scale := 1.0
+var _previous_msaa := Viewport.MSAA_DISABLED
+var _static_visuals: Array[Dictionary] = []
+var _static_batches: Array[MultiMeshInstance3D] = []
+var _mesh_pool: Dictionary = {}
+var _mat_pool: Dictionary = {}
+var _villagers: Array[Node3D] = []
+var _lod_elapsed := 0.0
+var _fps_elapsed := 0.0
+var _perf_hold_elapsed := 0.0
+var _perf_pressing := false
+var _perf_toggled_this_hold := false
+var _perf_badge: Label
+var _overview_was_on := false
 var gate_unlocked := false
 var gate_label: Label3D
 
@@ -47,13 +61,19 @@ var palette = {
 }
 
 func _ready() -> void:
-    # On iPad and software-rendered WebGL (CI SwiftShader), the uncapped 3D
-    # village can monopolize the compositor and stall Playwright screenshots.
-    # Preserve the original engine setting for other scenes; never throttle
-    # Creator or Director, and keep responsive 30 fps village touch control.
+    # A 30 FPS cap guaranteed <=30 even on powerful iPads. Allow 60, while
+    # using lower-cost Web rendering. Restore all global settings on exit.
     if OS.has_feature("web"):
         _village_previous_web_fps = Engine.max_fps
-        Engine.max_fps = 30 if Engine.max_fps <= 0 else mini(30, Engine.max_fps)
+        Engine.max_fps = 60
+        var viewport := get_viewport()
+        _previous_scale = viewport.scaling_3d_scale
+        _previous_msaa = viewport.msaa_3d
+        viewport.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+        viewport.scaling_3d_scale = 0.75
+        viewport.msaa_3d = Viewport.MSAA_DISABLED
+        viewport.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED
+        RenderingServer.directional_shadow_atlas_set_size(1024, true)
     _setup_environment()
     _build_ground()
     _build_path()
@@ -62,6 +82,9 @@ func _ready() -> void:
     _build_kaykit_villagers()
     _build_storybook_dressing()
     _build_locked_gate()
+    _batch_static_visuals()
+    _install_performance_badge()
+    _update_villager_lod()
     _apply_shared_theme_to_hud()
     var creator_button := get_node_or_null("HUD/OpenCreatorButton") as Button
     if creator_button != null:
@@ -101,6 +124,9 @@ func _apply_shared_theme_to_hud() -> void:
 func _exit_tree() -> void:
     if _village_previous_web_fps >= 0:
         Engine.max_fps = _village_previous_web_fps
+        get_viewport().scaling_3d_scale = _previous_scale
+        get_viewport().msaa_3d = _previous_msaa
+        RenderingServer.directional_shadow_atlas_set_size(2048, true)
 
 
 func _open_family_director() -> void:
@@ -117,7 +143,15 @@ func _open_character_creator() -> void:
     get_tree().change_scene_to_file("res://scenes/family_hero_library.tscn")
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+    # Fifteen bones/collision actors are examined once per 0.25s, not every
+    # actor scanning every other actor on each physics tick.
+    _lod_elapsed += delta
+    if _lod_elapsed >= 0.25:
+        _lod_elapsed = 0.0
+        _update_villager_lod()
+    _tick_performance_badge(delta)
+    _set_overview_visibility()
     if gate_unlocked or gate_label == null:
         return
 
@@ -222,7 +256,11 @@ func _setup_environment() -> void:
     env.fog_enabled = true
     env.fog_light_color = Color("#B8CFCA")
     env.fog_light_energy = 0.34
-    env.fog_density = 0.004
+    env.fog_density = 0.012 if OS.has_feature("web") else 0.004
+    env.ssao_enabled = false
+    env.glow_enabled = false
+    env.ssil_enabled = false
+    env.ssr_enabled = false
     world_env.environment = env
     add_child(world_env)
 
@@ -235,7 +273,8 @@ func _setup_environment() -> void:
     # buildings and 15 skinned KayKit villagers. Keep physical shadows.
     if OS.has_feature("web"):
         sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
-    sun.shadow_opacity = 0.8
+    sun.directional_shadow_max_distance = 38.0 if OS.has_feature("web") else 75.0
+    sun.shadow_opacity = 0.65
     add_child(sun)
 
 func _build_ground() -> void:
