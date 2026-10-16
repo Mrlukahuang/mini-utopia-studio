@@ -313,9 +313,9 @@ jobs:
           from pathlib import Path
           path = Path("godot/scripts/director_stage.gd")
           source = path.read_text()
-          marker = '    _build_overlay()\\n'
+          marker = '    _build_overlay()\n'
           assert source.count(marker) == 1
-          path.write_text(source.replace(marker, marker + '    call_deferred("_build_child_director_controls")\\n', 1))
+          path.write_text(source.replace(marker, marker + '    call_deferred("_build_child_director_controls")\n', 1))
           PY
           # The Director requires a validated play session; provide a
           # deterministic SYNTHETIC fixture only for this isolated CI export.
