@@ -13,6 +13,11 @@ var connection_panel: VBoxContainer
 var parent_entry_button: Button
 var profile_picker: Panel
 var picker_message: Label
+var parent_pin_panel: Panel
+var parent_pin_dots: Label
+var parent_pin_hint: Label
+var parent_pin_submit: Button
+var _parent_pin := ""
 var _profile_portraits: Dictionary = {}
 var _profile_labels: Dictionary = {}
 var _selected_profile := ""
@@ -189,6 +194,7 @@ func _build_profile_picker() -> void:
     var bottom_space := Control.new()
     bottom_space.size_flags_vertical = Control.SIZE_EXPAND_FILL
     column.add_child(bottom_space)
+    _build_parent_pin_pad()
 
     # The global pastel Panel theme is translucent. Hide the underlying
     # library content while this first-touch chooser is visible so labels,
@@ -202,6 +208,127 @@ func _sync_player_picker_visibility() -> void:
     var library_content := get_node_or_null("Margin") as Control
     if library_content != null:
         library_content.visible = not profile_picker.visible
+
+
+
+# Godot-only 8-digit keypad; the existing server decides if the PIN is valid.
+func _build_parent_pin_pad() -> void:
+    parent_pin_panel = Panel.new()
+    parent_pin_panel.name = "ParentPinPad"
+    parent_pin_panel.set_anchors_preset(Control.PRESET_CENTER)
+    parent_pin_panel.offset_left = -286
+    parent_pin_panel.offset_right = 286
+    parent_pin_panel.offset_top = -362
+    parent_pin_panel.offset_bottom = 362
+    profile_picker.add_child(parent_pin_panel)
+    var margin := MarginContainer.new()
+    margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+    for side in ["left", "top", "right", "bottom"]:
+        margin.add_theme_constant_override("margin_" + side, 20)
+    parent_pin_panel.add_child(margin)
+    var content := VBoxContainer.new()
+    content.add_theme_constant_override("separation", 9)
+    margin.add_child(content)
+    var heading := Label.new()
+    heading.text = "👨‍👩‍👧 家长解锁 · 8 位数字口令"
+    heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    content.add_child(heading)
+    var profile_row := HBoxContainer.new()
+    profile_row.add_theme_constant_override("separation", 12)
+    content.add_child(profile_row)
+    for id in ["child_a", "child_b"]:
+        var pick := Button.new()
+        pick.name = "PinChildA" if id == "child_a" else "PinChildB"
+        pick.text = "👧 大宝" if id == "child_a" else "🧒 二宝"
+        pick.custom_minimum_size = Vector2(245, 56)
+        pick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        pick.pressed.connect(_choose_pin_child.bind(id))
+        profile_row.add_child(pick)
+    parent_pin_dots = Label.new()
+    parent_pin_dots.name = "PinDots"
+    parent_pin_dots.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    content.add_child(parent_pin_dots)
+    var number_keys := GridContainer.new()
+    number_keys.name = "NumberKeys"
+    number_keys.columns = 3
+    number_keys.add_theme_constant_override("h_separation", 10)
+    number_keys.add_theme_constant_override("v_separation", 9)
+    content.add_child(number_keys)
+    for digit in ["1","2","3","4","5","6","7","8","9","清空","0","⌫"]:
+        var key := Button.new()
+        key.name = "Digit" + digit if digit.is_valid_int() else (
+            "Clear" if digit == "清空" else "Backspace"
+        )
+        key.text = digit
+        key.custom_minimum_size = Vector2(153, 62)
+        key.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        key.pressed.connect(_press_pin_key.bind(digit))
+        number_keys.add_child(key)
+    parent_pin_hint = Label.new()
+    parent_pin_hint.name = "PinHint"
+    parent_pin_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    content.add_child(parent_pin_hint)
+    parent_pin_submit = Button.new()
+    parent_pin_submit.name = "UnlockWithPin"
+    parent_pin_submit.text = "🔓 解锁孩子的小世界"
+    parent_pin_submit.custom_minimum_size.y = 68
+    parent_pin_submit.pressed.connect(_submit_parent_pin)
+    content.add_child(parent_pin_submit)
+    var cancel := Button.new()
+    cancel.name = "CancelParentPin"
+    cancel.text = "← 返回选择头像"
+    cancel.custom_minimum_size.y = 50
+    cancel.pressed.connect(_close_parent_pin_pad)
+    content.add_child(cancel)
+    parent_pin_panel.hide()
+    _update_pin_dots()
+
+
+func _update_pin_dots() -> void:
+    if parent_pin_dots == null:
+        return
+    var dots := ""
+    for i in range(8):
+        dots += ("● " if i < _parent_pin.length() else "○ ")
+    parent_pin_dots.text = dots.strip_edges()
+    parent_pin_submit.disabled = _parent_pin.length() != 8
+
+
+func _choose_pin_child(id: String) -> void:
+    _selected_profile = id
+    profile_choice.select(0 if id == "child_a" else 1)
+    parent_pin_hint.text = "已选择大宝" if id == "child_a" else "已选择二宝"
+
+
+func _press_pin_key(digit: String) -> void:
+    if digit == "清空":
+        _parent_pin = ""
+    elif digit == "⌫":
+        _parent_pin = _parent_pin.left(maxi(0, _parent_pin.length() - 1))
+    elif digit.is_valid_int() and digit.length() == 1 and _parent_pin.length() < 8:
+        _parent_pin += digit
+    parent_pin_hint.text = ""
+    _update_pin_dots()
+
+
+func _close_parent_pin_pad() -> void:
+    _parent_pin = ""
+    token_input.clear()
+    parent_pin_panel.hide()
+    (profile_picker.get_node("Margin") as Control).show()
+    _update_pin_dots()
+
+
+func _submit_parent_pin() -> void:
+    if _parent_pin.length() != 8:
+        parent_pin_hint.text = "请输入完整的 8 位数字口令"
+        return
+    token_input.text = _parent_pin
+    _parent_pin = ""
+    _update_pin_dots()
+    _on_connect_pressed()
+    if not connect_button.disabled:
+        parent_pin_hint.text = "暂时没成功，请检查家庭网络后再试"
 
 
 func _on_player_card_pressed(profile_id: String) -> void:
@@ -233,13 +360,18 @@ func _open_parent_from_picker() -> void:
             bridge.clear_family_session()
             _clear_hero_list()
             _set_connected(false)
-    profile_picker.hide()
-    _parent_controls_open = true
+    _parent_controls_open = false
     _refresh_parent_entry()
-    _set_status("请家长选择孩子并解锁，完成后交给孩子。", false)
+    _parent_pin = ""
+    token_input.clear()
+    _choose_pin_child(_selected_profile if _selected_profile in ["child_a", "child_b"] else "child_a")
+    (profile_picker.get_node("Margin") as Control).hide()
+    parent_pin_panel.show()
+    _update_pin_dots()
 
 
 func _show_player_picker() -> void:
+    _close_parent_pin_pad()
     _parent_controls_open = false
     _refresh_parent_entry()
     picker_message.text = ""
@@ -649,6 +781,8 @@ func _on_connect_pressed() -> void:
     token_input.clear()
     bridge.configure(url)
     if not bridge.base_url.begins_with("https://"):
+        if parent_pin_panel != null and parent_pin_panel.visible:
+            parent_pin_hint.text = "请从家庭 HTTPS 页面打开游戏"
         _set_status("A private HTTPS Family Cloud URL is required.", true)
         return
 
@@ -1152,6 +1286,7 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         api_input.clear()
         _parent_controls_open = false
         _set_connected(true)
+        _close_parent_pin_pad()
         profile_picker.hide()
         _refresh_characters()
         return
