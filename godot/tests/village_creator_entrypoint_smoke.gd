@@ -181,13 +181,20 @@ func _initialize() -> void:
     if unique_looks.size() != 15:
         _fail("villagers repeat a look identity")
         return
-    # Different roles must be visible meshes rather than 15 identical names.
+    var distinct_models := {}
     for villager in villagers:
-        var costume := villager.get_node_or_null("VillagerCostume") as MeshInstance3D
-        var headwear := villager.get_node_or_null("VillagerHeadgear") as MeshInstance3D
-        if costume == null or costume.mesh == null or headwear == null or headwear.mesh == null:
-            _fail("one of fifteen villagers has no visible distinct costume or hat")
+        var idx := int(villager.get_meta("kaykit_npc_model", -1))
+        distinct_models[idx] = true
+        if idx < 0 or villager.get_node_or_null("VillagerHeadgear") != null or villager.get_node_or_null("VillagerCostume") != null:
+            _fail("a villager still wears a procedural mesh hat or costume")
             return
+        var source := villager.get_node_or_null("KayKitBody") as Node3D
+        if source == null or source.find_child("Skeleton3D", true, false) == null:
+            _fail("official KayKit model missing a real skeleton")
+            return
+    if distinct_models.size() < 6:
+        _fail("NPC diversity needs six different source mesh models, not recolors")
+        return
 
 
     var player := scene.get_node_or_null("Player") as CharacterBody3D

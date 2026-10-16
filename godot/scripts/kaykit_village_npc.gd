@@ -11,6 +11,14 @@ var moving := false
 var greeting_bubble: Label3D
 var greeting_backdrop: Sprite3D
 var route_direction := 1.0
+const NPC_MODELS := [
+    preload("res://assets/kaykit/adventurers/Knight.glb"),
+    preload("res://assets/kaykit/adventurers/Barbarian_iPad.glb"),
+    preload("res://assets/kaykit/adventurers/Mage_iPad.glb"),
+    preload("res://assets/kaykit/adventurers/Rogue_iPad.glb"),
+    preload("res://assets/kaykit/adventurers/Rogue_Hooded_iPad.glb"),
+    preload("res://assets/kaykit/adventurers/Skeleton_Warrior_iPad.glb"),
+]
 const WALK_SPEED := 1.0
 const ROUTE_LENGTH := 4.5
 const GREETING_DISTANCE := 3.6
@@ -41,7 +49,17 @@ func _ready() -> void:
     collider.position.y = 0.9
     add_child(collider)
 
-    animation_player = MiniUtopiaKaykitAvatarV1.mount(self, look)
+    # Six distinct official KayKit characters, not recolored Knight clones.
+    var model_index := posmod(int(look.get("npc_model_index", 0)), NPC_MODELS.size())
+    set_meta("kaykit_npc_model", model_index)
+    var source := NPC_MODELS[model_index] as PackedScene
+    var model := source.instantiate() as Node3D
+    if model == null:
+        push_error("Missing source-authentic KayKit NPC model: " + str(model_index))
+        return
+    model.name = "KayKitBody"
+    add_child(model)
+    animation_player = model.find_child("AnimationPlayer", true, false) as AnimationPlayer
     MiniUtopiaKaykitAvatarV1.play(animation_player, "Idle")
     # The 15 moving rigs retain collision and animations, but never render
     # shadow maps; only the single village sun and static architecture do.
@@ -49,78 +67,12 @@ func _ready() -> void:
     if source_body != null:
         for mesh in source_body.find_children("*", "GeometryInstance3D", true, false):
             (mesh as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-    # In addition to the official KayKit animated rig, 15 villagers have
-    # five distinct toy hat silhouettes in three clearly visible colors.
-    # Unlike a hidden head-bone color, these survive the Knight helmet.
-    _decorate_villager()
+    # No procedural hats, coats or species shells: only the official GLB.
     _make_greeting()
     if animation_player == null:
         push_error("Official KayKit villager model did not load: " + name)
 
 
-func _decorate_villager() -> void:
-    var tint: Color = Color(String(look.get("role_palette", "#F7B7D2")))
-    var style: int = int(look.get("hat_style", 0))
-    var trim_color := Color("#FFF4D7")
-
-    var coat := BoxMesh.new()
-    coat.size = Vector3(0.85, 0.66, 0.22)
-    _piece("VillagerCostume", coat, Vector3(0.0, 1.12, 0.44), tint)
-
-    # The accessories use visibly different geometry, not a metadata-only ID.
-    match style:
-        0:
-            var dome := SphereMesh.new()
-            dome.radius = 0.49
-            dome.height = 0.60
-            _piece("VillagerHeadgear", dome, Vector3(0.0, 2.03, 0.0), tint)
-        1:
-            var wizard := CylinderMesh.new()
-            wizard.top_radius = 0.0
-            wizard.bottom_radius = 0.48
-            wizard.height = 0.95
-            _piece("VillagerHeadgear", wizard, Vector3(0.0, 2.44, 0.0), tint)
-        2:
-            var tall := CylinderMesh.new()
-            tall.top_radius = 0.38
-            tall.bottom_radius = 0.38
-            tall.height = 0.70
-            _piece("VillagerHeadgear", tall, Vector3(0.0, 2.38, 0.0), tint)
-            var brim := CylinderMesh.new()
-            brim.top_radius = 0.65
-            brim.bottom_radius = 0.65
-            brim.height = 0.13
-            _piece("ToyHatBrim", brim, Vector3(0.0, 2.08, 0.0), tint)
-        3:
-            var left_ear := SphereMesh.new()
-            left_ear.radius = 0.18
-            left_ear.height = 0.85
-            _piece("VillagerHeadgear", left_ear, Vector3(-0.32, 2.45, 0.0), tint)
-            var right_ear := SphereMesh.new()
-            right_ear.radius = 0.18
-            right_ear.height = 0.85
-            _piece("ToyHatRightEar", right_ear, Vector3(0.32, 2.45, 0.0), tint)
-        4:
-            var square := BoxMesh.new()
-            square.size = Vector3(0.80, 0.54, 0.80)
-            _piece("VillagerHeadgear", square, Vector3(0.0, 2.18, 0.0), tint)
-            var topper := SphereMesh.new()
-            topper.radius = 0.22
-            topper.height = 0.44
-            _piece("ToyHatTopper", topper, Vector3(0.0, 2.66, 0.0), trim_color)
-
-
-func _piece(part_name: String, mesh: Mesh, location: Vector3, tint: Color) -> void:
-    var node := MeshInstance3D.new()
-    node.name = part_name
-    node.mesh = mesh
-    node.position = location
-    var mat := StandardMaterial3D.new()
-    mat.albedo_color = tint
-    mat.roughness = 0.88
-    node.material_override = mat
-    node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-    add_child(node)
 # Draw the same low-cost speech bubble texture for all 15 NPCs. 3D labels
 # explicitly load Noto Sans SC so Safari shows Chinese instead of squares.
 func _make_greeting() -> void:
