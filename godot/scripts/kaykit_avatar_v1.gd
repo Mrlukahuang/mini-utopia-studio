@@ -42,6 +42,7 @@ static func mount(root: Node3D, appearance: Dictionary) -> AnimationPlayer:
     _bone_socket(skeleton, "handslot.r", MiniUtopiaAvatarContract.SOCKET_WEAPON_R)
     _bone_socket(skeleton, "handslot.l", MiniUtopiaAvatarContract.SOCKET_WEAPON_L)
     # A-012 visual check: no packaged official crown asset exists.
+    # CI confirmation: preserve native Knight helmet across every animation.
     # Real headwear belongs to the animated head bone, never a fixed-height
     # world/root socket. No separately licensed KayKit crown model is bundled
     # yet: hide the socket so legacy procedural crowns cannot float over the
