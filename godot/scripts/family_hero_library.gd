@@ -34,6 +34,7 @@ var refresh_button: Button
 var logout_button: Button
 var shoot_button: Button
 var _pending_cast_character_id := ""
+var _pending_direct_play_character_id := ""
 var _pending_guest_grant_id := ""
 var _share_character_id := ""
 var _active_grant_id := ""
@@ -1372,6 +1373,43 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         _refresh_cast_button()
         return
 
+    if kind == "character:get" and not _pending_direct_play_character_id.is_empty():
+        var direct_id := _pending_direct_play_character_id
+        var family := _family_state()
+        if (
+            not bridge.has_family_session()
+            or String(payload.get("character_id", "")) != direct_id
+            or family == null
+            or not family.select_character(payload)
+        ):
+            _pending_direct_play_character_id = ""
+            _set_status("无法打开这个英雄，请重试。", true)
+            return
+        var error := bridge.get_equipment(direct_id)
+        if error != OK:
+            _pending_direct_play_character_id = ""
+            family.clear_selection()
+            _set_status("衣服还没准备好，请再试一次。", true)
+        return
+
+    if kind == "equipment:get" and not _pending_direct_play_character_id.is_empty():
+        var direct_id := _pending_direct_play_character_id
+        _pending_direct_play_character_id = ""
+        var family := _family_state()
+        var runtime = payload.get("runtime", {})
+        if (
+            family == null
+            or typeof(runtime) != TYPE_DICTIONARY
+            or String(runtime.get("character_asset_id", "")) != direct_id
+            or not family.select_equipment(runtime)
+        ):
+            if family != null:
+                family.clear_selection()
+            _set_status("只有自己的英雄和装备才能去村子玩。", true)
+            return
+        get_tree().change_scene_to_file("res://scenes/main.tscn")
+        return
+
     if kind == "character:get" and not _pending_cast_character_id.is_empty():
         var family := _family_state()
         if (
@@ -1460,16 +1498,47 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
 
         var hero_name := Label.new()
         hero_name.name = "HeroName"
-        hero_name.text = "⭐ " + name + "\n✨ 点我换装 / Edit My Hero"
+        hero_name.text = "⭐ " + name + "\n✨ 我的英雄"
         hero_name.anchor_left = 0.0
         hero_name.anchor_right = 1.0
         hero_name.offset_left = 172.0
         hero_name.offset_right = -16.0
-        hero_name.offset_top = 48.0
-        hero_name.offset_bottom = 136.0
+        hero_name.offset_top = 18.0
+        hero_name.offset_bottom = 84.0
         hero_name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         hero_name.mouse_filter = Control.MOUSE_FILTER_IGNORE
         button.add_child(hero_name)
+
+        # These are deliberately large, separate iPad actions on EACH hero
+        # card; tapping the card body still opens the editor as before.
+        var actions := HBoxContainer.new()
+        actions.name = "HeroActions"
+        actions.anchor_left = 1.0
+        actions.anchor_right = 1.0
+        actions.anchor_top = 1.0
+        actions.anchor_bottom = 1.0
+        actions.offset_left = -370.0
+        actions.offset_right = -14.0
+        actions.offset_top = -75.0
+        actions.offset_bottom = -13.0
+        actions.add_theme_constant_override("separation", 10)
+        button.add_child(actions)
+
+        var edit_hero := Button.new()
+        edit_hero.name = "EditHero"
+        edit_hero.text = "🎨 编辑"
+        edit_hero.custom_minimum_size = Vector2(166, 60)
+        edit_hero.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        edit_hero.pressed.connect(_on_hero_pressed.bind(character_id))
+        actions.add_child(edit_hero)
+
+        var play_hero := Button.new()
+        play_hero.name = "PlayHero"
+        play_hero.text = "🌳 去玩"
+        play_hero.custom_minimum_size = Vector2(166, 60)
+        play_hero.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        play_hero.pressed.connect(_on_library_play_pressed.bind(character_id))
+        actions.add_child(play_hero)
 
         var family := _family_state()
         if (
@@ -1631,6 +1700,14 @@ func _on_bridge_failure(kind: String, status_code: int, _code: String, _message:
         )
         return
 
+    if kind in ["character:get", "equipment:get"] and not _pending_direct_play_character_id.is_empty():
+        _pending_direct_play_character_id = ""
+        var family := _family_state()
+        if family != null:
+            family.clear_selection()
+        _set_status("没能打开自己的英雄，请稍后重试。", true)
+        return
+
     if kind in ["character:get", "equipment:get"] and not _pending_cast_character_id.is_empty():
         var family := _family_state()
         if family != null:
@@ -1784,6 +1861,25 @@ func _on_guest_pressed(grant_id: String) -> void:
         _set_status("Could not load approved guest actor.", true)
     else:
         _set_status("Checking parent's film guest approval…", false)
+
+
+func _on_library_play_pressed(character_id: String) -> void:
+    var family := _family_state()
+    if (
+        family == null
+        or not family.has_family_connection()
+        or not bridge.has_family_session()
+        or bridge.is_busy()
+    ):
+        _set_status("请家长先解锁你的角色。", true)
+        return
+    _pending_direct_play_character_id = character_id
+    var error := bridge.get_character(character_id)
+    if error != OK:
+        _pending_direct_play_character_id = ""
+        _set_status("暂时打不开这个英雄，请再试一次。", true)
+    else:
+        _set_status("正在给你的英雄准备衣服和道具…", false)
 
 
 func _on_hero_pressed(character_id: String) -> void:
