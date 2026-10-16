@@ -30,6 +30,7 @@ static var _shared_bubble_texture: Texture2D
 var _cached_neighbors: Array[Node3D] = []
 var _lod_animation_on := true
 var _lod_physics_on := true
+var _greeting_allowed := false
 
 
 func configure(appearance: Dictionary, start: Vector3) -> void:
@@ -98,9 +99,10 @@ func _make_greeting() -> void:
     greeting_backdrop.name = "GreetingBubble"
     greeting_backdrop.texture = _shared_bubble_texture
     greeting_backdrop.pixel_size = 0.0075
-    greeting_backdrop.position = Vector3(0, 2.76, 0)
+    greeting_backdrop.position = Vector3(0, 3.20, 0)
     greeting_backdrop.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-    greeting_backdrop.no_depth_test = false
+    # Greeting must never disappear behind the child's rig or tall hat.
+    greeting_backdrop.no_depth_test = true
     greeting_backdrop.visible = false
     add_child(greeting_backdrop)
 
@@ -112,7 +114,8 @@ func _make_greeting() -> void:
     greeting_bubble.pixel_size = 0.0075
     greeting_bubble.outline_size = 0
     greeting_bubble.modulate = Color("#2D3150")
-    greeting_bubble.position = Vector3(0, 2.82, 0.03)
+    greeting_bubble.position = Vector3(0, 3.26, 0.03)
+    greeting_bubble.no_depth_test = true
     greeting_bubble.billboard = BaseMaterial3D.BILLBOARD_ENABLED
     greeting_bubble.visible = false
     add_child(greeting_bubble)
@@ -122,6 +125,16 @@ func _make_greeting() -> void:
 # physics tick). The collision body stays alive even when logic is asleep.
 func configure_neighbors(others: Array[Node3D]) -> void:
     _cached_neighbors = others
+
+
+func set_greeting_allowed(allowed: bool) -> void:
+    _greeting_allowed = allowed
+    # Hide non-selected bubbles immediately, even if NPC physics is asleep.
+    if not allowed:
+        if greeting_bubble != null:
+            greeting_bubble.visible = false
+        if greeting_backdrop != null:
+            greeting_backdrop.visible = false
 
 
 func set_performance_lod(distance_to_player: float, in_camera: bool) -> void:
@@ -153,7 +166,7 @@ func _physics_process(delta: float) -> void:
         velocity.y = -0.1
 
     var player := get_parent().get_node_or_null("Player") as Node3D
-    var nearby := player != null and global_position.distance_to(player.global_position) < GREETING_DISTANCE
+    var nearby := _greeting_allowed and player != null and global_position.distance_to(player.global_position) < GREETING_DISTANCE
     greeting_bubble.visible = nearby
     greeting_backdrop.visible = nearby
 
