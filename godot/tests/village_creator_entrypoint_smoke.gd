@@ -131,6 +131,20 @@ func _initialize() -> void:
         _fail("high quality did not restore 0.75 3D scale and one sun shadow")
         return
 
+    # The outer terrain is purely visual: fill overhead blue exposure
+    # without expanding walkable ground or adding costly edge collisions.
+    var meadow := scene.get_node_or_null("WoodlandMeadowApron") as MeshInstance3D
+    if meadow == null or not (meadow.mesh is BoxMesh):
+        _fail("woodland exterior has no visual terrain backdrop")
+        return
+    var meadow_size := (meadow.mesh as BoxMesh).size
+    if meadow_size.x < 100.0 or meadow_size.z < 100.0 or meadow.position.y > -0.2:
+        _fail("outer woodland meadow is too small or covers KayKit ground")
+        return
+    if scene.get_node_or_null("WoodlandMeadowApronCollision") != null or meadow.visible:
+        _fail("outer meadow must be collider-free and statically batched")
+        return
+
     var forest_obstacles := get_nodes_in_group("kaykit_village_nature")
     if forest_obstacles.size() < 44:
         _fail("original KayKit forest has fewer than 44 physical trees/rocks")
