@@ -109,8 +109,6 @@ func _build_child_director_controls() -> void:
         button.name = "Choice_" + key
         button.custom_minimum_size = Vector2(324, 60)
         button.add_theme_font_size_override("font_size", 19)
-        button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        button.expand_icon = true
         button.pressed.connect(_cycle_child_choice.bind(key))
         controls.add_child(button)
         match key:
@@ -280,7 +278,7 @@ func _build_overlay() -> void:
     var choices_card := PanelContainer.new()
     choices_card.name = "KidDirectorCard"
     choices_card.position = Vector2(22, 168)
-    choices_card.custom_minimum_size = Vector2(378, 584)
+    choices_card.custom_minimum_size = Vector2(378, 640)
     choices_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
     layer.add_child(choices_card)
 
