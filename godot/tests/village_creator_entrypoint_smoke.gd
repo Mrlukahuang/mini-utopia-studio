@@ -60,7 +60,8 @@ func _initialize() -> void:
     if disabled_original_meshes < 20:
         _fail("unbatched building meshes still render separately")
         return
-    var environment_node := scene.find_child("WorldEnvironment", true, false) as WorldEnvironment
+    var environments := scene.find_children("*", "WorldEnvironment", true, false)
+    var environment_node := environments[0] as WorldEnvironment if not environments.is_empty() else null
     if environment_node == null or environment_node.environment == null:
         _fail("village pastel sky Environment was not created")
         return
