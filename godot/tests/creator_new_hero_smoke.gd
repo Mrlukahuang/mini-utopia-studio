@@ -255,8 +255,14 @@ func _initialize() -> void:
         return
 
     var token := "test_only_family_token_not_a_real_secret_123456"
-    if not scene.activate_family_session(token, "https://family.example"):
+    if not scene.activate_family_session(token, "https://family.example:8443"):
         _fail("family session activation failed")
+        return
+    if scene.bridge.base_url != "https://family.example:8443":
+        _fail("family origin lost the parent's HTTPS port")
+        return
+    if scene.status_label.text.contains("暂时没成功"):
+        _fail("successful parent unlock displayed a false Creator error")
         return
     if save_button.disabled:
         _fail("named hero should become saveable with a scoped session")
