@@ -64,3 +64,19 @@ def test_all_godot_hanzi_exist_in_configured_font():
         f"{char} ({found[char][0]})" for char in missing[:40]
     )
     assert not missing, f"{len(missing)} Hanzi missing from Noto Sans SC: {detail}"
+
+
+
+def test_basic_latin_and_punctuation_are_available():
+    covered = _configured_hanzi_cmap()
+    required = {ord(ch) for ch in (
+        "abcdefghijklmnopqrstuvwxyz"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "0123456789 .,!?;:'\"-+()/"
+        "，。！？：；（）《》、“”‘’—…"
+    )}
+    missing = required - covered
+    assert not missing, (
+        "Missing basic Latin / punctuation glyphs: "
+        + " ".join(f"U+{cp:04X}" for cp in sorted(missing))
+    )
