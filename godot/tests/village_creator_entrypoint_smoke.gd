@@ -181,10 +181,22 @@ func _initialize() -> void:
         _fail("required fifteen animated KayKit villagers not present")
         return
     var unique_looks := {}
+    var unique_source_rigs := {}
     for villager in villagers:
         var body := villager as CharacterBody3D
         var look_id := String(villager.get_meta("kaykit_npc_look", ""))
         unique_looks[look_id] = true
+        var source_path := String(villager.get_meta("kaykit_npc_rig_resource", ""))
+        if not source_path.begins_with("res://assets/kaykit/adventurers/"):
+            _fail("villager must reference a real imported KayKit rig, not a pretend look")
+            return
+        unique_source_rigs[source_path] = true
+        # A physical CollisionShape3D is fine; visible MeshInstance3D
+        # primitives directly under the actor (hats, ears, boxes) are not.
+        for child in villager.get_children():
+            if child is MeshInstance3D:
+                _fail("villager still draws a primitive hat or costume")
+                return
         var collider := body.get_node_or_null("CollisionShape3D") as CollisionShape3D
         var official := body.get_node_or_null("KayKitBody") as Node3D
         var animation := official.find_child("AnimationPlayer", true, false) as AnimationPlayer if official != null else null
@@ -197,14 +209,9 @@ func _initialize() -> void:
     if unique_looks.size() != 15:
         _fail("villagers repeat a look identity")
         return
-    # Different roles must be visible meshes rather than 15 identical names.
-    for villager in villagers:
-        var costume := villager.get_node_or_null("VillagerCostume") as MeshInstance3D
-        var headwear := villager.get_node_or_null("VillagerHeadgear") as MeshInstance3D
-        if costume == null or costume.mesh == null or headwear == null or headwear.mesh == null:
-            _fail("one of fifteen villagers has no visible distinct costume or hat")
-            return
-
+    if unique_source_rigs.size() < 6:
+        _fail("villagers repeat the same underlying Knight model instead of six official rigs")
+        return
 
     var player := scene.get_node_or_null("Player") as CharacterBody3D
     if player == null or player.get_node_or_null("CollisionShape3D") == null:
