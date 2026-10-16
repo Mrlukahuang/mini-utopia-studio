@@ -553,12 +553,12 @@ func _setup_environment() -> void:
     env.ambient_light_energy = 0.62
     env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
     env.fog_enabled = true
-    # Godot fog affects the BG_COLOR sky (fog_sky_affect defaults to 1).
-    # Previously #C5E6FC at energy 0.34 rendered the sky as #798E9C
-    # on Web, even though background_color was pastel #ACDAFF.
-    # Match fog to the clear sky at neutral energy; preserve distance haze.
-    env.fog_light_color = env.background_color
-    env.fog_light_energy = 1.0
+    # #C5E6FC fog at energy 0.34 exactly matches the old gray-blue
+    # #798E9C screenshot. Keep that distance haze for scene contrast,
+    # but never let fog overwrite the BG_COLOR #ACDAFF sky itself.
+    env.fog_light_color = Color("#C5E6FC")
+    env.fog_light_energy = 0.34
+    env.fog_sky_affect = 0.0
     env.fog_density = 0.012 if OS.has_feature("web") else 0.004
     env.ssao_enabled = false
     env.glow_enabled = false
