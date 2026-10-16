@@ -36,6 +36,16 @@ var _perf_pressing := false
 var _perf_toggled_this_hold := false
 var _perf_badge: Label
 var _overview_was_on := false
+# Web-only two-tier adaptive quality. FPS must stay below 28 for 3 seconds
+# before downgrading; recovery requires above 45 for 5 seconds.
+const LOW_FPS_THRESHOLD := 28.0
+const HIGH_FPS_THRESHOLD := 45.0
+const DOWNGRADE_SECONDS := 3.0
+const UPGRADE_SECONDS := 5.0
+var _quality_low := false
+var _low_fps_seconds := 0.0
+var _high_fps_seconds := 0.0
+var _quality_warmup_seconds := 0.0
 var gate_unlocked := false
 var gate_label: Label3D
 
@@ -130,7 +140,7 @@ func _install_performance_badge() -> void:
     _perf_badge.name = "LaneAPerformanceBadge"
     _perf_badge.position = Vector2(460, 9)
     _perf_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-    _perf_badge.text = "FPS -- | Draw --"
+    _perf_badge.text = "FPS -- | Draw -- | 画质:清晰"
     _perf_badge.visible = false
     hud.add_child(_perf_badge)
 
@@ -176,7 +186,8 @@ func _tick_performance_badge(delta: float) -> void:
     _fps_elapsed = 0.0
     var frames := float(Performance.get_monitor(Performance.TIME_FPS))
     var draw := int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
-    _perf_badge.text = "FPS %.0f  |  Draw %s" % [frames, str(draw) if draw > 0 else "--"]
+    var quality := "流畅" if _quality_low else "清晰"
+    _perf_badge.text = "FPS %.0f | Draw %s | 画质:%s" % [frames, str(draw) if draw > 0 else "--", quality]
 
 
 func _update_villager_lod() -> void:
@@ -192,6 +203,58 @@ func _update_villager_lod() -> void:
         npc.set_performance_lod(distance_to_child, on_screen)
 
 
+func _watch_adaptive_quality(delta: float) -> void:
+    if not OS.has_feature("web"):
+        return
+    # CI overview uses F9 and an intentionally 12fps screenshot cap. Never
+    # misinterpret that diagnostic view as iPad gameplay performance.
+    var rig := get_node_or_null("CameraRig")
+    if rig != null and float(rig.get("distance")) > 20.0:
+        _low_fps_seconds = 0.0
+        _high_fps_seconds = 0.0
+        return
+    # Avoid switching during shader warmup, page restore or loading spikes.
+    _quality_warmup_seconds += minf(delta, 0.25)
+    if _quality_warmup_seconds < 4.0:
+        return
+    var fps := float(Performance.get_monitor(Performance.TIME_FPS))
+    if fps <= 0.0:
+        return
+    var sample_seconds := minf(delta, 0.25)
+    if not _quality_low:
+        _low_fps_seconds = _low_fps_seconds + sample_seconds if fps < LOW_FPS_THRESHOLD else 0.0
+        if _low_fps_seconds >= DOWNGRADE_SECONDS:
+            _set_quality_low(true)
+    else:
+        _high_fps_seconds = _high_fps_seconds + sample_seconds if fps > HIGH_FPS_THRESHOLD else 0.0
+        if _high_fps_seconds >= UPGRADE_SECONDS:
+            _set_quality_low(false)
+
+
+func _set_quality_low(enable: bool) -> void:
+    if _quality_low == enable:
+        return
+    _quality_low = enable
+    _low_fps_seconds = 0.0
+    _high_fps_seconds = 0.0
+    var viewport := get_viewport()
+    viewport.scaling_3d_scale = 0.6 if enable else 0.75
+    var sun := get_node_or_null("VillageSun") as DirectionalLight3D
+    if sun != null:
+        sun.shadow_enabled = not enable
+    var camera := viewport.get_camera_3d()
+    var rig := get_node_or_null("CameraRig")
+    var overview := rig != null and float(rig.get("distance")) > 20.0
+    if camera != null:
+        camera.far = 160.0 if overview else (60.0 if enable else 85.0)
+    for batch in _static_batches:
+        if is_instance_valid(batch):
+            batch.visibility_range_end = 0.0 if overview else (45.0 if enable else 65.0)
+    print("lane_a_quality: %s scale=%.2f shadows=%s" % [
+        "smooth" if enable else "clear", viewport.scaling_3d_scale, str(not enable)
+    ])
+
+
 func _set_overview_visibility() -> void:
     var camera_rig := get_node_or_null("CameraRig")
     if camera_rig == null:
@@ -204,10 +267,10 @@ func _set_overview_visibility() -> void:
     # can cheaply clip distant batches behind a little pastel fog.
     var active_camera := get_viewport().get_camera_3d()
     if active_camera != null and OS.has_feature("web"):
-        active_camera.far = 160.0 if overhead else 85.0
+        active_camera.far = 160.0 if overhead else (60.0 if _quality_low else 85.0)
     for batch in _static_batches:
         if is_instance_valid(batch):
-            batch.visibility_range_end = 0.0 if overhead else 65.0
+            batch.visibility_range_end = 0.0 if overhead else (45.0 if _quality_low else 65.0)
 
 
 func _exit_tree() -> void:
@@ -241,6 +304,7 @@ func _process(delta: float) -> void:
         _update_villager_lod()
     _tick_performance_badge(delta)
     _set_overview_visibility()
+    _watch_adaptive_quality(delta)
     if gate_unlocked or gate_label == null:
         return
 
@@ -434,6 +498,7 @@ func _setup_environment() -> void:
     add_child(world_env)
 
     var sun := DirectionalLight3D.new()
+    sun.name = "VillageSun"
     sun.rotation_degrees = Vector3(-48, -38, 0)
     sun.light_color = Color("#F7D6A5")
     sun.light_energy = 0.72
