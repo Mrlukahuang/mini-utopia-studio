@@ -205,9 +205,25 @@ func _initialize() -> void:
     library._on_bridge_success("characters:list", {
         "schema_version": "1.0", "characters": []
     })
-    if library.hero_list.get_node_or_null("CreateFirstHeroButton") == null:
-        _fail("empty library has no create hero action")
+    if library.hero_list.get_node_or_null("CreateFirstHeroHint") == null:
+        _fail("empty library must show an easy create hint")
         return
+    for required_name in ["NewHeroButton", "MyMoviesButton", "BackButton"]:
+        var action := library.get_node_or_null("Margin/Column/Toolbar/" + required_name) as Button
+        if action == null or action.icon == null or action.custom_minimum_size.y < 60:
+            _fail("child library needs three large SVG-icon actions: " + required_name)
+            return
+    # The chooser still covers the Library after the synthetic list event;
+    # close it before inspecting the actual child-facing toolbar.
+    chooser.hide()
+    if library.refresh_button.is_visible_in_tree() or library.shoot_button.is_visible_in_tree() or library.guests_refresh_button.is_visible_in_tree():
+        _fail("adult-only tools leaked into child's library")
+        return
+    library._toggle_parent_entry()
+    if not library.refresh_button.is_visible_in_tree() or library.refresh_button.icon == null:
+        _fail("adult refresh must use imported SVG icon")
+        return
+    library._toggle_parent_entry()
     family_for_card.disconnect_family()
     library.queue_free()
 
