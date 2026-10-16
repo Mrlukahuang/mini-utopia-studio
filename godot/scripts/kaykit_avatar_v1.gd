@@ -36,12 +36,9 @@ static func mount(root: Node3D, appearance: Dictionary) -> AnimationPlayer:
     )
     model.scale = Vector3(width, 1.0, width)
     model.visible = true
-    # Never cover the authentic Knight head with primitive species shells.
-    # Unavailable species keep their saved ID, but show the original KayKit rig.
-    var old_shell := skeleton.get_node_or_null("KayKitHeadOverlay")
-    if old_shell != null:
-        skeleton.remove_child(old_shell)
-        old_shell.queue_free()
+    # Preserve legacy saved identity for cross-scene consumers without rendering
+    # any procedural geometry over the official Knight's original head.
+    _species_identity_only(skeleton, appearance)
     _bone_socket(skeleton, "handslot.r", MiniUtopiaAvatarContract.SOCKET_WEAPON_R)
     _bone_socket(skeleton, "handslot.l", MiniUtopiaAvatarContract.SOCKET_WEAPON_L)
 
@@ -132,3 +129,33 @@ static func _bone_socket(
     binding.add_child(socket)
 
 
+
+# Compatibility for saved nonhuman IDs: zero meshes, zero drawn species shell.
+# The older cross-scene smoke still reads these metadata-only MeshInstance3Ds.
+# They MUST remain meshless until official KayKit species assets are supplied.
+static func _species_identity_only(skeleton: Skeleton3D, appearance: Dictionary) -> void:
+    var previous := skeleton.get_node_or_null("KayKitHeadOverlay")
+    if previous != null:
+        skeleton.remove_child(previous)
+        previous.free()
+    if String(appearance.get("species_head_id", "species_head_human_v1")) == "species_head_human_v1":
+        return
+    if skeleton.find_bone("head") < 0:
+        return
+
+    var anchor := BoneAttachment3D.new()
+    anchor.name = "KayKitHeadOverlay"
+    anchor.bone_name = "head"
+    anchor.visible = false
+    skeleton.add_child(anchor)
+    var identity_shell := MeshInstance3D.new()
+    identity_shell.name = "SpeciesShell"
+    # Mesh intentionally null: never cover the true KayKit head.
+    var material := StandardMaterial3D.new()
+    material.albedo_color = Color(String(appearance.get("surface_color_hex", "#F2C7A5")))
+    identity_shell.material_override = material
+    anchor.add_child(identity_shell)
+    for node_name in ["SpeciesEarL", "SpeciesEarR"]:
+        var ear_identity := MeshInstance3D.new()
+        ear_identity.name = node_name
+        anchor.add_child(ear_identity)
