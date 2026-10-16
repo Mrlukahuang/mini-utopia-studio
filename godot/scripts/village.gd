@@ -243,12 +243,29 @@ func _update_villager_lod() -> void:
     var cam := get_viewport().get_camera_3d()
     if player == null or cam == null:
         return
+    var nearest: Array[Node3D] = []
+    var nearest_distances: Array[float] = []
     for npc in _villagers:
         if not is_instance_valid(npc):
             continue
         var distance_to_child := npc.global_position.distance_to(player.global_position)
-        var on_screen := cam.is_position_in_frustum(npc.global_position + Vector3.UP)
+        var on_screen := cam.is_position_in_frustum(npc.global_position + Vector3.UP * 3.1)
         npc.set_performance_lod(distance_to_child, on_screen)
+        npc.set_greeting_enabled(false)
+        if not on_screen or distance_to_child >= 3.6:
+            continue
+        var insert_at := nearest_distances.size()
+        for index in range(nearest_distances.size()):
+            if distance_to_child < nearest_distances[index]:
+                insert_at = index
+                break
+        nearest.insert(insert_at, npc)
+        nearest_distances.insert(insert_at, distance_to_child)
+        if nearest.size() > 2:
+            nearest.pop_back()
+            nearest_distances.pop_back()
+    for npc in nearest:
+        npc.set_greeting_enabled(true)
 
 
 func _watch_adaptive_quality(delta: float) -> void:
