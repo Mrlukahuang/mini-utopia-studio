@@ -265,10 +265,15 @@ func _build_reward_banner() -> void:
 func _build_combat_label() -> void:
     _combat_label = Label3D.new()
     _combat_label.name = "CombatLabel"
-    _combat_label.position = Vector3(0.0, 2.34, 0.0)
-    _combat_label.font_size = 34
-    _combat_label.outline_size = 7
-    _combat_label.modulate = Color("#FFFFFF")
+    # A single centered two-line tag. Above the top of the official KayKit
+    # helmet even when looking down on the avatar in third person.
+    _combat_label.position = Vector3(0.0, 3.18, 0.0)
+    _combat_label.font_size = 28
+    _combat_label.pixel_size = 0.007
+    _combat_label.outline_size = 5
+    _combat_label.modulate = Color("#FFF9E8")
+    _combat_label.no_depth_test = true
+    _combat_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     _combat_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
     add_child(_combat_label)
 
@@ -276,13 +281,16 @@ func _build_combat_label() -> void:
 func _update_combat_label() -> void:
     if _combat_label == null:
         return
+    var character_name := "我的英雄"
+    if creator_play_runtime != null:
+        character_name = String(creator_play_runtime.payload.get("character_name", "我的英雄"))
+    if character_name.is_empty():
+        character_name = "我的英雄"
+    if character_name.length() > 12:
+        character_name = character_name.substr(0, 11) + "…"
     _combat_label.text = (
-        "❤️ "
-        + str(current_hp)
-        + "/"
-        + str(max_hp)
-        + "  ⚔️ "
-        + str(attack_power)
-        + "  🛡️ "
-        + str(defense)
+        character_name + "\n"
+        + "❤️" + str(current_hp) + "/" + str(max_hp)
+        + "  ⚔" + str(attack_power)
+        + "  🛡" + str(defense)
     )
