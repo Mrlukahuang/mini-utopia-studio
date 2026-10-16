@@ -73,6 +73,21 @@ func _initialize() -> void:
         _fail("FPS diagnostic cannot be hidden again")
         return
 
+    # Simulate the two runtime quality tiers deterministically, independent
+    # of CI/headless FPS. Automatic 3s/5s thresholds remain in village.gd.
+    var sun := scene.get_node_or_null("VillageSun") as DirectionalLight3D
+    if sun == null or not sun.shadow_enabled:
+        _fail("expected one sun shadow before adaptive quality downgrade")
+        return
+    scene.call("_set_quality_low", true)
+    if not scene._quality_low or sun.shadow_enabled or absf(root.get_viewport().scaling_3d_scale - 0.6) > 0.005:
+        _fail("low quality did not reduce 3D scale to 0.6 and disable sun shadows")
+        return
+    scene.call("_set_quality_low", false)
+    if scene._quality_low or not sun.shadow_enabled or absf(root.get_viewport().scaling_3d_scale - 0.75) > 0.005:
+        _fail("high quality did not restore 0.75 3D scale and one sun shadow")
+        return
+
     var villagers := get_nodes_in_group("kaykit_village_npc")
     if villagers.size() < 15:
         _fail("required fifteen animated KayKit villagers not present")
