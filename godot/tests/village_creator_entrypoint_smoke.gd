@@ -64,13 +64,33 @@ func _initialize() -> void:
     if perf == null or perf.visible:
         _fail("FPS diagnostic must be hidden until long press")
         return
-    scene.call("_toggle_performance_badge")
-    if not perf.visible or not perf.text.contains("FPS"):
-        _fail("long-hold FPS diagnostic toggle is not connected")
+    var info := scene.get_node_or_null("HUD/LaneAFPSInfoButton") as Button
+    if info == null or info.text != "ⓘ" or info.disabled:
+        _fail("iPad Safari lacks the always-tappable FPS info button")
         return
-    scene.call("_toggle_performance_badge")
+    info.pressed.emit()
+    if not perf.visible or not perf.text.contains("FPS"):
+        _fail("tapping the info button failed to open FPS stats")
+        return
+    info.pressed.emit()
     if perf.visible:
-        _fail("FPS diagnostic cannot be hidden again")
+        _fail("tapping the info button again failed to hide FPS stats")
+        return
+
+    var hold := InputEventScreenTouch.new()
+    hold.index = 3
+    hold.pressed = true
+    hold.position = Vector2(42, 38)
+    scene._input(hold)
+    scene.call("_tick_performance_badge", 1.02)
+    if not perf.visible:
+        _fail("one-second InputEventScreenTouch hold failed to open FPS stats")
+        return
+    hold.pressed = false
+    scene._input(hold)
+    info.pressed.emit()
+    if perf.visible:
+        _fail("touch release or info button did not hide FPS stats")
         return
 
     # Simulate the two runtime quality tiers deterministically, independent

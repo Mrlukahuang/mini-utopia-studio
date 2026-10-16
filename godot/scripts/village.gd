@@ -33,6 +33,7 @@ var _lod_elapsed := 0.0
 var _fps_elapsed := 0.0
 var _perf_hold_elapsed := 0.0
 var _perf_pressing := false
+var _perf_touch_index := -1
 var _perf_toggled_this_hold := false
 var _perf_badge: Label
 var _overview_was_on := false
@@ -144,19 +145,40 @@ func _install_performance_badge() -> void:
     _perf_badge.visible = false
     hud.add_child(_perf_badge)
 
+    # An actual GUI control is essential on iPad Safari: it cannot depend on
+    # the browser forwarding a touch-and-hold to an uncovered Logo region.
+    var info := Button.new()
+    info.name = "LaneAFPSInfoButton"
+    info.text = "ⓘ"
+    info.tooltip_text = "显示或隐藏 FPS"
+    info.custom_minimum_size = Vector2(52, 52)
+    info.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+    info.anchor_left = 1.0
+    info.anchor_right = 1.0
+    info.offset_left = -64.0
+    info.offset_right = -12.0
+    info.offset_top = 12.0
+    info.offset_bottom = 64.0
+    info.focus_mode = Control.FOCUS_NONE
+    info.pressed.connect(_toggle_performance_badge)
+    hud.add_child(info)
+
 
 func _input(event: InputEvent) -> void:
-    # Hidden until a deliberate 1.2s hold on the existing top-left Logo.
-    # Both touchscreen and desktop use the same non-invasive diagnostic.
+    # Touch down/up are distinct events on Safari. Keep the finger index so
+    # another finger (D-pad) cannot cancel a valid hold. One second is enough.
     if event is InputEventScreenTouch:
         var touch := event as InputEventScreenTouch
-        if touch.pressed and touch.position.x < 160.0 and touch.position.y < 164.0:
-            _perf_pressing = true
-            _perf_toggled_this_hold = false
-            _perf_hold_elapsed = 0.0
-        elif not touch.pressed:
+        if touch.pressed:
+            if _perf_touch_index < 0 and touch.position.x < 160.0 and touch.position.y < 164.0:
+                _perf_touch_index = touch.index
+                _perf_pressing = true
+                _perf_toggled_this_hold = false
+                _perf_hold_elapsed = 0.0
+        elif touch.index == _perf_touch_index:
+            _perf_touch_index = -1
             _perf_pressing = false
-    elif event is InputEventMouseButton:
+    elif event is InputEventMouseButton and _perf_touch_index < 0:
         var mouse := event as InputEventMouseButton
         if mouse.button_index == MOUSE_BUTTON_LEFT:
             if mouse.pressed and mouse.position.x < 160.0 and mouse.position.y < 164.0:
@@ -175,7 +197,7 @@ func _toggle_performance_badge() -> void:
 func _tick_performance_badge(delta: float) -> void:
     if _perf_pressing and not _perf_toggled_this_hold:
         _perf_hold_elapsed += delta
-        if _perf_hold_elapsed >= 1.2:
+        if _perf_hold_elapsed >= 1.0:
             _perf_toggled_this_hold = true
             _toggle_performance_badge()
     if _perf_badge == null or not _perf_badge.visible:
