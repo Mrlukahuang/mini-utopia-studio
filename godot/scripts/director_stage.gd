@@ -104,21 +104,15 @@ func _build_child_director_controls() -> void:
     title.add_theme_font_override("font", preload("res://assets/fonts/Fredoka-UI.tres"))
     title.add_theme_font_size_override("font_size", 25)
     controls.add_child(title)
-    var choice_grid := GridContainer.new()
-    choice_grid.name = "ShotChoiceGrid"
-    choice_grid.columns = 2
-    choice_grid.add_theme_constant_override("h_separation", 8)
-    choice_grid.add_theme_constant_override("v_separation", 8)
-    controls.add_child(choice_grid)
     for key in ["camera", "action", "duration_seconds", "caption_preset"]:
         var button := Button.new()
         button.name = "Choice_" + key
-        button.custom_minimum_size = Vector2(158, 76)
+        button.custom_minimum_size = Vector2(324, 60)
         button.add_theme_font_size_override("font_size", 19)
         button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
         button.expand_icon = true
         button.pressed.connect(_cycle_child_choice.bind(key))
-        choice_grid.add_child(button)
+        controls.add_child(button)
         match key:
             "camera": button.icon = preload("res://assets/ui/icons/camera.svg")
             "action": button.icon = preload("res://assets/ui/icons/action.svg")
