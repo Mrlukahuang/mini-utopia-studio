@@ -121,22 +121,22 @@ func _build_child_director_controls() -> void:
 
     film_title_input = LineEdit.new()
     film_title_input.name = "MyFilmTitle"
-    film_title_input.text = "My Mini Utopia Movie"
-    film_title_input.placeholder_text = "Name your movie"
+    film_title_input.text = "我的小电影"
+    film_title_input.placeholder_text = "给电影起个名字"
     film_title_input.max_length = 64
     film_title_input.custom_minimum_size = Vector2(324, 50)
     controls.add_child(film_title_input)
 
     film_note_input = LineEdit.new()
     film_note_input.name = "MyFilmNote"
-    film_note_input.placeholder_text = "Your story idea"
+    film_note_input.placeholder_text = "写下你的小故事"
     film_note_input.max_length = 280
     film_note_input.custom_minimum_size = Vector2(324, 48)
     controls.add_child(film_note_input)
 
     save_film_button = Button.new()
     save_film_button.name = "SaveMyMovieButton"
-    save_film_button.text = "Save My Movie"
+    save_film_button.text = "保存电影"
     save_film_button.custom_minimum_size = Vector2(324, 60)
     save_film_button.disabled = not film_bridge.has_family_session()
     save_film_button.pressed.connect(_on_save_private_film_pressed)
@@ -144,7 +144,7 @@ func _build_child_director_controls() -> void:
 
     record_voice_button = Button.new()
     record_voice_button.name = "RecordShotVoiceButton"
-    record_voice_button.text = "Record 9s Voice"
+    record_voice_button.text = "录一段声音"
     record_voice_button.icon = preload("res://assets/ui/icons/voice.svg")
     record_voice_button.custom_minimum_size = Vector2(324, 60)
     record_voice_button.add_theme_font_size_override("font_size", 18)
@@ -292,7 +292,7 @@ func _build_overlay() -> void:
     choices_card.add_child(intro_margin)
     var intro := Label.new()
     intro.name = "DirectorIntro"
-    intro.text = "Lights, camera,\nimagination!\n\nPick your hero and\nmake a little movie."
+    intro.text = "选好英雄，开始拍电影！"
     intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     intro.add_theme_font_override("font", preload("res://assets/fonts/Fredoka-UI.tres"))
     intro.add_theme_font_size_override("font_size", 25)
@@ -316,7 +316,7 @@ func _build_overlay() -> void:
 
     var replay := Button.new()
     replay.name = "ReplayButton"
-    replay.text = "↻ Replay"
+    replay.text = "再看一次"
     replay.custom_minimum_size = Vector2(160.0, 54.0)
     replay.add_theme_font_size_override("font_size", 20)
     replay.pressed.connect(_on_replay_pressed)
@@ -324,7 +324,7 @@ func _build_overlay() -> void:
 
     var home := Button.new()
     home.name = "BackToVillageButton"
-    home.text = "← Village"
+    home.text = "返回村子"
     home.custom_minimum_size = Vector2(185.0, 54.0)
     home.add_theme_font_size_override("font_size", 20)
     home.pressed.connect(_on_back_to_village_pressed)
@@ -340,7 +340,7 @@ func _build_overlay() -> void:
 
     status_label = Label.new()
     status_label.name = "StatusLabel"
-    status_label.text = "🎬 Director Stage / 导演模式"
+    status_label.text = "我的小电影"
     status_label.add_theme_font_size_override("font_size", 18)
     margin.add_child(status_label)
 
@@ -384,7 +384,7 @@ func _on_save_private_film_pressed() -> void:
         return
     var draft := _private_film_draft()
     if draft.is_empty():
-        status_label.text = "Please name your film and select your saved Hero."
+        status_label.text = "先给电影起名，再选英雄"
         return
     var error := (
         film_bridge.create_family_film(draft)
@@ -394,41 +394,41 @@ func _on_save_private_film_pressed() -> void:
         )
     )
     if error != OK:
-        status_label.text = "Could not start private film save."
+        status_label.text = "保存失败，请重试"
         return
     save_film_button.disabled = true
-    status_label.text = "Saving your film privately…"
+    status_label.text = "正在保存电影…"
 
 
 func _on_voice_tapped() -> void:
     if saved_film_id.is_empty() or film_bridge == null or film_bridge.is_busy():
         return
     if not voice_recorder.start_on_user_tap():
-        status_label.text = "Voice recording needs iPad Safari and trusted HTTPS."
+        status_label.text = "需要安全连接才能录音"
         return
     _refresh_record_button()
-    status_label.text = "🎙️ Recording one sentence (up to 9 seconds)…"
+    status_label.text = "正在录音（最多9秒）…"
 
 
 func _on_voice_ready(media_type: String, audio: PackedByteArray) -> void:
     if film_bridge == null or film_bridge.upload_private_film_voice(
         saved_film_id, audio, media_type
     ) != OK:
-        status_label.text = "Could not upload private voice. Try recording again."
+        status_label.text = "声音上传失败，请重试"
     else:
-        status_label.text = "Saving your voice privately…"
+        status_label.text = "正在保存声音…"
     _refresh_record_button()
 
 
 func _on_voice_failed() -> void:
-    status_label.text = "Microphone unavailable or recording rejected."
+    status_label.text = "暂时无法使用麦克风"
     _refresh_record_button()
 
 
 func _on_film_bridge_success(kind: String, payload: Dictionary) -> void:
     if kind == "films:voice:0":
         saved_film_revision = String(payload.get("revision", ""))
-        status_label.text = "💖 Voice saved privately. Parent review is needed again."
+        status_label.text = "声音已保存，请家长确认"
         _refresh_record_button()
         return
 
@@ -437,14 +437,14 @@ func _on_film_bridge_success(kind: String, payload: Dictionary) -> void:
     var id := String(payload.get("film_id", ""))
     var revision := String(payload.get("revision", ""))
     if not id.begins_with("FILM_") or revision.is_empty():
-        status_label.text = "Film save returned an invalid response."
+        status_label.text = "保存未成功，请重试"
         save_film_button.disabled = false
         return
     saved_film_id = id
     saved_film_revision = revision
     save_film_button.disabled = false
     _refresh_record_button()
-    status_label.text = "💖 Movie saved to your private Family Cloud!"
+    status_label.text = "电影已保存！"
     var family := get_node_or_null("/root/FamilySceneState") as MiniUtopiaFamilySceneState
     if family != null and family.second_cast_is_parent_guest:
         status_label.text += "\nSibling guest approval is temporary, not stored."
@@ -454,7 +454,7 @@ func _on_film_bridge_failure(
     kind: String, status_code: int, _code: String, _message: String
 ) -> void:
     if kind == "films:voice:0":
-        status_label.text = "Voice not saved. Check Safari microphone and try again."
+        status_label.text = "声音未保存，请检查麦克风"
         _refresh_record_button()
         return
     if kind not in ["films:post", "films:put"]:
@@ -471,7 +471,7 @@ func _show_missing_payload() -> void:
     if status_label == null:
         return
     status_label.text = (
-        "🎬 Director Stage / 导演模式\n"
+        "我的小电影\n"
         + "⚠️ No Director payload found.\n"
         + "Return to Mini Utopia → Episodes → Stage Shot first."
     )
@@ -496,7 +496,7 @@ func _show_ready(payload: Dictionary) -> void:
         world_line = "Fallback · " + director_runtime.world_load_error
 
     status_label.text = (
-        "🎬 Director Stage / 导演模式"
+        "我的小电影"
         + "\n"
         + String(payload.get("scene_id", "—"))
         + " · "
