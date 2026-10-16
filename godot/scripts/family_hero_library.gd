@@ -1617,6 +1617,11 @@ func _on_bridge_failure(kind: String, status_code: int, _code: String, _message:
     if kind == "family:session":
         connect_button.disabled = false
         _pending_profile_id = ""
+        if parent_pin_panel != null and parent_pin_panel.visible:
+            parent_pin_hint.text = (
+                "尝试太多次啦，请稍后再试。" if status_code == 429
+                else "口令没通过，请重新输入 8 位数字。"
+            )
         _set_connected(false)
         _set_status(
             "Parent unlock temporarily limited. Try again later."
