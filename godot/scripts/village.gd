@@ -686,6 +686,64 @@ func _build_forest() -> void:
         _forest_multimesh(KAYKIT_FOREST_TREES[index], tree_points, 8.0, "KayKitTree")
         _forest_multimesh(KAYKIT_FOREST_ROCKS[index], rock_points, 3.4, "KayKitRock")
 
+func _forest_multimesh(model: PackedScene, locations: Array[Vector3], scaling: float, title: String) -> void:
+    var source := model.instantiate() as Node3D
+    if source == null:
+        push_error("Official KayKit forest model missing: " + title)
+        return
+    # Spatial clustering makes WebGL's visibility range actually cull each
+    # group, rather than drawing every tree in one world-sized bounding box.
+    var bands: Dictionary = {}
+    for pos in locations:
+        var region := Vector2i(floori(pos.x / 24.0), floori(pos.z / 24.0))
+        if not bands.has(region):
+            bands[region] = []
+        var entries: Array = bands[region]
+        entries.append(pos)
+    var source_parts: Array[MeshInstance3D] = []
+    if source is MeshInstance3D:
+        source_parts.append(source as MeshInstance3D)
+    for child in source.find_children("*", "MeshInstance3D", true, false):
+        source_parts.append(child as MeshInstance3D)
+    for mesh_part in source_parts:
+        if mesh_part.mesh == null:
+            continue
+        var local := source.global_transform.affine_inverse() * mesh_part.global_transform
+        for region in bands:
+            var points: Array = bands[region]
+            var multi := MultiMesh.new()
+            multi.transform_format = MultiMesh.TRANSFORM_3D
+            multi.mesh = mesh_part.mesh
+            multi.instance_count = points.size()
+            for i in range(points.size()):
+                multi.set_instance_transform(i,
+                    Transform3D(Basis().scaled(Vector3.ONE * scaling), points[i]) * local
+                )
+            var batch := MultiMeshInstance3D.new()
+            batch.name = title + "Batch"
+            batch.multimesh = multi
+            batch.material_override = mesh_part.material_override
+            batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+            batch.visibility_range_end = 65.0
+            batch.add_to_group("lane_a_static_batch")
+            add_child(batch)
+            _static_batches.append(batch)
+    source.free()
+
+func _forest_collision(location: Vector3, is_tree: bool) -> void:
+    var body := StaticBody3D.new()
+    body.name = "KayKitTreeCollision" if is_tree else "KayKitRockCollision"
+    body.add_to_group("kaykit_village_nature")
+    body.position = location
+    var collider := CollisionShape3D.new()
+    collider.name = "CollisionShape3D"
+    var box := BoxShape3D.new()
+    box.size = Vector3(1.30, 2.70, 1.30) if is_tree else Vector3(1.40, 0.95, 1.40)
+    collider.position.y = box.size.y * 0.5
+    collider.shape = box
+    body.add_child(collider)
+    add_child(body)
+
 func _mushroom(origin: Vector3, scale_factor: float, cap_color: Color) -> void:
     var stem_height := 2.3 * scale_factor
     _cylinder(
