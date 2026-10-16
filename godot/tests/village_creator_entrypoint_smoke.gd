@@ -69,6 +69,13 @@ func _initialize() -> void:
     if environment.background_color.b < environment.background_color.r or environment.ambient_light_energy < 0.5:
         _fail("village sky is too dim or no longer pastel blue")
         return
+    # Fog can fully cover BG_COLOR sky; bright pastel BG alone did not
+    # prevent a #798E9C gray-blue Web sky with fog_light_energy 0.34.
+    if (not environment.fog_enabled
+        or environment.fog_light_energy < 0.95
+        or not environment.fog_light_color.is_equal_approx(environment.background_color)):
+        _fail("distant fog is still darkening the pastel sky")
+        return
     var touch := scene.get_node_or_null("TouchControls") as MiniUtopiaTouchControls
     if touch != null and touch.has_node("Overlay/Jump"):
         var jump := touch.get_node("Overlay/Jump") as Button
