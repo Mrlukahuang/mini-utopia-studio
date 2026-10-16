@@ -51,15 +51,15 @@ theme_override_constants/separation = 2
 
 [node name="Kicker" type="Label" parent="RootMargin/MainColumn/HeaderRow/TitleColumn"]
 layout_mode = 2
-text = "MINI UTOPIA · CHARACTER CREATOR"
+text = "迷你乌托邦"
 
 [node name="Title" type="Label" parent="RootMargin/MainColumn/HeaderRow/TitleColumn"]
 layout_mode = 2
-text = "Make Your Mini Hero ✨"
+text = "做一个你的小英雄！"
 
 [node name="Subtitle" type="Label" parent="RootMargin/MainColumn/HeaderRow/TitleColumn"]
 layout_mode = 2
-text = "Create, dress, and save your hero in Mini Utopia."
+text = "给英雄起名字，选喜欢的造型，再去村子玩！"
 
 [node name="HeroNameInput" type="LineEdit" parent="RootMargin/MainColumn/HeaderRow/TitleColumn"]
 custom_minimum_size = Vector2(240, 44)
@@ -179,7 +179,7 @@ text = "Chubby"
 
 [node name="SpeciesLabel" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
-text = "Species / 角色"
+text = "角色造型"
 
 [node name="SpeciesGrid" type="GridContainer" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
@@ -191,27 +191,31 @@ theme_override_constants/v_separation = 6
 custom_minimum_size = Vector2(126, 44)
 toggle_mode = true
 layout_mode = 2
-text = "Human"
+text = "骑士"
 
 [node name="SheepButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SpeciesGrid"]
+visible = false
 custom_minimum_size = Vector2(126, 44)
 toggle_mode = true
 layout_mode = 2
 text = "Sheep"
 
 [node name="RobotButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SpeciesGrid"]
+visible = false
 custom_minimum_size = Vector2(126, 44)
 toggle_mode = true
 layout_mode = 2
 text = "Robot"
 
 [node name="CatButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SpeciesGrid"]
+visible = false
 custom_minimum_size = Vector2(126, 44)
 toggle_mode = true
 layout_mode = 2
 text = "Cat"
 
 [node name="CloudButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SpeciesGrid"]
+visible = false
 custom_minimum_size = Vector2(126, 44)
 toggle_mode = true
 layout_mode = 2
