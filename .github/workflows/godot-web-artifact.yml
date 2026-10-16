@@ -307,6 +307,16 @@ jobs:
           test -s dist/village-visual/index.pck
           sed -i -E 's|^run/main_scene=".*"$|run/main_scene="res://scenes/director_stage.tscn"|' godot/project.godot
           grep -Fx 'run/main_scene="res://scenes/director_stage.tscn"' godot/project.godot
+          # A-012 screenshot-only fixture: show Director choice controls even
+          # without a private family login; never included in production export.
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("godot/scripts/director_stage.gd")
+          source = path.read_text()
+          marker = '    _build_overlay()\n'
+          assert source.count(marker) == 1
+          path.write_text(source.replace(marker, marker + '    call_deferred("_build_child_director_controls")\n', 1))
+          PY
           # The Director requires a validated play session; provide a
           # deterministic SYNTHETIC fixture only for this isolated CI export.
           # The production Web artifact was exported earlier and is unchanged.
