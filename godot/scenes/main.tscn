@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://scripts/village.gd" id="1_village"]
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="2_player"]
@@ -16,6 +16,8 @@
 
 [ext_resource type="Texture2D" path="res://assets/ui/icons/create.svg" id="11_create_icon"]
 [ext_resource type="Texture2D" path="res://assets/ui/icons/movie.svg" id="12_movie_icon"]
+
+[ext_resource type="Script" path="res://ui/theme/village_hud_localization.gd" id="13_ui_translation"]
 
 [node name="MiniUtopiaWorld" type="Node3D"]
 script = ExtResource("1_village")
@@ -36,6 +38,7 @@ position = Vector3(0, 0, -55)
 script = ExtResource("4_zone")
 
 [node name="HUD" type="CanvasLayer" parent="."]
+script = ExtResource("13_ui_translation")
 
 [node name="Panel" type="Panel" parent="HUD"]
 layout_mode = 1
