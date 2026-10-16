@@ -129,6 +129,37 @@ func _initialize() -> void:
         _fail("forest trees and rocks did not render in efficient MultiMesh batches: " + str(forest_batches))
         return
 
+    var market := get_nodes_in_group("kaykit_village_props")
+    if market.size() != 30:
+        _fail("market props do not retain exactly 30 simple physical blockers")
+        return
+    for item in market:
+        var collider := item.get_node_or_null("CollisionShape3D") as CollisionShape3D
+        if not (item is StaticBody3D) or collider == null or not (collider.shape is BoxShape3D):
+            _fail("KayKit market prop must use a lightweight BoxShape3D")
+            return
+    var grass := 0
+    var road := 0
+    var market_batches := 0
+    for entry in get_nodes_in_group("lane_a_static_batch"):
+        var batch := entry as MultiMeshInstance3D
+        if batch == null or batch.multimesh == null:
+            continue
+        var count := batch.multimesh.instance_count
+        if String(batch.name).begins_with("KayKitGrass"):
+            grass += count
+        elif String(batch.name).begins_with("KayKitStoneRoad"):
+            road += count
+        elif String(batch.name).begins_with("KayKitMarket"):
+            market_batches += 1
+            if batch.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF:
+                _fail("small market objects still cast expensive shadow maps")
+                return
+    if grass < 625 or road < 35 or market_batches < 2:
+        _fail("official KayKit terrain/market were not batched: " + str([grass, road, market_batches]))
+        return
+    print("lane_a_props: grass_instances=%d road_instances=%d market_batches=%d" % [grass, road, market_batches])
+
     var villagers := get_nodes_in_group("kaykit_village_npc")
     if villagers.size() < 15:
         _fail("required fifteen animated KayKit villagers not present")

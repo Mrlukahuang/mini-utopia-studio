@@ -49,3 +49,7 @@ Creator: Kay Lousberg; license: CC0 1.0 Universal (existing unchanged `godot/ass
 
 ## Lane A KayKit forest performance preparation (#404, unmerged draft)
 Official CC0 1.0 original KayKit Medieval Hexagon sources: https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0 ; tree_single_A/B and rock_single_A/B glTF plus paired original SHA-matched bin files. Author Kay Lousberg. Existing medieval/LICENSE.txt and hexagons_medieval.png are reused. Rendering uses region-clustered MultiMesh, no shadows, and independent lightweight BoxShape3D colliders. This is a draft until the owner measures iPad FPS.
+
+
+## Lane A KayKit prop and stone-road performance preparation (unmerged Draft)
+CC0 1.0 original source https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0 by Kay Lousberg. Curated unchanged original glTF/bin for barrel, crate_A_small, crate_A_big, sack, flag_blue, wheelbarrow, hex_grass and hex_road_A; original SHA and medieval/LICENSE.txt/hexagons_medieval.png are reused. Visible grass/stone roads and props use low-draw-call MultiMesh, shadowless materials and visibility-range culling; market physics is 30 primitive boxes. Remains Draft until owner supplies real iPad FPS and approves budget.
