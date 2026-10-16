@@ -713,9 +713,21 @@ func _build_kaykit_villagers() -> void:
     # Six genuinely different CC0 KayKit source meshes across 15 villagers.
     # No fake species heads, procedural hats or mesh-based costumes.
     var colors := ["#F7B7D2", "#B9E7D0", "#D7C2F3"]
-    for i in range(15):
-        var x: float = float([-6.8, -4.0, 4.0, 6.8][i % 4])
-        var z: float = 16.0 - float(int(i / 4)) * 9.0 - float(i % 4) * 0.8
+    # Keep the central road clear while distributing neighbours among the
+    # north/south housing blocks, market approaches and town square. Fixed
+    # locations make wandering, collision and iPad smoke tests reproducible.
+    var spawn_points: Array[Vector2] = [
+        Vector2(-6.8, 16.0), Vector2(6.8, 20.0),
+        Vector2(-4.8, 25.0), Vector2(4.8, 26.0),
+        Vector2(-8.2, 6.0), Vector2(8.2, 8.0),
+        Vector2(-5.8, 1.0), Vector2(5.8, -2.0),
+        Vector2(-8.0, -10.0), Vector2(8.0, -13.0),
+        Vector2(-5.2, -19.0), Vector2(5.2, -19.0),
+        Vector2(-8.0, -26.0), Vector2(8.0, -27.0),
+        Vector2(5.4, 12.0),
+    ]
+    for i in range(spawn_points.size()):
+        var start: Vector2 = spawn_points[i]
         var look := {
             "look_id": "KayKitVillager%02d" % i,
             "kaykit_rig_index": i % 6,
@@ -724,7 +736,7 @@ func _build_kaykit_villagers() -> void:
             "surface_color_hex": colors[int(i / 5)],
         }
         var npc := MiniUtopiaKaykitVillageNPC.new()
-        npc.configure(look, Vector3(x, 0.15, z))
+        npc.configure(look, Vector3(start.x, 0.15, start.y))
         add_child(npc)
         _villagers.append(npc)
     for actor in _villagers:
