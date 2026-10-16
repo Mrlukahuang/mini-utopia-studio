@@ -30,6 +30,17 @@ const KAYKIT_FOREST_ROCKS := [
     preload("res://assets/kaykit/medieval/rock_single_B.gltf"),
 ]
 
+const KAYKIT_GRASS := preload("res://assets/kaykit/medieval/hex_grass.gltf")
+const KAYKIT_ROAD := preload("res://assets/kaykit/medieval/hex_road_A.gltf")
+const KAYKIT_PROPS := [
+    preload("res://assets/kaykit/medieval/barrel.gltf"),
+    preload("res://assets/kaykit/medieval/crate_A_small.gltf"),
+    preload("res://assets/kaykit/medieval/wheelbarrow.gltf"),
+    preload("res://assets/kaykit/medieval/sack.gltf"),
+    preload("res://assets/kaykit/medieval/flag_blue.gltf"),
+    preload("res://assets/kaykit/medieval/crate_A_big.gltf"),
+]
+
 var _village_previous_web_fps := -1
 var _previous_scale := 1.0
 var _previous_msaa := Viewport.MSAA_DISABLED
@@ -543,7 +554,13 @@ func _setup_environment() -> void:
     add_child(sun)
 
 func _build_ground() -> void:
-    _box("VillageGround", Vector3(0, -0.55, 0), Vector3(70, 1, 70), palette.grass, true)
+    var physical_ground := _box("VillageGround", Vector3(0, -0.55, 0), Vector3(70, 1, 70), palette.grass, true)
+    physical_ground.visible = false
+    var tiles: Array[Vector3] = []
+    for row in range(-12, 13):
+        for col in range(-12, 13):
+            tiles.append(Vector3(float(col) * 2.9 + (1.45 if row % 2 else 0.0), -0.16, float(row) * 2.7))
+    _batch_kaykit_props(KAYKIT_GRASS, tiles, 1.58, "KayKitGrass", false)
     for p in [
         Vector3(-20,0,18), Vector3(22,0,-15), Vector3(-25,0,-20),
         Vector3(25,0,20), Vector3(0,0,-34)
@@ -552,16 +569,70 @@ func _build_ground() -> void:
     _sphere("VillageMound", Vector3(0,-1.0,-12), 12.0, palette.grass_dark, Vector3(1.2,0.12,0.85))
 
 func _build_path() -> void:
-    for i in range(-10, 12):
-        var x := sin(float(i) * 0.42) * 1.3
-        var width := 0.82 if i % 2 == 0 else 0.68
-        _cylinder(
-            "PathStone",
-            Vector3(x,0.02,float(i)*1.55),
-            width,
-            0.12,
-            palette.path_light if i % 3 == 0 else palette.path
-        )
+    var stones: Array[Vector3] = []
+    for i in range(-17, 18):
+        stones.append(Vector3(sin(float(i) * 0.25) * 0.8, 0.03, float(i) * 1.83))
+    _batch_kaykit_props(KAYKIT_ROAD, stones, 1.1, "KayKitStoneRoad", false)
+
+func _batch_kaykit_props(model: PackedScene, locations: Array[Vector3], scale_factor: float, label: String, regional: bool) -> void:
+    var template := model.instantiate() as Node3D
+    if template == null:
+        push_error("Official KayKit model missing: " + label)
+        return
+    # Imported GLTF transforms are only valid when the temporary source is
+    # inside the scene tree; free it immediately after baking the MultiMesh.
+    add_child(template)
+    var groups: Dictionary = {}
+    for point in locations:
+        var key := Vector2i(floori(point.x / 24.0), floori(point.z / 24.0)) if regional else Vector2i.ZERO
+        if not groups.has(key):
+            groups[key] = []
+        var points: Array = groups[key]
+        points.append(point)
+    var parts: Array[MeshInstance3D] = []
+    if template is MeshInstance3D:
+        parts.append(template as MeshInstance3D)
+    for sub in template.find_children("*", "MeshInstance3D", true, false):
+        parts.append(sub as MeshInstance3D)
+    for part in parts:
+        if part.mesh == null:
+            continue
+        var relative := template.global_transform.affine_inverse() * part.global_transform
+        for cell in groups:
+            var points: Array = groups[cell]
+            var multi := MultiMesh.new()
+            multi.transform_format = MultiMesh.TRANSFORM_3D
+            multi.mesh = part.mesh
+            multi.instance_count = points.size()
+            for i in range(points.size()):
+                multi.set_instance_transform(i,
+                    Transform3D(Basis().scaled(Vector3.ONE * scale_factor), points[i]) * relative
+                )
+            var batch := MultiMeshInstance3D.new()
+            batch.name = label + "Batch"
+            batch.multimesh = multi
+            batch.material_override = part.material_override
+            batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+            batch.visibility_range_end = 65.0
+            batch.add_to_group("lane_a_static_batch")
+            add_child(batch)
+            _static_batches.append(batch)
+    remove_child(template)
+    template.free()
+
+func _market_collision(location: Vector3) -> void:
+    var body := StaticBody3D.new()
+    body.name = "KayKitMarketCollider"
+    body.add_to_group("kaykit_village_props")
+    body.position = location
+    var collision := CollisionShape3D.new()
+    collision.name = "CollisionShape3D"
+    var shape := BoxShape3D.new()
+    shape.size = Vector3(1.25, 1.25, 1.25)
+    collision.position.y = 0.625
+    collision.shape = shape
+    body.add_child(collision)
+    add_child(body)
 
 func _build_village() -> void:
     _build_kaykit_houses()
@@ -569,8 +640,7 @@ func _build_village() -> void:
     _cylinder("FountainBase", Vector3(0,0.25,-10), 2.2, 0.5, palette.stone, true)
     _cylinder("FountainStem", Vector3(0,1.0,-10), 0.35, 1.5, palette.cream)
     _sphere("FountainBubble", Vector3(0,2.0,-10), 0.7, Color("#72B7C9"))
-    _mushroom(Vector3(-4.2,0,-11.5), 0.65, palette.mushroom_red)
-    _mushroom(Vector3(4.1,0,-12.0), 0.55, palette.mushroom_orange)
+
 
 func _build_kaykit_houses() -> void:
     # Twenty real KayKit buildings with walkable 6–10m gaps around the
@@ -744,86 +814,24 @@ func _forest_collision(location: Vector3, is_tree: bool) -> void:
     body.add_child(collider)
     add_child(body)
 
-func _mushroom(origin: Vector3, scale_factor: float, cap_color: Color) -> void:
-    var stem_height := 2.3 * scale_factor
-    _cylinder(
-        "MushroomStem",
-        origin + Vector3(0, stem_height * 0.5, 0),
-        0.48 * scale_factor,
-        stem_height,
-        palette.cream_light,
-        true
-    )
-    _sphere(
-        "MushroomCap",
-        origin + Vector3(0, stem_height + 0.28 * scale_factor, 0),
-        1.45 * scale_factor,
-        cap_color,
-        Vector3(1.25, 0.48, 1.25)
-    )
-    for offset in [
-        Vector3(-0.58,0.18,0.18),
-        Vector3(0.45,0.22,-0.32),
-        Vector3(0.1,0.3,0.52),
-    ]:
-        _sphere(
-            "MushroomSpot",
-            origin + Vector3(0, stem_height + 0.66 * scale_factor, 0)
-                + offset * scale_factor,
-            0.2 * scale_factor,
-            palette.mushroom_spot,
-            Vector3(1.0,0.35,1.0)
-        )
-
-func _fence_segment(origin: Vector3, length: float, yaw_degrees: float) -> void:
-    var root := Node3D.new()
-    root.position = origin
-    root.rotation_degrees.y = yaw_degrees
-    add_child(root)
-
-    for x in [-length * 0.5, length * 0.5]:
-        var post := _cylinder(
-            "FencePost",
-            Vector3.ZERO,
-            0.18,
-            1.55,
-            palette.wood,
-            false
-        )
-        remove_child(post)
-        root.add_child(post)
-        post.position = Vector3(x,0.78,0)
-
-    for y in [0.62, 1.2]:
-        var rail := _box(
-            "FenceRail",
-            Vector3.ZERO,
-            Vector3(length,0.18,0.18),
-            palette.wood_light,
-            false
-        )
-        remove_child(rail)
-        root.add_child(rail)
-        rail.position = Vector3(0,y,0)
-
 func _build_storybook_dressing() -> void:
-    _mushroom(Vector3(-13,0,8), 1.55, palette.mushroom_red)
-    _mushroom(Vector3(13,0,7), 1.3, palette.mushroom_orange)
-    _mushroom(Vector3(-22,0,-14), 1.7, palette.mushroom_red)
-    _mushroom(Vector3(22,0,-20), 1.45, palette.mushroom_orange)
+    # The same 30 market objects from #404, but six low-cost batched model
+    # groups instead of a unique imported scene draw for every placement.
+    for category in range(KAYKIT_PROPS.size()):
+        var positions: Array[Vector3] = []
+        for i in range(30):
+            if i % KAYKIT_PROPS.size() != category:
+                continue
+            var side := -1.0 if i % 2 == 0 else 1.0
+            var x := side * (11.1 + float(i % 3) * 0.8)
+            var z := -27.0 + float(int(i / 2) % 10) * 5.5
+            var spot := Vector3(x, 0.0, z)
+            positions.append(spot)
+            _market_collision(spot)
+        _batch_kaykit_props(KAYKIT_PROPS[category], positions, 3.3, "KayKitMarket%d" % category, true)
 
-    _fence_segment(Vector3(-8,0,-1.5), 7.0, 8.0)
-    _fence_segment(Vector3(8,0,-2.0), 7.0, -6.0)
-    _fence_segment(Vector3(-12,0,-20), 6.0, -10.0)
-    _fence_segment(Vector3(12,0,-23), 6.0, 12.0)
-
-    for p in [
-        Vector3(-5,0.22,-4), Vector3(5,0.22,-5),
-        Vector3(-6,0.22,-16), Vector3(6,0.22,-17),
-        Vector3(-2.5,0.22,-23), Vector3(3.2,0.22,-25),
-    ]:
-        _sphere("FlowerPatch", p, 0.42, palette.pink, Vector3(1.8,0.35,1.4))
-        _sphere("FlowerLeaf", p + Vector3(0.5,0,0.2), 0.28, palette.leaf2, Vector3(1.5,0.25,1.0))
+    # Removed the old sphere mushrooms, sphere flowers and cylinder/box
+    # fences. Official KayKit scenery is now supplied by batched assets.
 
     var welcome := Label3D.new()
     welcome.text = "NEWBIE VILLAGE"
