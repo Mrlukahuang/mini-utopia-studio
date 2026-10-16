@@ -64,6 +64,17 @@ func _initialize() -> void:
     if stage.avatar_root().get_node_or_null("KayKitBody") == null:
         _fail("Creator screenshot uses fallback instead of real KayKit")
         return
+    # A saved legacy nonhuman selection must never cover the official Knight.
+    var old_species := stage.current_appearance()
+    old_species["species_head_id"] = "species_head_robot_v1"
+    stage.apply_appearance(old_species)
+    var model := stage.avatar_root().get_node("KayKitBody") as Node3D
+    var skeleton := model.find_child("Skeleton3D", true, false) as Skeleton3D
+    if skeleton == null or skeleton.get_node_or_null("KayKitHeadOverlay") != null:
+        _fail("primitive species head still hides KayKit face")
+        return
+    old_species["species_head_id"] = "species_head_human_v1"
+    stage.apply_appearance(old_species)
     # First-touch selection has two themed, real SubViewport KayKit cards.
     # Clicking without an adult-issued session cannot expose either child's
     # library or parent-only token inputs.
