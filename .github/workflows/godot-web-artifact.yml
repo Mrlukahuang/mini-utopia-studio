@@ -243,6 +243,36 @@ jobs:
           test -s dist/creator-visual/index.pck
           test -s dist/creator-visual/index.wasm
 
+      # A-012: synthetic successful-save celebration in a screenshot-only
+      # Creator export. Production Web export above remains untouched.
+      - name: Export isolated Creator save celebration visual build
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("godot/scripts/character_creator_shell.gd")
+          source = path.read_text()
+          anchor = '    _build_save_celebration()'
+          assert source.count(anchor) == 1
+          source = source.replace(anchor, anchor + '\n    call_deferred("_ci_saved_hero_preview")', 1)
+          source += '''
+          func _ci_saved_hero_preview() -> void:
+              hero_name_input.text = "小星星 Star"
+              character_label.text = "小星星 Star"
+              play_button.disabled = false
+              _celebrate_saved_hero()
+              _set_status("保存成功啦！你的英雄可以去村子玩！", false)
+          '''
+          path.write_text(source)
+          PY
+          sed -i -E 's|^run/main_scene=".*"$|run/main_scene="res://scenes/character_creator.tscn"|' godot/project.godot
+          mkdir -p dist/creator-celebration-visual
+          "$GODOT_BINARY" --headless --path godot --editor --quit
+          "$GODOT_BINARY" --headless --path godot --export-release "Web" \
+            "$GITHUB_WORKSPACE/dist/creator-celebration-visual/index.html"
+          test -s dist/creator-celebration-visual/index.pck
+
       - name: Install pinned Playwright Chromium
         shell: bash
         run: |
@@ -292,6 +322,40 @@ jobs:
             } finally {await browser.close();}
           })().catch(e=>{console.error(e);process.exitCode=1;});
           JS
+
+      - name: Screenshot Creator saved-Hero celebration at 1180x820
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8772 --bind 127.0.0.1 --directory dist/creator-celebration-visual >/tmp/mini-utopia-save-celebration.log 2>&1 &
+          node <<'JS'
+          const {chromium} = require('/tmp/mini-utopia-playwright/node_modules/playwright');
+          const fs = require('node:fs');
+          (async () => {
+            const browser = await chromium.launch({
+              headless: true, args: ['--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox']
+            });
+            try {
+              const context = await browser.newContext({
+                viewport: {width:1180,height:820},
+                deviceScaleFactor:1,isMobile:true,hasTouch:true
+              });
+              const page = await context.newPage();
+              const errors = [];
+              page.on('pageerror', e => errors.push(e.message));
+              await page.goto('http://127.0.0.1:8772/',{waitUntil:'load',timeout:120000});
+              await page.locator('canvas').first().waitFor({state:'visible',timeout:120000});
+              await page.waitForFunction(() => document.getElementById('status') === null,null,{timeout:120000});
+              await page.waitForTimeout(4500);
+              const file = 'dist/visual-evidence/creator-save-celebration-1180x820.png';
+              await page.screenshot({path:file,fullPage:false,timeout:90000});
+              if (fs.statSync(file).size < 12000 || errors.length)
+                throw Error('Invalid Creator celebration screenshot: '+errors.join(';'));
+              await context.close();
+            } finally {await browser.close();}
+          })().catch(e=>{console.error(e);process.exitCode=1;});
+          JS
+          test -s dist/visual-evidence/creator-save-celebration-1180x820.png
 
       # A-009: new source-only CI exports for visual evidence. They use
       # checked-in synthetic session fixtures and never capture family data.

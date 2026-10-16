@@ -228,6 +228,16 @@ func _initialize() -> void:
     if scene.character_id != "CHAR_DEMO_LILY":
         _fail("created hero did not receive a canonical stable ID")
         return
+    var stars := scene.avatar_stage.get_parent().get_node_or_null("SavedStars") as Label
+    if stars == null or not stars.visible:
+        _fail("save success did not celebrate with visible stars")
+        return
+    if scene.avatar_stage.current_preview_animation() != "Jump":
+        _fail("saved Hero did not jump to celebrate")
+        return
+    if play_button.text != "🌳 去村子玩！" or play_button.custom_minimum_size.y < 68:
+        _fail("save success did not offer the large village button")
+        return
     if save_button.disabled:
         _fail("saved hero should remain editable")
         return
