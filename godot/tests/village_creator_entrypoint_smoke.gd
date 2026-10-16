@@ -163,6 +163,19 @@ func _initialize() -> void:
     if player == null or player.get_node_or_null("CollisionShape3D") == null:
         _fail("player has no physical collider")
         return
+    var player_tag := player.get_node_or_null("CombatLabel") as Label3D
+    if player_tag == null or player_tag.position.y < 3.0 or not player_tag.text.contains("\n"):
+        _fail("player stats and name are not in one centered overhead billboard")
+        return
+    if (player_tag.billboard != BaseMaterial3D.BILLBOARD_ENABLED
+        or player_tag.horizontal_alignment != HORIZONTAL_ALIGNMENT_CENTER
+        or not player_tag.no_depth_test):
+        _fail("player billboard could be off-center, occluded or truncated")
+        return
+    for required in ["❤️", "⚔", "🛡"]:
+        if not player_tag.text.contains(required):
+            _fail("player combined head label missing important stats: " + required)
+            return
 
     # Test actual physics-space intersections at known playable obstacles.
     # Checking that a shape exists alone cannot prove it blocks a ray.
