@@ -97,7 +97,7 @@ func _build_child_director_controls() -> void:
     var controls := VBoxContainer.new()
     controls.name = "KidDirectorChoices"
     controls.position = Vector2(34, 190)
-    controls.add_theme_constant_override("separation", 9)
+    controls.add_theme_constant_override("separation", 4)
     overlay.add_child(controls)
     var title := Label.new()
     title.text = "我的小电影"
@@ -278,7 +278,7 @@ func _build_overlay() -> void:
     var choices_card := PanelContainer.new()
     choices_card.name = "KidDirectorCard"
     choices_card.position = Vector2(22, 168)
-    choices_card.custom_minimum_size = Vector2(378, 640)
+    choices_card.custom_minimum_size = Vector2(378, 700)
     choices_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
     layer.add_child(choices_card)
 
