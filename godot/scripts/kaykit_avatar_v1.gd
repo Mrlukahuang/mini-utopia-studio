@@ -36,7 +36,12 @@ static func mount(root: Node3D, appearance: Dictionary) -> AnimationPlayer:
     )
     model.scale = Vector3(width, 1.0, width)
     model.visible = true
-    _head_for_species(skeleton, appearance)
+    # Never cover the authentic Knight head with primitive species shells.
+    # Unavailable species keep their saved ID, but show the original KayKit rig.
+    var old_shell := skeleton.get_node_or_null("KayKitHeadOverlay")
+    if old_shell != null:
+        skeleton.remove_child(old_shell)
+        old_shell.queue_free()
     _bone_socket(skeleton, "handslot.r", MiniUtopiaAvatarContract.SOCKET_WEAPON_R)
     _bone_socket(skeleton, "handslot.l", MiniUtopiaAvatarContract.SOCKET_WEAPON_L)
 
@@ -127,62 +132,3 @@ static func _bone_socket(
     binding.add_child(socket)
 
 
-static func _head_for_species(skeleton: Skeleton3D, appearance: Dictionary) -> void:
-    var previous := skeleton.get_node_or_null("KayKitHeadOverlay")
-    if previous != null:
-        skeleton.remove_child(previous)
-        previous.free()
-    var species := String(appearance.get("species_head_id", "species_head_human_v1"))
-    if species == "species_head_human_v1" or skeleton.find_bone("head") < 0:
-        return
-
-    # All four nonhuman Creator choices remain real, visually distinct heads
-    # mounted to the *animated* original KayKit head bone in every runtime.
-    var anchor := BoneAttachment3D.new()
-    anchor.name = "KayKitHeadOverlay"
-    anchor.bone_name = "head"
-    skeleton.add_child(anchor)
-    var color := Color(String(appearance.get("surface_color_hex", "#F2C7A5")))
-    var eye_color := Color(String(appearance.get("eye_color_hex", "#7A5238")))
-    var head := MeshInstance3D.new()
-    head.name = "SpeciesShell"
-    if species == "species_head_robot_v1":
-        var cube := BoxMesh.new()
-        cube.size = Vector3(0.72, 0.64, 0.70)
-        head.mesh = cube
-    else:
-        var sphere := SphereMesh.new()
-        sphere.radius = 0.48 if species == "species_head_cloud_v1" else 0.42
-        sphere.height = 0.90 if species == "species_head_cloud_v1" else 0.79
-        head.mesh = sphere
-    head.material_override = _material(color)
-    head.position = Vector3(0, 0.06, 0.0)
-    anchor.add_child(head)
-
-    for side in [-1.0, 1.0]:
-        var eye := MeshInstance3D.new()
-        eye.name = "SpeciesEyeL" if side < 0.0 else "SpeciesEyeR"
-        var eye_mesh := SphereMesh.new()
-        eye_mesh.radius = 0.072
-        eye_mesh.height = 0.14
-        eye.mesh = eye_mesh
-        eye.material_override = _material(eye_color)
-        eye.position = Vector3(side * 0.17, 0.11, 0.40)
-        anchor.add_child(eye)
-        if species in ["species_head_cat_v1", "species_head_sheep_v1"]:
-            var ear := MeshInstance3D.new()
-            ear.name = "SpeciesEarL" if side < 0.0 else "SpeciesEarR"
-            var ear_mesh := SphereMesh.new()
-            ear_mesh.radius = 0.15
-            ear_mesh.height = 0.39 if species == "species_head_cat_v1" else 0.22
-            ear.mesh = ear_mesh
-            ear.material_override = _material(color)
-            ear.position = Vector3(side * 0.36, 0.35, 0.0)
-            anchor.add_child(ear)
-
-
-static func _material(color: Color) -> StandardMaterial3D:
-    var material := StandardMaterial3D.new()
-    material.albedo_color = color
-    material.roughness = 0.85
-    return material
