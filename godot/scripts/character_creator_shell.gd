@@ -99,6 +99,8 @@ var _draft_appearance: Dictionary = {}
 var _eye_option_ids: Array[String] = []
 var _hair_option_ids: Array[String] = []
 var _return_scene := "res://scenes/main.tscn"
+var _save_stars: Label
+var _saved_celebration := false
 
 
 func _ready() -> void:
@@ -116,6 +118,7 @@ func _ready() -> void:
     _wire_look_controls()
     _wire_animation_controls()
     _wire_outfit_controls()
+    _build_save_celebration()
 
     _draft_appearance = avatar_stage.current_appearance()
     _refresh_look_controls()
@@ -148,6 +151,50 @@ func _ready() -> void:
             _set_status("Family Cloud not connected yet · preview only.", true)
         else:
             _set_status("Could not start Character load.", true)
+
+
+# Visual-only celebration; Play still requires the same server-verified
+# owner-scoped outfit runtime as before.
+func _build_save_celebration() -> void:
+    var preview := avatar_stage.get_parent() as Control
+    _save_stars = Label.new()
+    _save_stars.name = "SavedStars"
+    _save_stars.text = "✨ ⭐ 🌟 ✨\n🎉 保存成功啦！ 🎉"
+    _save_stars.set_anchors_preset(Control.PRESET_TOP_WIDE)
+    _save_stars.offset_left = 15
+    _save_stars.offset_right = -15
+    _save_stars.offset_top = 24
+    _save_stars.offset_bottom = 124
+    _save_stars.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    _save_stars.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+    _save_stars.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    preview.add_child(_save_stars)
+    _save_stars.hide()
+
+
+func _celebrate_saved_hero() -> void:
+    _saved_celebration = true
+    _save_stars.show()
+    _save_stars.pivot_offset = _save_stars.size / 2.0
+    _save_stars.scale = Vector2(0.65, 0.65)
+    avatar_stage.play_preview_animation("Jump")
+    var tween := create_tween()
+    tween.tween_property(_save_stars, "scale", Vector2(1.14, 1.14), 0.35)
+    tween.tween_property(_save_stars, "scale", Vector2.ONE, 0.25)
+    tween.tween_interval(0.55)
+    tween.tween_callback(func() -> void:
+        if is_instance_valid(avatar_stage):
+            avatar_stage.play_preview_animation("Idle")
+    )
+    _show_saved_village_button()
+
+
+func _show_saved_village_button() -> void:
+    if not _saved_celebration:
+        return
+    play_button.text = "🌳 去村子玩！"
+    play_button.custom_minimum_size = Vector2(275, 72)
+    play_button.show()
 
 
 func _wire_outfit_controls() -> void:
@@ -870,6 +917,7 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             if valid else "Clothes could not be verified.",
             not valid
         )
+        _show_saved_village_button()
         return
 
     if kind == "character:post":
@@ -881,6 +929,7 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         save_button.disabled = character_id.is_empty()
         play_button.disabled = true
         equipment_state.clear()
+        _celebrate_saved_hero()
         _set_status("Hero saved · loading your own clothes and props…", false)
         if not character_id.is_empty():
             var equipment_error := bridge.get_equipment(character_id)
@@ -904,6 +953,7 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             and typeof(saved_runtime.get("final_stats", null)) == TYPE_DICTIONARY
         )
         play_button.disabled = not owned_equipment
+        _celebrate_saved_hero()
         _set_status(
             "Saved! Tap Play to enter your village. 💖"
             if owned_equipment
