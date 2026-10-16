@@ -60,6 +60,22 @@ func _initialize() -> void:
     if disabled_original_meshes < 20:
         _fail("unbatched building meshes still render separately")
         return
+    var environments := scene.find_children("*", "WorldEnvironment", true, false)
+    var environment_node := environments[0] as WorldEnvironment if not environments.is_empty() else null
+    if environment_node == null or environment_node.environment == null:
+        _fail("village pastel sky Environment was not created")
+        return
+    var environment := environment_node.environment
+    if environment.background_color.b < environment.background_color.r or environment.ambient_light_energy < 0.5:
+        _fail("village sky is too dim or no longer pastel blue")
+        return
+    var touch := scene.get_node_or_null("TouchControls") as MiniUtopiaTouchControls
+    if touch != null and touch.has_node("Overlay/Jump"):
+        var jump := touch.get_node("Overlay/Jump") as Button
+        if jump.offset_right > -10.0:
+            _fail("iPad Jump button extends too close to the right-edge safe margin")
+            return
+
     var perf := scene.get_node_or_null("HUD/LaneAPerformanceBadge") as Label
     if perf == null or perf.visible:
         _fail("FPS diagnostic must be hidden until long press")
