@@ -43,6 +43,23 @@ func _initialize() -> void:
     root.add_child(scene)
     await process_frame
 
+    var title_label := scene.get_node_or_null(
+        "RootMargin/MainColumn/HeaderRow/TitleColumn/Title"
+    ) as Label
+    if title_label == null or title_label.text != "做一个你的小英雄！":
+        _fail("Creator Chinese title is missing")
+        return
+    var species_grid := scene.get_node_or_null(
+        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SpeciesGrid"
+    ) as GridContainer
+    if species_grid == null or not (species_grid.get_node("HumanButton") as Button).visible:
+        _fail("supported Knight species must be visible")
+        return
+    for hidden_species in ["SheepButton", "RobotButton", "CatButton", "CloudButton"]:
+        if (species_grid.get_node(hidden_species) as Button).visible:
+            _fail("unavailable species still visible: " + hidden_species)
+            return
+
     var name_input := scene.get_node(
         "RootMargin/MainColumn/HeaderRow/TitleColumn/HeroNameInput"
     ) as LineEdit

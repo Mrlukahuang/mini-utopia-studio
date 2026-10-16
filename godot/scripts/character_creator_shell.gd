@@ -1,7 +1,7 @@
 extends Control
 
-const DEFAULT_TITLE := "Make Your Mini Hero ✨"
-const DEFAULT_SUBTITLE := "Create, dress, and save your hero in Mini Utopia."
+const DEFAULT_TITLE := "做一个你的小英雄！"
+const DEFAULT_SUBTITLE := "给英雄起名字、选造型，再去村子玩！"
 
 const BODY_BUTTONS := {
     "SlimButton": "slim",
@@ -770,9 +770,11 @@ func _refresh_look_controls() -> void:
     )
     for button_name in SPECIES_BUTTONS:
         var button := species_grid.get_node(button_name) as Button
-        button.button_pressed = (
-            String(SPECIES_BUTTONS[button_name]) == species_head_id
-        )
+        # Only the bundled official Knight has a matching full head mesh.
+        # Keep older choices in the canonical data contract for existing
+        # saves, but don't present unsupported species as playable models.
+        button.visible = String(SPECIES_BUTTONS[button_name]) == "species_head_human_v1"
+        button.button_pressed = button.visible
 
     var allowed_surfaces := (
         MiniUtopiaCreatorAvatarCatalog.allowed_surface_ids(species_head_id)
