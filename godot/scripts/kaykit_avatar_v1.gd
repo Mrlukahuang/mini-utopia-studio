@@ -41,6 +41,19 @@ static func mount(root: Node3D, appearance: Dictionary) -> AnimationPlayer:
     _species_identity_only(skeleton, appearance)
     _bone_socket(skeleton, "handslot.r", MiniUtopiaAvatarContract.SOCKET_WEAPON_R)
     _bone_socket(skeleton, "handslot.l", MiniUtopiaAvatarContract.SOCKET_WEAPON_L)
+    # A-012 visual check: no packaged official crown asset exists.
+    # CI confirmation: preserve native Knight helmet across every animation.
+    # Real headwear belongs to the animated head bone, never a fixed-height
+    # world/root socket. No separately licensed KayKit crown model is bundled
+    # yet: hide the socket so legacy procedural crowns cannot float over the
+    # Knight helmet. Existing saved outfit data stays unchanged.
+    _bone_socket(skeleton, "head", MiniUtopiaAvatarContract.SOCKET_HEADWEAR)
+    var headwear := skeleton.find_child(
+        MiniUtopiaAvatarContract.SOCKET_HEADWEAR, true, false
+    ) as Node3D
+    if headwear != null:
+        headwear.position = Vector3(0.0, 0.24, 0.0)
+        headwear.visible = false
 
     # Keep legacy nodes for the save/preview contract and tests, but never
     # render an overlapping procedural body when official KayKit exists.

@@ -80,6 +80,17 @@ func _initialize() -> void:
         return
     old_species["species_head_id"] = "species_head_human_v1"
     stage.apply_appearance(old_species)
+    var headwear := MiniUtopiaKaykitAvatarV1.mounted_weapon_socket(
+        stage.avatar_root(), MiniUtopiaAvatarContract.SOCKET_HEADWEAR
+    )
+    if (
+        headwear == null
+        or not (headwear.get_parent() is BoneAttachment3D)
+        or (headwear.get_parent() as BoneAttachment3D).bone_name != "head"
+        or headwear.visible
+    ):
+        _fail("headwear is not safely mounted to animated KayKit head bone")
+        return
     # First-touch selection has two themed, real SubViewport KayKit cards.
     # Clicking without an adult-issued session cannot expose either child's
     # library or parent-only token inputs.
