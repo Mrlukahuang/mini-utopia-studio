@@ -64,7 +64,7 @@ text = "给英雄起名字，选喜欢的造型，再去村子玩！"
 [node name="HeroNameInput" type="LineEdit" parent="RootMargin/MainColumn/HeaderRow/TitleColumn"]
 custom_minimum_size = Vector2(240, 44)
 layout_mode = 2
-placeholder_text = "Name your Hero / 给角色起名字"
+placeholder_text = "给小英雄起个名字"
 max_length = 120
 caret_blink = true
 
@@ -76,7 +76,7 @@ text = "✨ 帮我起名"
 [node name="CharacterLabel" type="Label" parent="RootMargin/MainColumn/HeaderRow"]
 layout_mode = 2
 size_flags_vertical = 4
-text = "New Hero"
+text = "新英雄"
 horizontal_alignment = 2
 
 [node name="StepTabs" type="HBoxContainer" parent="RootMargin/MainColumn"]
@@ -87,25 +87,25 @@ theme_override_constants/separation = 8
 custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 size_flags_horizontal = 3
-text = "1 · Look"
+text = "1 · 外观"
 
 [node name="PersonalityStep" type="Button" parent="RootMargin/MainColumn/StepTabs"]
 custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 size_flags_horizontal = 3
-text = "2 · Personality"
+text = "2 · 个性"
 
 [node name="OutfitStep" type="Button" parent="RootMargin/MainColumn/StepTabs"]
 custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 size_flags_horizontal = 3
-text = "3 · Outfit"
+text = "3 · 换装"
 
 [node name="ReadyStep" type="Button" parent="RootMargin/MainColumn/StepTabs"]
 custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 size_flags_horizontal = 3
-text = "4 · Ready"
+text = "4 · 完成"
 
 [node name="CreatorBody" type="HBoxContainer" parent="RootMargin/MainColumn"]
 layout_mode = 2
@@ -136,21 +136,21 @@ theme_override_constants/separation = 10
 
 [node name="Heading" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
-text = "Build Your Hero"
+text = "创建小英雄"
 
 [node name="Hint" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
-text = "Tap a choice. Your 3D hero changes instantly."
+text = "点一点，看看英雄怎么变！"
 autowrap_mode = 2
 
 [node name="RandomLookButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
-text = "🎲 随机一下 / Surprise me!"
+text = "随机换个造型"
 
 [node name="BodyLabel" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
-text = "Body / 体型"
+text = "体型"
 
 [node name="BodyRow" type="HBoxContainer" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
@@ -161,21 +161,21 @@ custom_minimum_size = Vector2(0, 44)
 toggle_mode = true
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Slim"
+text = "瘦瘦"
 
 [node name="StandardButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/BodyRow"]
 custom_minimum_size = Vector2(0, 44)
 toggle_mode = true
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Standard"
+text = "标准"
 
 [node name="ChubbyButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/BodyRow"]
 custom_minimum_size = Vector2(0, 44)
 toggle_mode = true
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Chubby"
+text = "圆圆"
 
 [node name="SpeciesLabel" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
@@ -223,7 +223,7 @@ text = "Cloud"
 
 [node name="SurfaceLabel" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
-text = "Surface / 质感"
+text = "质感"
 
 [node name="SurfaceGrid" type="GridContainer" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
@@ -235,35 +235,35 @@ theme_override_constants/v_separation = 6
 custom_minimum_size = Vector2(82, 44)
 toggle_mode = true
 layout_mode = 2
-text = "Skin"
+text = "皮肤"
 
 [node name="FurButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SurfaceGrid"]
 custom_minimum_size = Vector2(82, 44)
 toggle_mode = true
 layout_mode = 2
-text = "Fur"
+text = "毛毛"
 
 [node name="WoolButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SurfaceGrid"]
 custom_minimum_size = Vector2(82, 44)
 toggle_mode = true
 layout_mode = 2
-text = "Wool"
+text = "羊毛"
 
 [node name="MetalButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SurfaceGrid"]
 custom_minimum_size = Vector2(82, 44)
 toggle_mode = true
 layout_mode = 2
-text = "Metal"
+text = "金属"
 
 [node name="CloudButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SurfaceGrid"]
 custom_minimum_size = Vector2(82, 44)
 toggle_mode = true
 layout_mode = 2
-text = "Cloud"
+text = "云朵"
 
 [node name="EyeLabel" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
-text = "Eyes / 眼睛"
+text = "眼睛"
 
 [node name="EyeStyleOption" type="OptionButton" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 custom_minimum_size = Vector2(0, 44)
@@ -271,7 +271,7 @@ layout_mode = 2
 
 [node name="HairLabel" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
-text = "Hair / 发型"
+text = "发型"
 
 [node name="HairStyleOption" type="OptionButton" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 custom_minimum_size = Vector2(0, 44)
@@ -279,7 +279,7 @@ layout_mode = 2
 
 [node name="ColorLabel" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
-text = "Colors / 颜色"
+text = "颜色"
 
 [node name="ColorTargetOption" type="OptionButton" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 custom_minimum_size = Vector2(0, 44)
@@ -295,89 +295,89 @@ theme_override_constants/v_separation = 6
 custom_minimum_size = Vector2(82, 44)
 toggle_mode = true
 layout_mode = 2
-text = "Cream"
+text = "奶油色"
 
 [node name="WarmButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
 custom_minimum_size = Vector2(82, 44)
 toggle_mode = true
 layout_mode = 2
-text = "Warm"
+text = "暖色"
 
 [node name="TanButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
 custom_minimum_size = Vector2(82, 44)
 toggle_mode = true
 layout_mode = 2
-text = "Tan"
+text = "浅棕"
 
 [node name="BrownButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
 custom_minimum_size = Vector2(82, 44)
 toggle_mode = true
 layout_mode = 2
-text = "Brown"
+text = "棕色"
 
 [node name="DarkButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
 custom_minimum_size = Vector2(82, 44)
 toggle_mode = true
 layout_mode = 2
-text = "Dark"
+text = "深棕"
 
 [node name="BlackButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
 custom_minimum_size = Vector2(82, 44)
 toggle_mode = true
 layout_mode = 2
-text = "Black"
+text = "黑色"
 
 [node name="PinkButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
 custom_minimum_size = Vector2(82, 44)
 toggle_mode = true
 layout_mode = 2
-text = "Pink"
+text = "粉色"
 
 [node name="MintButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
 custom_minimum_size = Vector2(82, 44)
 toggle_mode = true
 layout_mode = 2
-text = "Mint"
+text = "薄荷绿"
 
 [node name="LavenderButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
 custom_minimum_size = Vector2(82, 44)
 toggle_mode = true
 layout_mode = 2
-text = "Lavender"
+text = "淡紫"
 
 [node name="SkyButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
 custom_minimum_size = Vector2(82, 44)
 toggle_mode = true
 layout_mode = 2
-text = "Sky"
+text = "天蓝"
 
 [node name="PeachButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
 custom_minimum_size = Vector2(82, 44)
 toggle_mode = true
 layout_mode = 2
-text = "Peach"
+text = "蜜桃色"
 
 [node name="GoldButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
 custom_minimum_size = Vector2(82, 44)
 toggle_mode = true
 layout_mode = 2
-text = "Gold"
+text = "金色"
 
 [node name="PearlButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
 custom_minimum_size = Vector2(82, 44)
 toggle_mode = true
 layout_mode = 2
-text = "Pearl"
+text = "珍珠白"
 
 [node name="RobotBlueButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/ColorGrid"]
 custom_minimum_size = Vector2(82, 44)
 toggle_mode = true
 layout_mode = 2
-text = "Robot Blue"
+text = "机器人蓝"
 
 [node name="HandStyleLabel" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
-text = "✨ 手持道具造型 / Hand styles"
+text = "手持道具"
 
 [node name="HandStyleGrid" type="GridContainer" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
@@ -459,30 +459,30 @@ theme_override_constants/separation = 6
 custom_minimum_size = Vector2(104, 48)
 toggle_mode = true
 layout_mode = 2
-text = "Idle"
+text = "站立"
 
 [node name="ResetButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/AnimationControls"]
 custom_minimum_size = Vector2(104, 48)
 layout_mode = 2
-text = "Reset"
+text = "重置"
 
 [node name="WalkButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/AnimationControls"]
 custom_minimum_size = Vector2(104, 48)
 toggle_mode = true
 layout_mode = 2
-text = "Walk"
+text = "走路"
 
 [node name="RunButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/AnimationControls"]
 custom_minimum_size = Vector2(104, 48)
 toggle_mode = true
 layout_mode = 2
-text = "Run"
+text = "跑步"
 
 [node name="JumpButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel/AnimationControls"]
 custom_minimum_size = Vector2(104, 48)
 toggle_mode = true
 layout_mode = 2
-text = "Jump"
+text = "跳跃"
 
 [node name="StageHint" type="Label" parent="RootMargin/MainColumn/CreatorBody/PreviewPanel"]
 layout_mode = 1
@@ -496,7 +496,7 @@ offset_bottom = -88.0
 grow_horizontal = 2
 grow_vertical = 0
 mouse_filter = 2
-text = "Drag to rotate · Use + / − to zoom"
+text = "拖动转身 · 点击加减号缩放"
 horizontal_alignment = 1
 
 [node name="StatusBar" type="PanelContainer" parent="RootMargin/MainColumn"]
@@ -504,7 +504,7 @@ layout_mode = 2
 
 [node name="StatusLabel" type="Label" parent="RootMargin/MainColumn/StatusBar"]
 layout_mode = 2
-text = "Starting Creator…"
+text = "正在准备小英雄…"
 horizontal_alignment = 1
 
 [node name="FooterRow" type="HBoxContainer" parent="RootMargin/MainColumn"]
@@ -514,7 +514,7 @@ theme_override_constants/separation = 12
 [node name="BackButton" type="Button" parent="RootMargin/MainColumn/FooterRow"]
 custom_minimum_size = Vector2(180, 50)
 layout_mode = 2
-text = "← Back"
+text = "返回"
 
 [node name="FooterSpacer" type="Control" parent="RootMargin/MainColumn/FooterRow"]
 layout_mode = 2
@@ -523,10 +523,10 @@ size_flags_horizontal = 3
 [node name="PlayButton" type="Button" parent="RootMargin/MainColumn/FooterRow"]
 custom_minimum_size = Vector2(218, 50)
 layout_mode = 2
-text = "🎮 Play My Hero"
+text = "去村子玩"
 disabled = true
 
 [node name="SaveButton" type="Button" parent="RootMargin/MainColumn/FooterRow"]
 custom_minimum_size = Vector2(240, 50)
 layout_mode = 2
-text = "💖 Save My Hero"
+text = "保存英雄"

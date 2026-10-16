@@ -58,10 +58,10 @@ func _initialize() -> void:
         "RootMargin/MainColumn/StatusBar/StatusLabel"
     ) as Label
 
-    if save_button.text != "💖 Save My Hero":
+    if save_button.text != "保存英雄":
         _fail("Save action is not child-facing")
         return
-    if back_button.text != "← Back":
+    if back_button.text != "返回":
         _fail("Back action is missing")
         return
     if status_label.text.is_empty():
