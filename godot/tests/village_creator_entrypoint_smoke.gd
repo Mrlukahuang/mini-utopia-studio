@@ -180,6 +180,23 @@ func _initialize() -> void:
     if villagers.size() < 15:
         _fail("required fifteen animated KayKit villagers not present")
         return
+    # Spawn in many street blocks, not a dense line of neighbours by the gate.
+    var occupied_blocks: Dictionary = {}
+    for a in range(villagers.size()):
+        var first := villagers[a] as MiniUtopiaKaykitVillageNPC
+        var first_home: Vector3 = first.home
+        occupied_blocks[floori(first_home.z / 8.0)] = true
+        if absf(first_home.x) < 4.5:
+            _fail("villager spawned on the central stone road")
+            return
+        for b in range(a + 1, villagers.size()):
+            var other := villagers[b] as MiniUtopiaKaykitVillageNPC
+            if first_home.distance_to(other.home) < 3.0:
+                _fail("two KayKit villagers spawn too close together")
+                return
+    if occupied_blocks.size() < 6:
+        _fail("villagers are still clustered in too few village blocks")
+        return
     var unique_looks := {}
     var unique_source_rigs := {}
     for villager in villagers:
