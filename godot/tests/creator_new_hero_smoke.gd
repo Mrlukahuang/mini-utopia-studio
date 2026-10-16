@@ -49,6 +49,56 @@ func _initialize() -> void:
     if title_label == null or title_label.text != "做一个你的小英雄！":
         _fail("Creator Chinese title is missing")
         return
+    var ui_labels := {
+        "RootMargin/MainColumn/StepTabs/LookStep": "1 · 外观",
+        "RootMargin/MainColumn/StepTabs/PersonalityStep": "2 · 个性",
+        "RootMargin/MainColumn/StepTabs/OutfitStep": "3 · 换装",
+        "RootMargin/MainColumn/StepTabs/ReadyStep": "4 · 完成",
+        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/Heading": "创建小英雄",
+        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/BodyRow/SlimButton": "瘦瘦",
+        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/BodyRow/StandardButton": "标准",
+        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/BodyRow/ChubbyButton": "圆圆",
+        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SurfaceGrid/CloudButton": "云朵",
+        "RootMargin/MainColumn/CreatorBody/PreviewPanel/AnimationControls/IdleButton": "站立",
+        "RootMargin/MainColumn/CreatorBody/PreviewPanel/AnimationControls/WalkButton": "走路",
+        "RootMargin/MainColumn/CreatorBody/PreviewPanel/AnimationControls/RunButton": "跑步",
+        "RootMargin/MainColumn/CreatorBody/PreviewPanel/AnimationControls/JumpButton": "跳跃",
+        "RootMargin/MainColumn/FooterRow/SaveButton": "保存英雄",
+        "RootMargin/MainColumn/FooterRow/PlayButton": "去村子玩",
+        "RootMargin/MainColumn/FooterRow/BackButton": "返回",
+    }
+    for node_path in ui_labels:
+        var control := scene.get_node_or_null(node_path) as Control
+        if control == null or String(control.get("text")) != String(ui_labels[node_path]):
+            _fail("Creator Chinese child UI missing: " + node_path)
+            return
+    var scene_shell := scene as Control
+    var eye_choice := scene.get_node(
+        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/EyeStyleOption"
+    ) as OptionButton
+    var hair_choice := scene.get_node(
+        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/HairStyleOption"
+    ) as OptionButton
+    if eye_choice.get_item_text(0) != "圆眼睛" or hair_choice.get_item_text(0) != "没有头发":
+        _fail("Creator eye/hair display labels are not localized")
+        return
+    if scene_shell.get("_eye_option_ids").size() != eye_choice.item_count:
+        _fail("eye option identifiers changed while translating UI")
+        return
+    if scene_shell.get("_hair_option_ids").size() != hair_choice.item_count:
+        _fail("hair option identifiers changed while translating UI")
+        return
+    scene._select_creator_tab("outfit")
+    var heading := scene.get_node(
+        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/Heading"
+    ) as Label
+    if heading.text != "给英雄换装":
+        _fail("wardrobe heading not localized")
+        return
+    scene._select_creator_tab("look")
+    if heading.text != "创建小英雄":
+        _fail("look heading not restored after wardrobe tab")
+        return
     var species_grid := scene.get_node_or_null(
         "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SpeciesGrid"
     ) as GridContainer
