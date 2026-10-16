@@ -425,7 +425,8 @@ func _build_ui() -> void:
 
     guests_refresh_button = Button.new()
     guests_refresh_button.name = "RefreshParentApprovedGuests"
-    guests_refresh_button.text = "🎬 Find parent-approved guest actors"
+    guests_refresh_button.text = "寻找家长批准的演员"
+    guests_refresh_button.icon = load("res://assets/ui/icons/refresh.svg")
     guests_refresh_button.custom_minimum_size.y = 52
     guests_refresh_button.disabled = true
     guests_refresh_button.pressed.connect(_refresh_approved_guests)
@@ -433,14 +434,16 @@ func _build_ui() -> void:
 
     new_button = Button.new()
     new_button.name = "NewHeroButton"
-    new_button.text = "＋ New Hero"
+    new_button.text = "创建英雄"
+    new_button.icon = load("res://assets/ui/icons/hero_plus.svg")
     new_button.custom_minimum_size = Vector2(170, 52)
     new_button.pressed.connect(_on_new_pressed)
     toolbar.add_child(new_button)
 
     shoot_button = Button.new()
     shoot_button.name = "ShootWithCastButton"
-    shoot_button.text = "🎬 Film Together"
+    shoot_button.text = "一起拍电影"
+    shoot_button.icon = load("res://assets/ui/icons/movie.svg")
     shoot_button.custom_minimum_size = Vector2(200, 52)
     shoot_button.disabled = true
     shoot_button.pressed.connect(_on_shoot_together_pressed)
@@ -448,21 +451,23 @@ func _build_ui() -> void:
 
     refresh_button = Button.new()
     refresh_button.name = "RefreshButton"
-    refresh_button.text = "↻ Refresh"
+    refresh_button.text = "刷新"
+    refresh_button.icon = load("res://assets/ui/icons/refresh.svg")
     refresh_button.custom_minimum_size = Vector2(150, 52)
     refresh_button.pressed.connect(_refresh_characters)
     toolbar.add_child(refresh_button)
 
     movies_button = Button.new()
     movies_button.name = "MyMoviesButton"
-    movies_button.text = "🎞 My Movies / 我的电影"
+    movies_button.text = "我的电影"
+    movies_button.icon = load("res://assets/ui/icons/movie.svg")
     movies_button.custom_minimum_size = Vector2(190, 52)
     movies_button.pressed.connect(_refresh_films)
     toolbar.add_child(movies_button)
 
     var back := Button.new()
     back.name = "BackButton"
-    back.text = "← Village"
+    back.text = "返回村子"
     back.custom_minimum_size = Vector2(158, 52)
     back.pressed.connect(_on_back_pressed)
     toolbar.add_child(back)
@@ -476,7 +481,7 @@ func _build_ui() -> void:
 
     parent_entry_button = Button.new()
     parent_entry_button.name = "ParentEntryButton"
-    parent_entry_button.text = "👨‍👩‍👧 家长入口"
+    parent_entry_button.text = "家长入口"
     parent_entry_button.custom_minimum_size = Vector2(150, 52)
     parent_entry_button.pressed.connect(_toggle_parent_entry)
     toolbar.add_child(parent_entry_button)
@@ -1526,7 +1531,8 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
 
         var edit_hero := Button.new()
         edit_hero.name = "EditHero"
-        edit_hero.text = "🎨 编辑"
+        edit_hero.text = "编辑"
+        edit_hero.icon = load("res://assets/ui/icons/create.svg")
         edit_hero.custom_minimum_size = Vector2(166, 60)
         edit_hero.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         edit_hero.pressed.connect(_on_hero_pressed.bind(character_id))
@@ -1534,7 +1540,8 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
 
         var play_hero := Button.new()
         play_hero.name = "PlayHero"
-        play_hero.text = "🌳 去玩"
+        play_hero.text = "去玩"
+        play_hero.icon = load("res://assets/ui/icons/action.svg")
         play_hero.custom_minimum_size = Vector2(166, 60)
         play_hero.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         play_hero.pressed.connect(_on_library_play_pressed.bind(character_id))
