@@ -189,6 +189,9 @@ func _initialize() -> void:
     if portrait_button == null or portrait_button.custom_minimum_size.y < 120:
         _fail("big hero card missing")
         return
+    if library.new_button.icon == null or library.refresh_button.icon == null or library.movies_button.icon == null:
+        _fail("Hero Library toolbar SVG icons were not loaded")
+        return
     var edit_action := portrait_button.get_node_or_null("HeroActions/EditHero") as Button
     var play_action := portrait_button.get_node_or_null("HeroActions/PlayHero") as Button
     if (
