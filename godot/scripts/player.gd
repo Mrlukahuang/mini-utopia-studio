@@ -263,21 +263,43 @@ func _build_reward_banner() -> void:
 
 
 func _build_combat_label() -> void:
+    # A single two-line billboard above the KayKit hero's helmet. It travels
+    # with the player and faces the iPad camera without creating a screen HUD.
     _combat_label = Label3D.new()
     _combat_label.name = "CombatLabel"
-    _combat_label.position = Vector3(0.0, 2.34, 0.0)
-    _combat_label.font_size = 34
-    _combat_label.outline_size = 7
+    _combat_label.position = Vector3(0.0, 2.76, 0.0)
+    _combat_label.font_size = 30
+    _combat_label.pixel_size = 0.0045
+    _combat_label.width = 560.0
+    _combat_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    _combat_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    _combat_label.outline_size = 6
     _combat_label.modulate = Color("#FFFFFF")
     _combat_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+    var chinese_font := load("res://assets/fonts/NotoSansSC-UI.tres") as Font
+    if chinese_font != null:
+        _combat_label.font = chinese_font
     add_child(_combat_label)
+
+
+func _hero_display_name() -> String:
+    # The exact selected Hero payload is already applied before this label
+    # is built. Never display a stale name from a different family session.
+    if creator_play_runtime != null:
+        var display := String(
+            creator_play_runtime.payload.get("character_name", "")
+        ).strip_edges()
+        if not display.is_empty():
+            return display
+    return "小英雄"
 
 
 func _update_combat_label() -> void:
     if _combat_label == null:
         return
     _combat_label.text = (
-        "❤️ "
+        _hero_display_name()
+        + "\n❤️ "
         + str(current_hp)
         + "/"
         + str(max_hp)
