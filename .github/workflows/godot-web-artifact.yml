@@ -279,7 +279,7 @@ jobs:
             try {
               const page = await context.newPage();
               await page.goto('http://127.0.0.1:8771/',{waitUntil:'load',timeout:120000});
-              await page.waitForFunction(()=>document.querySelector('#loader')===null,{timeout:120000});
+              await page.waitForFunction(()=>document.querySelector('#loader')===null,null,{timeout:120000});
               await page.waitForTimeout(3000);
               await page.screenshot({path:'dist/visual-evidence/home-1180x820.png'});
               await page.mouse.click(590,485);
