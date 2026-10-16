@@ -29,6 +29,39 @@ const ANIMATION_BUTTONS := {
     "JumpButton": "Jump",
 }
 
+const EYE_LABELS := {
+    "eyes_round_soft_v1": "圆眼睛",
+    "eyes_sparkle_v1": "亮晶晶",
+    "eyes_sleepy_v1": "眯眯眼",
+    "eyes_robot_v1": "机器人眼",
+    "eyes_cat_v1": "猫眼睛",
+}
+const HAIR_LABELS := {
+    "hair_none": "没有头发",
+    "hair_short_v1": "短发",
+    "hair_bob_v1": "齐耳短发",
+    "hair_long_wavy_v1": "长卷发",
+    "hair_ponytail_v1": "马尾",
+    "hair_fluffy_v1": "蓬蓬头",
+}
+const ANIMATION_LABELS := {
+    "Idle": "站立",
+    "Walk": "走路",
+    "Run": "跑步",
+    "Jump": "跳跃",
+}
+const SLOT_LABELS := {
+    "headwear": "头饰",
+    "top": "上衣",
+    "bottom": "裤子",
+    "shoes": "鞋子",
+    "gloves": "手套",
+    "accessory": "小饰品",
+    "backpack": "背包",
+    "weapon_main": "手持道具",
+    "weapon_offhand": "副手道具",
+}
+
 const FRIENDLY_NAMES := [
     "小星星 Star", "露露 Lulu", "彩虹 Rainbow",
     "米米 Mimi", "泡泡 Bubbles", "豆豆 Dodo",
@@ -165,9 +198,9 @@ func _ready() -> void:
     var error := bridge.get_character(character_id)
     if error != OK:
         if error == ERR_UNCONFIGURED and OS.has_feature("web"):
-            _set_status("Family Cloud not connected yet · preview only.", true)
+            _set_status("请家长先帮你解锁，暂时只能预览。", true)
         else:
-            _set_status("Could not start Character load.", true)
+            _set_status("英雄暂时打不开，请再试一次。", true)
 
 
 # Visual-only celebration; Play still requires the same server-verified
@@ -237,12 +270,12 @@ func _select_creator_tab(tab: String) -> void:
     var heading := choice_content.get_node("Heading") as Label
     var hint := choice_content.get_node("Hint") as Label
     if _outfit_mode:
-        heading.text = "Dress Your Hero / 我的衣柜"
-        hint.text = "Tap a piece to try it on. Every change is saved."
+        heading.text = "给英雄换装"
+        hint.text = "选一件试穿，喜欢就保存！"
         _refresh_outfit_choices()
     else:
-        heading.text = "Build Your Hero"
-        hint.text = "Tap a choice. Your 3D hero changes instantly."
+        heading.text = "创建小英雄"
+        hint.text = "点一点，看看英雄怎么变！"
     choice_scroll.scroll_vertical = 0
 
 
@@ -257,7 +290,7 @@ func _refresh_outfit_choices() -> void:
 
     if equipment_state.is_empty():
         var help := Label.new()
-        help.text = "Save your Hero to open your private wardrobe."
+        help.text = "先保存英雄，就能打开你的衣柜啦！"
         help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         _outfit_choices.add_child(help)
         return
@@ -273,7 +306,7 @@ func _refresh_outfit_choices() -> void:
         var slot := String(raw_slot)
         var heading := Label.new()
         heading.name = "Slot_" + slot
-        heading.text = slot.replace("_", " ").capitalize()
+        heading.text = String(SLOT_LABELS.get(slot, "其他装备"))
         heading.add_theme_font_size_override("font_size", 19)
         _outfit_choices.add_child(heading)
 
@@ -295,8 +328,8 @@ func _refresh_outfit_choices() -> void:
             choice.custom_minimum_size = Vector2(0.0, 48.0)
             choice.add_theme_font_size_override("font_size", 17)
             choice.text = (
-                ("✓ Wearing  " if picked else "＋ Wear  ")
-                + String(item.get("display_name", "My Item"))
+                ("已穿上 · " if picked else "穿上 · ")
+                + String(item.get("display_name", "我的装备"))
             )
             choice.disabled = picked
             choice.pressed.connect(
@@ -307,7 +340,7 @@ func _refresh_outfit_choices() -> void:
         if currently_equipped:
             var remove := Button.new()
             remove.name = "Remove_" + slot
-            remove.text = "− Take off"
+            remove.text = "脱下"
             remove.custom_minimum_size = Vector2(0.0, 48.0)
             remove.pressed.connect(
                 _on_equipment_choice_pressed.bind(slot, "")
@@ -324,13 +357,13 @@ func _build_craft_prop_panel() -> void:
     _outfit_choices.add_child(section)
 
     var heading := Label.new()
-    heading.text = "✨ Create My Own Prop / 创造道具"
+    heading.text = "制作我的道具"
     heading.add_theme_font_size_override("font_size", 21)
     section.add_child(heading)
 
     _craft_name_input = LineEdit.new()
     _craft_name_input.name = "MyPropName"
-    _craft_name_input.placeholder_text = "Name your creation · 给道具取个名字"
+    _craft_name_input.placeholder_text = "给道具起个名字"
     _craft_name_input.max_length = 32
     _craft_name_input.custom_minimum_size.y = 48
     section.add_child(_craft_name_input)
@@ -338,7 +371,7 @@ func _build_craft_prop_panel() -> void:
     var shape_option := OptionButton.new()
     shape_option.name = "PropShape"
     shape_option.custom_minimum_size.y = 48
-    for label in ["⭐ Star", "❤️ Heart", "⚪ Ball", "🧊 Box"]:
+    for label in ["星星", "爱心", "圆球", "方块"]:
         shape_option.add_item(label)
     shape_option.selected = ["star", "heart", "sphere", "box"].find(_craft_shape)
     shape_option.item_selected.connect(_on_craft_shape_selected)
@@ -347,7 +380,7 @@ func _build_craft_prop_panel() -> void:
     var color_option := OptionButton.new()
     color_option.name = "PropColor"
     color_option.custom_minimum_size.y = 48
-    for label in ["Pink / 粉色", "Mint / 薄荷绿", "Blue / 天蓝", "Gold / 金色", "Purple / 紫色"]:
+    for label in ["粉色", "薄荷绿", "天蓝", "金色", "紫色"]:
         color_option.add_item(label)
     var colors := ["#F7B7D2", "#B9E7D0", "#74B9FF", "#F2C75C", "#B79CED"]
     color_option.selected = maxi(0, colors.find(_craft_color))
@@ -357,7 +390,7 @@ func _build_craft_prop_panel() -> void:
     var slot_option := OptionButton.new()
     slot_option.name = "PropSlot"
     slot_option.custom_minimum_size.y = 48
-    for label in ["✨ Accessory", "👑 Headwear", "🪄 Hand prop", "🎒 Backpack"]:
+    for label in ["小饰品", "头饰", "手持道具", "背包"]:
         slot_option.add_item(label)
     slot_option.selected = maxi(
         0, ["accessory", "headwear", "weapon_main", "backpack"].find(_craft_slot)
@@ -367,7 +400,7 @@ func _build_craft_prop_panel() -> void:
 
     var submit := Button.new()
     submit.name = "CreatePropButton"
-    submit.text = "✨ Create & Save My Prop"
+    submit.text = "保存我的道具"
     submit.custom_minimum_size.y = 58
     submit.add_theme_font_size_override("font_size", 19)
     submit.pressed.connect(_on_create_prop_pressed)
@@ -392,13 +425,13 @@ func _on_craft_slot_selected(index: int) -> void:
 
 func _on_create_prop_pressed() -> void:
     if character_id.is_empty() or not bridge.has_family_session() or bridge.is_busy():
-        _set_status("Connect and save your Hero before making a prop.", true)
+        _set_status("先请家长解锁并保存英雄，才能做道具。", true)
         return
     if _craft_name_input == null:
         return
     var name := _craft_name_input.text.strip_edges()
     if name.is_empty():
-        _set_status("Give your own prop a name first!", true)
+        _set_status("先给道具起个名字吧！", true)
         return
     var request := {
         "schema_version": "1.0",
@@ -410,21 +443,21 @@ func _on_create_prop_pressed() -> void:
     }
     var error := bridge.craft_family_prop(character_id, request)
     if error == OK:
-        _set_status("Saving your original creation in your private wardrobe…", false)
+        _set_status("正在保存你的道具…", false)
     else:
-        _set_status("Could not save your new prop. Try again.", true)
+        _set_status("道具没保存成功，再试一次吧。", true)
 
 
 func _on_equipment_choice_pressed(slot: String, item_id: String) -> void:
     if character_id.is_empty() or bridge.is_busy():
-        _set_status("Finish the current wardrobe change first.", true)
+        _set_status("先完成这次换装吧！", true)
         return
     var id: Variant = null if item_id.is_empty() else item_id
     var error := bridge.put_equipment_slot(character_id, slot, id)
     if error == OK:
-        _set_status("Updating your outfit…", false)
+        _set_status("正在换装…", false)
     else:
-        _set_status("Could not change your outfit. Please retry.", true)
+        _set_status("换装没成功，再试一次吧。", true)
 
 
 func activate_family_session(token: String, api_base_url: String) -> bool:
@@ -433,11 +466,11 @@ func activate_family_session(token: String, api_base_url: String) -> bool:
     var family := get_node_or_null("/root/FamilySceneState") as MiniUtopiaFamilySceneState
     if family == null or not family.connect_family(api_base_url, token):
         save_button.disabled = true
-        _set_status("Family Cloud sign-in required to save.", true)
+        _set_status("请家长先帮你解锁，才能保存英雄。", true)
         return false
     if not family.bind_family_client(bridge):
         save_button.disabled = true
-        _set_status("Family Cloud sign-in required to save.", true)
+        _set_status("请家长先帮你解锁，才能保存英雄。", true)
         return false
 
     if character_id.is_empty():
@@ -447,7 +480,7 @@ func activate_family_session(token: String, api_base_url: String) -> bool:
         save_button.disabled = true
         var error := bridge.get_character(character_id)
         if error != OK:
-            _set_status("Could not load the Family Cloud hero.", true)
+            _set_status("英雄暂时打不开，请再试一次。", true)
             return false
     return true
 
@@ -465,11 +498,11 @@ func _on_hero_name_changed(_value: String) -> void:
     if character_id.is_empty():
         save_button.disabled = not (has_name and bridge.has_family_session())
         if not has_name:
-            _set_status("Give your hero a name before saving.", false)
+            _set_status("先给英雄起个名字吧！", false)
         elif not bridge.has_family_session():
-            _set_status("Name ready · ask your parent to unlock Family Cloud.", false)
+            _set_status("名字起好了！请家长帮你解锁。", false)
         else:
-            _set_status("Hero named · tap Save to create your private Hero.", false)
+            _set_status("名字起好了！点「保存英雄」吧。", false)
     elif not loaded_character.is_empty():
         save_button.disabled = not has_name
 
@@ -511,9 +544,9 @@ func _wire_look_controls() -> void:
     hair_style_option.item_selected.connect(_on_hair_style_selected)
 
     color_target_option.clear()
-    color_target_option.add_item("Surface / 表面")
-    color_target_option.add_item("Eyes / 眼睛")
-    color_target_option.add_item("Hair / 头发")
+    color_target_option.add_item("外观颜色")
+    color_target_option.add_item("眼睛颜色")
+    color_target_option.add_item("头发颜色")
     color_target_option.select(0)
     color_target_option.item_selected.connect(_on_color_target_selected)
 
@@ -542,7 +575,7 @@ func _wire_animation_controls() -> void:
 func _on_animation_selected(animation_name: String) -> void:
     avatar_stage.play_preview_animation(animation_name)
     _refresh_animation_buttons()
-    _set_status("✨ " + animation_name + "！角色动起来啦。", false)
+    _set_status("看！英雄正在" + String(ANIMATION_LABELS.get(animation_name, animation_name)) + "！", false)
 
 
 func _refresh_animation_buttons() -> void:
@@ -607,7 +640,7 @@ func _on_hand_style_pressed(style: String) -> void:
 
 func _on_body_selected(body_type: String) -> void:
     _draft_appearance["body_type"] = body_type
-    _commit_live_appearance("Body changed instantly.")
+    _commit_live_appearance("体型换好啦！")
 
 
 func _on_species_selected(species_head_id: String) -> void:
@@ -644,7 +677,7 @@ func _on_species_selected(species_head_id: String) -> void:
     if not allowed_hair.has(current_hair):
         _draft_appearance["hair_style_id"] = allowed_hair[0]
 
-    _commit_live_appearance("Species changed instantly.")
+    _commit_live_appearance("造型换好啦！")
 
 
 func _on_surface_selected(surface_type: String) -> void:
@@ -662,21 +695,21 @@ func _on_surface_selected(surface_type: String) -> void:
         return
 
     _draft_appearance["surface_type"] = surface_type
-    _commit_live_appearance("Surface changed instantly.")
+    _commit_live_appearance("质感换好啦！")
 
 
 func _on_eye_style_selected(index: int) -> void:
     if index < 0 or index >= _eye_option_ids.size():
         return
     _draft_appearance["eye_style_id"] = _eye_option_ids[index]
-    _commit_live_appearance("Eyes changed instantly.")
+    _commit_live_appearance("眼睛换好啦！")
 
 
 func _on_hair_style_selected(index: int) -> void:
     if index < 0 or index >= _hair_option_ids.size():
         return
     _draft_appearance["hair_style_id"] = _hair_option_ids[index]
-    _commit_live_appearance("Hair changed instantly.")
+    _commit_live_appearance("发型换好啦！")
 
 
 func _on_color_target_selected(_index: int) -> void:
@@ -685,7 +718,7 @@ func _on_color_target_selected(_index: int) -> void:
 
 func _on_color_selected(hex_value: String) -> void:
     _draft_appearance[_active_color_field()] = hex_value
-    _commit_live_appearance("Color changed instantly.")
+    _commit_live_appearance("颜色换好啦！")
 
 
 func _active_color_field() -> String:
@@ -737,9 +770,9 @@ func _commit_live_appearance(message: String) -> void:
     _refresh_look_controls()
 
     if loaded_character.is_empty():
-        _set_status(message + " Preview mode · not saved yet.", false)
+        _set_status(message + " 还没保存哦。", false)
     else:
-        _set_status(message + " Press Save when ready.", false)
+        _set_status(message + " 喜欢就点「保存英雄」吧。", false)
 
 
 func _sync_loaded_profile_avatar() -> void:
@@ -804,14 +837,7 @@ func _refresh_detail_controls() -> void:
     )
     eye_style_option.clear()
     for option_id in _eye_option_ids:
-        eye_style_option.add_item(
-            String(
-                MiniUtopiaCreatorAvatarCatalog.EYE_OPTIONS.get(
-                    option_id,
-                    option_id
-                )
-            )
-        )
+        eye_style_option.add_item(String(EYE_LABELS.get(option_id, "眼睛")))
     _select_option_by_id(
         eye_style_option,
         _eye_option_ids,
@@ -828,14 +854,7 @@ func _refresh_detail_controls() -> void:
     )
     hair_style_option.clear()
     for option_id in _hair_option_ids:
-        hair_style_option.add_item(
-            String(
-                MiniUtopiaCreatorAvatarCatalog.HAIR_OPTIONS.get(
-                    option_id,
-                    option_id
-                )
-            )
-        )
+        hair_style_option.add_item(String(HAIR_LABELS.get(option_id, "发型")))
     _select_option_by_id(
         hair_style_option,
         _hair_option_ids,
@@ -877,14 +896,14 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             or String(crafted.get("character_id", "")) != character_id
             or String(owned.get("character_id", "")) != character_id
         ):
-            _set_status("Your new prop could not be verified.", true)
+            _set_status("道具还没准备好，请再试一次。", true)
             return
         equipment_state = owned.duplicate(true)
         _refresh_outfit_choices()
         var runtime = equipment_state.get("runtime", {})
         if typeof(runtime) == TYPE_DICTIONARY:
             avatar_stage.apply_equipment_runtime(runtime)
-        _set_status("New prop saved! Tap Wear to put it on your Hero.", false)
+        _set_status("道具保存成功！点「穿上」试试吧。", false)
         return
 
     if kind == "character:get":
@@ -909,11 +928,11 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
                 _refresh_look_controls()
         save_button.disabled = false
         play_button.disabled = true
-        _set_status("Hero loaded · fetching your own clothes and props…", false)
+        _set_status("英雄回来啦，正在打开衣柜…", false)
         var equipment_error := bridge.get_equipment(character_id)
         if equipment_error != OK:
             _set_status(
-                "Character loaded · My Stuff could not start loading.",
+                "衣柜暂时打不开，请再试一次。",
                 true
             )
         return
@@ -932,8 +951,8 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             not valid or loaded_character.is_empty() or _appearance_dirty
         )
         _set_status(
-            "Hero + your clothes and props loaded."
-            if valid else "Clothes could not be verified.",
+            "英雄和衣柜都准备好啦！"
+            if valid else "衣柜还没准备好，请再试一次。",
             not valid
         )
         _show_saved_village_button()
@@ -943,17 +962,17 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         loaded_character = payload.duplicate(true)
         _appearance_dirty = false
         character_id = String(payload.get("character_id", ""))
-        character_label.text = String(payload.get("display_name", "New Hero"))
+        character_label.text = String(payload.get("display_name", "新英雄"))
         hero_name_input.text = character_label.text
         save_button.disabled = character_id.is_empty()
         play_button.disabled = true
         equipment_state.clear()
         _celebrate_saved_hero()
-        _set_status("Hero saved · loading your own clothes and props…", false)
+        _set_status("英雄保存成功！正在准备衣柜…", false)
         if not character_id.is_empty():
             var equipment_error := bridge.get_equipment(character_id)
             if equipment_error != OK:
-                _set_status("Saved, but clothes are not ready yet.", true)
+                _set_status("英雄已保存，衣柜还没准备好。", true)
         return
 
     if kind == "character:put":
@@ -974,9 +993,9 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         play_button.disabled = not owned_equipment
         _celebrate_saved_hero()
         _set_status(
-            "Saved! Tap Play to enter your village. 💖"
+            "保存成功啦！去村子玩吧！"
             if owned_equipment
-            else "Hero saved · reload your own clothes before Play.",
+            else "英雄已保存，请先打开衣柜再去玩。",
             false
         )
 
@@ -991,7 +1010,7 @@ func _on_bridge_failure(
     # URLs, child names or request payloads.
     push_warning("Creator request failed: %s (HTTP %d)" % [kind, status_code])
     if kind == "prop:craft":
-        _set_status("Could not create your prop. Choose a different name or try again.", true)
+        _set_status("道具没做好，换个名字再试试吧。", true)
         return
     if kind.begins_with("equipment:"):
         play_button.disabled = true
@@ -1003,7 +1022,7 @@ func _on_bridge_failure(
     if kind == "character:get":
         if status_code == 404:
             _set_status(
-                "Character not found. Return and choose another hero.",
+                "找不到这个英雄啦，返回再选一个吧。",
                 true
             )
         else:
@@ -1023,7 +1042,7 @@ func _on_bridge_failure(
     if kind == "character:put":
         if status_code == 409:
             _set_status(
-                "This hero changed somewhere else. Reopen it before saving.",
+                "英雄刚刚有了新变化，请重新打开再保存。",
                 true
             )
         else:
@@ -1032,11 +1051,11 @@ func _on_bridge_failure(
 
 func _on_play_pressed() -> void:
     if play_button.disabled or loaded_character.is_empty():
-        _set_status("Save your hero before playing.", true)
+        _set_status("先保存英雄，再去村子玩吧！", true)
         return
     var family_state := get_node_or_null("/root/FamilySceneState") as MiniUtopiaFamilySceneState
     if family_state == null or not family_state.select_character(loaded_character):
-        _set_status("Your saved hero could not enter the village.", true)
+        _set_status("英雄暂时进不了村子，请再试一次。", true)
         return
     var runtime = equipment_state.get("runtime", {})
     if (
@@ -1044,11 +1063,11 @@ func _on_play_pressed() -> void:
         or not family_state.select_equipment(runtime)
     ):
         family_state.clear_selection()
-        _set_status("Your own clothes and props must load before playing.", true)
+        _set_status("衣服和道具还没准备好，请稍后再试。", true)
         return
     var target := "res://scenes/main.tscn"
     if not ResourceLoader.exists(target):
-        _set_status("Village is not available yet.", true)
+        _set_status("村子暂时打不开，请稍后再试。", true)
         return
     get_tree().change_scene_to_file(target)
 
@@ -1071,15 +1090,15 @@ func _on_back_pressed() -> void:
 func _on_save_pressed() -> void:
     var name := hero_name_input.text.strip_edges()
     if name.is_empty():
-        _set_status("Please give your hero a name first.", true)
+        _set_status("先给英雄起个名字吧！", true)
         return
 
     if character_id.is_empty():
         if not bridge.has_family_session():
-            _set_status("Parent Cloud sign-in is required to save.", true)
+            _set_status("请家长先帮你解锁，才能保存。", true)
             return
         save_button.disabled = true
-        _set_status("Creating your hero…", false)
+        _set_status("正在创建小英雄…", false)
         var create_error := bridge.create_character({
             "schema_version": "1.0",
             "display_name": name,
@@ -1088,22 +1107,22 @@ func _on_save_pressed() -> void:
         })
         if create_error != OK:
             save_button.disabled = false
-            _set_status("Could not begin creating your hero.", true)
+            _set_status("创建没成功，再试一次吧。", true)
         return
 
     if loaded_character.is_empty():
-        _set_status("Please load your hero before saving changes.", true)
+        _set_status("请先打开英雄，再保存修改。", true)
         return
 
     save_button.disabled = true
-    _set_status("Saving your hero…", false)
+    _set_status("正在保存英雄…", false)
 
     var error := bridge.put_character(
         character_id, _character_update_payload(name)
     )
     if error != OK:
         save_button.disabled = false
-        _set_status("Could not start Save. Please try again.", true)
+        _set_status("保存没开始成功，请再试一次。", true)
 
 ## Keep the server-owned Character identity and revision, but persist the
 ## child's CURRENT avatar choices rather than resending the old profile.
