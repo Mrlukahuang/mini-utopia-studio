@@ -45,6 +45,7 @@ var share_submit: Button
 var share_revoke: Button
 var guests_refresh_button: Button
 var movies_button: Button
+var parent_tools: VBoxContainer
 var movie_list: VBoxContainer
 var _movie_restore: Dictionary = {}
 var _movie_phase := ""
@@ -123,7 +124,7 @@ func _build_profile_picker() -> void:
 
     var parent_corner := Button.new()
     parent_corner.name = "ParentCornerButton"
-    parent_corner.text = "👨‍👩‍👧 家长入口"
+    parent_corner.text = "家长入口"
     parent_corner.custom_minimum_size = Vector2(152, 56)
     parent_corner.pressed.connect(_open_parent_from_picker)
     header.add_child(parent_corner)
@@ -411,11 +412,11 @@ func _build_ui() -> void:
     column.add_child(brand)
 
     var title := Label.new()
-    title.text = "✨ 我的英雄 / My Heroes"
+    title.text = "我的英雄"
     column.add_child(title)
 
     var subtitle := Label.new()
-    subtitle.text = "Choose one to dress, play, or film. Every hero stays yours."
+    subtitle.text = "选择你的英雄，继续冒险吧！"
     column.add_child(subtitle)
 
     var toolbar := HBoxContainer.new()
@@ -423,47 +424,61 @@ func _build_ui() -> void:
     toolbar.add_theme_constant_override("separation", 10)
     column.add_child(toolbar)
 
+    # Advanced actions stay within the deliberate adult entry.
+    # A-012 visual check: use Lane B's merged SVG resources, no glyph icons.
+    parent_tools = VBoxContainer.new()
+    parent_tools.name = "ParentTools"
+    parent_tools.add_theme_constant_override("separation", 10)
+    parent_tools.visible = false
+    column.add_child(parent_tools)
+
     guests_refresh_button = Button.new()
     guests_refresh_button.name = "RefreshParentApprovedGuests"
-    guests_refresh_button.text = "🎬 Find parent-approved guest actors"
+    guests_refresh_button.text = "查看家长已允许的客串角色"
+    guests_refresh_button.icon = load("res://assets/ui/icons/refresh.svg") as Texture2D
     guests_refresh_button.custom_minimum_size.y = 52
     guests_refresh_button.disabled = true
     guests_refresh_button.pressed.connect(_refresh_approved_guests)
-    column.add_child(guests_refresh_button)
+    parent_tools.add_child(guests_refresh_button)
 
     new_button = Button.new()
     new_button.name = "NewHeroButton"
-    new_button.text = "＋ New Hero"
-    new_button.custom_minimum_size = Vector2(170, 52)
+    new_button.text = "创建英雄"
+    new_button.icon = load("res://assets/ui/icons/hero_plus.svg") as Texture2D
+    new_button.custom_minimum_size = Vector2(218, 68)
     new_button.pressed.connect(_on_new_pressed)
     toolbar.add_child(new_button)
 
     shoot_button = Button.new()
     shoot_button.name = "ShootWithCastButton"
-    shoot_button.text = "🎬 Film Together"
+    shoot_button.text = "合作拍电影"
+    shoot_button.icon = load("res://assets/ui/icons/camera.svg") as Texture2D
     shoot_button.custom_minimum_size = Vector2(200, 52)
     shoot_button.disabled = true
     shoot_button.pressed.connect(_on_shoot_together_pressed)
-    toolbar.add_child(shoot_button)
+    parent_tools.add_child(shoot_button)
 
     refresh_button = Button.new()
     refresh_button.name = "RefreshButton"
-    refresh_button.text = "↻ Refresh"
+    refresh_button.text = "刷新角色"
+    refresh_button.icon = load("res://assets/ui/icons/refresh.svg") as Texture2D
     refresh_button.custom_minimum_size = Vector2(150, 52)
     refresh_button.pressed.connect(_refresh_characters)
-    toolbar.add_child(refresh_button)
+    parent_tools.add_child(refresh_button)
 
     movies_button = Button.new()
     movies_button.name = "MyMoviesButton"
-    movies_button.text = "🎞 My Movies / 我的电影"
-    movies_button.custom_minimum_size = Vector2(190, 52)
+    movies_button.text = "我的电影"
+    movies_button.icon = load("res://assets/ui/icons/movie.svg") as Texture2D
+    movies_button.custom_minimum_size = Vector2(218, 68)
     movies_button.pressed.connect(_refresh_films)
     toolbar.add_child(movies_button)
 
     var back := Button.new()
     back.name = "BackButton"
-    back.text = "← Village"
-    back.custom_minimum_size = Vector2(158, 52)
+    back.text = "去村子"
+    back.icon = load("res://assets/ui/icons/action.svg") as Texture2D
+    back.custom_minimum_size = Vector2(218, 68)
     back.pressed.connect(_on_back_pressed)
     toolbar.add_child(back)
 
@@ -476,7 +491,7 @@ func _build_ui() -> void:
 
     parent_entry_button = Button.new()
     parent_entry_button.name = "ParentEntryButton"
-    parent_entry_button.text = "👨‍👩‍👧 家长入口"
+    parent_entry_button.text = "家长入口"
     parent_entry_button.custom_minimum_size = Vector2(150, 52)
     parent_entry_button.pressed.connect(_toggle_parent_entry)
     toolbar.add_child(parent_entry_button)
@@ -693,8 +708,10 @@ func _refresh_parent_entry() -> void:
                 )
     if parent_entry_button != null:
         parent_entry_button.text = (
-            "← 返回我的角色" if _parent_controls_open else "👨‍👩‍👧 家长入口"
+            "返回角色库" if _parent_controls_open else "家长入口"
         )
+    if parent_tools != null:
+        parent_tools.visible = _parent_controls_open
     if hero_list != null:
         for widget in hero_list.get_children():
             if widget.name.begins_with("Share_"):
@@ -807,14 +824,14 @@ func _on_connect_pressed() -> void:
 func _refresh_characters() -> void:
     if not bridge.has_family_session():
         _set_connected(false)
-        _set_status("Parent connection required to see saved Heroes.", true)
+        _set_status("请家长先帮你解锁。", true)
         return
     if bridge.is_busy():
         return
-    _set_status("Loading your saved Heroes…", false)
+    _set_status("正在寻找你的英雄…", false)
     var error := bridge.list_characters()
     if error != OK:
-        _set_status("Could not start loading Heroes.", true)
+        _set_status("英雄暂时没有打开，请稍后重试。", true)
 
 
 func _clear_movie_list() -> void:
@@ -1498,7 +1515,7 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
 
         var hero_name := Label.new()
         hero_name.name = "HeroName"
-        hero_name.text = "⭐ " + name + "\n✨ 我的英雄"
+        hero_name.text = name + "\n我的英雄"
         hero_name.anchor_left = 0.0
         hero_name.anchor_right = 1.0
         hero_name.offset_left = 172.0
@@ -1526,7 +1543,8 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
 
         var edit_hero := Button.new()
         edit_hero.name = "EditHero"
-        edit_hero.text = "🎨 编辑"
+        edit_hero.text = "编辑"
+        edit_hero.icon = load("res://assets/ui/icons/create.svg") as Texture2D
         edit_hero.custom_minimum_size = Vector2(166, 60)
         edit_hero.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         edit_hero.pressed.connect(_on_hero_pressed.bind(character_id))
@@ -1534,7 +1552,8 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
 
         var play_hero := Button.new()
         play_hero.name = "PlayHero"
-        play_hero.text = "🌳 去玩"
+        play_hero.text = "去玩"
+        play_hero.icon = load("res://assets/ui/icons/action.svg") as Texture2D
         play_hero.custom_minimum_size = Vector2(166, 60)
         play_hero.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         play_hero.pressed.connect(_on_library_play_pressed.bind(character_id))
@@ -1567,13 +1586,12 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             hero_list.add_child(cast_button)
 
     if heroes.is_empty():
-        var first_hero := Button.new()
-        first_hero.name = "CreateFirstHeroButton"
-        first_hero.text = "🌈 创建我的英雄\nCreate My Hero ✨"
-        first_hero.custom_minimum_size.y = 148
-        first_hero.disabled = not bridge.has_family_session()
-        first_hero.pressed.connect(_on_new_pressed)
-        hero_list.add_child(first_hero)
+        var hint := Label.new()
+        hint.name = "CreateFirstHeroHint"
+        hint.text = "还没有英雄，点上面的「创建英雄」开始吧！"
+        hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        hint.custom_minimum_size.y = 92
+        hero_list.add_child(hint)
     var message := (
         "让我们做出第一个小英雄！" if heroes.is_empty()
         else "找到你的英雄啦！选一个继续冒险 ✨"
