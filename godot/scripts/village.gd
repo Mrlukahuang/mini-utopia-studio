@@ -243,11 +243,32 @@ func _update_villager_lod() -> void:
     var cam := get_viewport().get_camera_3d()
     if player == null or cam == null:
         return
+    # One village-wide selection, not 15 independent nearby bubbles.
+    # Two nearest villagers greet; everyone else hides on this same tick.
+    var nearest: Node3D = null
+    var second_nearest: Node3D = null
+    var nearest_distance: float = INF
+    var second_distance: float = INF
+    for npc in _villagers:
+        if not is_instance_valid(npc):
+            continue
+        var distance_to_child := npc.global_position.distance_to(player.global_position)
+        if distance_to_child >= MiniUtopiaKaykitVillageNPC.GREETING_DISTANCE:
+            continue
+        if distance_to_child < nearest_distance:
+            second_nearest = nearest
+            second_distance = nearest_distance
+            nearest = npc
+            nearest_distance = distance_to_child
+        elif distance_to_child < second_distance:
+            second_nearest = npc
+            second_distance = distance_to_child
     for npc in _villagers:
         if not is_instance_valid(npc):
             continue
         var distance_to_child := npc.global_position.distance_to(player.global_position)
         var on_screen := cam.is_position_in_frustum(npc.global_position + Vector3.UP)
+        npc.set_greeting_allowed(npc == nearest or npc == second_nearest)
         npc.set_performance_lod(distance_to_child, on_screen)
 
 
