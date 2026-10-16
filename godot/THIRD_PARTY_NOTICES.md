@@ -45,3 +45,8 @@ Fifteen visible villagers reuse the original KayKit Knight animation/skeleton as
 ## KayKit Medieval Hexagon — eight more authentic architecture meshes (V1-W15-01 / Lane A)
 Official source: https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0
 Creator: Kay Lousberg; license: CC0 1.0 Universal (existing unchanged `godot/assets/kaykit/medieval/LICENSE.txt`). Exact source-verified glTF and paired binary Git blobs: **tavern, church, market, windmill, blacksmith, tower_A, lumbermill, well**. Reuses official `hexagons_medieval.png` atlas. Along with the two existing home shapes, the village offers ten distinct base architectural meshes in twenty plots. Curated resources stay under A-010's 150MB ceiling.
+
+
+## Noto Sans SC / Noto Sans CJK — GB2312 UI font (V1-W15-02)
+Source repository: https://github.com/Mrlukahuang/nz-social-trend-radar ; original `assets/fonts/NotoSansSC-Bold.otf`, Git blob SHA `ff4c0450e8a5bf0290fbb6013a72dc61a10e8e56` (verified by GitHub source contents metadata).
+Original license: `assets/fonts/LICENSES/OFL-NotoSansCJK.txt`, **SIL Open Font License 1.1**, preserved at `godot/assets/fonts/OFL-NotoSansCJK.txt`. Copyright 2014–2021 Adobe; Reserved Font Name `Source` applies. This is **not CC0**. A derived, glyph-subset WOFF2 must retain OFL notices and comply with reserved-name restrictions.
