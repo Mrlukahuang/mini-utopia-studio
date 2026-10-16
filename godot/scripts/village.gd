@@ -159,7 +159,9 @@ func _install_performance_badge() -> void:
         return
     _perf_badge = Label.new()
     _perf_badge.name = "LaneAPerformanceBadge"
-    _perf_badge.position = Vector2(460, 9)
+    _perf_badge.position = Vector2(12, 85)
+    _perf_badge.autowrap_mode = TextServer.AUTOWRAP_OFF
+    _perf_badge.clip_text = true
     _perf_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
     _perf_badge.text = "FPS -- | Draw -- | 画质:清晰"
     _perf_badge.visible = false
@@ -180,6 +182,10 @@ func _install_performance_badge() -> void:
     info.offset_top = 12.0
     info.offset_bottom = 64.0
     info.focus_mode = Control.FOCUS_NONE
+    # Keep the info button inside the actual viewport safe rectangle.
+    info.resized.connect(func() -> void:
+        info.clip_contents = true
+    )
     info.pressed.connect(_toggle_performance_badge)
     hud.add_child(info)
 
@@ -523,13 +529,13 @@ func _setup_environment() -> void:
     var world_env := WorldEnvironment.new()
     var env := Environment.new()
     env.background_mode = Environment.BG_COLOR
-    env.background_color = Color("#88BBC4")
+    env.background_color = Color("#ACDAFF")
     env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-    env.ambient_light_color = Color("#E7C8A4")
-    env.ambient_light_energy = 0.34
-    env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+    env.ambient_light_color = Color("#DDEFFF")
+    env.ambient_light_energy = 0.62
+    env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
     env.fog_enabled = true
-    env.fog_light_color = Color("#B8CFCA")
+    env.fog_light_color = Color("#C5E6FC")
     env.fog_light_energy = 0.34
     env.fog_density = 0.012 if OS.has_feature("web") else 0.004
     env.ssao_enabled = false
@@ -542,7 +548,7 @@ func _setup_environment() -> void:
     var sun := DirectionalLight3D.new()
     sun.name = "VillageSun"
     sun.rotation_degrees = Vector3(-48, -38, 0)
-    sun.light_color = Color("#F7D6A5")
+    sun.light_color = Color("#FFF4D9")
     sun.light_energy = 0.72
     sun.shadow_enabled = true
     # One shadow frustum on Web avoids multiplying the draw cost of 20 real
