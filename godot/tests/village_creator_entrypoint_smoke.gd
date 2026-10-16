@@ -194,8 +194,76 @@ func _initialize() -> void:
         _fail("near NPC failed to wake after distance-based LOD")
         return
 
+    # Simulate a child traversing the central village road and returning to
+    # spawn, with real CharacterBody3D movement and physics-world overlaps.
+    if not await _walk_main_road_round_trip(scene as Node3D, player):
+        return
+
     print("village_creator_entrypoint_smoke: PASS · 20 KayKit houses / 15 animated collider NPCs")
     quit(0)
+
+
+# A full outbound/return trip round the fountain along the central path.
+# Use small real physics movements, not teleporting or ray-only assertions.
+func _walk_main_road_round_trip(scene: Node3D, player: CharacterBody3D) -> bool:
+    var saved := player.global_position
+    player.set_physics_process(false)
+    player.velocity = Vector3.ZERO
+    player.global_position = Vector3(0.0, 0.15, 15.0)
+    await physics_frame
+    var waypoints: Array[Vector3] = [
+        Vector3(0.0, 0.15, -3.5),
+        Vector3(3.1, 0.15, -5.0),
+        Vector3(3.1, 0.15, -15.0),
+        Vector3(0.0, 0.15, -17.0),
+        Vector3(0.0, 0.15, -25.0),
+        Vector3(0.0, 0.15, -17.0),
+        Vector3(-3.1, 0.15, -15.0),
+        Vector3(-3.1, 0.15, -5.0),
+        Vector3(0.0, 0.15, -3.5),
+        Vector3(0.0, 0.15, 15.0),
+    ]
+    var collider := player.get_node("CollisionShape3D") as CollisionShape3D
+    var world := scene.get_world_3d()
+    var checks := 0
+    for target in waypoints:
+        var steps := 0
+        while Vector2(player.global_position.x, player.global_position.z).distance_to(
+            Vector2(target.x, target.z)
+        ) > 0.55 and steps < 140:
+            await physics_frame
+            var delta_pos := target - player.global_position
+            delta_pos.y = 0.0
+            var motion := delta_pos.normalized() * minf(0.42, delta_pos.length())
+            var contact := player.move_and_collide(motion)
+            if contact != null:
+                # Sliding along a building or NPC must never penetrate them.
+                var tangent := motion.slide(contact.get_normal())
+                if tangent.length_squared() > 0.0001:
+                    player.move_and_collide(tangent)
+            var test := PhysicsShapeQueryParameters3D.new()
+            test.shape = collider.shape
+            test.transform = collider.global_transform
+            test.exclude = [player.get_rid()]
+            var overlaps := world.direct_space_state.intersect_shape(test, 16)
+            for overlap in overlaps:
+                var hit := overlap["collider"] as Node
+                if hit != null and (
+                    hit.is_in_group("kaykit_village_house")
+                    or hit.is_in_group("kaykit_village_npc")
+                    or hit.is_in_group("kaykit_village_nature")
+                ):
+                    _fail("road walk penetrated solid obstacle: " + hit.name)
+                    return false
+            checks += 1
+            steps += 1
+        if steps >= 140:
+            _fail("player became stuck on the main village road before " + str(target))
+            return false
+    player.global_position = saved
+    player.set_physics_process(true)
+    print("lane_a_road_walk: PASS physics_steps=%d complete_return=true" % checks)
+    return true
 
 
 func _fail(message: String) -> void:
