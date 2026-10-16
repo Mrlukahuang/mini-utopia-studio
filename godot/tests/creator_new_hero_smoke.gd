@@ -121,6 +121,25 @@ func _initialize() -> void:
     if library.api_input.visible or library.token_input.visible:
         _fail("parent login controls remained visible on the child page")
         return
+    # Parent unlock now uses large on-canvas buttons, not clipboard paste.
+    library._open_parent_from_picker()
+    var pin_pad := library.get_node_or_null("WhoIsPlaying/ParentPinPad") as Panel
+    if pin_pad == null or not pin_pad.visible or library.token_input.visible:
+        _fail("the parent eight-digit keypad did not open safely")
+        return
+    for digit in ["1", "2", "3", "4", "5", "6", "7", "8"]:
+        library._press_pin_key(digit)
+    if library._parent_pin.length() != 8 or library.parent_pin_submit.disabled:
+        _fail("eight-digit parent unlock did not enable the button")
+        return
+    library._press_pin_key("⌫")
+    if not library.parent_pin_submit.disabled:
+        _fail("incomplete parent PIN enabled unlock")
+        return
+    library._close_parent_pin_pad()
+    if pin_pad.visible or not chooser.get_node("Margin").visible:
+        _fail("parent PIN did not return to the child chooser")
+        return
     # Reuse the existing owner-scoped list contract for real 3D cards.
     var family_for_card := root.get_node("FamilySceneState") as MiniUtopiaFamilySceneState
     var synthetic_token := "synthetic_hero_card_token_0123456789abcdef"

@@ -369,6 +369,9 @@ jobs:
           func _ci_library_fixture() -> void:
               if _ci_visual_state == "chooser":
                   return
+              if _ci_visual_state == "pin":
+                  _open_parent_from_picker()
+                  return
               var family := _family_state()
               if family == null:
                   return
@@ -406,7 +409,7 @@ jobs:
           PY
           # Capture the initial two-player chooser before injecting a synthetic
           # owner-scoped session into the other two isolated CI exports.
-          for state in chooser empty hero; do
+          for state in chooser pin empty hero; do
             sed -i 's|var _ci_visual_state := "[^"]*"|var _ci_visual_state := "'"$state"'"|' godot/scripts/family_hero_library.gd
             "$GODOT_BINARY" --headless --path godot --editor --quit
             mkdir -p "$GITHUB_WORKSPACE/dist/library-$state-visual"
@@ -422,6 +425,7 @@ jobs:
           python3 -m http.server 8768 --bind 127.0.0.1 --directory dist/library-empty-visual >/tmp/mini-utopia-library-empty.log 2>&1 &
           python3 -m http.server 8769 --bind 127.0.0.1 --directory dist/library-hero-visual >/tmp/mini-utopia-library-hero.log 2>&1 &
           python3 -m http.server 8770 --bind 127.0.0.1 --directory dist/library-chooser-visual >/tmp/mini-utopia-chooser.log 2>&1 &
+          python3 -m http.server 8781 --bind 127.0.0.1 --directory dist/library-pin-visual >/tmp/mini-utopia-parent-pin.log 2>&1 &
           node <<'JS'
           const {chromium} = require('/tmp/mini-utopia-playwright/node_modules/playwright');
           const fs = require('node:fs');
@@ -431,7 +435,7 @@ jobs:
               args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--no-sandbox']
             });
             try {
-              for (const [state, port] of [['who-is-playing', 8770], ['empty', 8768], ['with-hero', 8769]]) {
+              for (const [state, port] of [['who-is-playing', 8770], ['parent-pin', 8781], ['empty', 8768], ['with-hero', 8769]]) {
                 const context = await browser.newContext({
                   viewport: {width: 1180, height: 820},
                   deviceScaleFactor: 1, isMobile: true, hasTouch: true
@@ -450,9 +454,11 @@ jobs:
                   null, {timeout: 120000}
                 );
                 await page.waitForTimeout(5000);
-                const file = 'dist/visual-evidence/' + (state === 'who-is-playing' ? state : 'library-' + state) + '-1180x820.png';
+                const file = 'dist/visual-evidence/' + (state === 'who-is-playing' || state === 'parent-pin' ? state : 'library-' + state) + '-1180x820.png';
                 await page.screenshot({path: file, fullPage: false, timeout: 90000});
-                if (fs.statSync(file).size < 12000 || errors.length) {
+                if (fs.statSync(file).size < 12000 || errors.length ||
+                    (state === 'parent-pin' && fs.existsSync('dist/visual-evidence/home-1180x820.png') &&
+                    fs.readFileSync(file).equals(fs.readFileSync('dist/visual-evidence/home-1180x820.png')))) {
                   throw Error('Invalid library screenshot ' + state + ': ' + errors.join('; '));
                 }
                 console.log('Captured isolated, synthetic library: ' + file);
@@ -461,6 +467,7 @@ jobs:
             } finally { await browser.close(); }
           })().catch(e => {console.error(e); process.exitCode = 1;});
           JS
+          test -s dist/visual-evidence/parent-pin-1180x820.png
           test -s dist/visual-evidence/who-is-playing-1180x820.png
           test -s dist/visual-evidence/library-empty-1180x820.png
           test -s dist/visual-evidence/library-with-hero-1180x820.png
