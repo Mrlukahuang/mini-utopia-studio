@@ -110,6 +110,7 @@ func _ready() -> void:
     _build_path()
     _build_village()
     _build_forest()
+    _build_natural_boundary()
     _build_kaykit_villagers()
     _build_storybook_dressing()
     _build_locked_gate()
@@ -781,6 +782,54 @@ func _build_forest() -> void:
                 rock_points.append(rocks[i])
         _forest_multimesh(KAYKIT_FOREST_TREES[index], tree_points, 8.0, "KayKitTree")
         _forest_multimesh(KAYKIT_FOREST_ROCKS[index], rock_points, 3.4, "KayKitRock")
+
+# A real woodland silhouette encloses the 70m playfield. The short
+# BoxShape3D edge rails sit behind KayKit tree scenery: a child sees forest,
+# not an exposed tile cutoff or a mysterious invisible-only barrier.
+func _build_natural_boundary() -> void:
+    var edge_trees: Array[Vector3] = []
+    for side in [-1.0, 1.0]:
+        for i in range(7):
+            edge_trees.append(Vector3(side * 34.0, 0.0, -30.0 + float(i) * 10.0))
+        for i in range(6):
+            edge_trees.append(Vector3(-25.0 + float(i) * 10.0, 0.0, side * 34.0))
+    _forest_multimesh(KAYKIT_FOREST_TREES[0], edge_trees, 8.0, "KayKitEdgeTree")
+
+    # Dress the previously bare hill silhouettes with the same official
+    # CC0 trees and rocks, without extra draw calls for individual props.
+    var hill_trees: Array[Vector3] = [
+        Vector3(-28.0, 1.1, 18.0), Vector3(29.0, 1.1, -15.0),
+        Vector3(-29.0, 1.1, -20.0), Vector3(29.0, 1.1, 20.0),
+        Vector3(-3.5, 1.1, -32.0),
+    ]
+    var hill_rocks: Array[Vector3] = [
+        Vector3(-27.0, 0.6, 14.0), Vector3(28.0, 0.6, -19.0),
+        Vector3(-27.0, 0.6, -24.0), Vector3(28.0, 0.6, 24.0),
+        Vector3(3.5, 0.6, -33.0),
+    ]
+    _forest_multimesh(KAYKIT_FOREST_TREES[1], hill_trees, 7.0, "KayKitHillTree")
+    _forest_multimesh(KAYKIT_FOREST_ROCKS[0], hill_rocks, 3.4, "KayKitHillRock")
+
+    _natural_edge_collider(Vector3(-34.3, 0.0, 0.0), Vector3(1.4, 4.0, 68.6))
+    _natural_edge_collider(Vector3(34.3, 0.0, 0.0), Vector3(1.4, 4.0, 68.6))
+    _natural_edge_collider(Vector3(0.0, 0.0, -34.3), Vector3(68.6, 4.0, 1.4))
+    _natural_edge_collider(Vector3(0.0, 0.0, 34.3), Vector3(68.6, 4.0, 1.4))
+
+
+func _natural_edge_collider(location: Vector3, dimensions: Vector3) -> void:
+    var boundary := StaticBody3D.new()
+    boundary.name = "NaturalWoodlandBoundary"
+    boundary.add_to_group("lane_a_natural_edge")
+    boundary.position = location
+    var collider := CollisionShape3D.new()
+    collider.name = "CollisionShape3D"
+    var blocker := BoxShape3D.new()
+    blocker.size = dimensions
+    collider.shape = blocker
+    collider.position.y = dimensions.y * 0.5
+    boundary.add_child(collider)
+    add_child(boundary)
+
 
 func _forest_multimesh(model: PackedScene, locations: Array[Vector3], scaling: float, title: String) -> void:
     var source := model.instantiate() as Node3D

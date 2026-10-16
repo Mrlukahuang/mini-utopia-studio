@@ -140,6 +140,26 @@ func _initialize() -> void:
             if node.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF:
                 _fail("forest geometry still casts costly shadows")
                 return
+    var natural_edges := get_nodes_in_group("lane_a_natural_edge")
+    if natural_edges.size() != 4:
+        _fail("woodland does not contain all four physical boundary rails")
+        return
+    for edge in natural_edges:
+        var blocker := edge.get_node_or_null("CollisionShape3D") as CollisionShape3D
+        if not (edge is StaticBody3D) or blocker == null or not (blocker.shape is BoxShape3D):
+            _fail("natural edge must block with lightweight BoxShape3D")
+            return
+    var dressed_edge := false
+    var dressed_hills := false
+    for batch_node in get_nodes_in_group("lane_a_static_batch"):
+        if String(batch_node.name).begins_with("KayKitEdgeTree"):
+            dressed_edge = true
+        if String(batch_node.name).begins_with("KayKitHill"):
+            dressed_hills = true
+    if not dressed_edge or not dressed_hills:
+        _fail("forest edges or hill silhouettes have no real KayKit scenery")
+        return
+
     print("lane_a_forest: shadowless_draw_batches=%d" % forest_batches)
     if forest_batches < 2:
         _fail("forest trees and rocks did not render in efficient MultiMesh batches: " + str(forest_batches))
