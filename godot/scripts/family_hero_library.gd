@@ -259,7 +259,7 @@ func _build_parent_pin_pad() -> void:
         key.name = "Digit" + digit if digit.is_valid_int() else (
             "Clear" if digit == "清空" else "Backspace"
         )
-        key.text = digit
+        key.text = "删除" if digit == "⌫" else digit
         key.custom_minimum_size = Vector2(153, 62)
         key.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         key.pressed.connect(_press_pin_key.bind(digit))
