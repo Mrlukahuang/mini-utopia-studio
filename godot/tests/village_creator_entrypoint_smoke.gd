@@ -88,7 +88,7 @@ func _initialize() -> void:
         _fail("FPS diagnostic must be hidden until long press")
         return
     var info := scene.get_node_or_null("HUD/LaneAFPSInfoButton") as Button
-    if info == null or info.text != "ⓘ" or info.disabled:
+    if info == null or info.text != "i" or info.disabled:
         _fail("iPad Safari lacks the always-tappable FPS info button")
         return
     info.pressed.emit()

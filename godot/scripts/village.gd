@@ -172,7 +172,9 @@ func _install_performance_badge() -> void:
     # the browser forwarding a touch-and-hold to an uncovered Logo region.
     var info := Button.new()
     info.name = "LaneAFPSInfoButton"
-    info.text = "ⓘ"
+    # Web Theme font lacks the enclosed-i U+24D8 glyph (rendered as tofu).
+    # ASCII i is supported by the bundled fonts and preserves the small info control.
+    info.text = "i"
     info.tooltip_text = "显示或隐藏 FPS"
     info.custom_minimum_size = Vector2(52, 52)
     info.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
