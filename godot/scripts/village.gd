@@ -586,6 +586,13 @@ func _setup_environment() -> void:
 func _build_ground() -> void:
     var physical_ground := _box("VillageGround", Vector3(0, -0.55, 0), Vector3(70, 1, 70), palette.grass, true)
     physical_ground.visible = false
+    # The 70m walkable grass tiles end at the forest rails, leaving blue sky
+    # visible beyond both woodland edges in the F9 1180x820 overview.
+    # A single flat terrain skirt fills that non-playable backdrop. It stays
+    # below the KayKit tiles, has no collider, casts no shadow, and is folded
+    # into the existing static MultiMesh batching.
+    _box("WoodlandMeadowApron", Vector3(0.0, -0.39, 0.0),
+        Vector3(104.0, 0.26, 104.0), palette.grass2)
     var tiles: Array[Vector3] = []
     for row in range(-12, 13):
         for col in range(-12, 13):
