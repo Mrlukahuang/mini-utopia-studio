@@ -45,13 +45,13 @@ def _hanzi_in_sources():
     return found
 
 
-def test_gb2312_level_one_coverage_at_least_99_percent():
+def test_gb2312_level_one_coverage():
     covered = _configured_hanzi_cmap()
     required = _gb2312_level_one()
     missing = required - covered
     ratio = (len(required) - len(missing)) / len(required)
-    assert ratio >= 0.99, (
-        f"GB2312 level-one coverage {ratio:.2%} < 99%; "
+    assert ratio == 1.0, (
+        f"GB2312 level-one coverage {ratio:.2%} < 100%; "
         f"missing {len(missing)}: {''.join(sorted(map(chr, missing))[:80])}"
     )
 
