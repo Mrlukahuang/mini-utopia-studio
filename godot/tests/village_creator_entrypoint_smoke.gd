@@ -108,6 +108,27 @@ func _initialize() -> void:
         _fail("high quality did not restore 0.75 3D scale and one sun shadow")
         return
 
+    var forest_obstacles := get_nodes_in_group("kaykit_village_nature")
+    if forest_obstacles.size() < 44:
+        _fail("original KayKit forest has fewer than 44 physical trees/rocks")
+        return
+    for thing in forest_obstacles:
+        var shape := thing.get_node_or_null("CollisionShape3D") as CollisionShape3D
+        if not (thing is StaticBody3D) or shape == null or not (shape.shape is BoxShape3D):
+            _fail("forest collision was not a lightweight box")
+            return
+    var forest_batches := 0
+    for node in get_nodes_in_group("lane_a_static_batch"):
+        if String(node.name).contains("KayKitTree") or String(node.name).contains("KayKitRock"):
+            forest_batches += 1
+            if node.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF:
+                _fail("forest geometry still casts costly shadows")
+                return
+    print("lane_a_forest: shadowless_draw_batches=%d" % forest_batches)
+    if forest_batches < 2:
+        _fail("forest trees and rocks did not render in efficient MultiMesh batches: " + str(forest_batches))
+        return
+
     var villagers := get_nodes_in_group("kaykit_village_npc")
     if villagers.size() < 15:
         _fail("required fifteen animated KayKit villagers not present")

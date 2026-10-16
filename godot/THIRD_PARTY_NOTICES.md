@@ -45,3 +45,7 @@ Fifteen visible villagers reuse the original KayKit Knight animation/skeleton as
 ## KayKit Medieval Hexagon — eight more authentic architecture meshes (V1-W15-01 / Lane A)
 Official source: https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0
 Creator: Kay Lousberg; license: CC0 1.0 Universal (existing unchanged `godot/assets/kaykit/medieval/LICENSE.txt`). Exact source-verified glTF and paired binary Git blobs: **tavern, church, market, windmill, blacksmith, tower_A, lumbermill, well**. Reuses official `hexagons_medieval.png` atlas. Along with the two existing home shapes, the village offers ten distinct base architectural meshes in twenty plots. Curated resources stay under A-010's 150MB ceiling.
+
+
+## Lane A KayKit forest performance preparation (#404, unmerged draft)
+Official CC0 1.0 original KayKit Medieval Hexagon sources: https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0 ; tree_single_A/B and rock_single_A/B glTF plus paired original SHA-matched bin files. Author Kay Lousberg. Existing medieval/LICENSE.txt and hexagons_medieval.png are reused. Rendering uses region-clustered MultiMesh, no shadows, and independent lightweight BoxShape3D colliders. This is a draft until the owner measures iPad FPS.

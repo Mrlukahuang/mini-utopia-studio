@@ -21,6 +21,15 @@ const KAYKIT_HOUSES := [
     preload("res://assets/kaykit/medieval/building_well_blue.gltf"),
 ]
 
+const KAYKIT_FOREST_TREES := [
+    preload("res://assets/kaykit/medieval/tree_single_A.gltf"),
+    preload("res://assets/kaykit/medieval/tree_single_B.gltf"),
+]
+const KAYKIT_FOREST_ROCKS := [
+    preload("res://assets/kaykit/medieval/rock_single_A.gltf"),
+    preload("res://assets/kaykit/medieval/rock_single_B.gltf"),
+]
+
 var _village_previous_web_fps := -1
 var _previous_scale := 1.0
 var _previous_msaa := Viewport.MSAA_DISABLED
@@ -648,24 +657,92 @@ func _cottage(origin: Vector3, accent: Color) -> void:
     _cylinder("Chimney", origin + Vector3(1.35,4.1,-0.6), 0.35, 1.8, palette.wood)
 
 func _build_forest() -> void:
-    # Keep the trees outside house footprints and the player's paths.
-    var points = [
-        Vector3(-31,0,-28), Vector3(-31,0,-16), Vector3(-31,0,-4),
-        Vector3(-31,0,8), Vector3(-31,0,20), Vector3(-31,0,30),
-        Vector3(31,0,-28), Vector3(31,0,-16), Vector3(31,0,-4),
-        Vector3(31,0,8), Vector3(31,0,20), Vector3(31,0,30),
-        Vector3(-12,0,26), Vector3(12,0,26), Vector3(-4,0,30),
-        Vector3(4,0,30)
-    ]
-    for i in points.size():
-        _tree(points[i], i % 2 == 0)
+    # Use CC0 KayKit geometry, rendered through z-clustered MultiMeshes.
+    # Physics stays in primitive BoxShapes instead of mesh triangles.
+    var trees: Array[Vector3] = []
+    var rocks: Array[Vector3] = []
+    for side in [-1.0, 1.0]:
+        for i in range(10):
+            var z := -29.0 + float(i) * 6.4
+            trees.append(Vector3(side * 31.0, 0.0, z))
+            rocks.append(Vector3(side * 28.0, 0.0, z + 3.1))
+    trees.append_array([
+        Vector3(-11, 0, 25), Vector3(11, 0, 25),
+        Vector3(-10, 0, -30), Vector3(10, 0, -30)
+    ])
+    for i in range(trees.size()):
+        _forest_collision(trees[i], true)
+    for rock in rocks:
+        _forest_collision(rock, false)
+    for index in range(2):
+        var tree_points: Array[Vector3] = []
+        var rock_points: Array[Vector3] = []
+        for i in range(trees.size()):
+            if i % 2 == index:
+                tree_points.append(trees[i])
+        for i in range(rocks.size()):
+            if i % 2 == index:
+                rock_points.append(rocks[i])
+        _forest_multimesh(KAYKIT_FOREST_TREES[index], tree_points, 8.0, "KayKitTree")
+        _forest_multimesh(KAYKIT_FOREST_ROCKS[index], rock_points, 3.4, "KayKitRock")
 
-func _tree(origin: Vector3, alternate: bool) -> void:
-    _cylinder("TreeTrunk", origin + Vector3(0,1.5,0), 0.42, 3.0, palette.wood, true)
-    var leaf_color: Color = palette.leaf2 if alternate else palette.leaf
-    _sphere("TreeCrown", origin + Vector3(0,4.1,0), 2.2, leaf_color, Vector3(1.0,1.15,1.0))
-    _sphere("TreeCrown", origin + Vector3(1.0,3.8,0.4), 1.5, leaf_color)
-    _sphere("TreeCrown", origin + Vector3(-1.0,3.9,-0.3), 1.55, leaf_color)
+func _forest_multimesh(model: PackedScene, locations: Array[Vector3], scaling: float, title: String) -> void:
+    var source := model.instantiate() as Node3D
+    if source == null:
+        push_error("Official KayKit forest model missing: " + title)
+        return
+    # Spatial clustering makes WebGL's visibility range actually cull each
+    # group, rather than drawing every tree in one world-sized bounding box.
+    var bands: Dictionary = {}
+    for pos in locations:
+        var region := Vector2i(floori(pos.x / 24.0), floori(pos.z / 24.0))
+        if not bands.has(region):
+            bands[region] = []
+        var entries: Array = bands[region]
+        entries.append(pos)
+    var source_parts: Array[MeshInstance3D] = []
+    if source is MeshInstance3D:
+        source_parts.append(source as MeshInstance3D)
+    for child in source.find_children("*", "MeshInstance3D", true, false):
+        source_parts.append(child as MeshInstance3D)
+    for mesh_part in source_parts:
+        if mesh_part.mesh == null:
+            continue
+        var local := source.global_transform.affine_inverse() * mesh_part.global_transform
+        for region in bands:
+            var points: Array = bands[region]
+            var multi := MultiMesh.new()
+            multi.transform_format = MultiMesh.TRANSFORM_3D
+            multi.mesh = mesh_part.mesh
+            multi.instance_count = points.size()
+            for i in range(points.size()):
+                multi.set_instance_transform(i,
+                    Transform3D(Basis().scaled(Vector3.ONE * scaling), points[i]) * local
+                )
+            var batch := MultiMeshInstance3D.new()
+            batch.name = title + "Batch"
+            batch.multimesh = multi
+            batch.material_override = mesh_part.material_override
+            batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+            batch.visibility_range_end = 65.0
+            batch.add_to_group("lane_a_static_batch")
+            add_child(batch)
+            _static_batches.append(batch)
+    source.free()
+
+func _forest_collision(location: Vector3, is_tree: bool) -> void:
+    var body := StaticBody3D.new()
+    body.name = "KayKitTreeCollision" if is_tree else "KayKitRockCollision"
+    body.add_to_group("kaykit_village_nature")
+    body.position = location
+    var collider := CollisionShape3D.new()
+    collider.name = "CollisionShape3D"
+    var box := BoxShape3D.new()
+    box.size = Vector3(1.30, 2.70, 1.30) if is_tree else Vector3(1.40, 0.95, 1.40)
+    collider.position.y = box.size.y * 0.5
+    collider.shape = box
+    body.add_child(collider)
+    add_child(body)
 
 func _mushroom(origin: Vector3, scale_factor: float, cap_color: Color) -> void:
     var stem_height := 2.3 * scale_factor
