@@ -60,17 +60,53 @@ func _initialize() -> void:
     if disabled_original_meshes < 20:
         _fail("unbatched building meshes still render separately")
         return
+    var environments := scene.find_children("*", "WorldEnvironment", true, false)
+    var environment_node := environments[0] as WorldEnvironment if not environments.is_empty() else null
+    if environment_node == null or environment_node.environment == null:
+        _fail("village pastel sky Environment was not created")
+        return
+    var environment := environment_node.environment
+    if environment.background_color.b < environment.background_color.r or environment.ambient_light_energy < 0.5:
+        _fail("village sky is too dim or no longer pastel blue")
+        return
+    var touch := scene.get_node_or_null("TouchControls") as MiniUtopiaTouchControls
+    if touch != null and touch.has_node("Overlay/Jump"):
+        var jump := touch.get_node("Overlay/Jump") as Button
+        if jump.offset_right > -10.0:
+            _fail("iPad Jump button extends too close to the right-edge safe margin")
+            return
+
     var perf := scene.get_node_or_null("HUD/LaneAPerformanceBadge") as Label
     if perf == null or perf.visible:
         _fail("FPS diagnostic must be hidden until long press")
         return
-    scene.call("_toggle_performance_badge")
-    if not perf.visible or not perf.text.contains("FPS"):
-        _fail("long-hold FPS diagnostic toggle is not connected")
+    var info := scene.get_node_or_null("HUD/LaneAFPSInfoButton") as Button
+    if info == null or info.text != "ⓘ" or info.disabled:
+        _fail("iPad Safari lacks the always-tappable FPS info button")
         return
-    scene.call("_toggle_performance_badge")
+    info.pressed.emit()
+    if not perf.visible or not perf.text.contains("FPS"):
+        _fail("tapping the info button failed to open FPS stats")
+        return
+    info.pressed.emit()
     if perf.visible:
-        _fail("FPS diagnostic cannot be hidden again")
+        _fail("tapping the info button again failed to hide FPS stats")
+        return
+
+    var hold := InputEventScreenTouch.new()
+    hold.index = 3
+    hold.pressed = true
+    hold.position = Vector2(42, 38)
+    scene._input(hold)
+    scene.call("_tick_performance_badge", 1.02)
+    if not perf.visible:
+        _fail("one-second InputEventScreenTouch hold failed to open FPS stats")
+        return
+    hold.pressed = false
+    scene._input(hold)
+    info.pressed.emit()
+    if perf.visible:
+        _fail("touch release or info button did not hide FPS stats")
         return
 
     # Simulate the two runtime quality tiers deterministically, independent
@@ -88,15 +124,116 @@ func _initialize() -> void:
         _fail("high quality did not restore 0.75 3D scale and one sun shadow")
         return
 
+    var forest_obstacles := get_nodes_in_group("kaykit_village_nature")
+    if forest_obstacles.size() < 44:
+        _fail("original KayKit forest has fewer than 44 physical trees/rocks")
+        return
+    for thing in forest_obstacles:
+        var shape := thing.get_node_or_null("CollisionShape3D") as CollisionShape3D
+        if not (thing is StaticBody3D) or shape == null or not (shape.shape is BoxShape3D):
+            _fail("forest collision was not a lightweight box")
+            return
+    var forest_batches := 0
+    for node in get_nodes_in_group("lane_a_static_batch"):
+        if String(node.name).contains("KayKitTree") or String(node.name).contains("KayKitRock"):
+            forest_batches += 1
+            if node.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF:
+                _fail("forest geometry still casts costly shadows")
+                return
+    var natural_edges := get_nodes_in_group("lane_a_natural_edge")
+    if natural_edges.size() != 4:
+        _fail("woodland does not contain all four physical boundary rails")
+        return
+    for edge in natural_edges:
+        var blocker := edge.get_node_or_null("CollisionShape3D") as CollisionShape3D
+        if not (edge is StaticBody3D) or blocker == null or not (blocker.shape is BoxShape3D):
+            _fail("natural edge must block with lightweight BoxShape3D")
+            return
+    var dressed_edge := false
+    var dressed_hills := false
+    for batch_node in get_nodes_in_group("lane_a_static_batch"):
+        if String(batch_node.name).begins_with("KayKitEdgeTree"):
+            dressed_edge = true
+        if String(batch_node.name).begins_with("KayKitHill"):
+            dressed_hills = true
+    if not dressed_edge or not dressed_hills:
+        _fail("forest edges or hill silhouettes have no real KayKit scenery")
+        return
+
+    print("lane_a_forest: shadowless_draw_batches=%d" % forest_batches)
+    if forest_batches < 2:
+        _fail("forest trees and rocks did not render in efficient MultiMesh batches: " + str(forest_batches))
+        return
+
+    var market := get_nodes_in_group("kaykit_village_props")
+    if market.size() != 30:
+        _fail("market props do not retain exactly 30 simple physical blockers")
+        return
+    for item in market:
+        var collider := item.get_node_or_null("CollisionShape3D") as CollisionShape3D
+        if not (item is StaticBody3D) or collider == null or not (collider.shape is BoxShape3D):
+            _fail("KayKit market prop must use a lightweight BoxShape3D")
+            return
+    var grass := 0
+    var road := 0
+    var market_batches := 0
+    for entry in get_nodes_in_group("lane_a_static_batch"):
+        var batch := entry as MultiMeshInstance3D
+        if batch == null or batch.multimesh == null:
+            continue
+        var count := batch.multimesh.instance_count
+        if String(batch.name).begins_with("KayKitGrass"):
+            grass += count
+        elif String(batch.name).begins_with("KayKitStoneRoad"):
+            road += count
+        elif String(batch.name).begins_with("KayKitMarket"):
+            market_batches += 1
+            if batch.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF:
+                _fail("small market objects still cast expensive shadow maps")
+                return
+    if grass < 625 or road < 35 or market_batches < 2:
+        _fail("official KayKit terrain/market were not batched: " + str([grass, road, market_batches]))
+        return
+    print("lane_a_props: grass_instances=%d road_instances=%d market_batches=%d" % [grass, road, market_batches])
+
     var villagers := get_nodes_in_group("kaykit_village_npc")
     if villagers.size() < 15:
         _fail("required fifteen animated KayKit villagers not present")
         return
+    # Spawn in many street blocks, not a dense line of neighbours by the gate.
+    var occupied_blocks: Dictionary = {}
+    for a in range(villagers.size()):
+        var first := villagers[a] as MiniUtopiaKaykitVillageNPC
+        var first_home: Vector3 = first.home
+        occupied_blocks[floori(first_home.z / 8.0)] = true
+        if absf(first_home.x) < 4.5:
+            _fail("villager spawned on the central stone road")
+            return
+        for b in range(a + 1, villagers.size()):
+            var other := villagers[b] as MiniUtopiaKaykitVillageNPC
+            if first_home.distance_to(other.home) < 3.0:
+                _fail("two KayKit villagers spawn too close together")
+                return
+    if occupied_blocks.size() < 6:
+        _fail("villagers are still clustered in too few village blocks")
+        return
     var unique_looks := {}
+    var unique_source_rigs := {}
     for villager in villagers:
         var body := villager as CharacterBody3D
         var look_id := String(villager.get_meta("kaykit_npc_look", ""))
         unique_looks[look_id] = true
+        var source_path := String(villager.get_meta("kaykit_npc_rig_resource", ""))
+        if not source_path.begins_with("res://assets/kaykit/adventurers/"):
+            _fail("villager must reference a real imported KayKit rig, not a pretend look")
+            return
+        unique_source_rigs[source_path] = true
+        # A physical CollisionShape3D is fine; visible MeshInstance3D
+        # primitives directly under the actor (hats, ears, boxes) are not.
+        for child in villager.get_children():
+            if child is MeshInstance3D:
+                _fail("villager still draws a primitive hat or costume")
+                return
         var collider := body.get_node_or_null("CollisionShape3D") as CollisionShape3D
         var official := body.get_node_or_null("KayKitBody") as Node3D
         var animation := official.find_child("AnimationPlayer", true, false) as AnimationPlayer if official != null else null
@@ -109,19 +246,42 @@ func _initialize() -> void:
     if unique_looks.size() != 15:
         _fail("villagers repeat a look identity")
         return
-    # Different roles must be visible meshes rather than 15 identical names.
-    for villager in villagers:
-        var costume := villager.get_node_or_null("VillagerCostume") as MeshInstance3D
-        var headwear := villager.get_node_or_null("VillagerHeadgear") as MeshInstance3D
-        if costume == null or costume.mesh == null or headwear == null or headwear.mesh == null:
-            _fail("one of fifteen villagers has no visible distinct costume or hat")
-            return
-
+    if unique_source_rigs.size() < 6:
+        _fail("villagers repeat the same underlying Knight model instead of six official rigs")
+        return
 
     var player := scene.get_node_or_null("Player") as CharacterBody3D
     if player == null or player.get_node_or_null("CollisionShape3D") == null:
         _fail("player has no physical collider")
         return
+
+    # Name and combat values must share one camera-facing label anchored
+    # above the active KayKit Hero's head, not a second floating HUD label.
+    var head_labels := player.find_children("CombatLabel", "Label3D", true, false)
+    if head_labels.size() != 1:
+        _fail("player requires exactly one name + stats billboard")
+        return
+    var head_label := head_labels[0] as Label3D
+    if (head_label.billboard != BaseMaterial3D.BILLBOARD_ENABLED
+        or head_label.position.y < 2.5
+        or head_label.width < 500.0):
+        _fail("Hero name billboard is off-center or too narrow")
+        return
+    var play_state := player.get_node_or_null("CreatorPlayRuntime") as MiniUtopiaCreatorPlayRuntime
+    if play_state == null:
+        _fail("selected Hero session missing from player")
+        return
+    var earlier_name: String = String(play_state.payload.get("character_name", ""))
+    play_state.payload["character_name"] = "小冒险家"
+    player.call("_update_combat_label")
+    if (not head_label.text.begins_with("小冒险家\n")
+        or not head_label.text.contains("❤️ ")
+        or not head_label.text.contains("⚔️ ")
+        or not head_label.text.contains("🛡️ ")):
+        _fail("Hero name and HP/ATK/DEF do not appear in a single billboard")
+        return
+    play_state.payload["character_name"] = earlier_name
+    player.call("_update_combat_label")
 
     # Test actual physics-space intersections at known playable obstacles.
     # Checking that a shape exists alone cannot prove it blocks a ray.

@@ -50,3 +50,19 @@ Creator: Kay Lousberg; license: CC0 1.0 Universal (existing unchanged `godot/ass
 ## Noto Sans SC / Noto Sans CJK — GB2312 UI font (V1-W15-02)
 Source repository: https://github.com/Mrlukahuang/nz-social-trend-radar ; original `assets/fonts/NotoSansSC-Bold.otf`, Git blob SHA `ff4c0450e8a5bf0290fbb6013a72dc61a10e8e56` (verified by GitHub source contents metadata).
 Original license: `assets/fonts/LICENSES/OFL-NotoSansCJK.txt`, **SIL Open Font License 1.1**, preserved at `godot/assets/fonts/OFL-NotoSansCJK.txt`. Copyright 2014–2021 Adobe; Reserved Font Name `Source` applies. This is **not CC0**. `godot/assets/fonts/mini-utopia-noto-sc-bold-subset.woff2` is a modified glyph subset of the SHA-verified original Bold OTF, made with fontTools. It covers GB2312 level-one Hanzi, current Godot `.gd` / `.tscn` Hanzi, basic Latin, and common punctuation. The subset retains the original OFL metadata and does not use the reserved name `Source` as its primary font name.
+
+## Lane A KayKit forest performance preparation (#404, unmerged draft)
+Official CC0 1.0 original KayKit Medieval Hexagon sources: https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0 ; tree_single_A/B and rock_single_A/B glTF plus paired original SHA-matched bin files. Author Kay Lousberg. Existing medieval/LICENSE.txt and hexagons_medieval.png are reused. Rendering uses region-clustered MultiMesh, no shadows, and independent lightweight BoxShape3D colliders. This is a draft until the owner measures iPad FPS.
+
+
+## Lane A KayKit prop and stone-road performance preparation (unmerged Draft)
+CC0 1.0 original source https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0 by Kay Lousberg. Curated unchanged original glTF/bin for barrel, crate_A_small, crate_A_big, sack, flag_blue, wheelbarrow, hex_grass and hex_road_A; original SHA and medieval/LICENSE.txt/hexagons_medieval.png are reused. Visible grass/stone roads and props use low-draw-call MultiMesh, shadowless materials and visibility-range culling; market physics is 30 primitive boxes. Remains Draft until owner supplies real iPad FPS and approves budget.
+
+
+## Lane A six authentic KayKit NPC rig sources (V1-W15-01, October 2026)
+
+Creator: Kay Lousberg. All five added meshes are from the official KayKit CC0 1.0 Universal asset releases:
+- Barbarian, Mage, Rogue and Rogue_Hooded: https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0
+- Skeleton_Warrior: https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Skeletons-1.0
+
+**Modified derivative GLB files**, not byte-for-byte upstream originals: unused content was stripped to make lightweight Web assets, while retaining the original character meshes, skin, skeleton and Idle / Walking_A animations. The existing original Knight.glb remains the sixth distinct model and remains unchanged. All six are loaded as real imported 3D meshes with animation and a separate capsule physics collider; no procedural hats or costume meshes are added. The earlier notice describing fifteen Knight copies with primitive hats is historical and superseded for newly merged code by this section.

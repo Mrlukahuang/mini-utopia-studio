@@ -1,7 +1,7 @@
 extends Control
 
-const DEFAULT_TITLE := "Make Your Mini Hero ✨"
-const DEFAULT_SUBTITLE := "Create, dress, and save your hero in Mini Utopia."
+const DEFAULT_TITLE := "做一个你的小英雄！"
+const DEFAULT_SUBTITLE := "给英雄起名字、选造型，再去村子玩！"
 
 const BODY_BUTTONS := {
     "SlimButton": "slim",
@@ -124,6 +124,12 @@ func _ready() -> void:
     _refresh_look_controls()
 
     _read_user_args()
+    # The browser origin includes the family's custom HTTPS port.
+    var browser_origin := ""
+    if OS.has_feature("web"):
+        browser_origin = MiniUtopiaBridgeEndpointPolicy.normalize(
+            String(JavaScriptBridge.eval("window.location.origin", true)), true
+        )
     var family := get_node_or_null("/root/FamilySceneState") as MiniUtopiaFamilySceneState
     if family != null and family.has_family_connection():
         if character_id.is_empty() and not family.pending_character_id.is_empty():
@@ -132,15 +138,26 @@ func _ready() -> void:
             _set_status("请家长到「我的角色」帮忙解锁。", true)
             save_button.disabled = true
             return
-    _set_status("Connecting to Mini Utopia…", false)
+        if not browser_origin.is_empty() and bridge.base_url != browser_origin:
+            # Never send the child session to a different browser origin.
+            bridge.clear_family_session()
+            _set_status("请家长从当前家庭页面重新解锁。", true)
+            save_button.disabled = true
+            return
+    _set_status("准备好了，开始做你的小英雄吧！", false)
 
     if character_id.is_empty():
-        character_label.text = "New Hero"
+        character_label.text = "新英雄"
         _set_status(
-            "Name your hero · parent Family Cloud sign-in required to save.",
+            "给英雄起个名字，就可以保存！"
+            if bridge.has_family_session()
+            else "请家长先帮你解锁，才能保存英雄。",
             false
         )
-        save_button.disabled = true
+        save_button.disabled = not (
+            bridge.has_family_session()
+            and not hero_name_input.text.strip_edges().is_empty()
+        )
         return
 
     character_label.text = "正在打开角色…"
@@ -425,7 +442,7 @@ func activate_family_session(token: String, api_base_url: String) -> bool:
 
     if character_id.is_empty():
         _on_hero_name_changed(hero_name_input.text)
-        _set_status("Family Cloud connected · name and save your hero.", false)
+        _set_status("已解锁！给英雄起名，然后点保存。", false)
     else:
         save_button.disabled = true
         var error := bridge.get_character(character_id)
@@ -753,9 +770,11 @@ func _refresh_look_controls() -> void:
     )
     for button_name in SPECIES_BUTTONS:
         var button := species_grid.get_node(button_name) as Button
-        button.button_pressed = (
-            String(SPECIES_BUTTONS[button_name]) == species_head_id
-        )
+        # Only the bundled official Knight has a matching full head mesh.
+        # Keep older choices in the canonical data contract for existing
+        # saves, but don't present unsupported species as playable models.
+        button.visible = String(SPECIES_BUTTONS[button_name]) == "species_head_human_v1"
+        button.button_pressed = button.visible
 
     var allowed_surfaces := (
         MiniUtopiaCreatorAvatarCatalog.allowed_surface_ids(species_head_id)
@@ -968,6 +987,9 @@ func _on_bridge_failure(
     _error_code: String,
     _message: String
 ) -> void:
+    # Only request category and HTTP status are logged; never print secrets,
+    # URLs, child names or request payloads.
+    push_warning("Creator request failed: %s (HTTP %d)" % [kind, status_code])
     if kind == "prop:craft":
         _set_status("Could not create your prop. Choose a different name or try again.", true)
         return

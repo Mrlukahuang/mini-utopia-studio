@@ -43,6 +43,23 @@ func _initialize() -> void:
     root.add_child(scene)
     await process_frame
 
+    var title_label := scene.get_node_or_null(
+        "RootMargin/MainColumn/HeaderRow/TitleColumn/Title"
+    ) as Label
+    if title_label == null or title_label.text != "做一个你的小英雄！":
+        _fail("Creator Chinese title is missing")
+        return
+    var species_grid := scene.get_node_or_null(
+        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SpeciesGrid"
+    ) as GridContainer
+    if species_grid == null or not (species_grid.get_node("HumanButton") as Button).visible:
+        _fail("supported Knight species must be visible")
+        return
+    for hidden_species in ["SheepButton", "RobotButton", "CatButton", "CloudButton"]:
+        if (species_grid.get_node(hidden_species) as Button).visible:
+            _fail("unavailable species still visible: " + hidden_species)
+            return
+
     var name_input := scene.get_node(
         "RootMargin/MainColumn/HeaderRow/TitleColumn/HeroNameInput"
     ) as LineEdit
@@ -80,6 +97,17 @@ func _initialize() -> void:
         return
     old_species["species_head_id"] = "species_head_human_v1"
     stage.apply_appearance(old_species)
+    var headwear := MiniUtopiaKaykitAvatarV1.mounted_weapon_socket(
+        stage.avatar_root(), MiniUtopiaAvatarContract.SOCKET_HEADWEAR
+    )
+    if (
+        headwear == null
+        or not (headwear.get_parent() is BoneAttachment3D)
+        or (headwear.get_parent() as BoneAttachment3D).bone_name != "head"
+        or headwear.visible
+    ):
+        _fail("headwear is not safely mounted to animated KayKit head bone")
+        return
     # First-touch selection has two themed, real SubViewport KayKit cards.
     # Clicking without an adult-issued session cannot expose either child's
     # library or parent-only token inputs.
@@ -194,9 +222,25 @@ func _initialize() -> void:
     library._on_bridge_success("characters:list", {
         "schema_version": "1.0", "characters": []
     })
-    if library.hero_list.get_node_or_null("CreateFirstHeroButton") == null:
-        _fail("empty library has no create hero action")
+    if library.hero_list.get_node_or_null("CreateFirstHeroHint") == null:
+        _fail("empty library must show an easy create hint")
         return
+    for required_name in ["NewHeroButton", "MyMoviesButton", "BackButton"]:
+        var action := library.get_node_or_null("Margin/Column/Toolbar/" + required_name) as Button
+        if action == null or action.icon == null or action.custom_minimum_size.y < 60:
+            _fail("child library needs three large SVG-icon actions: " + required_name)
+            return
+    # The chooser still covers the Library after the synthetic list event;
+    # close it before inspecting the actual child-facing toolbar.
+    chooser.hide()
+    if library.refresh_button.is_visible_in_tree() or library.shoot_button.is_visible_in_tree() or library.guests_refresh_button.is_visible_in_tree():
+        _fail("adult-only tools leaked into child's library")
+        return
+    library._toggle_parent_entry()
+    if not library.refresh_button.is_visible_in_tree() or library.refresh_button.icon == null:
+        _fail("adult refresh must use imported SVG icon")
+        return
+    library._toggle_parent_entry()
     family_for_card.disconnect_family()
     library.queue_free()
 
@@ -228,8 +272,14 @@ func _initialize() -> void:
         return
 
     var token := "test_only_family_token_not_a_real_secret_123456"
-    if not scene.activate_family_session(token, "https://family.example"):
+    if not scene.activate_family_session(token, "https://family.example:8443"):
         _fail("family session activation failed")
+        return
+    if scene.bridge.base_url != "https://family.example:8443":
+        _fail("family origin lost the parent's HTTPS port")
+        return
+    if scene.status_label.text.contains("暂时没成功"):
+        _fail("successful parent unlock displayed a false Creator error")
         return
     if save_button.disabled:
         _fail("named hero should become saveable with a scoped session")

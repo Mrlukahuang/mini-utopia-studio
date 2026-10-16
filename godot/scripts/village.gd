@@ -21,6 +21,26 @@ const KAYKIT_HOUSES := [
     preload("res://assets/kaykit/medieval/building_well_blue.gltf"),
 ]
 
+const KAYKIT_FOREST_TREES := [
+    preload("res://assets/kaykit/medieval/tree_single_A.gltf"),
+    preload("res://assets/kaykit/medieval/tree_single_B.gltf"),
+]
+const KAYKIT_FOREST_ROCKS := [
+    preload("res://assets/kaykit/medieval/rock_single_A.gltf"),
+    preload("res://assets/kaykit/medieval/rock_single_B.gltf"),
+]
+
+const KAYKIT_GRASS := preload("res://assets/kaykit/medieval/hex_grass.gltf")
+const KAYKIT_ROAD := preload("res://assets/kaykit/medieval/hex_road_A.gltf")
+const KAYKIT_PROPS := [
+    preload("res://assets/kaykit/medieval/barrel.gltf"),
+    preload("res://assets/kaykit/medieval/crate_A_small.gltf"),
+    preload("res://assets/kaykit/medieval/wheelbarrow.gltf"),
+    preload("res://assets/kaykit/medieval/sack.gltf"),
+    preload("res://assets/kaykit/medieval/flag_blue.gltf"),
+    preload("res://assets/kaykit/medieval/crate_A_big.gltf"),
+]
+
 var _village_previous_web_fps := -1
 var _previous_scale := 1.0
 var _previous_msaa := Viewport.MSAA_DISABLED
@@ -33,6 +53,7 @@ var _lod_elapsed := 0.0
 var _fps_elapsed := 0.0
 var _perf_hold_elapsed := 0.0
 var _perf_pressing := false
+var _perf_touch_index := -1
 var _perf_toggled_this_hold := false
 var _perf_badge: Label
 var _overview_was_on := false
@@ -89,6 +110,7 @@ func _ready() -> void:
     _build_path()
     _build_village()
     _build_forest()
+    _build_natural_boundary()
     _build_kaykit_villagers()
     _build_storybook_dressing()
     _build_locked_gate()
@@ -138,25 +160,52 @@ func _install_performance_badge() -> void:
         return
     _perf_badge = Label.new()
     _perf_badge.name = "LaneAPerformanceBadge"
-    _perf_badge.position = Vector2(460, 9)
+    _perf_badge.position = Vector2(12, 85)
+    _perf_badge.autowrap_mode = TextServer.AUTOWRAP_OFF
+    _perf_badge.clip_text = true
     _perf_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
     _perf_badge.text = "FPS -- | Draw -- | 画质:清晰"
     _perf_badge.visible = false
     hud.add_child(_perf_badge)
 
+    # An actual GUI control is essential on iPad Safari: it cannot depend on
+    # the browser forwarding a touch-and-hold to an uncovered Logo region.
+    var info := Button.new()
+    info.name = "LaneAFPSInfoButton"
+    info.text = "ⓘ"
+    info.tooltip_text = "显示或隐藏 FPS"
+    info.custom_minimum_size = Vector2(52, 52)
+    info.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+    info.anchor_left = 1.0
+    info.anchor_right = 1.0
+    info.offset_left = -64.0
+    info.offset_right = -12.0
+    info.offset_top = 12.0
+    info.offset_bottom = 64.0
+    info.focus_mode = Control.FOCUS_NONE
+    # Keep the info button inside the actual viewport safe rectangle.
+    info.resized.connect(func() -> void:
+        info.clip_contents = true
+    )
+    info.pressed.connect(_toggle_performance_badge)
+    hud.add_child(info)
+
 
 func _input(event: InputEvent) -> void:
-    # Hidden until a deliberate 1.2s hold on the existing top-left Logo.
-    # Both touchscreen and desktop use the same non-invasive diagnostic.
+    # Touch down/up are distinct events on Safari. Keep the finger index so
+    # another finger (D-pad) cannot cancel a valid hold. One second is enough.
     if event is InputEventScreenTouch:
         var touch := event as InputEventScreenTouch
-        if touch.pressed and touch.position.x < 160.0 and touch.position.y < 164.0:
-            _perf_pressing = true
-            _perf_toggled_this_hold = false
-            _perf_hold_elapsed = 0.0
-        elif not touch.pressed:
+        if touch.pressed:
+            if _perf_touch_index < 0 and touch.position.x < 160.0 and touch.position.y < 164.0:
+                _perf_touch_index = touch.index
+                _perf_pressing = true
+                _perf_toggled_this_hold = false
+                _perf_hold_elapsed = 0.0
+        elif touch.index == _perf_touch_index:
+            _perf_touch_index = -1
             _perf_pressing = false
-    elif event is InputEventMouseButton:
+    elif event is InputEventMouseButton and _perf_touch_index < 0:
         var mouse := event as InputEventMouseButton
         if mouse.button_index == MOUSE_BUTTON_LEFT:
             if mouse.pressed and mouse.position.x < 160.0 and mouse.position.y < 164.0:
@@ -175,7 +224,7 @@ func _toggle_performance_badge() -> void:
 func _tick_performance_badge(delta: float) -> void:
     if _perf_pressing and not _perf_toggled_this_hold:
         _perf_hold_elapsed += delta
-        if _perf_hold_elapsed >= 1.2:
+        if _perf_hold_elapsed >= 1.0:
             _perf_toggled_this_hold = true
             _toggle_performance_badge()
     if _perf_badge == null or not _perf_badge.visible:
@@ -195,12 +244,29 @@ func _update_villager_lod() -> void:
     var cam := get_viewport().get_camera_3d()
     if player == null or cam == null:
         return
+    var nearest: Array[Node3D] = []
+    var nearest_distances: Array[float] = []
     for npc in _villagers:
         if not is_instance_valid(npc):
             continue
         var distance_to_child := npc.global_position.distance_to(player.global_position)
-        var on_screen := cam.is_position_in_frustum(npc.global_position + Vector3.UP)
+        var on_screen := cam.is_position_in_frustum(npc.global_position + Vector3.UP * 3.1)
         npc.set_performance_lod(distance_to_child, on_screen)
+        npc.set_greeting_enabled(false)
+        if not on_screen or distance_to_child >= 3.6:
+            continue
+        var insert_at := nearest_distances.size()
+        for index in range(nearest_distances.size()):
+            if distance_to_child < nearest_distances[index]:
+                insert_at = index
+                break
+        nearest.insert(insert_at, npc)
+        nearest_distances.insert(insert_at, distance_to_child)
+        if nearest.size() > 2:
+            nearest.pop_back()
+            nearest_distances.pop_back()
+    for npc in nearest:
+        npc.set_greeting_enabled(true)
 
 
 func _watch_adaptive_quality(delta: float) -> void:
@@ -481,13 +547,13 @@ func _setup_environment() -> void:
     var world_env := WorldEnvironment.new()
     var env := Environment.new()
     env.background_mode = Environment.BG_COLOR
-    env.background_color = Color("#88BBC4")
+    env.background_color = Color("#ACDAFF")
     env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-    env.ambient_light_color = Color("#E7C8A4")
-    env.ambient_light_energy = 0.34
-    env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+    env.ambient_light_color = Color("#DDEFFF")
+    env.ambient_light_energy = 0.62
+    env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
     env.fog_enabled = true
-    env.fog_light_color = Color("#B8CFCA")
+    env.fog_light_color = Color("#C5E6FC")
     env.fog_light_energy = 0.34
     env.fog_density = 0.012 if OS.has_feature("web") else 0.004
     env.ssao_enabled = false
@@ -500,7 +566,7 @@ func _setup_environment() -> void:
     var sun := DirectionalLight3D.new()
     sun.name = "VillageSun"
     sun.rotation_degrees = Vector3(-48, -38, 0)
-    sun.light_color = Color("#F7D6A5")
+    sun.light_color = Color("#FFF4D9")
     sun.light_energy = 0.72
     sun.shadow_enabled = true
     # One shadow frustum on Web avoids multiplying the draw cost of 20 real
@@ -512,7 +578,13 @@ func _setup_environment() -> void:
     add_child(sun)
 
 func _build_ground() -> void:
-    _box("VillageGround", Vector3(0, -0.55, 0), Vector3(70, 1, 70), palette.grass, true)
+    var physical_ground := _box("VillageGround", Vector3(0, -0.55, 0), Vector3(70, 1, 70), palette.grass, true)
+    physical_ground.visible = false
+    var tiles: Array[Vector3] = []
+    for row in range(-12, 13):
+        for col in range(-12, 13):
+            tiles.append(Vector3(float(col) * 2.9 + (1.45 if row % 2 else 0.0), -0.16, float(row) * 2.7))
+    _batch_kaykit_props(KAYKIT_GRASS, tiles, 1.58, "KayKitGrass", false)
     for p in [
         Vector3(-20,0,18), Vector3(22,0,-15), Vector3(-25,0,-20),
         Vector3(25,0,20), Vector3(0,0,-34)
@@ -521,16 +593,70 @@ func _build_ground() -> void:
     _sphere("VillageMound", Vector3(0,-1.0,-12), 12.0, palette.grass_dark, Vector3(1.2,0.12,0.85))
 
 func _build_path() -> void:
-    for i in range(-10, 12):
-        var x := sin(float(i) * 0.42) * 1.3
-        var width := 0.82 if i % 2 == 0 else 0.68
-        _cylinder(
-            "PathStone",
-            Vector3(x,0.02,float(i)*1.55),
-            width,
-            0.12,
-            palette.path_light if i % 3 == 0 else palette.path
-        )
+    var stones: Array[Vector3] = []
+    for i in range(-17, 18):
+        stones.append(Vector3(sin(float(i) * 0.25) * 0.8, 0.03, float(i) * 1.83))
+    _batch_kaykit_props(KAYKIT_ROAD, stones, 1.1, "KayKitStoneRoad", false)
+
+func _batch_kaykit_props(model: PackedScene, locations: Array[Vector3], scale_factor: float, label: String, regional: bool) -> void:
+    var template := model.instantiate() as Node3D
+    if template == null:
+        push_error("Official KayKit model missing: " + label)
+        return
+    # Imported GLTF transforms are only valid when the temporary source is
+    # inside the scene tree; free it immediately after baking the MultiMesh.
+    add_child(template)
+    var groups: Dictionary = {}
+    for point in locations:
+        var key := Vector2i(floori(point.x / 24.0), floori(point.z / 24.0)) if regional else Vector2i.ZERO
+        if not groups.has(key):
+            groups[key] = []
+        var points: Array = groups[key]
+        points.append(point)
+    var parts: Array[MeshInstance3D] = []
+    if template is MeshInstance3D:
+        parts.append(template as MeshInstance3D)
+    for sub in template.find_children("*", "MeshInstance3D", true, false):
+        parts.append(sub as MeshInstance3D)
+    for part in parts:
+        if part.mesh == null:
+            continue
+        var relative := template.global_transform.affine_inverse() * part.global_transform
+        for cell in groups:
+            var points: Array = groups[cell]
+            var multi := MultiMesh.new()
+            multi.transform_format = MultiMesh.TRANSFORM_3D
+            multi.mesh = part.mesh
+            multi.instance_count = points.size()
+            for i in range(points.size()):
+                multi.set_instance_transform(i,
+                    Transform3D(Basis().scaled(Vector3.ONE * scale_factor), points[i]) * relative
+                )
+            var batch := MultiMeshInstance3D.new()
+            batch.name = label + "Batch"
+            batch.multimesh = multi
+            batch.material_override = part.material_override
+            batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+            batch.visibility_range_end = 65.0
+            batch.add_to_group("lane_a_static_batch")
+            add_child(batch)
+            _static_batches.append(batch)
+    remove_child(template)
+    template.free()
+
+func _market_collision(location: Vector3) -> void:
+    var body := StaticBody3D.new()
+    body.name = "KayKitMarketCollider"
+    body.add_to_group("kaykit_village_props")
+    body.position = location
+    var collision := CollisionShape3D.new()
+    collision.name = "CollisionShape3D"
+    var shape := BoxShape3D.new()
+    shape.size = Vector3(1.25, 1.25, 1.25)
+    collision.position.y = 0.625
+    collision.shape = shape
+    body.add_child(collision)
+    add_child(body)
 
 func _build_village() -> void:
     _build_kaykit_houses()
@@ -538,8 +664,7 @@ func _build_village() -> void:
     _cylinder("FountainBase", Vector3(0,0.25,-10), 2.2, 0.5, palette.stone, true)
     _cylinder("FountainStem", Vector3(0,1.0,-10), 0.35, 1.5, palette.cream)
     _sphere("FountainBubble", Vector3(0,2.0,-10), 0.7, Color("#72B7C9"))
-    _mushroom(Vector3(-4.2,0,-11.5), 0.65, palette.mushroom_red)
-    _mushroom(Vector3(4.1,0,-12.0), 0.55, palette.mushroom_orange)
+
 
 func _build_kaykit_houses() -> void:
     # Twenty real KayKit buildings with walkable 6–10m gaps around the
@@ -586,34 +711,37 @@ func _build_kaykit_houses() -> void:
 
 
 func _build_kaykit_villagers() -> void:
-    # Fifteen separate, visible KayKit-rig villagers, not impostor billboards.
-    # Five creator species heads x three clear pastel palettes, each with a
-    # stable unique look ID. All are physics actors that block the player.
-    var species := [
-        "species_head_human_v1", "species_head_cat_v1",
-        "species_head_sheep_v1", "species_head_robot_v1",
-        "species_head_cloud_v1",
-    ]
+    # Six genuinely different CC0 KayKit source meshes across 15 villagers.
+    # No fake species heads, procedural hats or mesh-based costumes.
     var colors := ["#F7B7D2", "#B9E7D0", "#D7C2F3"]
-    for i in range(15):
-        var x: float = float([-6.8, -4.0, 4.0, 6.8][i % 4])
-        var z: float = 16.0 - float(int(i / 4)) * 9.0 - float(i % 4) * 0.8
+    # Keep the central road clear while distributing neighbours among the
+    # north/south housing blocks, market approaches and town square. Fixed
+    # locations make wandering, collision and iPad smoke tests reproducible.
+    var spawn_points: Array[Vector2] = [
+        Vector2(-6.8, 16.0), Vector2(6.8, 20.0),
+        Vector2(-4.8, 25.0), Vector2(4.8, 26.0),
+        Vector2(-8.2, 6.0), Vector2(8.2, 8.0),
+        Vector2(-5.8, 1.0), Vector2(5.8, -2.0),
+        Vector2(-8.0, -10.0), Vector2(8.0, -13.0),
+        Vector2(-5.2, -19.0), Vector2(5.2, -19.0),
+        Vector2(-8.0, -26.0), Vector2(8.0, -27.0),
+        Vector2(5.4, 12.0),
+    ]
+    for i in range(spawn_points.size()):
+        var start: Vector2 = spawn_points[i]
         var look := {
             "look_id": "KayKitVillager%02d" % i,
-            "species_head_id": species[i % 5],
-            "surface_color_hex": colors[int(i / 5)],
-            "eye_color_hex": "#2D3150",
+            "kaykit_rig_index": i % 6,
+            "species_head_id": "species_head_human_v1",
             "body_type": "standard" if i % 2 == 0 else "slim",
-            "role_palette": colors[int(i / 5)],
-            "hat_style": i % 5,
+            "surface_color_hex": colors[int(i / 5)],
         }
         var npc := MiniUtopiaKaykitVillageNPC.new()
-        npc.configure(look, Vector3(x, 0.15, z))
+        npc.configure(look, Vector3(start.x, 0.15, start.y))
         add_child(npc)
         _villagers.append(npc)
     for actor in _villagers:
         actor.configure_neighbors(_villagers)
-
 
 func _cottage(origin: Vector3, accent: Color) -> void:
     _box("Cottage", origin + Vector3(0,1.5,0), Vector3(4.4,3.0,3.6), palette.cream, true)
@@ -626,105 +754,159 @@ func _cottage(origin: Vector3, accent: Color) -> void:
     _cylinder("Chimney", origin + Vector3(1.35,4.1,-0.6), 0.35, 1.8, palette.wood)
 
 func _build_forest() -> void:
-    # Keep the trees outside house footprints and the player's paths.
-    var points = [
-        Vector3(-31,0,-28), Vector3(-31,0,-16), Vector3(-31,0,-4),
-        Vector3(-31,0,8), Vector3(-31,0,20), Vector3(-31,0,30),
-        Vector3(31,0,-28), Vector3(31,0,-16), Vector3(31,0,-4),
-        Vector3(31,0,8), Vector3(31,0,20), Vector3(31,0,30),
-        Vector3(-12,0,26), Vector3(12,0,26), Vector3(-4,0,30),
-        Vector3(4,0,30)
+    # Use CC0 KayKit geometry, rendered through z-clustered MultiMeshes.
+    # Physics stays in primitive BoxShapes instead of mesh triangles.
+    var trees: Array[Vector3] = []
+    var rocks: Array[Vector3] = []
+    for side in [-1.0, 1.0]:
+        for i in range(10):
+            var z := -29.0 + float(i) * 6.4
+            trees.append(Vector3(side * 31.0, 0.0, z))
+            rocks.append(Vector3(side * 28.0, 0.0, z + 3.1))
+    trees.append_array([
+        Vector3(-11, 0, 25), Vector3(11, 0, 25),
+        Vector3(-10, 0, -30), Vector3(10, 0, -30)
+    ])
+    for i in range(trees.size()):
+        _forest_collision(trees[i], true)
+    for rock in rocks:
+        _forest_collision(rock, false)
+    for index in range(2):
+        var tree_points: Array[Vector3] = []
+        var rock_points: Array[Vector3] = []
+        for i in range(trees.size()):
+            if i % 2 == index:
+                tree_points.append(trees[i])
+        for i in range(rocks.size()):
+            if i % 2 == index:
+                rock_points.append(rocks[i])
+        _forest_multimesh(KAYKIT_FOREST_TREES[index], tree_points, 8.0, "KayKitTree")
+        _forest_multimesh(KAYKIT_FOREST_ROCKS[index], rock_points, 3.4, "KayKitRock")
+
+# A real woodland silhouette encloses the 70m playfield. The short
+# BoxShape3D edge rails sit behind KayKit tree scenery: a child sees forest,
+# not an exposed tile cutoff or a mysterious invisible-only barrier.
+func _build_natural_boundary() -> void:
+    var edge_trees: Array[Vector3] = []
+    for side in [-1.0, 1.0]:
+        for i in range(7):
+            edge_trees.append(Vector3(side * 34.0, 0.0, -30.0 + float(i) * 10.0))
+        for i in range(6):
+            edge_trees.append(Vector3(-25.0 + float(i) * 10.0, 0.0, side * 34.0))
+    _forest_multimesh(KAYKIT_FOREST_TREES[0], edge_trees, 8.0, "KayKitEdgeTree")
+
+    # Dress the previously bare hill silhouettes with the same official
+    # CC0 trees and rocks, without extra draw calls for individual props.
+    var hill_trees: Array[Vector3] = [
+        Vector3(-28.0, 1.1, 18.0), Vector3(29.0, 1.1, -15.0),
+        Vector3(-29.0, 1.1, -20.0), Vector3(29.0, 1.1, 20.0),
+        Vector3(-3.5, 1.1, -32.0),
     ]
-    for i in points.size():
-        _tree(points[i], i % 2 == 0)
+    var hill_rocks: Array[Vector3] = [
+        Vector3(-27.0, 0.6, 14.0), Vector3(28.0, 0.6, -19.0),
+        Vector3(-27.0, 0.6, -24.0), Vector3(28.0, 0.6, 24.0),
+        Vector3(3.5, 0.6, -33.0),
+    ]
+    _forest_multimesh(KAYKIT_FOREST_TREES[1], hill_trees, 7.0, "KayKitHillTree")
+    _forest_multimesh(KAYKIT_FOREST_ROCKS[0], hill_rocks, 3.4, "KayKitHillRock")
 
-func _tree(origin: Vector3, alternate: bool) -> void:
-    _cylinder("TreeTrunk", origin + Vector3(0,1.5,0), 0.42, 3.0, palette.wood, true)
-    var leaf_color: Color = palette.leaf2 if alternate else palette.leaf
-    _sphere("TreeCrown", origin + Vector3(0,4.1,0), 2.2, leaf_color, Vector3(1.0,1.15,1.0))
-    _sphere("TreeCrown", origin + Vector3(1.0,3.8,0.4), 1.5, leaf_color)
-    _sphere("TreeCrown", origin + Vector3(-1.0,3.9,-0.3), 1.55, leaf_color)
+    _natural_edge_collider(Vector3(-34.3, 0.0, 0.0), Vector3(1.4, 4.0, 68.6))
+    _natural_edge_collider(Vector3(34.3, 0.0, 0.0), Vector3(1.4, 4.0, 68.6))
+    _natural_edge_collider(Vector3(0.0, 0.0, -34.3), Vector3(68.6, 4.0, 1.4))
+    _natural_edge_collider(Vector3(0.0, 0.0, 34.3), Vector3(68.6, 4.0, 1.4))
 
-func _mushroom(origin: Vector3, scale_factor: float, cap_color: Color) -> void:
-    var stem_height := 2.3 * scale_factor
-    _cylinder(
-        "MushroomStem",
-        origin + Vector3(0, stem_height * 0.5, 0),
-        0.48 * scale_factor,
-        stem_height,
-        palette.cream_light,
-        true
-    )
-    _sphere(
-        "MushroomCap",
-        origin + Vector3(0, stem_height + 0.28 * scale_factor, 0),
-        1.45 * scale_factor,
-        cap_color,
-        Vector3(1.25, 0.48, 1.25)
-    )
-    for offset in [
-        Vector3(-0.58,0.18,0.18),
-        Vector3(0.45,0.22,-0.32),
-        Vector3(0.1,0.3,0.52),
-    ]:
-        _sphere(
-            "MushroomSpot",
-            origin + Vector3(0, stem_height + 0.66 * scale_factor, 0)
-                + offset * scale_factor,
-            0.2 * scale_factor,
-            palette.mushroom_spot,
-            Vector3(1.0,0.35,1.0)
-        )
 
-func _fence_segment(origin: Vector3, length: float, yaw_degrees: float) -> void:
-    var root := Node3D.new()
-    root.position = origin
-    root.rotation_degrees.y = yaw_degrees
-    add_child(root)
+func _natural_edge_collider(location: Vector3, dimensions: Vector3) -> void:
+    var boundary := StaticBody3D.new()
+    boundary.name = "NaturalWoodlandBoundary"
+    boundary.add_to_group("lane_a_natural_edge")
+    boundary.position = location
+    var collider := CollisionShape3D.new()
+    collider.name = "CollisionShape3D"
+    var blocker := BoxShape3D.new()
+    blocker.size = dimensions
+    collider.shape = blocker
+    collider.position.y = dimensions.y * 0.5
+    boundary.add_child(collider)
+    add_child(boundary)
 
-    for x in [-length * 0.5, length * 0.5]:
-        var post := _cylinder(
-            "FencePost",
-            Vector3.ZERO,
-            0.18,
-            1.55,
-            palette.wood,
-            false
-        )
-        remove_child(post)
-        root.add_child(post)
-        post.position = Vector3(x,0.78,0)
 
-    for y in [0.62, 1.2]:
-        var rail := _box(
-            "FenceRail",
-            Vector3.ZERO,
-            Vector3(length,0.18,0.18),
-            palette.wood_light,
-            false
-        )
-        remove_child(rail)
-        root.add_child(rail)
-        rail.position = Vector3(0,y,0)
+func _forest_multimesh(model: PackedScene, locations: Array[Vector3], scaling: float, title: String) -> void:
+    var source := model.instantiate() as Node3D
+    if source == null:
+        push_error("Official KayKit forest model missing: " + title)
+        return
+    # Spatial clustering makes WebGL's visibility range actually cull each
+    # group, rather than drawing every tree in one world-sized bounding box.
+    var bands: Dictionary = {}
+    for pos in locations:
+        var region := Vector2i(floori(pos.x / 24.0), floori(pos.z / 24.0))
+        if not bands.has(region):
+            bands[region] = []
+        var entries: Array = bands[region]
+        entries.append(pos)
+    var source_parts: Array[MeshInstance3D] = []
+    if source is MeshInstance3D:
+        source_parts.append(source as MeshInstance3D)
+    for child in source.find_children("*", "MeshInstance3D", true, false):
+        source_parts.append(child as MeshInstance3D)
+    for mesh_part in source_parts:
+        if mesh_part.mesh == null:
+            continue
+        var local := source.global_transform.affine_inverse() * mesh_part.global_transform
+        for region in bands:
+            var points: Array = bands[region]
+            var multi := MultiMesh.new()
+            multi.transform_format = MultiMesh.TRANSFORM_3D
+            multi.mesh = mesh_part.mesh
+            multi.instance_count = points.size()
+            for i in range(points.size()):
+                multi.set_instance_transform(i,
+                    Transform3D(Basis().scaled(Vector3.ONE * scaling), points[i]) * local
+                )
+            var batch := MultiMeshInstance3D.new()
+            batch.name = title + "Batch"
+            batch.multimesh = multi
+            batch.material_override = mesh_part.material_override
+            batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+            batch.visibility_range_end = 65.0
+            batch.add_to_group("lane_a_static_batch")
+            add_child(batch)
+            _static_batches.append(batch)
+    source.free()
+
+func _forest_collision(location: Vector3, is_tree: bool) -> void:
+    var body := StaticBody3D.new()
+    body.name = "KayKitTreeCollision" if is_tree else "KayKitRockCollision"
+    body.add_to_group("kaykit_village_nature")
+    body.position = location
+    var collider := CollisionShape3D.new()
+    collider.name = "CollisionShape3D"
+    var box := BoxShape3D.new()
+    box.size = Vector3(1.30, 2.70, 1.30) if is_tree else Vector3(1.40, 0.95, 1.40)
+    collider.position.y = box.size.y * 0.5
+    collider.shape = box
+    body.add_child(collider)
+    add_child(body)
 
 func _build_storybook_dressing() -> void:
-    _mushroom(Vector3(-13,0,8), 1.55, palette.mushroom_red)
-    _mushroom(Vector3(13,0,7), 1.3, palette.mushroom_orange)
-    _mushroom(Vector3(-22,0,-14), 1.7, palette.mushroom_red)
-    _mushroom(Vector3(22,0,-20), 1.45, palette.mushroom_orange)
+    # The same 30 market objects from #404, but six low-cost batched model
+    # groups instead of a unique imported scene draw for every placement.
+    for category in range(KAYKIT_PROPS.size()):
+        var positions: Array[Vector3] = []
+        for i in range(30):
+            if i % KAYKIT_PROPS.size() != category:
+                continue
+            var side := -1.0 if i % 2 == 0 else 1.0
+            var x := side * (11.1 + float(i % 3) * 0.8)
+            var z := -27.0 + float(int(i / 2) % 10) * 5.5
+            var spot := Vector3(x, 0.0, z)
+            positions.append(spot)
+            _market_collision(spot)
+        _batch_kaykit_props(KAYKIT_PROPS[category], positions, 3.3, "KayKitMarket%d" % category, true)
 
-    _fence_segment(Vector3(-8,0,-1.5), 7.0, 8.0)
-    _fence_segment(Vector3(8,0,-2.0), 7.0, -6.0)
-    _fence_segment(Vector3(-12,0,-20), 6.0, -10.0)
-    _fence_segment(Vector3(12,0,-23), 6.0, 12.0)
-
-    for p in [
-        Vector3(-5,0.22,-4), Vector3(5,0.22,-5),
-        Vector3(-6,0.22,-16), Vector3(6,0.22,-17),
-        Vector3(-2.5,0.22,-23), Vector3(3.2,0.22,-25),
-    ]:
-        _sphere("FlowerPatch", p, 0.42, palette.pink, Vector3(1.8,0.35,1.4))
-        _sphere("FlowerLeaf", p + Vector3(0.5,0,0.2), 0.28, palette.leaf2, Vector3(1.5,0.25,1.0))
+    # Removed the old sphere mushrooms, sphere flowers and cylinder/box
+    # fences. Official KayKit scenery is now supplied by batched assets.
 
     var welcome := Label3D.new()
     welcome.text = "NEWBIE VILLAGE"
