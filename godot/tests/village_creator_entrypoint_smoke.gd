@@ -218,6 +218,34 @@ func _initialize() -> void:
         _fail("player has no physical collider")
         return
 
+    # Name and combat values must share one camera-facing label anchored
+    # above the active KayKit Hero's head, not a second floating HUD label.
+    var head_labels := player.find_children("CombatLabel", "Label3D", true, false)
+    if head_labels.size() != 1:
+        _fail("player requires exactly one name + stats billboard")
+        return
+    var head_label := head_labels[0] as Label3D
+    if (head_label.billboard != BaseMaterial3D.BILLBOARD_ENABLED
+        or head_label.position.y < 2.5
+        or head_label.width < 500.0):
+        _fail("Hero name billboard is off-center or too narrow")
+        return
+    var play_state := player.get_node_or_null("CreatorPlayRuntime") as MiniUtopiaCreatorPlayRuntime
+    if play_state == null:
+        _fail("selected Hero session missing from player")
+        return
+    var earlier_name: String = String(play_state.payload.get("character_name", ""))
+    play_state.payload["character_name"] = "小冒险家"
+    player.call("_update_combat_label")
+    if (not head_label.text.begins_with("小冒险家\n")
+        or not head_label.text.contains("❤️ ")
+        or not head_label.text.contains("⚔️ ")
+        or not head_label.text.contains("🛡️ ")):
+        _fail("Hero name and HP/ATK/DEF do not appear in a single billboard")
+        return
+    play_state.payload["character_name"] = earlier_name
+    player.call("_update_combat_label")
+
     # Test actual physics-space intersections at known playable obstacles.
     # Checking that a shape exists alone cannot prove it blocks a ray.
     await physics_frame
