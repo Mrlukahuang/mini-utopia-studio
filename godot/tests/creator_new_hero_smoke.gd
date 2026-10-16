@@ -162,6 +162,15 @@ func _initialize() -> void:
     if portrait_button == null or portrait_button.custom_minimum_size.y < 120:
         _fail("big hero card missing")
         return
+    var edit_action := portrait_button.get_node_or_null("HeroActions/EditHero") as Button
+    var play_action := portrait_button.get_node_or_null("HeroActions/PlayHero") as Button
+    if (
+        edit_action == null or play_action == null
+        or edit_action.custom_minimum_size.y < 56
+        or play_action.custom_minimum_size.y < 56
+    ):
+        _fail("each saved Hero needs large Edit and Play touch buttons")
+        return
     var portrait := portrait_button.get_node_or_null("Portrait3D") as MiniUtopiaCreatorAvatarStage
     if portrait == null or portrait.avatar_root().get_node_or_null("KayKitBody") == null:
         _fail("KayKit 3D SubViewport portrait missing")
