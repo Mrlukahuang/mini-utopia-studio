@@ -96,21 +96,29 @@ func _build_child_director_controls() -> void:
         intro_margin.hide()
     var controls := VBoxContainer.new()
     controls.name = "KidDirectorChoices"
-    controls.position = Vector2(42, 190)
-    controls.add_theme_constant_override("separation", 8)
+    controls.position = Vector2(34, 190)
+    controls.add_theme_constant_override("separation", 9)
     overlay.add_child(controls)
     var title := Label.new()
-    title.text = "My Movie / 我来当导演"
+    title.text = "我的小电影"
     title.add_theme_font_override("font", preload("res://assets/fonts/Fredoka-UI.tres"))
     title.add_theme_font_size_override("font_size", 25)
     controls.add_child(title)
+    var choice_grid := GridContainer.new()
+    choice_grid.name = "ShotChoiceGrid"
+    choice_grid.columns = 2
+    choice_grid.add_theme_constant_override("h_separation", 8)
+    choice_grid.add_theme_constant_override("v_separation", 8)
+    controls.add_child(choice_grid)
     for key in ["camera", "action", "duration_seconds", "caption_preset"]:
         var button := Button.new()
         button.name = "Choice_" + key
-        button.custom_minimum_size = Vector2(267, 54)
-        button.add_theme_font_size_override("font_size", 18)
+        button.custom_minimum_size = Vector2(158, 76)
+        button.add_theme_font_size_override("font_size", 19)
+        button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        button.expand_icon = true
         button.pressed.connect(_cycle_child_choice.bind(key))
-        controls.add_child(button)
+        choice_grid.add_child(button)
         match key:
             "camera": button.icon = preload("res://assets/ui/icons/camera.svg")
             "action": button.icon = preload("res://assets/ui/icons/action.svg")
@@ -124,20 +132,20 @@ func _build_child_director_controls() -> void:
     film_title_input.text = "My Mini Utopia Movie"
     film_title_input.placeholder_text = "Name your movie"
     film_title_input.max_length = 64
-    film_title_input.custom_minimum_size = Vector2(267, 50)
+    film_title_input.custom_minimum_size = Vector2(324, 50)
     controls.add_child(film_title_input)
 
     film_note_input = LineEdit.new()
     film_note_input.name = "MyFilmNote"
     film_note_input.placeholder_text = "Your story idea"
     film_note_input.max_length = 280
-    film_note_input.custom_minimum_size = Vector2(267, 48)
+    film_note_input.custom_minimum_size = Vector2(324, 48)
     controls.add_child(film_note_input)
 
     save_film_button = Button.new()
     save_film_button.name = "SaveMyMovieButton"
     save_film_button.text = "Save My Movie"
-    save_film_button.custom_minimum_size = Vector2(267, 56)
+    save_film_button.custom_minimum_size = Vector2(324, 60)
     save_film_button.disabled = not film_bridge.has_family_session()
     save_film_button.pressed.connect(_on_save_private_film_pressed)
     controls.add_child(save_film_button)
@@ -146,7 +154,7 @@ func _build_child_director_controls() -> void:
     record_voice_button.name = "RecordShotVoiceButton"
     record_voice_button.text = "Record 9s Voice"
     record_voice_button.icon = preload("res://assets/ui/icons/voice.svg")
-    record_voice_button.custom_minimum_size = Vector2(267, 54)
+    record_voice_button.custom_minimum_size = Vector2(324, 60)
     record_voice_button.add_theme_font_size_override("font_size", 18)
     record_voice_button.pressed.connect(_on_voice_tapped)
     controls.add_child(record_voice_button)
@@ -174,15 +182,15 @@ func _refresh_choice_labels() -> void:
     var length_button: Button = child_choice_buttons.get("duration_seconds")
     var caption_button: Button = child_choice_buttons.get("caption_preset")
     if camera_button != null:
-        camera_button.text = "Camera: " + String(choices.get("camera", "follow")).capitalize()
+        camera_button.text = "镜头  " + {"follow":"跟随","wide":"远景","close":"特写"}.get(String(choices.get("camera", "follow")), "跟随")
     if action_button != null:
-        action_button.text = "Action: " + String(choices.get("action", "walk")).capitalize()
+        action_button.text = "动作  " + {"walk":"走路","run":"跑步","celebrate":"庆祝"}.get(String(choices.get("action", "walk")), "走路")
     if length_button != null:
-        length_button.text = "Length: " + str(int(choices.get("duration_seconds", 15))) + "s"
+        length_button.text = "时长  " + str(int(choices.get("duration_seconds", 15))) + "秒"
     if caption_button != null:
         var preset_id := String(choices.get("caption_preset", "none"))
         var caption := MiniUtopiaFamilyDirectorSession.caption_text(preset_id)
-        caption_button.text = "Subtitle: " + (caption if not caption.is_empty() else "Off")
+        caption_button.text = "字幕  " + ("开启" if not caption.is_empty() else "关闭")
 
 
 func _cycle_child_choice(key: String) -> void:
@@ -278,7 +286,7 @@ func _build_overlay() -> void:
     var choices_card := PanelContainer.new()
     choices_card.name = "KidDirectorCard"
     choices_card.position = Vector2(22, 168)
-    choices_card.custom_minimum_size = Vector2(308, 584)
+    choices_card.custom_minimum_size = Vector2(378, 584)
     choices_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
     layer.add_child(choices_card)
 
