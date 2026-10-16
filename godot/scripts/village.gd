@@ -693,26 +693,18 @@ func _build_kaykit_houses() -> void:
 
 
 func _build_kaykit_villagers() -> void:
-    # Fifteen separate, visible KayKit-rig villagers, not impostor billboards.
-    # Five creator species heads x three clear pastel palettes, each with a
-    # stable unique look ID. All are physics actors that block the player.
-    var species := [
-        "species_head_human_v1", "species_head_cat_v1",
-        "species_head_sheep_v1", "species_head_robot_v1",
-        "species_head_cloud_v1",
-    ]
+    # Six genuinely different CC0 KayKit source meshes across 15 villagers.
+    # No fake species heads, procedural hats or mesh-based costumes.
     var colors := ["#F7B7D2", "#B9E7D0", "#D7C2F3"]
     for i in range(15):
         var x: float = float([-6.8, -4.0, 4.0, 6.8][i % 4])
         var z: float = 16.0 - float(int(i / 4)) * 9.0 - float(i % 4) * 0.8
         var look := {
             "look_id": "KayKitVillager%02d" % i,
-            "species_head_id": species[i % 5],
-            "surface_color_hex": colors[int(i / 5)],
-            "eye_color_hex": "#2D3150",
+            "kaykit_rig_index": i % 6,
+            "species_head_id": "species_head_human_v1",
             "body_type": "standard" if i % 2 == 0 else "slim",
-            "role_palette": colors[int(i / 5)],
-            "hat_style": i % 5,
+            "surface_color_hex": colors[int(i / 5)],
         }
         var npc := MiniUtopiaKaykitVillageNPC.new()
         npc.configure(look, Vector3(x, 0.15, z))
@@ -720,7 +712,6 @@ func _build_kaykit_villagers() -> void:
         _villagers.append(npc)
     for actor in _villagers:
         actor.configure_neighbors(_villagers)
-
 
 func _cottage(origin: Vector3, accent: Color) -> void:
     _box("Cottage", origin + Vector3(0,1.5,0), Vector3(4.4,3.0,3.6), palette.cream, true)
