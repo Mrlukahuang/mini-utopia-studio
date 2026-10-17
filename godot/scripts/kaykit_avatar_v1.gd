@@ -56,31 +56,20 @@ class HeadClearancePivot extends Node3D:
                 # clearly in a head-on Creator preview.
                 axis = basis.y + basis.z + basis.x * (0.18 * side)
             "staff":
-                # Web geometry at Walk 90°: the grip advances .31m in front
-                # of the head. A fixed tilt leaves the green jewel over the
-                # helmet, even when the staff long axis itself is correct.
-                # Derive the minimum backward component from the *animated*
-                # grip and true head bone. Keep the bottom anchored to the
-                # imported hand: no socket shift and no test threshold change.
-                var outward := 0.28
-                var backward := 0.68
-                if rig != null:
-                    var head_index := rig.find_bone("head")
-                    if head_index >= 0:
-                        var head := rig.to_global(
-                            rig.get_bone_global_pose(head_index).origin
-                        )
-                        var grip_behind := (global_position - head).dot(-basis.z)
-                        var required := (
-                            STAFF_SIDE_CLEARANCE + STAFF_END_HALF_DEPTH + 0.06
-                            - grip_behind
-                        ) / STAFF_REACH
-                        backward = clampf(required, 0.60, 0.89)
+                # The actual green jewel occupies a *wide* crown near local
+                # +Y (staff glTF: y 0.70..1.254, x -0.245..0.331).
+                # Tilting backwards kept that whole silhouette against the
+                # back edge of the helmet, despite generous center distances.
+                # Point it forward AND outboard of the real animated grip.
+                # Do not chase the head or camera, scale the jewel, or offset
+                # the socket; sword's fixed ~45-degree axis stays unchanged.
+                var outward := 0.34
+                var forward := 0.58
                 var upward := sqrt(
-                    1.0 - backward * backward - outward * outward
+                    1.0 - forward * forward - outward * outward
                 )
                 axis = (
-                    basis.y * upward - basis.z * backward
+                    basis.y * upward + basis.z * forward
                     + basis.x * (outward * side)
                 )
             _:
