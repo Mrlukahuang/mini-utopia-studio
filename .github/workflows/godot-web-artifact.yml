@@ -604,11 +604,14 @@ jobs:
           JS
 
       # A-012 screenshot-only CI fixtures; never included in production artifact.
-      # Baseline and fixed: sword/staff x (Idle one, Walk/Run two phases) x four views x two sizes.
+      # Candidate A: first capture only 12 real Web frames (staff left/right
+      # Idle 1 phase and Walk 2 phases; before/after; 1366x1024).
+      # Full 160-frame option remains available for later visual acceptance.
       - name: Capture actual Godot Web weapon clearance before and after
         shell: bash
         run: |
           set -euo pipefail
+          export MU_CLEARANCE_MATRIX=small
           sed -i -E 's|^run/main_scene=".*"$|run/main_scene="res://scenes/character_creator.tscn"|' godot/project.godot
           python3 - <<'PY'
           import os
@@ -711,8 +714,9 @@ jobs:
               '--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox'
             ]});
             try {
+              const full=process.env.MU_CLEARANCE_MATRIX==='full';
               for(const [build,port] of [['before',8783],['after',8784]]) {
-                for(const [width,height] of [[1180,820],[1366,1024]]) {
+                for(const [width,height] of (full ? [[1180,820],[1366,1024]] : [[1366,1024]])) {
                   const context=await browser.newContext({
                     viewport:{width,height},deviceScaleFactor:1,isMobile:true,hasTouch:true
                   });
@@ -726,9 +730,11 @@ jobs:
                     ()=>document.querySelector('#loader')===null,null,{timeout:120000}
                   );
                   await page.waitForTimeout(1600);
-                  for(const gear of ['sword_1handed','staff']) {
-                    for(const action of ['Idle','Walk','Run']) {
-                      for(const [view,angle] of [['front',0],['side',90],['side-left',270],['back',180]]) {
+                  for(const gear of (full ? ['sword_1handed','staff'] : ['staff'])) {
+                    for(const action of (full ? ['Idle','Walk','Run'] : ['Idle','Walk'])) {
+                      for(const [view,angle] of (full ?
+                          [['front',0],['side',90],['side-left',270],['back',180]] :
+                          [['side',90],['side-left',270]])) {
                         await page.evaluate(command=>{window.__MU_CLEARANCE_FRAME=command;},
                           [gear,action,angle].join('|'));
                         await page.waitForTimeout(950);
@@ -755,13 +761,16 @@ jobs:
             }finally{await browser.close();}
           })().catch(e=>{console.error(e);process.exitCode=1;});
           JS
-          test -s dist/visual-evidence/clearance-before-staff-Idle-front-1180x820.png
-          test -s dist/visual-evidence/clearance-after-staff-Run-back-1366x1024.png
+          test -s dist/visual-evidence/clearance-before-staff-Idle-side-1366x1024.png
+          test -s dist/visual-evidence/clearance-after-staff-Walk-side-left-1366x1024-later.png
           python3 - <<'PY'
+          import os
           from pathlib import Path
           files=list(Path('dist/visual-evidence').glob('clearance-*.png'))
-          assert len(files)==160, f'Expected 160 Web frames, found {len(files)}'
-          print('Verified 160 genuine Godot Web weapon frames')
+          full=os.environ.get('MU_CLEARANCE_MATRIX')=='full'
+          expected=160 if full else 12
+          assert len(files)==expected, f'Expected {expected} genuine Web frames, found {len(files)}'
+          print(f'Verified {expected} genuine Godot Web weapon frames')
           PY
 
       # A-012: screenshots only; production export and test steps unchanged.
