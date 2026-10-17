@@ -606,9 +606,6 @@ jobs:
       # A-012 screenshot-only CI fixtures; never included in production artifact.
       # Baseline and fixed: sword/staff x (Idle one, Walk/Run two phases) x four views x two sizes.
       - name: Capture actual Godot Web weapon clearance before and after
-        # A-012: temporarily skip screenshot-only 160-frame comparison during
-        # approved 12-frame focused staff candidate review. Restore for final.
-        if: ${{ false }}
         shell: bash
         run: |
           set -euo pipefail
