@@ -140,7 +140,7 @@ text = "创建小英雄"
 
 [node name="Hint" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
-text = "点一点，看看英雄怎么变！"
+text = "骑士可换体型与动作，更多造型准备中。"
 autowrap_mode = 2
 
 [node name="RandomLookButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]

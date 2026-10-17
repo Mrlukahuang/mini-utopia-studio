@@ -275,7 +275,8 @@ func _select_creator_tab(tab: String) -> void:
         _refresh_outfit_choices()
     else:
         heading.text = "创建小英雄"
-        hint.text = "点一点，看看英雄怎么变！"
+        hint.text = "骑士可换体型与动作，更多造型准备中。"
+        _hide_unavailable_knight_choices()
     choice_scroll.scroll_vertical = 0
 
 
@@ -785,7 +786,23 @@ func _sync_loaded_profile_avatar() -> void:
     loaded_character["profile"] = profile
 
 
+# Only the official Knight is packaged. The legacy eye/hair/surface
+# meshes live beneath Visual, which KaykitAvatarV1 hides in favor of the
+# original rig. Do not let children tap a control that has no visible result.
+# Keep all canonical IDs and old saved appearances unchanged.
+func _hide_unavailable_knight_choices() -> void:
+    for node_name in [
+        "SurfaceLabel", "SurfaceGrid",
+        "EyeLabel", "EyeStyleOption", "HairLabel", "HairStyleOption",
+        "ColorLabel", "ColorTargetOption", "ColorGrid",
+    ]:
+        var control := choice_content.get_node_or_null(node_name) as Control
+        if control != null:
+            control.visible = false
+
+
 func _refresh_look_controls() -> void:
+    _hide_unavailable_knight_choices()
     var body_type := String(
         _draft_appearance.get("body_type", "standard")
     )
