@@ -36,8 +36,17 @@ class HeadClearancePivot extends Node3D:
         if away.length_squared() < 0.015:
             away = -actor.global_transform.basis.x
             away.y = 0.0
-        var upright := actor.global_transform.basis.y.normalized()
-        var target_world := (upright + away.normalized() * 0.68).normalized()
+        # One grip point: never translate away from the official animated
+        # right hand. A sideways-only lean clears front views but places
+        # the jewel against the helmet silhouette at both 90-degree views.
+        # Lean the long axis both *outward* and *forward* in actor space,
+        # providing real fore-aft depth from either side-camera projection.
+        var basis := actor.global_transform.basis.orthonormalized()
+        var right := basis.x
+        var sideways := right if away.dot(right) >= 0.0 else -right
+        var target_world := (
+            basis.y + sideways * 0.80 + basis.z * 1.05
+        ).normalized()
         var parent_space := (get_parent() as Node3D).global_transform.basis.inverse()
         quaternion = Quaternion(Vector3.UP, (parent_space * target_world).normalized())
 

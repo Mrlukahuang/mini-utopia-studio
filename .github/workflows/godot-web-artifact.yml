@@ -384,7 +384,7 @@ jobs:
           JS
 
       # A-012 screenshot-only CI fixtures; never included in production artifact.
-      # Baseline and fixed: sword/staff x Idle/Walk/Run x front/side/back x 2 sizes.
+      # Baseline and fixed: sword/staff x Idle/Walk/Run x front/right/left/back x 2 sizes.
       - name: Capture actual Godot Web weapon clearance before and after
         shell: bash
         run: |
@@ -508,7 +508,7 @@ jobs:
                   await page.waitForTimeout(1600);
                   for(const gear of ['sword_1handed','staff']) {
                     for(const action of ['Idle','Walk','Run']) {
-                      for(const [view,angle] of [['front',0],['side',90],['back',180]]) {
+                      for(const [view,angle] of [['front',0],['side',90],['side-left',270],['back',180]]) {
                         await page.evaluate(command=>{window.__MU_CLEARANCE_FRAME=command;},
                           [gear,action,angle].join('|'));
                         await page.waitForTimeout(950);

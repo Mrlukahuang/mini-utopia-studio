@@ -297,9 +297,26 @@ func _initialize() -> void:
         var head_bone := rig.find_bone("head")
         var center := rig.to_global(rig.get_bone_global_pose(head_bone).origin)
         var tip := hand.to_global(Vector3(0.0, 1.25, 0.0))
-        var head_gap := Vector2(tip.x - center.x, tip.z - center.z).length()
-        if head_gap < 0.45:
-            _fail("official staff tip crossed the helmet footprint in " + pose)
+        var delta := tip - center
+        var axes := reopened_stage.avatar_root().global_transform.basis.orthonormalized()
+        # A 3-D radius alone cannot distinguish a jewel that overlaps the
+        # *side-view projection*. Test BOTH actor-space planar projections:
+        # front/back see X, left/right side see Z.
+        var front_gap := absf(delta.dot(axes.x))
+        var side_gap := absf(delta.dot(axes.z))
+        if front_gap < 0.38 or side_gap < 0.46:
+            _fail(
+                "staff tip projected onto helmet in " + pose
+                + " front=" + str(front_gap) + " side=" + str(side_gap)
+            )
+            return
+        # Separately sample the long prop's centerline against the head in
+        # 3-D. This is a coarse rig-proximity assertion, NOT mesh intersection.
+        var start := hand.global_position
+        var shaft := tip - start
+        var fraction := clampf((center - start).dot(shaft) / shaft.length_squared(), 0.0, 1.0)
+        if center.distance_to(start + shaft * fraction) < 0.35:
+            _fail("staff centerline is too near the 3D helmet in " + pose)
             return
 
     creator._select_creator_tab("look")
