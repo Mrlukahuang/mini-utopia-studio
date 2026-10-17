@@ -102,10 +102,16 @@ func _initialize() -> void:
     var knight_rig := stage.avatar_root().get_node("KayKitBody/Rig/Skeleton3D") as Skeleton3D
     for hand_name in ["handslot_l", "handslot_r"]:
         var native := knight_rig.get_node(hand_name) as Node3D
-        for raw_mesh in native.find_children("*", "MeshInstance3D", true, false):
-            if (raw_mesh as MeshInstance3D).layers != 0:
+        for raw_mesh in native.get_children():
+            if raw_mesh is MeshInstance3D and (raw_mesh as MeshInstance3D).layers != 0:
                 _fail("native Knight weapon still visible without owned equipment")
                 return
+    var actual_hand := MiniUtopiaKaykitAvatarV1.mounted_weapon_socket(
+        stage.avatar_root(), MiniUtopiaAvatarContract.SOCKET_WEAPON_R
+    )
+    if actual_hand == null or actual_hand.get_parent() != knight_rig.get_node("handslot_r"):
+        _fail("owned hand models do not inherit the imported KayKit grip transform")
+        return
 
     # Synthetic owner-scoped server response: only an actually owned standard
     # sword may be reskinned, and only AFTER equipment PUT confirms its ID.

@@ -75,8 +75,11 @@ static func _hide_native_hand_props(skeleton: Skeleton3D) -> void:
         var original := skeleton.get_node_or_null(hand) as Node3D
         if original == null:
             continue
-        for part in original.find_children("*", "MeshInstance3D", true, false):
-            (part as MeshInstance3D).layers = 0
+        # Only original direct mesh children; a runtime Socket_WeaponR/L
+        # inserted below the imported holder MUST remain drawable.
+        for part in original.get_children():
+            if part is MeshInstance3D:
+                (part as MeshInstance3D).layers = 0
 
 
 static func visible_hand_style(root: Node3D, slot: String, style: String) -> bool:
@@ -167,6 +170,21 @@ static func _bone_socket(
         return
     if skeleton.find_child(socket_name, true, false) != null:
         return
+    # Prefer the source GLB's already-authored hands: these imported holders
+    # have the grip pose/rotation for the bundled KayKit equipment models.
+    # A fresh BoneAttachment3D at the bare bone origin turns a long staff into
+    # a sideways disc in the real Web screenshot.
+    var imported_hand := (
+        "handslot_r" if bone_name == "handslot.r" else
+        "handslot_l" if bone_name == "handslot.l" else ""
+    )
+    if not imported_hand.is_empty():
+        var existing := skeleton.get_node_or_null(imported_hand) as Node3D
+        if existing != null:
+            var hand_socket := Node3D.new()
+            hand_socket.name = socket_name
+            existing.add_child(hand_socket)
+            return
     var binding := BoneAttachment3D.new()
     binding.name = "KayKitBone_" + bone_name
     binding.bone_name = bone_name

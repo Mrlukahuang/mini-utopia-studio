@@ -303,7 +303,13 @@ jobs:
           import os
 
           path = Path("godot/scripts/character_creator_shell.gd")
-          original = path.read_text()
+          # The previous screenshot-only "save celebration" step temporarily
+          # edits this same file. Always start from the CHECKED-IN source:
+          # these evidence frames must not imply a real save occurred.
+          original = subprocess.check_output(
+              ["git", "show", "HEAD:godot/scripts/character_creator_shell.gd"],
+              text=True,
+          )
           anchor = '    _build_save_celebration()'
           assert original.count(anchor) == 1
           for style, label in [
