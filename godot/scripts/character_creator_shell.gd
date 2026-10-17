@@ -134,6 +134,9 @@ var _hair_option_ids: Array[String] = []
 var _return_scene := "res://scenes/main.tscn"
 var _save_stars: Label
 var _saved_celebration := false
+var _pending_hand_style := ""
+var _pending_hand_slot := ""
+var _pending_hand_item_id := ""
 
 
 func _ready() -> void:
@@ -608,11 +611,17 @@ func _on_hand_style_pressed(style: String) -> void:
         return
     var slot := "weapon_offhand" if style == "shield_round" else "weapon_main"
     var items = equipment_state.get("items", [])
-    if typeof(items) != TYPE_ARRAY or character_id.is_empty() or bridge.is_busy():
-        _set_status("先保存你的英雄，再来选手持道具吧！", false)
+    if (
+        typeof(items) != TYPE_ARRAY or character_id.is_empty()
+        or not bridge.has_family_session() or bridge.is_busy()
+    ):
+        _set_status("先保存英雄并打开衣柜，才能拿道具哦！", true)
         return
-    # Four CC0 models, but never invent inventory: staff/wand are skins
-    # of the child's genuinely owned starter main-hand weapon.
+
+    # Prefer the already worn owned item; a handcrafted prop has its own
+    # appearance recipe and MUST NOT silently turn into a KayKit weapon.
+    var chosen := ""
+    var already_worn := false
     for raw in items:
         if typeof(raw) != TYPE_DICTIONARY:
             continue
@@ -622,14 +631,69 @@ func _on_hand_style_pressed(style: String) -> void:
         var item_id := String(item.get("item_instance_id", ""))
         if item_id.is_empty():
             continue
-        var tags: Array = _draft_appearance.get("compatible_tags", ["humanoid"])
-        tags = tags.filter(func(tag): return not String(tag).begins_with("kaykit_style_"))
-        tags.append("kaykit_style_" + style)
-        _draft_appearance["compatible_tags"] = tags
-        _commit_live_appearance("✨ 装备外观已选择，记得保存！")
-        _on_equipment_choice_pressed(slot, item_id)
+        var recipe = item.get("visual_recipe", {})
+        if typeof(recipe) == TYPE_DICTIONARY and not recipe.is_empty():
+            continue
+        var worn := bool(item.get("equipped", false))
+        if chosen.is_empty() or (worn and not already_worn):
+            chosen = item_id
+            already_worn = worn
+    if chosen.is_empty():
+        _set_status("衣柜里还没有能换造型的手持道具。", true)
         return
-    _set_status("这件道具还不在你的衣柜里。", true)
+
+    # Never alter the saved appearance until the owner-scoped equipment PUT
+    # returns the SAME item in this slot. Failed writes cannot show success.
+    _pending_hand_style = style
+    _pending_hand_slot = slot
+    _pending_hand_item_id = chosen
+    var error := bridge.put_equipment_slot(character_id, slot, chosen)
+    if error == OK:
+        _set_status("正在取出你的道具…", false)
+    else:
+        _clear_pending_hand_style()
+        _set_status("道具暂时没换好，请再试一次。", true)
+
+
+func _clear_pending_hand_style() -> void:
+    _pending_hand_style = ""
+    _pending_hand_slot = ""
+    _pending_hand_item_id = ""
+
+
+func _confirm_pending_hand_style(kind: String, runtime: Dictionary) -> bool:
+    if _pending_hand_style.is_empty() or kind != "equipment:put:" + _pending_hand_slot:
+        return false
+    var style := _pending_hand_style
+    var slot := _pending_hand_slot
+    var item_id := _pending_hand_item_id
+    _clear_pending_hand_style()
+    var equipped = runtime.get("equipped", {})
+    if typeof(equipped) != TYPE_DICTIONARY:
+        return false
+    var item = equipped.get(slot, {})
+    if typeof(item) != TYPE_DICTIONARY:
+        return false
+    if String(item.get("item_instance_id", "")) != item_id:
+        return false
+    var recipe = item.get("visual_recipe", {})
+    if typeof(recipe) == TYPE_DICTIONARY and not recipe.is_empty():
+        return false
+
+    var original := _draft_appearance.duplicate(true)
+    var tags: Array = _draft_appearance.get("compatible_tags", ["humanoid"])
+    tags = tags.filter(func(tag): return not String(tag).begins_with("kaykit_style_"))
+    tags.append("kaykit_style_" + style)
+    _draft_appearance["compatible_tags"] = tags
+    avatar_stage.apply_appearance(_draft_appearance)
+    if not MiniUtopiaKaykitAvatarV1.visible_hand_style(
+        avatar_stage.avatar_root(), slot, style
+    ):
+        _draft_appearance = original
+        avatar_stage.apply_appearance(original)
+        return false
+    _commit_live_appearance("手持道具换好啦！")
+    return true
 
 
 func _on_body_selected(body_type: String) -> void:
@@ -957,13 +1021,27 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         )
         if valid:
             avatar_stage.apply_equipment_runtime(runtime)
+        var hand_request := (
+            not _pending_hand_style.is_empty()
+            and kind == "equipment:put:" + _pending_hand_slot
+        )
+        var hand_visible := false
+        if valid and hand_request:
+            hand_visible = _confirm_pending_hand_style(kind, runtime)
+        elif hand_request:
+            _clear_pending_hand_style()
         play_button.disabled = (
             not valid or loaded_character.is_empty() or _appearance_dirty
+            or (hand_request and not hand_visible)
         )
         _set_status(
-            "英雄和衣柜都准备好啦！"
+            "手持道具已经出现在英雄手上！记得保存英雄。"
+            if hand_visible
+            else "道具还没成功出现在英雄手上，请重试。"
+            if hand_request
+            else "英雄和衣柜都准备好啦！"
             if valid else "衣柜还没准备好，请再试一次。",
-            not valid
+            hand_request and not hand_visible or not valid
         )
         _show_saved_village_button()
         return
@@ -1023,6 +1101,7 @@ func _on_bridge_failure(
         _set_status("道具没做好，换个名字再试试吧。", true)
         return
     if kind.begins_with("equipment:"):
+        _clear_pending_hand_style()
         play_button.disabled = true
         _set_status("装扮暂时没打开，请稍后重试。", true)
         return

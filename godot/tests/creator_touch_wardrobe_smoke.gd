@@ -95,13 +95,73 @@ func _initialize() -> void:
     if stage == null or stage.avatar_root().find_child("Equipment_headwear", true, false) == null:
         _fail("equipped crown did not appear on the same 3D Hero")
         return
-    # W1.5 hand-prop investigation: native Knight meshes already appear
-    # armed in the default Creator screenshot, before equipment is loaded.
-    var native_knight := stage.avatar_root().get_node("KayKitBody") as Node3D
-    for mesh_node in native_knight.find_children("*", "MeshInstance3D", true, false):
-        var mesh := mesh_node as MeshInstance3D
-        print("KNIGHT_NATIVE_MESH: ", mesh.get_path(), " | ", mesh.mesh.resource_name if mesh.mesh != null else "null")
 
+
+    # The official imported Knight carries unearned demo sword/shields.
+    # Their imported draw layers must be zero so only server-owned gear renders.
+    var knight_rig := stage.avatar_root().get_node("KayKitBody/Rig/Skeleton3D") as Skeleton3D
+    for hand_name in ["handslot_l", "handslot_r"]:
+        var native := knight_rig.get_node(hand_name) as Node3D
+        for raw_mesh in native.find_children("*", "MeshInstance3D", true, false):
+            if (raw_mesh as MeshInstance3D).layers != 0:
+                _fail("native Knight weapon still visible without owned equipment")
+                return
+
+    # Synthetic owner-scoped server response: only an actually owned standard
+    # sword may be reskinned, and only AFTER equipment PUT confirms its ID.
+    var equipped_sword := equipment.duplicate(true)
+    equipped_sword["items"][1]["equipped"] = true
+    equipped_sword["runtime"]["equipped"]["weapon_main"] = {
+        "item_instance_id": "ITEM_WARDROBE_SWORD",
+        "display_name": "Star Sword",
+        "rarity": "blue",
+    }
+    creator._on_bridge_success("equipment:put:weapon_main", equipped_sword)
+    var before_tags: Array = creator._draft_appearance.get("compatible_tags", ["humanoid"])
+    creator._pending_hand_style = "staff"
+    creator._pending_hand_slot = "weapon_main"
+    creator._pending_hand_item_id = "ITEM_NOT_OWNED"
+    creator._on_bridge_success("equipment:put:weapon_main", equipped_sword)
+    if creator._draft_appearance.get("compatible_tags", ["humanoid"]) != before_tags:
+        _fail("a mismatched equipment PUT changed avatar appearance")
+        return
+
+    creator._pending_hand_style = "staff"
+    creator._pending_hand_slot = "weapon_main"
+    creator._pending_hand_item_id = "ITEM_WARDROBE_SWORD"
+    creator._on_bridge_success("equipment:put:weapon_main", equipped_sword)
+    if not MiniUtopiaKaykitAvatarV1.visible_hand_style(
+        stage.avatar_root(), "weapon_main", "staff"
+    ):
+        _fail("confirmed owned staff reskin was not visible on the official Knight")
+        return
+    if not creator._appearance_dirty:
+        _fail("confirmed hand style was not marked for canonical Character save")
+        return
+    var updated := creator._character_update_payload("Lily")
+    var avatar := updated.get("profile", {}).get("avatar", {})
+    if MiniUtopiaKaykitAvatarV1.hand_skin(avatar) != "staff":
+        _fail("hand style missing from canonical Character update payload")
+        return
+
+    # The same confirmed Character avatar + owned equipment must render in
+    # the village, not just in the Creator's isolated SubViewport.
+    var saved := creator.loaded_character.duplicate(true)
+    saved["profile"]["avatar"] = avatar
+    var play_payload := MiniUtopiaFamilyCharacterPlayAdapter.play_session_for(saved)
+    play_payload["equipment"] = equipped_sword["runtime"].duplicate(true)
+    var world := Node3D.new()
+    world.name = "MiniUtopiaWorld"
+    root.add_child(world)
+    var player := CharacterBody3D.new()
+    world.add_child(player)
+    var runtime := MiniUtopiaCreatorPlayRuntime.new()
+    world.add_child(runtime)
+    runtime.apply_payload_to_player(player, play_payload)
+    if not MiniUtopiaKaykitAvatarV1.visible_hand_style(player, "weapon_main", "staff"):
+        _fail("the same saved owned hand model disappeared after village reload")
+        return
+    world.queue_free()
 
     creator._select_creator_tab("look")
     if outfit.visible:
