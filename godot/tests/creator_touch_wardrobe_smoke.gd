@@ -138,15 +138,15 @@ func _initialize() -> void:
     if not creator._appearance_dirty:
         _fail("confirmed hand style was not marked for canonical Character save")
         return
-    var updated := creator._character_update_payload("Lily")
-    var avatar := updated.get("profile", {}).get("avatar", {})
+    var updated: Dictionary = creator._character_update_payload("Lily")
+    var avatar: Dictionary = updated.get("profile", {}).get("avatar", {})
     if MiniUtopiaKaykitAvatarV1.hand_skin(avatar) != "staff":
         _fail("hand style missing from canonical Character update payload")
         return
 
     # The same confirmed Character avatar + owned equipment must render in
     # the village, not just in the Creator's isolated SubViewport.
-    var saved := creator.loaded_character.duplicate(true)
+    var saved: Dictionary = creator.loaded_character.duplicate(true)
     saved["profile"]["avatar"] = avatar
     var play_payload := MiniUtopiaFamilyCharacterPlayAdapter.play_session_for(saved)
     play_payload["equipment"] = equipped_sword["runtime"].duplicate(true)
