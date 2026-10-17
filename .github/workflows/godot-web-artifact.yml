@@ -383,50 +383,61 @@ jobs:
           })().catch(e=>{console.error(e);process.exitCode=1;});
           JS
 
-
-      # A-012 screenshot-only: actual Godot Web renderer, synthetic owned
-      # equipment, before/after at both viewports and nine view/pose pairs.
-      # Production Web export and tests above are entirely unchanged.
-      - name: Screenshot long prop helmet clearance before and after
+      # A-012 screenshot-only CI fixtures; never included in production artifact.
+      # Baseline and fixed: sword/staff x Idle/Walk/Run x front/side/back x 2 sizes.
+      - name: Capture actual Godot Web weapon clearance before and after
         shell: bash
         run: |
           set -euo pipefail
+          sed -i -E 's|^run/main_scene=".*"$|run/main_scene="res://scenes/character_creator.tscn"|' godot/project.godot
           python3 - <<'PY'
           import os
-          import re
           import subprocess
           from pathlib import Path
-
-          src = Path("godot/scripts/character_creator_shell.gd")
-          adapter = Path("godot/scripts/kaykit_avatar_v1.gd")
-          original = subprocess.check_output(
-              ["git", "show", "HEAD:godot/scripts/character_creator_shell.gd"], text=True
+          src=Path("godot/scripts/character_creator_shell.gd")
+          kit=Path("godot/scripts/kaykit_avatar_v1.gd")
+          original=subprocess.check_output(
+              ["git","show","HEAD:godot/scripts/character_creator_shell.gd"],text=True
           )
-          old = subprocess.check_output(
-              ["git", "show", "84c6af913184cca0a64d4aa01d4dbebc59823566:godot/scripts/kaykit_avatar_v1.gd"], text=True
+          after=subprocess.check_output(
+              ["git","show","HEAD:godot/scripts/kaykit_avatar_v1.gd"],text=True
           )
-          new = subprocess.check_output(
-              ["git", "show", "HEAD:godot/scripts/kaykit_avatar_v1.gd"], text=True
+          # Recreate #453 baseline from our own Lane C visual-only diff so
+          # shallow GitHub Actions checkout does not need to fetch prior commits.
+          begin=after.index("# Dynamic *visual-only* grip pivot.")
+          end=after.index("static func mount(",begin)
+          before=after[:begin]+after[end:]
+          start=before.index('            if style in ["sword_1handed", "staff", "wand"]:',before.index("static func apply_hand_skin"))
+          stop=before.index("\n\n\nstatic func play(",start)
+          baseline='''            model.name = "Equipment_" + slot
+              '''.strip("\n")
+          old=(
+            '            model.name = "Equipment_" + slot\n'
+            '            model.set_meta("kaykit_style", style)\n'
+            '            if style in ["sword_1handed", "staff", "wand"]:\n'
+            '                model.rotation_degrees.z = 90.0\n'
+            '            socket.add_child(model)'
           )
-          marker = '    _build_save_celebration()'
-          assert original.count(marker) == 1
-          injected = original.replace(
-              marker, marker + '\n    call_deferred("_ci_clearance_ready")', 1
+          before=before[:start]+old+before[stop:]
+          anchor='    _build_save_celebration()'
+          assert original.count(anchor)==1
+          fixture=original.replace(
+              anchor,anchor+'\n    call_deferred("_ci_clearance_ready")',1
           )
-          injected += '''
+          fixture+='''
           var _ci_clearance_key := ""
 
           func _ci_clearance_ready() -> void:
               avatar_stage.apply_equipment_runtime({
-                  "character_asset_id": "CHAR_CI_CLEARANCE",
+                  "character_asset_id": "CHAR_CI_HEAD_CLEARANCE",
                   "equipped": {"weapon_main": {
-                      "item_instance_id": "ITEM_CI_OWNED_HAND",
-                      "display_name": "Owned Prop",
-                      "mesh_asset_id": "sword_1handed"
+                      "item_instance_id": "ITEM_CI_OWNED",
+                      "display_name": "Synthetic Owned Sword",
+                      "mesh_asset_id": "sword_1handed",
                   }},
-                  "final_stats": {}
+                  "final_stats": {},
               })
-              _set_status("CI 合成已拥有道具，非真实家庭数据", false)
+              _set_status("CI 合成装备 · 真实 Godot Web", false)
 
           func _process(_delta: float) -> void:
               if not OS.has_feature("web"):
@@ -453,423 +464,66 @@ jobs:
               avatar_stage.play_preview_animation(action)
               avatar_stage.avatar_root().rotation_degrees.y = float(parts[2])
           '''
-          src.write_text(injected)
-          project = Path("godot/project.godot")
-          before_project = project.read_text()
-          switched, count = re.subn(
-              r'^run/main_scene=".*"$',
-              'run/main_scene="res://scenes/character_creator.tscn"',
-              before_project, count=1, flags=re.MULTILINE
-          )
-          assert count == 1
-          project.write_text(switched)
-          for label, code in [("before", old), ("after", new)]:
-              adapter.write_text(code)
-              subprocess.run(
-                  [os.environ["GODOT_BINARY"], "--headless", "--path", "godot",
-                   "--editor", "--quit"], check=True
-              )
-              out = Path("dist/clearance-" + label)
-              out.mkdir(parents=True, exist_ok=True)
-              subprocess.run(
-                  [os.environ["GODOT_BINARY"], "--headless", "--path", "godot",
-                   "--export-release", "Web", str((out / "index.html").resolve())],
-                  check=True
-              )
-              assert (out / "index.pck").stat().st_size > 0
-          adapter.write_text(new)
+          src.write_text(fixture)
+          for label,content in [("before",before),("after",after)]:
+              kit.write_text(content)
+              subprocess.run([
+                  os.environ["GODOT_BINARY"],"--headless","--path","godot",
+                  "--editor","--quit"
+              ],check=True)
+              out=Path("dist/clearance-"+label)
+              out.mkdir(parents=True,exist_ok=True)
+              subprocess.run([
+                  os.environ["GODOT_BINARY"],"--headless","--path","godot",
+                  "--export-release","Web",str(out.resolve()/"index.html")
+              ],check=True)
+              assert (out/"index.pck").stat().st_size>0
+          kit.write_text(after)
           src.write_text(original)
-          project.write_text(before_project)
           PY
-          python3 -m http.server 8783 --bind 127.0.0.1 --directory dist/clearance-before >/tmp/mu-clearance-before.log 2>&1 &
-          python3 -m http.server 8784 --bind 127.0.0.1 --directory dist/clearance-after >/tmp/mu-clearance-after.log 2>&1 &
+          python3 -m http.server 8783 --bind 127.0.0.1 --directory dist/clearance-before > /tmp/mu-clearance-before.log 2>&1 &
+          python3 -m http.server 8784 --bind 127.0.0.1 --directory dist/clearance-after > /tmp/mu-clearance-after.log 2>&1 &
           node <<'JS'
-          const {chromium} = require('/tmp/mini-utopia-playwright/node_modules/playwright');
-          const fs = require('node:fs');
-          (async () => {
-            const browser = await chromium.launch({
-              headless: true, args: [
-                '--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox'
-              ]
-            });
+          const {chromium}=require('/tmp/mini-utopia-playwright/node_modules/playwright');
+          const fs=require('node:fs');
+          (async()=>{
+            const browser=await chromium.launch({headless:true,args:[
+              '--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox'
+            ]});
             try {
-              for (const [version, port] of [['before',8783],['after',8784]]) {
-                for (const [width,height] of [[1180,820],[1366,1024]]) {
-                  const context = await browser.newContext({
+              for(const [build,port] of [['before',8783],['after',8784]]) {
+                for(const [width,height] of [[1180,820],[1366,1024]]) {
+                  const context=await browser.newContext({
                     viewport:{width,height},deviceScaleFactor:1,isMobile:true,hasTouch:true
                   });
-                  const page = await context.newPage();
-                  const errors = [];
-                  page.on('pageerror',e=>errors.push(e.message));
+                  const page=await context.newPage();
+                  const errors=[];
+                  page.on('pageerror',e=>errors.push(String(e.message)));
                   await page.goto('http://127.0.0.1:'+port+'/',{
                     waitUntil:'load',timeout:120000
                   });
                   await page.waitForFunction(
                     ()=>document.querySelector('#loader')===null,null,{timeout:120000}
                   );
-                  await page.waitForTimeout(1400);
-                  for (const prop of ['sword_1handed','staff']) {
-                    for (const action of ['Idle','Walk','Run']) {
-                      for (const [view,angle] of [['front',0],['side',90],['back',180]]) {
-                        await page.evaluate(
-                          s=>window.__MU_CLEARANCE_FRAME=s,[prop,action,angle].join('|')
-                        );
-                        await page.waitForTimeout(850);
-                        const name = ['clearance',version,prop,action,view,
-                          width+'x'+height].join('-')+'.png';
-                        const out='dist/visual-evidence/'+name;
-                        await page.screenshot({path:out,timeout:90000});
-                        if(fs.statSync(out).size<15000)
-                          throw Error('Invalid Godot Web screenshot '+name);
-                      }
-                    }
-                  }
-                  if(errors.length)
-                    throw Error('Godot Web JS error '+errors.join(' | '));
-                  await context.close();
-                }
-              }
-            } finally { await browser.close(); }
-          })().catch(e=>{console.error(e);process.exitCode=1;});
-          JS
-          test -s dist/visual-evidence/clearance-before-staff-Idle-front-1180x820.png
-          test -s dist/visual-evidence/clearance-after-staff-Run-back-1366x1024.png
-
-      - name: Capture Start Home and Who Is Playing at 1180x820
-        shell: bash
-        run: |
-          set -euo pipefail
-          sed -i -E 's|^run/main_scene=".*"$|run/main_scene="res://ui/theme/home.tscn"|' godot/project.godot
-          mkdir -p dist/home-visual dist/visual-evidence
-          "$GODOT_BINARY" --headless --path godot --export-release "Web" \
-            "$GITHUB_WORKSPACE/dist/home-visual/index.html"
-          test -s dist/home-visual/index.pck
-          python3 -m http.server 8771 --bind 127.0.0.1 --directory dist/home-visual >/tmp/mini-utopia-home.log 2>&1 &
-          node <<'JS'
-          const {chromium} = require('/tmp/mini-utopia-playwright/node_modules/playwright');
-          (async () => {
-            const browser = await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox']});
-            const context = await browser.newContext({viewport:{width:1180,height:820},deviceScaleFactor:1,isMobile:true,hasTouch:true});
-            try {
-              const page = await context.newPage();
-              await page.goto('http://127.0.0.1:8771/',{waitUntil:'load',timeout:120000});
-              await page.waitForFunction(()=>document.querySelector('#loader')===null,null,{timeout:120000});
-              await page.waitForTimeout(3000);
-              await page.screenshot({path:'dist/visual-evidence/home-1180x820.png'});
-              await page.mouse.click(590,485);
-              await page.waitForTimeout(7000);
-              await page.screenshot({path:'dist/visual-evidence/home-to-who-is-playing-1180x820.png'});
-              const fs=require('node:fs');
-              for(const file of ['home-1180x820.png','home-to-who-is-playing-1180x820.png']){
-                if(fs.statSync('dist/visual-evidence/'+file).size<12000)throw Error('Empty screenshot: '+file);
-              }
-            } finally {await browser.close();}
-          })().catch(e=>{console.error(e);process.exitCode=1;});
-          JS
-
-      - name: Screenshot Creator saved-Hero celebration at 1180x820
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 -m http.server 8772 --bind 127.0.0.1 --directory dist/creator-celebration-visual >/tmp/mini-utopia-save-celebration.log 2>&1 &
-          node <<'JS'
-          const {chromium} = require('/tmp/mini-utopia-playwright/node_modules/playwright');
-          const fs = require('node:fs');
-          (async () => {
-            const browser = await chromium.launch({
-              headless: true, args: ['--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox']
-            });
-            try {
-              const context = await browser.newContext({
-                viewport: {width:1180,height:820},
-                deviceScaleFactor:1,isMobile:true,hasTouch:true
-              });
-              const page = await context.newPage();
-              const errors = [];
-              page.on('pageerror', e => errors.push(e.message));
-              await page.goto('http://127.0.0.1:8772/',{waitUntil:'load',timeout:120000});
-              await page.locator('canvas').first().waitFor({state:'visible',timeout:120000});
-              await page.waitForFunction(() => document.getElementById('status') === null,null,{timeout:120000});
-              await page.waitForTimeout(4500);
-              const file = 'dist/visual-evidence/creator-save-celebration-1180x820.png';
-              await page.screenshot({path:file,fullPage:false,timeout:90000});
-              if (fs.statSync(file).size < 12000 || errors.length)
-                throw Error('Invalid Creator celebration screenshot: '+errors.join(';'));
-              await context.close();
-            } finally {await browser.close();}
-          })().catch(e=>{console.error(e);process.exitCode=1;});
-          JS
-          test -s dist/visual-evidence/creator-save-celebration-1180x820.png
-
-      # A-009: new source-only CI exports for visual evidence. They use
-      # checked-in synthetic session fixtures and never capture family data.
-      - name: Export isolated Village and Director visual-check builds
-        shell: bash
-        run: |
-          set -euo pipefail
-          sed -i -E 's|^run/main_scene=".*"$|run/main_scene="res://scenes/main.tscn"|' godot/project.godot
-          grep -Fx 'run/main_scene="res://scenes/main.tscn"' godot/project.godot
-          mkdir -p "$GITHUB_WORKSPACE/dist/village-visual"
-          "$GODOT_BINARY" --headless --path godot --export-release "Web" \
-            "$GITHUB_WORKSPACE/dist/village-visual/index.html"
-          test -s dist/village-visual/index.pck
-          sed -i -E 's|^run/main_scene=".*"$|run/main_scene="res://scenes/director_stage.tscn"|' godot/project.godot
-          grep -Fx 'run/main_scene="res://scenes/director_stage.tscn"' godot/project.godot
-          # A-012 screenshot-only fixture: show Director choice controls even
-          # without a private family login; never included in production export.
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path("godot/scripts/director_stage.gd")
-          source = path.read_text()
-          marker = '    _build_overlay()\n'
-          assert source.count(marker) == 1
-          path.write_text(source.replace(marker, marker + '    call_deferred("_build_child_director_controls")\n', 1))
-          PY
-          # The Director requires a validated play session; provide a
-          # deterministic SYNTHETIC fixture only for this isolated CI export.
-          # The production Web artifact was exported earlier and is unchanged.
-          mkdir -p godot/runtime_state
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-          play = json.loads(Path("godot/config/runtime/creator_play_session_example.json").read_text())
-          director = {
-              "schema_version": "1.0",
-              "director_session_id": "DIR_CI_FAKE",
-              "episode_id": "EP_CI_FAKE",
-              "scene_id": "SCENE_CI_FAKE",
-              "shot_id": "SHOT_CI_FAKE",
-              "world_asset_id": "LOC_NEWBIE_VILLAGE",
-              "duration_seconds": 15.0,
-              "animation_intent": "walk",
-              "play_session": play,
-              "shot": {},
-              "camera": {"position": [0.0, 4.2, 7.8], "look_at": [0.0, 1.1, 0.0], "fov": 52.0},
-          }
-          Path("godot/runtime_state/director_shot_session.json").write_text(json.dumps(director))
-          PY
-          # Non-imported JSON fixtures must be explicitly included in PCK.
-          sed -i 's|include_filter=""|include_filter="runtime_state/*.json"|' godot/export_presets.cfg
-          mkdir -p "$GITHUB_WORKSPACE/dist/director-visual"
-          "$GODOT_BINARY" --headless --path godot --export-release "Web" \
-            "$GITHUB_WORKSPACE/dist/director-visual/index.html"
-          test -s dist/director-visual/index.pck
-
-      - name: Capture Village and Director on iPad landscape
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 -m http.server 8766 --bind 127.0.0.1 --directory dist/village-visual >/tmp/mini-utopia-village-http.log 2>&1 &
-          python3 -m http.server 8767 --bind 127.0.0.1 --directory dist/director-visual >/tmp/mini-utopia-director-http.log 2>&1 &
-          MINI_UTOPIA_VISUAL_SCENE=village MINI_UTOPIA_VISUAL_PORT=8766 node tools/playwright_creator_visual.cjs
-          MINI_UTOPIA_VISUAL_SCENE=director MINI_UTOPIA_VISUAL_PORT=8767 node tools/playwright_creator_visual.cjs
-          test -s dist/visual-evidence/village-1366x1024.png
-          test -s dist/visual-evidence/director-1366x1024.png
-
-      # Governance-only evidence: isolated synthetic library builds. Never use
-      # household credentials or export this fixture in the production Web PCK.
-      - name: Export isolated empty and populated Hero Library visual builds
-        shell: bash
-        run: |
-          set -euo pipefail
-          sed -i 's|run/main_scene="res://scenes/director_stage.tscn"|run/main_scene="res://scenes/family_hero_library.tscn"|' godot/project.godot
-          grep -Fx 'run/main_scene="res://scenes/family_hero_library.tscn"' godot/project.godot
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path("godot/scripts/family_hero_library.gd")
-          source = path.read_text()
-          anchor = 'func _family_state() -> MiniUtopiaFamilySceneState:'
-          assert source.count(anchor) == 1
-          # CI-only injectable fixture: session is synthetic and never sent to a host.
-          fixture = '''
-          var _ci_visual_state := "chooser"
-
-          func _ci_library_fixture() -> void:
-              if _ci_visual_state == "chooser":
-                  return
-              if _ci_visual_state == "pin":
-                  _open_parent_from_picker()
-                  return
-              var family := _family_state()
-              if family == null:
-                  return
-              if not family.connect_family(
-                  "https://family.invalid",
-                  "CI_FAKE_NON_SECRET_0123456789abcdefghij",
-                  "child_a"
-              ):
-                  return
-              if not family.bind_family_client(bridge):
-                  return
-              _set_connected(true)
-              var heroes: Array = []
-              if _ci_visual_state == "hero":
-                  heroes.append({
-                      "character_id": "CHAR_CI_SYNTHETIC",
-                      "display_name": "小星星 Star",
-                      "profile": {"avatar": {}}
-                  })
-              _on_bridge_success("characters:list", {
-                  "schema_version": "1.0", "characters": heroes
-              })
-              # The new Lane C first-touch chooser must not cover the
-              # library-content evidence once it lands on main.
-              var chooser := get_node_or_null("WhoIsPlaying") as Control
-              if chooser != null:
-                  chooser.hide()
-
-          '''
-          source = source.replace(anchor, fixture + anchor, 1)
-          ready_end = '        _set_status("想保存新角色？请家长先点「家长入口」。", false)'
-          assert source.count(ready_end) == 1
-          source = source.replace(ready_end, ready_end + '\n    call_deferred("_ci_library_fixture")', 1)
-          path.write_text(source)
-          PY
-          # Capture the initial two-player chooser before injecting a synthetic
-          # owner-scoped session into the other two isolated CI exports.
-          for state in chooser pin empty hero; do
-            sed -i 's|var _ci_visual_state := "[^"]*"|var _ci_visual_state := "'"$state"'"|' godot/scripts/family_hero_library.gd
-            "$GODOT_BINARY" --headless --path godot --editor --quit
-            mkdir -p "$GITHUB_WORKSPACE/dist/library-$state-visual"
-            "$GODOT_BINARY" --headless --path godot --export-release "Web" \
-              "$GITHUB_WORKSPACE/dist/library-$state-visual/index.html"
-            test -s "dist/library-$state-visual/index.pck"
-          done
-
-      - name: Screenshot Who Is Playing and Hero Library at 1180x820
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 -m http.server 8768 --bind 127.0.0.1 --directory dist/library-empty-visual >/tmp/mini-utopia-library-empty.log 2>&1 &
-          python3 -m http.server 8769 --bind 127.0.0.1 --directory dist/library-hero-visual >/tmp/mini-utopia-library-hero.log 2>&1 &
-          python3 -m http.server 8770 --bind 127.0.0.1 --directory dist/library-chooser-visual >/tmp/mini-utopia-chooser.log 2>&1 &
-          python3 -m http.server 8781 --bind 127.0.0.1 --directory dist/library-pin-visual >/tmp/mini-utopia-parent-pin.log 2>&1 &
-          node <<'JS'
-          const {chromium} = require('/tmp/mini-utopia-playwright/node_modules/playwright');
-          const fs = require('node:fs');
-          (async () => {
-            const browser = await chromium.launch({
-              headless: true,
-              args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--no-sandbox']
-            });
-            try {
-              for (const [state, port] of [['who-is-playing', 8770], ['parent-pin', 8781], ['empty', 8768], ['with-hero', 8769]]) {
-                const context = await browser.newContext({
-                  viewport: {width: 1180, height: 820},
-                  deviceScaleFactor: 1, isMobile: true, hasTouch: true
-                });
-                const page = await context.newPage();
-                const errors = [];
-                page.on('pageerror', e => errors.push(e.message));
-                await page.goto('http://127.0.0.1:' + port + '/', {
-                  waitUntil: 'load', timeout: 120000
-                });
-                await page.locator('canvas').first().waitFor({
-                  state: 'visible', timeout: 120000
-                });
-                await page.waitForFunction(
-                  () => document.getElementById('status') === null,
-                  null, {timeout: 120000}
-                );
-                await page.waitForTimeout(5000);
-                const file = 'dist/visual-evidence/' + (state === 'who-is-playing' || state === 'parent-pin' ? state : 'library-' + state) + '-1180x820.png';
-                await page.screenshot({path: file, fullPage: false, timeout: 90000});
-                if (fs.statSync(file).size < 12000 || errors.length ||
-                    (state === 'parent-pin' && fs.existsSync('dist/visual-evidence/home-1180x820.png') &&
-                    fs.readFileSync(file).equals(fs.readFileSync('dist/visual-evidence/home-1180x820.png')))) {
-                  throw Error('Invalid library screenshot ' + state + ': ' + errors.join('; '));
-                }
-                console.log('Captured isolated, synthetic library: ' + file);
-                await context.close();
-              }
-            } finally { await browser.close(); }
-          })().catch(e => {console.error(e); process.exitCode = 1;});
-          JS
-          test -s dist/visual-evidence/parent-pin-1180x820.png
-          test -s dist/visual-evidence/who-is-playing-1180x820.png
-          test -s dist/visual-evidence/library-empty-1180x820.png
-          test -s dist/visual-evidence/library-with-hero-1180x820.png
-
-      - name: Publish iPad Creator visual evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: family-ipad-three-scenes-${{ github.sha }}
-          path: dist/visual-evidence/
-          if-no-files-found: warn
-          retention-days: 14
-
-      - name: Publish private build artifact for Mac/iPad review
-        uses: actions/upload-artifact@v4
-        with:
-          name: mini-utopia-web-${{ github.sha }}
-          path: dist/web/
-          if-no-files-found: error
-          retention-days: 14
-,
-              'run/main_scene="res://scenes/character_creator.tscn"',
-              project, count=1, flags=re.MULTILINE
-          ))
-          src.write_text(fixture)
-          for label,version in [("before",before),("after",after)]:
-              kit.write_text(version)
-              subprocess.run(
-                  [os.environ["GODOT_BINARY"],"--headless","--path","godot","--editor","--quit"],
-                  check=True
-              )
-              output=Path("dist/clearance-"+label)
-              output.mkdir(parents=True,exist_ok=True)
-              subprocess.run([
-                  os.environ["GODOT_BINARY"],"--headless","--path","godot",
-                  "--export-release","Web",str(output.resolve()/"index.html")
-              ],check=True)
-              assert (output/"index.pck").stat().st_size>0
-          kit.write_text(after)
-          src.write_text(original)
-          PY
-          python3 -m http.server 8783 --bind 127.0.0.1 --directory dist/clearance-before >/tmp/mu-clearance-before.log 2>&1 &
-          python3 -m http.server 8784 --bind 127.0.0.1 --directory dist/clearance-after >/tmp/mu-clearance-after.log 2>&1 &
-          node <<'JS'
-          const {chromium}=require('/tmp/mini-utopia-playwright/node_modules/playwright');
-          const fs=require('node:fs');
-          (async()=>{
-            const b=await chromium.launch({headless:true,args:[
-              '--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox'
-            ]});
-            try {
-              for(const [build,port] of [['before',8783],['after',8784]]) {
-                for(const [width,height] of [[1180,820],[1366,1024]]) {
-                  const context=await b.newContext({
-                    viewport:{width,height},deviceScaleFactor:1,isMobile:true,hasTouch:true
-                  });
-                  const page=await context.newPage();
-                  const errors=[];
-                  page.on('pageerror',e=>errors.push(e.message));
-                  await page.goto('http://127.0.0.1:'+port+'/',{
-                    waitUntil:'load',timeout:120000
-                  });
-                  await page.waitForFunction(()=>document.querySelector('#loader')===null,
-                    null,{timeout:120000});
-                  await page.waitForTimeout(1500);
+                  await page.waitForTimeout(1600);
                   for(const gear of ['sword_1handed','staff']) {
                     for(const action of ['Idle','Walk','Run']) {
                       for(const [view,angle] of [['front',0],['side',90],['back',180]]) {
-                        const command=[gear,action,angle].join('|');
-                        await page.evaluate(s=>{window.__MU_CLEARANCE_FRAME=s;},command);
+                        await page.evaluate(command=>{window.__MU_CLEARANCE_FRAME=command;},
+                          [gear,action,angle].join('|'));
                         await page.waitForTimeout(950);
-                        const name='clearance-'+build+'-'+gear+'-'+action+'-'+view+
-                          '-'+width+'x'+height+'.png';
-                        const path='dist/visual-evidence/'+name;
+                        const path='dist/visual-evidence/clearance-'+build+'-'+gear+
+                          '-'+action+'-'+view+'-'+width+'x'+height+'.png';
                         await page.screenshot({path,timeout:90000});
-                        if(fs.statSync(path).size<15000)throw Error('Blank Web frame '+name);
+                        if(fs.statSync(path).size<15000)throw Error('Invalid frame '+path);
                       }
                     }
                   }
-                  if(errors.length)throw Error('Godot browser errors: '+errors.join('|'));
+                  if(errors.length)throw Error('Godot browser errors '+errors.join(';'));
                   await context.close();
                 }
               }
-            }finally{await b.close();}
+            }finally{await browser.close();}
           })().catch(e=>{console.error(e);process.exitCode=1;});
           JS
           test -s dist/visual-evidence/clearance-before-staff-Idle-front-1180x820.png
