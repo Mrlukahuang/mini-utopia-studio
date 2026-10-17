@@ -113,6 +113,7 @@ jobs:
           fixture+='''
           var _ci_key := ""
           func _ci_diag_ready() -> void:
+              RenderingServer.frame_post_draw.connect(_ci_capture_frame)
               avatar_stage.apply_equipment_runtime({
                   "character_asset_id": "CHAR_CI_DIAG",
                   "equipped": {"weapon_main": {
@@ -125,7 +126,7 @@ jobs:
           func _ci_v(v: Vector3) -> Array:
               return [v.x,v.y,v.z]
 
-          func _process(_delta: float) -> void:
+          func _ci_capture_frame() -> void:
               if not OS.has_feature("web"):
                   return
               var request := String(JavaScriptBridge.eval(
@@ -197,6 +198,9 @@ jobs:
               var head := rig.to_global(
                   rig.get_bone_global_pose(bone).origin
               )
+              var anim := actor.find_child("AnimationPlayer",true,false) as AnimationPlayer
+              if anim == null or anim.current_animation.is_empty():
+                  return
               var axes := actor.global_transform.basis.orthonormalized()
               var d := tip-head
               var px1 := cam.unproject_position(head)
@@ -204,6 +208,11 @@ jobs:
               JavaScriptBridge.get_interface("window").set(
                   "__MU_DIAG_JSON",JSON.stringify({
                       "request": request,
+                      "render_frame": Engine.get_frames_drawn(),
+                      "ticks_ms": Time.get_ticks_msec(),
+                      "animation": anim.current_animation,
+                      "animation_time": anim.current_animation_position,
+                      "animation_length": anim.current_animation_length,
                       "head": _ci_v(head),
                       "grip": _ci_v(hand.global_position),
                       "grip_parent": _ci_v((hand.get_parent() as Node3D).global_position),
@@ -229,6 +238,10 @@ jobs:
                       "tip_screen":[px2.x,px2.y],
                       "screen_gap_px":px1.distance_to(px2),
                   })
+              )
+              JavaScriptBridge.eval(
+                  "if(window.__MU_CAPTURE){window.__MU_CYCLE_FRAMES.push(window.__MU_DIAG_JSON);}",
+                  true
               )
           '''
           shell.write_text(fixture)
@@ -290,6 +303,51 @@ jobs:
                     }
                   }
                 }
+                if(width===1366){
+                  const key='staff|Walk|270';
+                  await page.evaluate(x=>{window.__MU_REQUEST=x;window.__MU_DIAG_JSON='';},key);
+                  await page.waitForFunction(x=>{
+                    try{return JSON.parse(window.__MU_DIAG_JSON||'{}').request===x;}
+                    catch(e){return false;}
+                  },key,{timeout:45000});
+                  const info=await page.evaluate(()=>JSON.parse(window.__MU_DIAG_JSON));
+                  if(!(info.animation_length>0 && info.animation_length<30))
+                    throw Error('Invalid Walk cycle length');
+                  // Record the real rendered canvas at normal game resolution.
+                  // Two cycles guarantee a complete wrap-to-wrap cycle is present.
+                  const durationMs=Math.ceil((2*info.animation_length+0.25)*1000);
+                  const recording=await page.evaluate(async durationMs=>{
+                    const canvas=document.querySelector('canvas');
+                    if(!canvas || !canvas.captureStream)throw Error('Canvas recording unavailable');
+                    const stream=canvas.captureStream(30);
+                    const chunks=[];
+                    const recorder=new MediaRecorder(stream,{mimeType:'video/webm;codecs=vp8'});
+                    recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+                    const stopped=new Promise(resolve=>{recorder.onstop=resolve;});
+                    window.__MU_CYCLE_FRAMES=[];window.__MU_CAPTURE=true;
+                    recorder.start();
+                    await new Promise(resolve=>setTimeout(resolve,durationMs));
+                    recorder.stop();await stopped;
+                    window.__MU_CAPTURE=false;stream.getTracks().forEach(t=>t.stop());
+                    const frames=window.__MU_CYCLE_FRAMES.map(x=>JSON.parse(x));
+                    const bytes=Array.from(new Uint8Array(await new Blob(chunks).arrayBuffer()));
+                    return {bytes,frames,canvas:[canvas.width,canvas.height]};
+                  },durationMs);
+                  const frames=recording.frames;
+                  let wraps=0;
+                  for(let i=1;i<frames.length;i++){
+                    if(frames[i].animation_time<frames[i-1].animation_time)wraps++;
+                  }
+                  if(frames.length<12 || wraps<2)
+                    throw Error('Recording lacks a full wrap-to-wrap Walk cycle: '+wraps);
+                  fs.writeFileSync('dist/visual-evidence/A2-left-Walk-cycle.webm',
+                    Buffer.from(recording.bytes));
+                  fs.writeFileSync('dist/visual-evidence/A2-left-Walk-cycle.json',
+                    JSON.stringify({source:process.env.GITHUB_SHA,viewport:[width,height],
+                      canvas:recording.canvas,durationMs,wraps,frames,
+                      limitation:'World-space mesh/crown and head-bone references; not a helmet mesh intersection test.'},null,2));
+                  console.log('A2 Walk recording: '+frames.length+' rendered frames, '+wraps+' wraps');
+                }
                 await context.close();
               }
             }finally{await browser.close();}
@@ -308,6 +366,7 @@ jobs:
           path: |
             dist/visual-evidence/diag-*.png
             dist/visual-evidence/clearance-geometry.json
+            dist/visual-evidence/A2-left-Walk-cycle.*
           if-no-files-found: warn
           retention-days: 14
 
