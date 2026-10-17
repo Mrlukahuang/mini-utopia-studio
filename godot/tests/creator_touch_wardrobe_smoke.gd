@@ -1,5 +1,31 @@
 extends SceneTree
 
+# Capture the actual child button and Save callbacks without external
+# HTTP, credentials or real children. Server responses are simulated.
+class CaptureBridge extends MiniUtopiaBridgeClient:
+    var gear_calls: Array[Dictionary] = []
+    var save_calls: Array[Dictionary] = []
+    var reads: Array[String] = []
+    var deny := false
+
+    func has_family_session() -> bool:
+        return true
+
+    func is_busy() -> bool:
+        return false
+
+    func get_equipment(character_id: String) -> int:
+        reads.append(character_id)
+        return OK
+
+    func put_equipment_slot(character_id: String, slot: String, item: Variant) -> int:
+        gear_calls.append({"hero": character_id, "slot": slot, "item": item})
+        return ERR_CANT_CONNECT if deny else OK
+
+    func put_character(character_id: String, payload: Dictionary) -> int:
+        save_calls.append({"hero": character_id, "payload": payload.duplicate(true)})
+        return OK
+
 ## Child-facing wardrobe: nine-slot list, large touch targets, canonical
 ## server updates, and immediate 3D Hero clothing/prop preview.
 
@@ -9,9 +35,14 @@ func _initialize() -> void:
         _fail("Character Creator scene missing")
         return
     var creator := packed.instantiate()
+    creator.get_node("BridgeClient").set_script(CaptureBridge)
     root.add_child(creator)
     await process_frame
 
+    var bridge := creator.get_node("BridgeClient") as CaptureBridge
+    if bridge == null:
+        _fail("Creator mock Bridge script did not attach")
+        return
     var character := {
         "schema_version": "1.0",
         "character_id": "CHAR_WARDROBE_LILY",
@@ -31,6 +62,19 @@ func _initialize() -> void:
                 "slot": "headwear",
                 "display_name": "Tiny Crown",
                 "item_instance_id": "ITEM_WARDROBE_CROWN",
+                "equipped": false
+            },
+            {
+                "slot": "weapon_main",
+                "display_name": "Crafted Star",
+                "item_instance_id": "ITEM_WARDROBE_CRAFTED",
+                "visual_recipe": {"shape": "star"},
+                "equipped": false
+            },
+            {
+                "slot": "weapon_main",
+                "display_name": "Spare Sword",
+                "item_instance_id": "ITEM_WARDROBE_SPARE",
                 "equipped": false
             },
             {
@@ -116,46 +160,109 @@ func _initialize() -> void:
     # Synthetic owner-scoped server response: only an actually owned standard
     # sword may be reskinned, and only AFTER equipment PUT confirms its ID.
     var equipped_sword := equipment.duplicate(true)
-    equipped_sword["items"][1]["equipped"] = true
+    equipped_sword["items"][3]["equipped"] = true
     equipped_sword["runtime"]["equipped"]["weapon_main"] = {
         "item_instance_id": "ITEM_WARDROBE_SWORD",
         "display_name": "Star Sword",
         "rarity": "blue",
     }
     creator._on_bridge_success("equipment:put:weapon_main", equipped_sword)
+    var staff := creator.hand_style_grid.get_node("StaffStyleButton") as Button
+    if not staff.visible or staff.pressed.get_connections().is_empty():
+        _fail("child-facing staff control is not connected")
+        return
     var before_tags: Array = creator._draft_appearance.get("compatible_tags", ["humanoid"])
-    creator._pending_hand_style = "staff"
-    creator._pending_hand_slot = "weapon_main"
-    creator._pending_hand_item_id = "ITEM_NOT_OWNED"
-    creator._on_bridge_success("equipment:put:weapon_main", equipped_sword)
+    bridge.deny = true
+    staff.pressed.emit()
+    if bridge.gear_calls.size() != 1:
+        _fail("staff click never sent a wardrobe PUT")
+        return
+    var call: Dictionary = bridge.gear_calls[0]
+    if (
+        call.get("hero") != "CHAR_WARDROBE_LILY"
+        or call.get("slot") != "weapon_main"
+        or call.get("item") != "ITEM_WARDROBE_SWORD"
+    ):
+        _fail("hand click chose crafted/spare instead of worn owned sword")
+        return
     if creator._draft_appearance.get("compatible_tags", ["humanoid"]) != before_tags:
-        _fail("a mismatched equipment PUT changed avatar appearance")
+        _fail("failed equipment write changed Hero appearance")
+        return
+    if not creator._pending_hand_style.is_empty():
+        _fail("failed equipment write left pending hand choice")
         return
 
-    creator._pending_hand_style = "staff"
-    creator._pending_hand_slot = "weapon_main"
-    creator._pending_hand_item_id = "ITEM_WARDROBE_SWORD"
-    creator._on_bridge_success("equipment:put:weapon_main", equipped_sword)
+    bridge.deny = false
+    staff.pressed.emit()
+    if bridge.gear_calls.size() != 2 or creator._pending_hand_style != "staff":
+        _fail("successful hand click did not wait for server response")
+        return
+    if MiniUtopiaKaykitAvatarV1.visible_hand_style(
+        stage.avatar_root(), "weapon_main", "staff"
+    ):
+        _fail("staff appeared before server confirmation")
+        return
+    var mismatch := equipped_sword.duplicate(true)
+    mismatch["runtime"]["equipped"]["weapon_main"]["item_instance_id"] = "ITEM_FOREIGN"
+    bridge.request_succeeded.emit("equipment:put:weapon_main", mismatch)
+    if MiniUtopiaKaykitAvatarV1.hand_skin(creator._draft_appearance) == "staff":
+        _fail("a mismatched server item changed appearance")
+        return
+
+    staff.pressed.emit()
+    if bridge.gear_calls.size() != 3:
+        _fail("retry after mismatched server item was blocked")
+        return
+    bridge.request_succeeded.emit("equipment:put:weapon_main", equipped_sword)
     if not MiniUtopiaKaykitAvatarV1.visible_hand_style(
         stage.avatar_root(), "weapon_main", "staff"
     ):
-        _fail("confirmed owned staff reskin was not visible on the official Knight")
+        _fail("server-confirmed staff not visible on Knight")
         return
-    if not creator._appearance_dirty:
-        _fail("confirmed hand style was not marked for canonical Character save")
+    if not creator._appearance_dirty or not creator.play_button.disabled:
+        _fail("unsaved hand change incorrectly allowed Village")
         return
-    var updated: Dictionary = creator._character_update_payload("Lily")
-    var avatar: Dictionary = updated.get("profile", {}).get("avatar", {})
+    creator.save_button.pressed.emit()
+    if bridge.save_calls.size() != 1:
+        _fail("Save control did not send canonical Character PUT")
+        return
+    var write: Dictionary = bridge.save_calls[0]
+    if write.get("hero") != "CHAR_WARDROBE_LILY":
+        _fail("save targeted wrong Hero")
+        return
+    var avatar: Dictionary = write["payload"].get("profile", {}).get("avatar", {})
     if MiniUtopiaKaykitAvatarV1.hand_skin(avatar) != "staff":
-        _fail("hand style missing from canonical Character update payload")
+        _fail("Character PUT missing visible staff")
         return
+    var saved: Dictionary = character.duplicate(true)
+    saved["profile"]["avatar"] = avatar.duplicate(true)
+    saved["revision"] = "2"
+    bridge.request_succeeded.emit("character:put", saved)
 
-    # The same confirmed Character avatar + owned equipment must render in
-    # the village, not just in the Creator's isolated SubViewport.
-    var saved: Dictionary = creator.loaded_character.duplicate(true)
-    saved["profile"]["avatar"] = avatar
-    var play_payload := MiniUtopiaFamilyCharacterPlayAdapter.play_session_for(saved)
-    play_payload["equipment"] = equipped_sword["runtime"].duplicate(true)
+    # Fresh Creator reopens using server-saved Character and equipment GET,
+    # not an unsaved draft composed directly into a village session.
+    var reopened := packed.instantiate()
+    reopened.get_node("BridgeClient").set_script(CaptureBridge)
+    root.add_child(reopened)
+    await process_frame
+    var fresh_bridge := reopened.get_node("BridgeClient") as CaptureBridge
+    fresh_bridge.request_succeeded.emit("character:get", saved)
+    if fresh_bridge.reads != ["CHAR_WARDROBE_LILY"]:
+        _fail("reopen did not GET the saved Hero wardrobe")
+        return
+    fresh_bridge.request_succeeded.emit("equipment:get", equipped_sword)
+    if not MiniUtopiaKaykitAvatarV1.visible_hand_style(
+        reopened.avatar_stage.avatar_root(), "weapon_main", "staff"
+    ):
+        _fail("saved staff disappeared on fresh Creator reopen")
+        return
+    if reopened.play_button.disabled:
+        _fail("saved Hero with owned gear cannot enter Village")
+        return
+    var play_payload := MiniUtopiaFamilyCharacterPlayAdapter.play_session_for(
+        reopened.loaded_character
+    )
+    play_payload["equipment"] = reopened.equipment_state["runtime"].duplicate(true)
     var world := Node3D.new()
     world.name = "MiniUtopiaWorld"
     root.add_child(world)
