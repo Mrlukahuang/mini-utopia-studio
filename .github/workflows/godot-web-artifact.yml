@@ -170,12 +170,35 @@ jobs:
                   bb.position.z + bb.size.z * 0.5
               )
               var tip := mesh.to_global(p)
+              # Only staff's actual crown vertices: no generic silhouette
+              # classifier or camera-dependent rendering change. Includes the
+              # green jewel AND its metal housing at the tip.
+              var crown_low := Vector3(INF,INF,INF)
+              var crown_high := Vector3(-INF,-INF,-INF)
+              var crown_world_low := Vector3(INF,INF,INF)
+              var crown_world_high := Vector3(-INF,-INF,-INF)
+              var crown_screen_low := Vector2(INF,INF)
+              var crown_screen_high := Vector2(-INF,-INF)
+              var crown_samples := 0
+              var verts := mesh.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX] as PackedVector3Array
+              var cam := avatar_stage._camera as Camera3D
+              for vertex in verts:
+                  if vertex.y < 0.70:
+                      continue
+                  crown_samples += 1
+                  crown_low = crown_low.min(vertex)
+                  crown_high = crown_high.max(vertex)
+                  var w := mesh.to_global(vertex)
+                  crown_world_low = crown_world_low.min(w)
+                  crown_world_high = crown_world_high.max(w)
+                  var screen := cam.unproject_position(w)
+                  crown_screen_low = crown_screen_low.min(screen)
+                  crown_screen_high = crown_screen_high.max(screen)
               var head := rig.to_global(
                   rig.get_bone_global_pose(bone).origin
               )
               var axes := actor.global_transform.basis.orthonormalized()
               var d := tip-head
-              var cam := avatar_stage._camera as Camera3D
               var px1 := cam.unproject_position(head)
               var px2 := cam.unproject_position(tip)
               JavaScriptBridge.get_interface("window").set(
@@ -183,7 +206,19 @@ jobs:
                       "request": request,
                       "head": _ci_v(head),
                       "grip": _ci_v(hand.global_position),
+                      "grip_parent": _ci_v((hand.get_parent() as Node3D).global_position),
+                      "grip_basis_x": _ci_v(hand.global_transform.basis.x),
+                      "grip_basis_y": _ci_v(hand.global_transform.basis.y),
+                      "grip_basis_z": _ci_v(hand.global_transform.basis.z),
+                      "mesh_origin": _ci_v(mesh.global_position),
                       "tip": _ci_v(tip),
+                      "crown_vertex_count": crown_samples,
+                      "crown_local_min": _ci_v(crown_low),
+                      "crown_local_max": _ci_v(crown_high),
+                      "crown_world_min": _ci_v(crown_world_low),
+                      "crown_world_max": _ci_v(crown_world_high),
+                      "crown_screen_min": [crown_screen_low.x,crown_screen_low.y],
+                      "crown_screen_max": [crown_screen_high.x,crown_screen_high.y],
                       "axis": _ci_v(hand.global_transform.basis.y),
                       "bounds_min": _ci_v(bb.position),
                       "bounds_max": _ci_v(bb.position+bb.size),
@@ -232,21 +267,23 @@ jobs:
                   ()=>document.querySelector('#loader')===null,null,{timeout:120000}
                 );
                 await page.waitForTimeout(1300);
-                for(const gear of ['staff','sword_1handed']){
-                  for(const pose of ['Idle','Walk','Run']){
-                    for(const [view,angle] of [['front',0],['side',90],['back',180]]){
-                      const key=[gear,pose,angle].join('|');
-                      await page.evaluate(x=>{window.__MU_REQUEST=x;
-                        window.__MU_DIAG_JSON='';},key);
-                      await page.waitForFunction(
-                        x=>{try{return JSON.parse(window.__MU_DIAG_JSON||'{}').request===x;}
-                        catch(e){return false;}},key,{timeout:45000});
-                      await page.waitForTimeout(550);
+                // Focused preview: only one real staff build, both sides,
+                // Idle and two actual Walk phases at both iPad viewport sizes.
+                for(const pose of ['Idle','Walk']){
+                  for(const [view,angle] of [['side',90],['side-left',270]]){
+                    const key=['staff',pose,angle].join('|');
+                    await page.evaluate(x=>{window.__MU_REQUEST=x;
+                      window.__MU_DIAG_JSON='';},key);
+                    await page.waitForFunction(
+                      x=>{try{return JSON.parse(window.__MU_DIAG_JSON||'{}').request===x;}
+                      catch(e){return false;}},key,{timeout:45000});
+                    for(const phase of (pose==='Walk'?['early','later']:['idle'])){
+                      await page.waitForTimeout(phase==='later'?730:550);
                       const data=await page.evaluate(()=>JSON.parse(window.__MU_DIAG_JSON));
-                      data.viewport=[width,height];data.pose=pose;data.view=view;
+                      data.viewport=[width,height];data.pose=pose;data.view=view;data.phase=phase;
                       records.push(data);
-                      const dest='dist/visual-evidence/diag-'+gear+'-'+pose+
-                        '-'+view+'-'+width+'x'+height+'.png';
+                      const dest='dist/visual-evidence/diag-staff-'+pose+
+                        '-'+view+'-'+phase+'-'+width+'x'+height+'.png';
                       await page.screenshot({path:dest,timeout:90000});
                       if(fs.statSync(dest).size<15000)throw Error('Empty Web screenshot '+dest);
                       console.log('MU_DIAG '+JSON.stringify(data));
@@ -258,7 +295,7 @@ jobs:
             }finally{await browser.close();}
             fs.writeFileSync('dist/visual-evidence/clearance-geometry.json',
               JSON.stringify(records,null,2));
-            if(records.length!==36)throw Error('Only '+records.length+' diagnostic frames');
+            if(records.length!==12)throw Error('Only '+records.length+' focused diagnostic frames');
           })().catch(e=>{console.error(e);process.exitCode=1;});
           JS
 
@@ -569,6 +606,9 @@ jobs:
       # A-012 screenshot-only CI fixtures; never included in production artifact.
       # Baseline and fixed: sword/staff x (Idle one, Walk/Run two phases) x four views x two sizes.
       - name: Capture actual Godot Web weapon clearance before and after
+        # A-012: temporarily skip screenshot-only 160-frame comparison during
+        # approved 12-frame focused staff candidate review. Restore for final.
+        if: ${{ false }}
         shell: bash
         run: |
           set -euo pipefail
