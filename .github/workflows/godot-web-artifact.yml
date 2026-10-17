@@ -314,8 +314,9 @@ jobs:
                   if(!(info.animation_length>0 && info.animation_length<30))
                     throw Error('Invalid Walk cycle length');
                   // Record the real rendered canvas at normal game resolution.
-                  // Two cycles guarantee a complete wrap-to-wrap cycle is present.
-                  const durationMs=Math.ceil((2*info.animation_length+0.25)*1000);
+                  // Software rendering can run slower than wall-clock animation time.
+                  // Stop only after observed wraps, with a bounded timeout.
+                  const durationMs=120000;
                   const recording=await page.evaluate(async durationMs=>{
                     const canvas=document.querySelector('canvas');
                     if(!canvas || !canvas.captureStream)throw Error('Canvas recording unavailable');
@@ -326,26 +327,37 @@ jobs:
                     const stopped=new Promise(resolve=>{recorder.onstop=resolve;});
                     window.__MU_CYCLE_FRAMES=[];window.__MU_CAPTURE=true;
                     recorder.start();
-                    await new Promise(resolve=>setTimeout(resolve,durationMs));
+                    const start=performance.now();
+                    let observedWraps=0,seen=0,previous=null;
+                    while(performance.now()-start<durationMs){
+                      await new Promise(resolve=>setTimeout(resolve,200));
+                      const samples=window.__MU_CYCLE_FRAMES;
+                      for(;seen<samples.length;seen++){
+                        const current=JSON.parse(samples[seen]).animation_time;
+                        if(previous!==null && current<previous)observedWraps++;
+                        previous=current;
+                      }
+                      if(observedWraps>=2 && seen>=12)break;
+                    }
                     recorder.stop();await stopped;
                     window.__MU_CAPTURE=false;stream.getTracks().forEach(t=>t.stop());
                     const frames=window.__MU_CYCLE_FRAMES.map(x=>JSON.parse(x));
                     const bytes=Array.from(new Uint8Array(await new Blob(chunks).arrayBuffer()));
-                    return {bytes,frames,canvas:[canvas.width,canvas.height]};
+                    return {bytes,frames,elapsedMs:performance.now()-start,canvas:[canvas.width,canvas.height]};
                   },durationMs);
                   const frames=recording.frames;
                   let wraps=0;
                   for(let i=1;i<frames.length;i++){
                     if(frames[i].animation_time<frames[i-1].animation_time)wraps++;
                   }
-                  if(frames.length<12 || wraps<2)
-                    throw Error('Recording lacks a full wrap-to-wrap Walk cycle: '+wraps);
                   fs.writeFileSync('dist/visual-evidence/A2-left-Walk-cycle.webm',
                     Buffer.from(recording.bytes));
                   fs.writeFileSync('dist/visual-evidence/A2-left-Walk-cycle.json',
                     JSON.stringify({source:process.env.GITHUB_SHA,viewport:[width,height],
-                      canvas:recording.canvas,durationMs,wraps,frames,
+                      canvas:recording.canvas,durationMs:recording.elapsedMs,wraps,frames,
                       limitation:'World-space mesh/crown and head-bone references; not a helmet mesh intersection test.'},null,2));
+                  if(frames.length<12 || wraps<2)
+                    throw Error('Recording lacks a full wrap-to-wrap Walk cycle: '+wraps);
                   console.log('A2 Walk recording: '+frames.length+' rendered frames, '+wraps+' wraps');
                 }
                 await context.close();
