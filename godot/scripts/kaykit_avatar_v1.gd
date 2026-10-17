@@ -23,6 +23,11 @@ class HeadClearancePivot extends Node3D:
     var style := "sword_1handed"
 
     func _ready() -> void:
+        # Imported AnimationPlayer changes handslot_r in idle processing.
+        # At default priority 0 the prop can orient before the animated hand,
+        # causing one-frame Walk/Run drift toward the helmet. Resolve the
+        # visual-only grip AFTER the rig update, with no socket translation.
+        process_priority = 100
         _orient_in_actor_space()
 
     func _process(_delta: float) -> void:
