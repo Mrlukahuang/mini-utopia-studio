@@ -13,6 +13,35 @@ const WEAPONS := {
 }
 
 
+# Dynamic *visual-only* grip pivot. The Knight's hand follows real imported
+# Idle/Walking_A/Running_A animations while long props lean out of the head's
+# horizontal footprint. The owned item's identity and server slot never change.
+class HeadClearancePivot extends Node3D:
+    var actor: Node3D
+    var rig: Skeleton3D
+    var head_bone := -1
+
+    func _ready() -> void:
+        _orient_out_of_helmet()
+
+    func _process(_delta: float) -> void:
+        _orient_out_of_helmet()
+
+    func _orient_out_of_helmet() -> void:
+        if actor == null or rig == null or head_bone < 0:
+            return
+        var head_world := rig.to_global(rig.get_bone_global_pose(head_bone).origin)
+        var away := global_position - head_world
+        away.y = 0.0
+        if away.length_squared() < 0.015:
+            away = -actor.global_transform.basis.x
+            away.y = 0.0
+        var upright := actor.global_transform.basis.y.normalized()
+        var target_world := (upright + away.normalized() * 0.68).normalized()
+        var parent_space := (get_parent() as Node3D).global_transform.basis.inverse()
+        quaternion = Quaternion(Vector3.UP, (parent_space * target_world).normalized())
+
+
 static func mount(root: Node3D, appearance: Dictionary) -> AnimationPlayer:
     var model := root.get_node_or_null("KayKitBody") as Node3D
     if model == null:
@@ -143,15 +172,26 @@ static func apply_hand_skin(root: Node3D, appearance: Dictionary, equipment: Dic
     if packed != null:
         var model := packed.instantiate() as Node3D
         if model != null:
-            model.name = "Equipment_" + slot
-            model.set_meta("kaykit_style", style)
-            # The imported hand grip points a prop's local Y axis toward
-            # the camera; rotate it into the standing plane instead. The
-            # official sword, wand and staff must show a full recognizable
-            # silhouette, not an end-on disc or a cross-body rod.
             if style in ["sword_1handed", "staff", "wand"]:
-                model.rotation_degrees.z = 90.0
-            socket.add_child(model)
+                var rig := socket.get_parent() as Node3D
+                var skeleton := root.get_node("KayKitBody").find_child(
+                    "Skeleton3D", true, false
+                ) as Skeleton3D
+                if skeleton == null:
+                    return
+                var pivot := HeadClearancePivot.new()
+                pivot.name = "Equipment_" + slot
+                pivot.set_meta("kaykit_style", style)
+                pivot.actor = root
+                pivot.rig = skeleton
+                pivot.head_bone = skeleton.find_bone("head")
+                socket.add_child(pivot)
+                model.name = "OfficialHandProp"
+                pivot.add_child(model)
+            else:
+                model.name = "Equipment_" + slot
+                model.set_meta("kaykit_style", style)
+                socket.add_child(model)
 
 
 static func play(animation: AnimationPlayer, semantic: String) -> void:

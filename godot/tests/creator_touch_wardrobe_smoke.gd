@@ -276,6 +276,30 @@ func _initialize() -> void:
         return
     world.queue_free()
 
+    # The original fixed 90-degree weapon rotation brought the staff gem into
+    # the helmet at animation extremes. Sample the same official right-hand
+    # mount while Godot advances the imported Idle/Walk/Run animation clips.
+    for pose in ["Idle", "Walk", "Run"]:
+        reopened_stage.play_preview_animation(pose)
+        await process_frame
+        await process_frame
+        var hand := reopened_stage.avatar_root().find_child(
+            "Equipment_weapon_main", true, false
+        ) as Node3D
+        if hand == null or hand.get_node_or_null("OfficialHandProp") == null:
+            _fail("owned long prop no longer follows the animated official hand")
+            return
+        var rig := reopened_stage.avatar_root().get_node(
+            "KayKitBody/Rig/Skeleton3D"
+        ) as Skeleton3D
+        var head_bone := rig.find_bone("head")
+        var center := rig.to_global(rig.get_bone_global_pose(head_bone).origin)
+        var tip := hand.to_global(Vector3(0.0, 1.25, 0.0))
+        var head_gap := Vector2(tip.x - center.x, tip.z - center.z).length()
+        if head_gap < 0.45:
+            _fail("official staff tip crossed the helmet footprint in " + pose)
+            return
+
     creator._select_creator_tab("look")
     if outfit.visible:
         _fail("Look tab did not close the wardrobe")
