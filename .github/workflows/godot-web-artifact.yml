@@ -384,47 +384,49 @@ jobs:
           JS
 
 
-      # A-012: isolated Web screenshots only. Compare source at the merged
-      # #453 baseline with the PR's new source, never export these fixtures as
-      # the release game. 2 gear types x 3 animations x 3 views x 2 viewports,
-      # captured *before and after* from the real Godot Web renderer.
-      - name: Screenshot long weapon helmet clearance matrix
+      # A-012 screenshot-only: actual Godot Web renderer, synthetic owned
+      # equipment, before/after at both viewports and nine view/pose pairs.
+      # Production Web export and tests above are entirely unchanged.
+      - name: Screenshot long prop helmet clearance before and after
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           import os
+          import re
           import subprocess
           from pathlib import Path
-          main_file=Path("godot/project.godot")
-          src=Path("godot/scripts/character_creator_shell.gd")
-          kit=Path("godot/scripts/kaykit_avatar_v1.gd")
-          original=subprocess.check_output(
-              ["git","show","HEAD:godot/scripts/character_creator_shell.gd"],text=True
+
+          src = Path("godot/scripts/character_creator_shell.gd")
+          adapter = Path("godot/scripts/kaykit_avatar_v1.gd")
+          original = subprocess.check_output(
+              ["git", "show", "HEAD:godot/scripts/character_creator_shell.gd"], text=True
           )
-          before=subprocess.check_output(
-              ["git","show","84c6af913184cca0a64d4aa01d4dbebc59823566:godot/scripts/kaykit_avatar_v1.gd"],text=True
+          old = subprocess.check_output(
+              ["git", "show", "84c6af913184cca0a64d4aa01d4dbebc59823566:godot/scripts/kaykit_avatar_v1.gd"], text=True
           )
-          after=subprocess.check_output(
-              ["git","show","HEAD:godot/scripts/kaykit_avatar_v1.gd"],text=True
+          new = subprocess.check_output(
+              ["git", "show", "HEAD:godot/scripts/kaykit_avatar_v1.gd"], text=True
           )
-          anchor='    _build_save_celebration()'
-          assert original.count(anchor)==1
-          fixture=original.replace(anchor,anchor+'\n    call_deferred("_ci_clearance_ready")',1)
-          fixture+='''
+          marker = '    _build_save_celebration()'
+          assert original.count(marker) == 1
+          injected = original.replace(
+              marker, marker + '\n    call_deferred("_ci_clearance_ready")', 1
+          )
+          injected += '''
           var _ci_clearance_key := ""
+
           func _ci_clearance_ready() -> void:
-              var owned := {
-                  "character_asset_id": "CHAR_CI_HEAD_CLEARANCE",
+              avatar_stage.apply_equipment_runtime({
+                  "character_asset_id": "CHAR_CI_CLEARANCE",
                   "equipped": {"weapon_main": {
-                      "item_instance_id": "ITEM_CI_OWNED_SWORD",
-                      "display_name": "Owned Sword",
-                      "mesh_asset_id": "sword_1handed",
+                      "item_instance_id": "ITEM_CI_OWNED_HAND",
+                      "display_name": "Owned Prop",
+                      "mesh_asset_id": "sword_1handed"
                   }},
-                  "final_stats": {},
-              }
-              avatar_stage.apply_equipment_runtime(owned)
-              _set_status("CI 模拟已拥有道具 · 真实 Godot Web", false)
+                  "final_stats": {}
+              })
+              _set_status("CI 合成已拥有道具，非真实家庭数据", false)
 
           func _process(_delta: float) -> void:
               if not OS.has_feature("web"):
@@ -451,10 +453,88 @@ jobs:
               avatar_stage.play_preview_animation(action)
               avatar_stage.avatar_root().rotation_degrees.y = float(parts[2])
           '''
-          import re
-          project=main_file.read_text()
-          main_file.write_text(re.sub(
-              r'^run/main_scene=".*"
+          src.write_text(injected)
+          project = Path("godot/project.godot")
+          before_project = project.read_text()
+          switched, count = re.subn(
+              r'^run/main_scene=".*"$',
+              'run/main_scene="res://scenes/character_creator.tscn"',
+              before_project, count=1, flags=re.MULTILINE
+          )
+          assert count == 1
+          project.write_text(switched)
+          for label, code in [("before", old), ("after", new)]:
+              adapter.write_text(code)
+              subprocess.run(
+                  [os.environ["GODOT_BINARY"], "--headless", "--path", "godot",
+                   "--editor", "--quit"], check=True
+              )
+              out = Path("dist/clearance-" + label)
+              out.mkdir(parents=True, exist_ok=True)
+              subprocess.run(
+                  [os.environ["GODOT_BINARY"], "--headless", "--path", "godot",
+                   "--export-release", "Web", str((out / "index.html").resolve())],
+                  check=True
+              )
+              assert (out / "index.pck").stat().st_size > 0
+          adapter.write_text(new)
+          src.write_text(original)
+          project.write_text(before_project)
+          PY
+          python3 -m http.server 8783 --bind 127.0.0.1 --directory dist/clearance-before >/tmp/mu-clearance-before.log 2>&1 &
+          python3 -m http.server 8784 --bind 127.0.0.1 --directory dist/clearance-after >/tmp/mu-clearance-after.log 2>&1 &
+          node <<'JS'
+          const {chromium} = require('/tmp/mini-utopia-playwright/node_modules/playwright');
+          const fs = require('node:fs');
+          (async () => {
+            const browser = await chromium.launch({
+              headless: true, args: [
+                '--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox'
+              ]
+            });
+            try {
+              for (const [version, port] of [['before',8783],['after',8784]]) {
+                for (const [width,height] of [[1180,820],[1366,1024]]) {
+                  const context = await browser.newContext({
+                    viewport:{width,height},deviceScaleFactor:1,isMobile:true,hasTouch:true
+                  });
+                  const page = await context.newPage();
+                  const errors = [];
+                  page.on('pageerror',e=>errors.push(e.message));
+                  await page.goto('http://127.0.0.1:'+port+'/',{
+                    waitUntil:'load',timeout:120000
+                  });
+                  await page.waitForFunction(
+                    ()=>document.querySelector('#loader')===null,null,{timeout:120000}
+                  );
+                  await page.waitForTimeout(1400);
+                  for (const prop of ['sword_1handed','staff']) {
+                    for (const action of ['Idle','Walk','Run']) {
+                      for (const [view,angle] of [['front',0],['side',90],['back',180]]) {
+                        await page.evaluate(
+                          s=>window.__MU_CLEARANCE_FRAME=s,[prop,action,angle].join('|')
+                        );
+                        await page.waitForTimeout(850);
+                        const name = ['clearance',version,prop,action,view,
+                          width+'x'+height].join('-')+'.png';
+                        const out='dist/visual-evidence/'+name;
+                        await page.screenshot({path:out,timeout:90000});
+                        if(fs.statSync(out).size<15000)
+                          throw Error('Invalid Godot Web screenshot '+name);
+                      }
+                    }
+                  }
+                  if(errors.length)
+                    throw Error('Godot Web JS error '+errors.join(' | '));
+                  await context.close();
+                }
+              }
+            } finally { await browser.close(); }
+          })().catch(e=>{console.error(e);process.exitCode=1;});
+          JS
+          test -s dist/visual-evidence/clearance-before-staff-Idle-front-1180x820.png
+          test -s dist/visual-evidence/clearance-after-staff-Run-back-1366x1024.png
+
       - name: Capture Start Home and Who Is Playing at 1180x820
         shell: bash
         run: |
