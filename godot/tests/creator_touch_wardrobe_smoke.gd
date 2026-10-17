@@ -339,15 +339,15 @@ func _initialize() -> void:
         for frame_index in range(6):
             await process_frame
             var sword_root := reopened_stage.avatar_root()
-            var sword := sword_root.find_child(
+            var blade_pivot := sword_root.find_child(
                 "Equipment_weapon_main", true, false
             ) as Node3D
-            if sword == null or sword.get_node_or_null("OfficialHandProp") == null:
+            if blade_pivot == null or blade_pivot.get_node_or_null("OfficialHandProp") == null:
                 _fail("sword vanished from owned Knight right-hand socket")
                 return
             var actor_up := sword_root.global_transform.basis.y.normalized()
             var actor_forward := sword_root.global_transform.basis.z.normalized()
-            var blade_axis := sword.global_transform.basis.y.normalized()
+            var blade_axis := blade_pivot.global_transform.basis.y.normalized()
             var rise := blade_axis.dot(actor_up)
             var forward := blade_axis.dot(actor_forward)
             if rise < 0.64 or rise > 0.77 or forward < 0.64:
