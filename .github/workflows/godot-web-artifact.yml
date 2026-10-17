@@ -91,6 +91,297 @@ jobs:
           set -euo pipefail
           "$GODOT_BINARY" --headless --path godot --editor --quit
 
+      # A-012: same-HEAD Web screenshots and actual mesh/bone diagnostics.
+      # Runs BEFORE formal smoke; never replaces/skips it or production export.
+      - name: Diagnose staff and sword in isolated Web before formal smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --prefix /tmp/mini-utopia-playwright --no-audit --no-fund playwright@1.56.1
+          /tmp/mini-utopia-playwright/node_modules/.bin/playwright install --with-deps chromium
+          mkdir -p dist/visual-evidence
+          python3 - <<'PY'
+          import os,re,subprocess
+          from pathlib import Path
+          pr=Path("godot/project.godot")
+          shell=Path("godot/scripts/character_creator_shell.gd")
+          project=pr.read_text()
+          original=shell.read_text()
+          anchor='    _build_save_celebration()'
+          assert original.count(anchor)==1
+          fixture=original.replace(anchor,anchor+'\n    call_deferred("_ci_diag_ready")',1)
+          fixture+='''
+          var _ci_key := ""
+          func _ci_diag_ready() -> void:
+              RenderingServer.frame_post_draw.connect(_ci_capture_frame)
+              avatar_stage.apply_equipment_runtime({
+                  "character_asset_id": "CHAR_CI_DIAG",
+                  "equipped": {"weapon_main": {
+                      "item_instance_id": "ITEM_CI_DIAG",
+                      "mesh_asset_id": "staff",
+                  }},
+                  "final_stats": {},
+              })
+
+          func _ci_v(v: Vector3) -> Array:
+              return [v.x,v.y,v.z]
+
+          func _ci_capture_frame() -> void:
+              if not OS.has_feature("web"):
+                  return
+              var request := String(JavaScriptBridge.eval(
+                  "window.__MU_REQUEST || ''",true
+              ))
+              if request.is_empty():
+                  return
+              if request != _ci_key:
+                  var parts := request.split("|")
+                  if parts.size() != 3:
+                      return
+                  _ci_key = request
+                  _draft_appearance["compatible_tags"] = [
+                      "humanoid", "kaykit_style_" + String(parts[0])
+                  ]
+                  avatar_stage.apply_appearance(_draft_appearance)
+                  avatar_stage.play_preview_animation(String(parts[1]))
+                  avatar_stage.avatar_root().rotation_degrees.y = float(parts[2])
+                  return
+              var actor := avatar_stage.avatar_root()
+              var hand := actor.find_child(
+                  "Equipment_weapon_main",true,false
+              ) as Node3D
+              var rig := actor.get_node_or_null(
+                  "KayKitBody/Rig/Skeleton3D"
+              ) as Skeleton3D
+              if hand == null or rig == null:
+                  return
+              var meshes := hand.find_children(
+                  "*","MeshInstance3D",true,false
+              )
+              if meshes.is_empty():
+                  return
+              var mesh := meshes[0] as MeshInstance3D
+              var bone := rig.find_bone("head")
+              if mesh == null or bone < 0:
+                  return
+              var bb := mesh.get_aabb()
+              var p := Vector3(
+                  bb.position.x + bb.size.x * 0.5,
+                  bb.position.y + bb.size.y,
+                  bb.position.z + bb.size.z * 0.5
+              )
+              var tip := mesh.to_global(p)
+              # Only staff's actual crown vertices: no generic silhouette
+              # classifier or camera-dependent rendering change. Includes the
+              # green jewel AND its metal housing at the tip.
+              var crown_low := Vector3(INF,INF,INF)
+              var crown_high := Vector3(-INF,-INF,-INF)
+              var crown_world_low := Vector3(INF,INF,INF)
+              var crown_world_high := Vector3(-INF,-INF,-INF)
+              var crown_screen_low := Vector2(INF,INF)
+              var crown_screen_high := Vector2(-INF,-INF)
+              var crown_samples := 0
+              var verts := mesh.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX] as PackedVector3Array
+              var cam := avatar_stage._camera as Camera3D
+              for vertex in verts:
+                  if vertex.y < 0.70:
+                      continue
+                  crown_samples += 1
+                  crown_low = crown_low.min(vertex)
+                  crown_high = crown_high.max(vertex)
+                  var w := mesh.to_global(vertex)
+                  crown_world_low = crown_world_low.min(w)
+                  crown_world_high = crown_world_high.max(w)
+                  var screen := cam.unproject_position(w)
+                  crown_screen_low = crown_screen_low.min(screen)
+                  crown_screen_high = crown_screen_high.max(screen)
+              var head := rig.to_global(
+                  rig.get_bone_global_pose(bone).origin
+              )
+              var anim := actor.find_child("AnimationPlayer",true,false) as AnimationPlayer
+              if anim == null or anim.current_animation.is_empty():
+                  return
+              var axes := actor.global_transform.basis.orthonormalized()
+              var d := tip-head
+              var px1 := cam.unproject_position(head)
+              var px2 := cam.unproject_position(tip)
+              JavaScriptBridge.get_interface("window").set(
+                  "__MU_DIAG_JSON",JSON.stringify({
+                      "request": request,
+                      "render_frame": Engine.get_frames_drawn(),
+                      "ticks_ms": Time.get_ticks_msec(),
+                      "animation": anim.current_animation,
+                      "animation_time": anim.current_animation_position,
+                      "animation_length": anim.current_animation_length,
+                      "head": _ci_v(head),
+                      "grip": _ci_v(hand.global_position),
+                      "grip_parent": _ci_v((hand.get_parent() as Node3D).global_position),
+                      "grip_basis_x": _ci_v(hand.global_transform.basis.x),
+                      "grip_basis_y": _ci_v(hand.global_transform.basis.y),
+                      "grip_basis_z": _ci_v(hand.global_transform.basis.z),
+                      "mesh_origin": _ci_v(mesh.global_position),
+                      "tip": _ci_v(tip),
+                      "crown_vertex_count": crown_samples,
+                      "crown_local_min": _ci_v(crown_low),
+                      "crown_local_max": _ci_v(crown_high),
+                      "crown_world_min": _ci_v(crown_world_low),
+                      "crown_world_max": _ci_v(crown_world_high),
+                      "crown_screen_min": [crown_screen_low.x,crown_screen_low.y],
+                      "crown_screen_max": [crown_screen_high.x,crown_screen_high.y],
+                      "axis": _ci_v(hand.global_transform.basis.y),
+                      "bounds_min": _ci_v(bb.position),
+                      "bounds_max": _ci_v(bb.position+bb.size),
+                      "front_gap":absf(d.dot(axes.x)),
+                      "side_gap":absf(d.dot(axes.z)),
+                      "height":d.dot(axes.y),
+                      "head_screen":[px1.x,px1.y],
+                      "tip_screen":[px2.x,px2.y],
+                      "screen_gap_px":px1.distance_to(px2),
+                  })
+              )
+              JavaScriptBridge.eval(
+                  "if(window.__MU_CAPTURE){window.__MU_CYCLE_FRAMES.push(window.__MU_DIAG_JSON);}",
+                  true
+              )
+          '''
+          shell.write_text(fixture)
+          pr.write_text(re.sub(
+              r'^run/main_scene=".*"$',
+              'run/main_scene="res://scenes/character_creator.tscn"',
+              project,count=1,flags=re.MULTILINE
+          ))
+          subprocess.run([os.environ["GODOT_BINARY"],"--headless","--path","godot",
+              "--editor","--quit"],check=True)
+          out=Path("dist/clearance-diag")
+          out.mkdir(parents=True,exist_ok=True)
+          subprocess.run([os.environ["GODOT_BINARY"],"--headless","--path","godot",
+              "--export-release","Web",str(out.resolve()/"index.html")],check=True)
+          assert (out/"index.pck").stat().st_size>0
+          pr.write_text(project)
+          shell.write_text(original)
+          PY
+          python3 -m http.server 8791 --bind 127.0.0.1 --directory dist/clearance-diag >/tmp/mu-diag.log 2>&1 &
+          node <<'JS'
+          const {chromium}=require('/tmp/mini-utopia-playwright/node_modules/playwright');
+          const fs=require('node:fs');
+          (async()=>{
+            const browser=await chromium.launch({headless:true,args:[
+              '--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox'
+            ]});
+            const records=[];
+            try{
+              for(const [width,height] of [[1180,820],[1366,1024]]){
+                const context=await browser.newContext({
+                  viewport:{width,height},deviceScaleFactor:1,isMobile:true,hasTouch:true
+                });
+                const page=await context.newPage();
+                await page.goto('http://127.0.0.1:8791/',{waitUntil:'load',timeout:120000});
+                await page.waitForFunction(
+                  ()=>document.querySelector('#loader')===null,null,{timeout:120000}
+                );
+                await page.waitForTimeout(1300);
+                // Focused preview: only one real staff build, both sides,
+                // Idle and two actual Walk phases at both iPad viewport sizes.
+                for(const pose of ['Idle','Walk']){
+                  for(const [view,angle] of [['side',90],['side-left',270]]){
+                    const key=['staff',pose,angle].join('|');
+                    await page.evaluate(x=>{window.__MU_REQUEST=x;
+                      window.__MU_DIAG_JSON='';},key);
+                    await page.waitForFunction(
+                      x=>{try{return JSON.parse(window.__MU_DIAG_JSON||'{}').request===x;}
+                      catch(e){return false;}},key,{timeout:45000});
+                    for(const phase of (pose==='Walk'?['early','later']:['idle'])){
+                      await page.waitForTimeout(phase==='later'?730:550);
+                      const data=await page.evaluate(()=>JSON.parse(window.__MU_DIAG_JSON));
+                      data.viewport=[width,height];data.pose=pose;data.view=view;data.phase=phase;
+                      records.push(data);
+                      const dest='dist/visual-evidence/diag-staff-'+pose+
+                        '-'+view+'-'+phase+'-'+width+'x'+height+'.png';
+                      await page.screenshot({path:dest,timeout:90000});
+                      if(fs.statSync(dest).size<15000)throw Error('Empty Web screenshot '+dest);
+                      console.log('MU_DIAG '+JSON.stringify(data));
+                    }
+                  }
+                }
+                if(width===1366){
+                  const key='staff|Walk|270';
+                  await page.evaluate(x=>{window.__MU_REQUEST=x;window.__MU_DIAG_JSON='';},key);
+                  await page.waitForFunction(x=>{
+                    try{return JSON.parse(window.__MU_DIAG_JSON||'{}').request===x;}
+                    catch(e){return false;}
+                  },key,{timeout:45000});
+                  const info=await page.evaluate(()=>JSON.parse(window.__MU_DIAG_JSON));
+                  if(!(info.animation_length>0 && info.animation_length<30))
+                    throw Error('Invalid Walk cycle length');
+                  // Record the real rendered canvas at normal game resolution.
+                  // Software rendering can run slower than wall-clock animation time.
+                  // Stop only after observed wraps, with a bounded timeout.
+                  const durationMs=120000;
+                  const recording=await page.evaluate(async durationMs=>{
+                    const canvas=document.querySelector('canvas');
+                    if(!canvas || !canvas.captureStream)throw Error('Canvas recording unavailable');
+                    const stream=canvas.captureStream(30);
+                    const chunks=[];
+                    const recorder=new MediaRecorder(stream,{mimeType:'video/webm;codecs=vp8'});
+                    recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+                    const stopped=new Promise(resolve=>{recorder.onstop=resolve;});
+                    window.__MU_CYCLE_FRAMES=[];window.__MU_CAPTURE=true;
+                    recorder.start();
+                    const start=performance.now();
+                    let observedWraps=0,seen=0,previous=null;
+                    while(performance.now()-start<durationMs){
+                      await new Promise(resolve=>setTimeout(resolve,200));
+                      const samples=window.__MU_CYCLE_FRAMES;
+                      for(;seen<samples.length;seen++){
+                        const current=JSON.parse(samples[seen]).animation_time;
+                        if(previous!==null && current<previous)observedWraps++;
+                        previous=current;
+                      }
+                      if(observedWraps>=2 && seen>=12)break;
+                    }
+                    recorder.stop();await stopped;
+                    window.__MU_CAPTURE=false;stream.getTracks().forEach(t=>t.stop());
+                    const frames=window.__MU_CYCLE_FRAMES.map(x=>JSON.parse(x));
+                    const bytes=Array.from(new Uint8Array(await new Blob(chunks).arrayBuffer()));
+                    return {bytes,frames,elapsedMs:performance.now()-start,canvas:[canvas.width,canvas.height]};
+                  },durationMs);
+                  const frames=recording.frames;
+                  let wraps=0;
+                  for(let i=1;i<frames.length;i++){
+                    if(frames[i].animation_time<frames[i-1].animation_time)wraps++;
+                  }
+                  fs.writeFileSync('dist/visual-evidence/A2-left-Walk-cycle.webm',
+                    Buffer.from(recording.bytes));
+                  fs.writeFileSync('dist/visual-evidence/A2-left-Walk-cycle.json',
+                    JSON.stringify({source:process.env.GITHUB_SHA,viewport:[width,height],
+                      canvas:recording.canvas,durationMs:recording.elapsedMs,wraps,frames,
+                      limitation:'World-space mesh/crown and head-bone references; not a helmet mesh intersection test.'},null,2));
+                  if(frames.length<12 || wraps<2)
+                    throw Error('Recording lacks a full wrap-to-wrap Walk cycle: '+wraps);
+                  console.log('A2 Walk recording: '+frames.length+' rendered frames, '+wraps+' wraps');
+                }
+                await context.close();
+              }
+            }finally{await browser.close();}
+            fs.writeFileSync('dist/visual-evidence/clearance-geometry.json',
+              JSON.stringify(records,null,2));
+            if(records.length!==12)throw Error('Only '+records.length+' focused diagnostic frames');
+          })().catch(e=>{console.error(e);process.exitCode=1;});
+          JS
+
+      # A-012: publish evidence even when unchanged required smoke fails later.
+      - name: Upload isolated same-HEAD geometry evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lane-c-454-geometry-diagnostic-HEAD
+          path: |
+            dist/visual-evidence/diag-*.png
+            dist/visual-evidence/clearance-geometry.json
+            dist/visual-evidence/A2-left-Walk-cycle.*
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Smoke-test iPad touch controls
         shell: bash
         run: |
@@ -382,6 +673,176 @@ jobs:
             } finally {await browser.close();}
           })().catch(e=>{console.error(e);process.exitCode=1;});
           JS
+
+      # A-012 screenshot-only CI fixtures; never included in production artifact.
+      # A-012 complete visual acceptance: 160 real Godot Web before/after frames,
+      # both props, Idle/Walk/Run, front/left/right/back and both game viewports.
+      # The A2 grip, sword pose and all production/test steps are unchanged.
+      - name: Capture actual Godot Web weapon clearance before and after
+        shell: bash
+        run: |
+          set -euo pipefail
+          export MU_CLEARANCE_MATRIX=full
+          sed -i -E 's|^run/main_scene=".*"$|run/main_scene="res://scenes/character_creator.tscn"|' godot/project.godot
+          python3 - <<'PY'
+          import os
+          import subprocess
+          from pathlib import Path
+          src=Path("godot/scripts/character_creator_shell.gd")
+          kit=Path("godot/scripts/kaykit_avatar_v1.gd")
+          original=subprocess.check_output(
+              ["git","show","HEAD:godot/scripts/character_creator_shell.gd"],text=True
+          )
+          after=subprocess.check_output(
+              ["git","show","HEAD:godot/scripts/kaykit_avatar_v1.gd"],text=True
+          )
+          # Recreate #453 baseline from our own Lane C visual-only diff so
+          # shallow GitHub Actions checkout does not need to fetch prior commits.
+          begin=after.index("# Dynamic *visual-only* grip pivot.")
+          end=after.index("static func mount(",begin)
+          before=after[:begin]+after[end:]
+          start=before.index('            if style in ["sword_1handed", "staff", "wand"]:',before.index("static func apply_hand_skin"))
+          stop=before.index("\n\n\nstatic func play(",start)
+          baseline='''            model.name = "Equipment_" + slot
+              '''.strip("\n")
+          old=(
+            '            model.name = "Equipment_" + slot\n'
+            '            model.set_meta("kaykit_style", style)\n'
+            '            if style in ["sword_1handed", "staff", "wand"]:\n'
+            '                model.rotation_degrees.z = 90.0\n'
+            '            socket.add_child(model)'
+          )
+          before=before[:start]+old+before[stop:]
+          anchor='    _build_save_celebration()'
+          assert original.count(anchor)==1
+          fixture=original.replace(
+              anchor,anchor+'\n    call_deferred("_ci_clearance_ready")',1
+          )
+          fixture+='''
+          var _ci_clearance_key := ""
+
+          func _ci_clearance_ready() -> void:
+              avatar_stage.apply_equipment_runtime({
+                  "character_asset_id": "CHAR_CI_HEAD_CLEARANCE",
+                  "equipped": {"weapon_main": {
+                      "item_instance_id": "ITEM_CI_OWNED",
+                      "display_name": "Synthetic Owned Sword",
+                      "mesh_asset_id": "sword_1handed",
+                  }},
+                  "final_stats": {},
+              })
+              _set_status("CI 合成装备 · 真实 Godot Web", false)
+
+          func _process(_delta: float) -> void:
+              if not OS.has_feature("web"):
+                  return
+              var request := String(JavaScriptBridge.eval(
+                  "window.__MU_CLEARANCE_FRAME || ''", true
+              ))
+              if request.is_empty() or request == _ci_clearance_key:
+                  return
+              var parts := request.split("|")
+              if parts.size() != 3:
+                  return
+              var style := String(parts[0])
+              var action := String(parts[1])
+              if style not in ["sword_1handed", "staff"]:
+                  return
+              if action not in ["Idle", "Walk", "Run"]:
+                  return
+              _ci_clearance_key = request
+              _draft_appearance["compatible_tags"] = [
+                  "humanoid", "kaykit_style_" + style
+              ]
+              avatar_stage.apply_appearance(_draft_appearance)
+              avatar_stage.play_preview_animation(action)
+              avatar_stage.avatar_root().rotation_degrees.y = float(parts[2])
+          '''
+          src.write_text(fixture)
+          for label,content in [("before",before),("after",after)]:
+              kit.write_text(content)
+              subprocess.run([
+                  os.environ["GODOT_BINARY"],"--headless","--path","godot",
+                  "--editor","--quit"
+              ],check=True)
+              out=Path("dist/clearance-"+label)
+              out.mkdir(parents=True,exist_ok=True)
+              subprocess.run([
+                  os.environ["GODOT_BINARY"],"--headless","--path","godot",
+                  "--export-release","Web",str(out.resolve()/"index.html")
+              ],check=True)
+              assert (out/"index.pck").stat().st_size>0
+          kit.write_text(after)
+          src.write_text(original)
+          PY
+          python3 -m http.server 8783 --bind 127.0.0.1 --directory dist/clearance-before > /tmp/mu-clearance-before.log 2>&1 &
+          python3 -m http.server 8784 --bind 127.0.0.1 --directory dist/clearance-after > /tmp/mu-clearance-after.log 2>&1 &
+          node <<'JS'
+          const {chromium}=require('/tmp/mini-utopia-playwright/node_modules/playwright');
+          const fs=require('node:fs');
+          (async()=>{
+            const browser=await chromium.launch({headless:true,args:[
+              '--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox'
+            ]});
+            try {
+              const full=process.env.MU_CLEARANCE_MATRIX==='full';
+              for(const [build,port] of [['before',8783],['after',8784]]) {
+                for(const [width,height] of (full ? [[1180,820],[1366,1024]] : [[1366,1024]])) {
+                  const context=await browser.newContext({
+                    viewport:{width,height},deviceScaleFactor:1,isMobile:true,hasTouch:true
+                  });
+                  const page=await context.newPage();
+                  const errors=[];
+                  page.on('pageerror',e=>errors.push(String(e.message)));
+                  await page.goto('http://127.0.0.1:'+port+'/',{
+                    waitUntil:'load',timeout:120000
+                  });
+                  await page.waitForFunction(
+                    ()=>document.querySelector('#loader')===null,null,{timeout:120000}
+                  );
+                  await page.waitForTimeout(1600);
+                  for(const gear of (full ? ['sword_1handed','staff'] : ['staff'])) {
+                    for(const action of (full ? ['Idle','Walk','Run'] : ['Idle','Walk'])) {
+                      for(const [view,angle] of (full ?
+                          [['front',0],['side',90],['side-left',270],['back',180]] :
+                          [['side',90],['side-left',270]])) {
+                        await page.evaluate(command=>{window.__MU_CLEARANCE_FRAME=command;},
+                          [gear,action,angle].join('|'));
+                        await page.waitForTimeout(950);
+                        const base='dist/visual-evidence/clearance-'+build+'-'+gear+
+                          '-'+action+'-'+view+'-'+width+'x'+height;
+                        const save=async(path)=>{
+                          await page.screenshot({path,timeout:90000});
+                          if(fs.statSync(path).size<15000)throw Error('Invalid frame '+path);
+                        };
+                        await save(base+'.png');
+                        // Also sample a later real animation phase, not just
+                        // one arbitrary Walk/Run freeze frame.
+                        if(action!=='Idle'){
+                          await page.waitForTimeout(730);
+                          await save(base+'-later.png');
+                        }
+                      }
+                    }
+                  }
+                  if(errors.length)throw Error('Godot browser errors '+errors.join(';'));
+                  await context.close();
+                }
+              }
+            }finally{await browser.close();}
+          })().catch(e=>{console.error(e);process.exitCode=1;});
+          JS
+          test -s dist/visual-evidence/clearance-before-staff-Idle-side-1366x1024.png
+          test -s dist/visual-evidence/clearance-after-staff-Walk-side-left-1366x1024-later.png
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          files=list(Path('dist/visual-evidence').glob('clearance-*.png'))
+          full=os.environ.get('MU_CLEARANCE_MATRIX')=='full'
+          expected=160 if full else 12
+          assert len(files)==expected, f'Expected {expected} genuine Web frames, found {len(files)}'
+          print(f'Verified {expected} genuine Godot Web weapon frames')
+          PY
 
       # A-012: screenshots only; production export and test steps unchanged.
       - name: Capture Start Home and Who Is Playing at 1180x820
