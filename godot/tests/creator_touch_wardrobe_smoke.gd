@@ -95,6 +95,13 @@ func _initialize() -> void:
     if stage == null or stage.avatar_root().find_child("Equipment_headwear", true, false) == null:
         _fail("equipped crown did not appear on the same 3D Hero")
         return
+    # W1.5 hand-prop investigation: native Knight meshes already appear
+    # armed in the default Creator screenshot, before equipment is loaded.
+    var native_knight := stage.avatar_root().get_node("KayKitBody") as Node3D
+    for mesh_node in native_knight.find_children("*", "MeshInstance3D", true, false):
+        var mesh := mesh_node as MeshInstance3D
+        print("KNIGHT_NATIVE_MESH: ", mesh.get_path(), " | ", mesh.mesh.resource_name if mesh.mesh != null else "null")
+
 
     creator._select_creator_tab("look")
     if outfit.visible:
