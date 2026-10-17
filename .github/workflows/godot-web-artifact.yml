@@ -97,6 +97,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          npm install --prefix /tmp/mini-utopia-playwright --no-audit --no-fund playwright@1.56.1
+          /tmp/mini-utopia-playwright/node_modules/.bin/playwright install --with-deps chromium
           mkdir -p dist/visual-evidence
           python3 - <<'PY'
           import os,re,subprocess
@@ -152,9 +154,12 @@ jobs:
               ) as Skeleton3D
               if hand == null or rig == null:
                   return
-              var mesh := hand.find_child(
+              var meshes := hand.find_children(
                   "*","MeshInstance3D",true,false
-              ) as MeshInstance3D
+              )
+              if meshes.is_empty():
+                  return
+              var mesh := meshes[0] as MeshInstance3D
               var bone := rig.find_bone("head")
               if mesh == null or bone < 0:
                   return
