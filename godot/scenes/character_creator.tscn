@@ -140,13 +140,13 @@ text = "创建小英雄"
 
 [node name="Hint" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
-text = "点一点，看看英雄怎么变！"
+text = "眼睛、发型等暂未开放"
 autowrap_mode = 2
 
 [node name="RandomLookButton" type="Button" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
-text = "随机换个造型"
+text = "随机换体型"
 
 [node name="BodyLabel" type="Label" parent="RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"]
 layout_mode = 2
