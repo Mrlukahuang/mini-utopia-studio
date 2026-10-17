@@ -63,8 +63,8 @@ class HeadClearancePivot extends Node3D:
                 # Point it forward AND outboard of the real animated grip.
                 # Do not chase the head or camera, scale the jewel, or offset
                 # the socket; sword's fixed ~45-degree axis stays unchanged.
-                var outward := 0.34
-                var forward := 0.58
+                var outward := 0.30
+                var forward := 0.70
                 var upward := sqrt(
                     1.0 - forward * forward - outward * outward
                 )
@@ -223,6 +223,11 @@ static func apply_hand_skin(root: Node3D, appearance: Dictionary, equipment: Dic
                 ) as Skeleton3D
                 socket.add_child(pivot)
                 model.name = "OfficialHandProp"
+                # The original grip at mesh y=0 remains on the staff shaft;
+                # grasp slightly lower on that same continuous shaft (y=-.25).
+                # Parent pivot stays at official handslot_r; no floating socket.
+                if style == "staff":
+                    model.position.y = 0.25
                 pivot.add_child(model)
             else:
                 model.name = "Equipment_" + slot
