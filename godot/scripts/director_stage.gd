@@ -447,7 +447,7 @@ func _on_film_bridge_success(kind: String, payload: Dictionary) -> void:
     status_label.text = "电影已保存！"
     var family := get_node_or_null("/root/FamilySceneState") as MiniUtopiaFamilySceneState
     if family != null and family.second_cast_is_parent_guest:
-        status_label.text += "\nSibling guest approval is temporary, not stored."
+        status_label.text += "\n客串邀请只在本次游戏有效"
 
 
 func _on_film_bridge_failure(
@@ -461,20 +461,16 @@ func _on_film_bridge_failure(
         return
     save_film_button.disabled = false
     status_label.text = (
-        "Your saved movie changed. Reopen it before editing."
+        "电影内容已更新，请重新打开"
         if status_code == 409
-        else "Could not save privately. Please retry."
+        else "暂时无法保存，请重试"
     )
 
 
 func _show_missing_payload() -> void:
     if status_label == null:
         return
-    status_label.text = (
-        "我的小电影\n"
-        + "⚠️ No Director payload found.\n"
-        + "Return to Mini Utopia → Episodes → Stage Shot first."
-    )
+    status_label.text = "还没有拍摄内容，请先选择一个场景"
     push_warning(
         "DIR-04B: no director_shot_session.json; Stage Shot in Creator first."
     )
@@ -483,31 +479,9 @@ func _show_missing_payload() -> void:
 func _show_ready(payload: Dictionary) -> void:
     if status_label == null:
         return
-
-    var camera_payload = payload.get("camera", {})
-    var camera_text := ""
-    if typeof(camera_payload) == TYPE_DICTIONARY:
-        camera_text = String(camera_payload.get("movement", ""))
-
-    var world_line := "Fallback Stage"
-    if director_runtime != null and director_runtime.bound_world_loaded:
-        world_line = "Real World · " + director_runtime.bound_scene_path
-    elif director_runtime != null and not director_runtime.world_load_error.is_empty():
-        world_line = "Fallback · " + director_runtime.world_load_error
-
-    status_label.text = (
-        "我的小电影"
-        + "\n"
-        + String(payload.get("scene_id", "—"))
-        + " · "
-        + String(payload.get("shot_id", "—"))
-        + " · "
-        + String(payload.get("animation_intent", "idle")).capitalize()
-        + " · "
-        + str(float(payload.get("duration_seconds", 0.0)))
-        + "s"
-        + "\n🎥 "
-        + camera_text
-        + "\n🌍 "
-        + world_line
-    )
+    # Stage IDs, internal scene paths and synthetic CI identifiers belong only
+    # in diagnostics, never the child-facing Director status panel.
+    var seconds := int(round(float(payload.get("duration_seconds", 0.0))))
+    status_label.text = "镜头准备好了！"
+    if seconds > 0:
+        status_label.text += "\n时长 " + str(seconds) + " 秒"
