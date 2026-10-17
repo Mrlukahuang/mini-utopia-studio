@@ -44,7 +44,7 @@ class HeadClearancePivot extends Node3D:
                 # A staff is a longer, asymmetrical object. Put the green
                 # jewel *outside and behind* the helmet, not in front of the
                 # face; the shaft continues to originate at the real grip.
-                axis = basis.y * 1.55 - basis.z * 0.75 + basis.x * (1.10 * side)
+                axis = basis.y * 2.00 - basis.z * 1.45 + basis.x * (1.10 * side)
             _:
                 # Short wand: near upright, modest outward tilt.
                 axis = basis.y * 1.3 + basis.x * (0.55 * side)
