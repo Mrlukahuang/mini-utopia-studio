@@ -275,7 +275,7 @@ func _select_creator_tab(tab: String) -> void:
         _refresh_outfit_choices()
     else:
         heading.text = "创建小英雄"
-        hint.text = "骑士可换体型与动作，更多造型准备中。"
+        hint.text = "眼睛、发型等暂未开放"
         _hide_unavailable_knight_choices()
     choice_scroll.scroll_vertical = 0
 
@@ -594,20 +594,13 @@ func _on_help_name_pressed() -> void:
 
 
 func _on_random_look_pressed() -> void:
-    var species := String(MiniUtopiaCreatorAvatarCatalog.SPECIES_OPTIONS.keys().pick_random())
-    var allowed_surfaces := MiniUtopiaCreatorAvatarCatalog.allowed_surface_ids(species)
-    var allowed_eyes := MiniUtopiaCreatorAvatarCatalog.allowed_eye_ids(species)
-    var allowed_hair := MiniUtopiaCreatorAvatarCatalog.allowed_hair_ids(species)
-    var colors := COLOR_BUTTONS.values()
-    _draft_appearance["species_head_id"] = species
-    _draft_appearance["body_type"] = String(MiniUtopiaCreatorAvatarCatalog.BODY_OPTIONS.keys().pick_random())
-    _draft_appearance["surface_type"] = String(allowed_surfaces.pick_random())
-    _draft_appearance["eye_style_id"] = String(allowed_eyes.pick_random())
-    _draft_appearance["hair_style_id"] = String(allowed_hair.pick_random())
-    _draft_appearance["surface_color_hex"] = String(colors.pick_random())
-    _draft_appearance["eye_color_hex"] = String(colors.pick_random())
-    _draft_appearance["hair_color_hex"] = String(colors.pick_random())
-    _commit_live_appearance("🎲 新造型！喜欢就保存吧。")
+    # The official Knight has no interchangeable species/head/eyes/hair meshes.
+    # Randomize only a body width the child can actually see, and always choose
+    # a different width. Preserve legacy saved identity and all other IDs.
+    var choices := MiniUtopiaCreatorAvatarCatalog.BODY_OPTIONS.keys()
+    choices.erase(String(_draft_appearance.get("body_type", "standard")))
+    _draft_appearance["body_type"] = String(choices.pick_random())
+    _commit_live_appearance("🎲 体型换好啦！喜欢就保存吧。")
 
 
 func _on_hand_style_pressed(style: String) -> void:

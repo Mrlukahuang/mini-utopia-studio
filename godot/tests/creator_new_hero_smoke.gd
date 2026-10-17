@@ -132,9 +132,25 @@ func _initialize() -> void:
         _fail("actual Knight body width choices were hidden")
         return
     var hint := content.get_node("Hint") as Label
-    if hint.text != "骑士可换体型与动作，更多造型准备中。":
+    if hint.text != "眼睛、发型等暂未开放":
         _fail("Knight does not explain unavailable looks")
         return
+    var original_look: Dictionary = scene._draft_appearance.duplicate(true)
+    scene._on_random_look_pressed()
+    if String(scene._draft_appearance.get("body_type", "")) == String(original_look.get("body_type", "")):
+        _fail("random body choice did not visibly change Knight width")
+        return
+    for identity_field in [
+        "species_head_id", "surface_type", "eye_style_id",
+        "hair_style_id", "surface_color_hex", "eye_color_hex", "hair_color_hex",
+    ]:
+        if scene._draft_appearance.get(identity_field) != original_look.get(identity_field):
+            _fail("random body choice changed unsupported saved field: " + identity_field)
+            return
+    scene._draft_appearance = original_look
+    scene.avatar_stage.apply_appearance(original_look)
+    scene._appearance_dirty = false
+    scene._refresh_look_controls()
 
     var name_input := scene.get_node(
         "RootMargin/MainColumn/HeaderRow/TitleColumn/HeroNameInput"
