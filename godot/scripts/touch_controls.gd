@@ -31,7 +31,9 @@ func _build_controls() -> void:
     _overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
     # Four directions at bottom-left; large enough for fingers.
-    _make_button("MoveForward", "▲", "move_forward", false, Vector2(100, -208), Vector2(72, 72))
+    # The bundled Web font renders U+25B2 (▲) as a missing-glyph box.
+    # A familiar single Chinese character is supported by the shipped UI font.
+    _make_button("MoveForward", "上", "move_forward", false, Vector2(100, -208), Vector2(72, 72))
     _make_button("MoveLeft", "◀", "move_left", false, Vector2(20, -132), Vector2(72, 72))
     _make_button("MoveBack", "▼", "move_back", false, Vector2(100, -132), Vector2(72, 72))
     _make_button("MoveRight", "▶", "move_right", false, Vector2(180, -132), Vector2(72, 72))
