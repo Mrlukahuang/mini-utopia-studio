@@ -77,6 +77,22 @@ func _initialize() -> void:
         _fail("fog either darkens the sky or washes out the village")
         return
     var touch := scene.get_node_or_null("TouchControls") as MiniUtopiaTouchControls
+    if touch != null:
+        # Headless tests do not have a touchscreen. Build the same buttons
+        # explicitly so a missing Web glyph cannot silently regress.
+        touch._build_controls()
+        var forward := touch.get_node_or_null("Overlay/MoveForward") as Button
+        if forward == null or forward.text != "上":
+            _fail("forward touch button uses an unsupported Web glyph")
+            return
+        forward.button_down.emit()
+        if not Input.is_action_pressed("move_forward"):
+            _fail("forward touch button no longer presses the move action")
+            return
+        forward.button_up.emit()
+        if Input.is_action_pressed("move_forward"):
+            _fail("forward touch button failed to release move action")
+            return
     if touch != null and touch.has_node("Overlay/Jump"):
         var jump := touch.get_node("Overlay/Jump") as Button
         if jump.offset_right > -10.0:
