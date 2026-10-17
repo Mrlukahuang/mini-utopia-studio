@@ -276,6 +276,8 @@ func _initialize() -> void:
         return
     world.queue_free()
 
+    var reopened_stage := reopened.avatar_stage as MiniUtopiaCreatorAvatarStage
+
     # The original fixed 90-degree weapon rotation brought the staff gem into
     # the helmet at animation extremes. Sample the same official right-hand
     # mount while Godot advances the imported Idle/Walk/Run animation clips.
