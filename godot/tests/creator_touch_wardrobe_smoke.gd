@@ -319,6 +319,44 @@ func _initialize() -> void:
             _fail("staff centerline is too near the 3D helmet in " + pose)
             return
 
+    # Independent visual-only sword check: saved staff was already
+    # reloaded and applied in Village above. Never PUT synthetic sword data.
+    var sword_appearance := reopened_stage.current_appearance()
+    sword_appearance["compatible_tags"] = [
+        "humanoid", "kaykit_style_sword_1handed"
+    ]
+    reopened_stage.apply_appearance(sword_appearance)
+    reopened_stage.apply_equipment_runtime({
+        "equipped": {"weapon_main": {
+            "item_instance_id": "ITEM_CI_SWORD",
+            "display_name": "Synthetic Owned Sword",
+            "mesh_asset_id": "sword_1handed",
+        }},
+        "final_stats": {},
+    })
+    for action in ["Idle", "Walk", "Run"]:
+        reopened_stage.play_preview_animation(action)
+        for frame_index in range(6):
+            await process_frame
+            var sword_root := reopened_stage.avatar_root()
+            var sword := sword_root.find_child(
+                "Equipment_weapon_main", true, false
+            ) as Node3D
+            if sword == null or sword.get_node_or_null("OfficialHandProp") == null:
+                _fail("sword vanished from owned Knight right-hand socket")
+                return
+            var actor_up := sword_root.global_transform.basis.y.normalized()
+            var actor_forward := sword_root.global_transform.basis.z.normalized()
+            var blade_axis := sword.global_transform.basis.y.normalized()
+            var rise := blade_axis.dot(actor_up)
+            var forward := blade_axis.dot(actor_forward)
+            if rise < 0.64 or rise > 0.77 or forward < 0.64:
+                _fail(
+                    "sword is not forward/upward about 45 degrees in " + action
+                    + ": up=" + str(rise) + " forward=" + str(forward)
+                )
+                return
+
     creator._select_creator_tab("look")
     if outfit.visible:
         _fail("Look tab did not close the wardrobe")

@@ -384,7 +384,7 @@ jobs:
           JS
 
       # A-012 screenshot-only CI fixtures; never included in production artifact.
-      # Baseline and fixed: sword/staff x Idle/Walk/Run x front/right/left/back x 2 sizes.
+      # Baseline and fixed: sword/staff x (Idle one, Walk/Run two phases) x four views x two sizes.
       - name: Capture actual Godot Web weapon clearance before and after
         shell: bash
         run: |
@@ -512,10 +512,19 @@ jobs:
                         await page.evaluate(command=>{window.__MU_CLEARANCE_FRAME=command;},
                           [gear,action,angle].join('|'));
                         await page.waitForTimeout(950);
-                        const path='dist/visual-evidence/clearance-'+build+'-'+gear+
-                          '-'+action+'-'+view+'-'+width+'x'+height+'.png';
-                        await page.screenshot({path,timeout:90000});
-                        if(fs.statSync(path).size<15000)throw Error('Invalid frame '+path);
+                        const base='dist/visual-evidence/clearance-'+build+'-'+gear+
+                          '-'+action+'-'+view+'-'+width+'x'+height;
+                        const save=async(path)=>{
+                          await page.screenshot({path,timeout:90000});
+                          if(fs.statSync(path).size<15000)throw Error('Invalid frame '+path);
+                        };
+                        await save(base+'.png');
+                        // Also sample a later real animation phase, not just
+                        // one arbitrary Walk/Run freeze frame.
+                        if(action!=='Idle'){
+                          await page.waitForTimeout(730);
+                          await save(base+'-later.png');
+                        }
                       }
                     }
                   }
@@ -528,6 +537,12 @@ jobs:
           JS
           test -s dist/visual-evidence/clearance-before-staff-Idle-front-1180x820.png
           test -s dist/visual-evidence/clearance-after-staff-Run-back-1366x1024.png
+          python3 - <<'PY'
+          from pathlib import Path
+          files=list(Path('dist/visual-evidence').glob('clearance-*.png'))
+          assert len(files)==160, f'Expected 160 Web frames, found {len(files)}'
+          print('Verified 160 genuine Godot Web weapon frames')
+          PY
 
       # A-012: screenshots only; production export and test steps unchanged.
       - name: Capture Start Home and Who Is Playing at 1180x820

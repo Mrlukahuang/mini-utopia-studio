@@ -13,42 +13,46 @@ const WEAPONS := {
 }
 
 
-# Dynamic *visual-only* grip pivot. The Knight's hand follows real imported
-# Idle/Walking_A/Running_A animations while long props lean out of the head's
-# horizontal footprint. The owned item's identity and server slot never change.
+# Dynamic *visual-only* grip pivot. The bundled sword and staff mesh long
+# axes are +Y in their GLTF POSITION bounds (sword Y -0.366..1.409,
+# staff Y -0.900..1.254); imported handslot_r supplies the true grip.
+# Reorient the local +Y long axis in ACTOR SPACE, never toward a moving head.
+# This preserves a fixed natural pose through Idle/Walking_A/Running_A.
 class HeadClearancePivot extends Node3D:
     var actor: Node3D
-    var rig: Skeleton3D
-    var head_bone := -1
+    var style := "sword_1handed"
 
     func _ready() -> void:
-        _orient_out_of_helmet()
+        _orient_in_actor_space()
 
     func _process(_delta: float) -> void:
-        _orient_out_of_helmet()
+        _orient_in_actor_space()
 
-    func _orient_out_of_helmet() -> void:
-        if actor == null or rig == null or head_bone < 0:
+    func _orient_in_actor_space() -> void:
+        if actor == null or get_parent() == null:
             return
-        var head_world := rig.to_global(rig.get_bone_global_pose(head_bone).origin)
-        var away := global_position - head_world
-        away.y = 0.0
-        if away.length_squared() < 0.015:
-            away = -actor.global_transform.basis.x
-            away.y = 0.0
-        # One grip point: never translate away from the official animated
-        # right hand. A sideways-only lean clears front views but places
-        # the jewel against the helmet silhouette at both 90-degree views.
-        # Lean the long axis both *outward* and *forward* in actor space,
-        # providing real fore-aft depth from either side-camera projection.
         var basis := actor.global_transform.basis.orthonormalized()
-        var right := basis.x
-        var sideways := right if away.dot(right) >= 0.0 else -right
-        var target_world := (
-            basis.y + sideways * 0.80 + basis.z * 1.05
+        var side := -1.0 if (global_position - actor.global_position).dot(basis.x) < 0.0 else 1.0
+        var axis: Vector3
+        match style:
+            "sword_1handed":
+                # Blade 45 degrees above the character's horizontal plane,
+                # pointing *forward*, with a small outward bias so it reads
+                # clearly in a head-on Creator preview.
+                axis = basis.y + basis.z + basis.x * (0.18 * side)
+            "staff":
+                # A staff is a longer, asymmetrical object. Put the green
+                # jewel *outside and behind* the helmet, not in front of the
+                # face; the shaft continues to originate at the real grip.
+                axis = basis.y * 1.55 - basis.z * 0.75 + basis.x * (1.10 * side)
+            _:
+                # Short wand: near upright, modest outward tilt.
+                axis = basis.y * 1.3 + basis.x * (0.55 * side)
+        var local_axis := (
+            (get_parent() as Node3D).global_transform.basis.inverse()
+            * axis.normalized()
         ).normalized()
-        var parent_space := (get_parent() as Node3D).global_transform.basis.inverse()
-        quaternion = Quaternion(Vector3.UP, (parent_space * target_world).normalized())
+        quaternion = Quaternion(Vector3.UP, local_axis)
 
 
 static func mount(root: Node3D, appearance: Dictionary) -> AnimationPlayer:
@@ -182,18 +186,11 @@ static func apply_hand_skin(root: Node3D, appearance: Dictionary, equipment: Dic
         var model := packed.instantiate() as Node3D
         if model != null:
             if style in ["sword_1handed", "staff", "wand"]:
-                var rig := socket.get_parent() as Node3D
-                var skeleton := root.get_node("KayKitBody").find_child(
-                    "Skeleton3D", true, false
-                ) as Skeleton3D
-                if skeleton == null:
-                    return
                 var pivot := HeadClearancePivot.new()
                 pivot.name = "Equipment_" + slot
                 pivot.set_meta("kaykit_style", style)
                 pivot.actor = root
-                pivot.rig = skeleton
-                pivot.head_bone = skeleton.find_bone("head")
+                pivot.style = style
                 socket.add_child(pivot)
                 model.name = "OfficialHandProp"
                 pivot.add_child(model)
