@@ -675,14 +675,14 @@ jobs:
           JS
 
       # A-012 screenshot-only CI fixtures; never included in production artifact.
-      # Candidate A: first capture only 12 real Web frames (staff left/right
-      # Idle 1 phase and Walk 2 phases; before/after; 1366x1024).
-      # Full 160-frame option remains available for later visual acceptance.
+      # A-012 complete visual acceptance: 160 real Godot Web before/after frames,
+      # both props, Idle/Walk/Run, front/left/right/back and both game viewports.
+      # The A2 grip, sword pose and all production/test steps are unchanged.
       - name: Capture actual Godot Web weapon clearance before and after
         shell: bash
         run: |
           set -euo pipefail
-          export MU_CLEARANCE_MATRIX=small
+          export MU_CLEARANCE_MATRIX=full
           sed -i -E 's|^run/main_scene=".*"$|run/main_scene="res://scenes/character_creator.tscn"|' godot/project.godot
           python3 - <<'PY'
           import os
