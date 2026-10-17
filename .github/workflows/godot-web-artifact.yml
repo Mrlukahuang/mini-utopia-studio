@@ -290,6 +290,99 @@ jobs:
           test -s dist/visual-evidence/creator-1180x820.png
           test -s dist/visual-evidence/creator-1366x1024.png
 
+      # A-012 screenshot-only synthetic OWNED sword versus staff. Production
+      # Web export and all smoke tests above remain completely untouched.
+      - name: Screenshot owner-scoped hand item swap in isolated Creator builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          sed -i -E 's|^run/main_scene=".*"$|run/main_scene="res://scenes/character_creator.tscn"|' godot/project.godot
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import os
+
+          path = Path("godot/scripts/character_creator_shell.gd")
+          # The previous screenshot-only "save celebration" step temporarily
+          # edits this same file. Always start from the CHECKED-IN source:
+          # these evidence frames must not imply a real save occurred.
+          original = subprocess.check_output(
+              ["git", "show", "HEAD:godot/scripts/character_creator_shell.gd"],
+              text=True,
+          )
+          anchor = '    _build_save_celebration()'
+          assert original.count(anchor) == 1
+          for style, label in [
+              ("sword_1handed", "剑"),
+              ("staff", "法杖"),
+          ]:
+              source = original.replace(
+                  anchor,
+                  anchor + '\n    call_deferred("_ci_preview_owned_hand")',
+                  1,
+              )
+              source += f'''
+          func _ci_preview_owned_hand() -> void:
+              var owned := {{
+                  "character_asset_id": "CHAR_CI_OWNED_FIXTURE",
+                  "equipped": {{
+                      "weapon_main": {{
+                          "item_instance_id": "ITEM_CI_OWNED_SWORD",
+                          "display_name": "Star Sword",
+                          "mesh_asset_id": "sword_1handed",
+                          "rarity": "blue",
+                      }},
+                  }},
+                  "final_stats": {{}},
+              }}
+              _draft_appearance["compatible_tags"] = ["humanoid", "kaykit_style_{style}"]
+              avatar_stage.apply_appearance(_draft_appearance)
+              avatar_stage.apply_equipment_runtime(owned)
+              _set_status("CI合成演示：已拥有的剑 → {label}", false)
+          '''
+              path.write_text(source)
+              subprocess.run(
+                  [os.environ["GODOT_BINARY"], "--headless", "--path", "godot", "--editor", "--quit"],
+                  check=True,
+              )
+              target = Path("dist/creator-hand-" + style)
+              target.mkdir(parents=True, exist_ok=True)
+              subprocess.run(
+                  [os.environ["GODOT_BINARY"], "--headless", "--path", "godot",
+                   "--export-release", "Web", str(target.resolve() / "index.html")],
+                  check=True,
+              )
+              assert (target / "index.pck").stat().st_size > 0
+          path.write_text(original)
+          PY
+          python3 -m http.server 8775 --bind 127.0.0.1 --directory dist/creator-hand-sword_1handed >/tmp/ci-hand-sword.log 2>&1 &
+          python3 -m http.server 8776 --bind 127.0.0.1 --directory dist/creator-hand-staff >/tmp/ci-hand-staff.log 2>&1 &
+          node <<'JS'
+          const {chromium} = require('/tmp/mini-utopia-playwright/node_modules/playwright');
+          const fs = require('node:fs');
+          (async () => {
+            const browser = await chromium.launch({headless:true,args:[
+              '--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox'
+            ]});
+            try {
+              for (const [name,port] of [['sword',8775],['staff',8776]]) {
+                for (const [width,height] of [[1180,820],[1366,1024]]) {
+                  const context=await browser.newContext({viewport:{width,height},
+                    deviceScaleFactor:1,isMobile:true,hasTouch:true});
+                  const page=await context.newPage();
+                  await page.goto('http://127.0.0.1:'+port+'/',{waitUntil:'load',timeout:120000});
+                  await page.waitForFunction(()=>document.querySelector('#loader')===null,null,{timeout:120000});
+                  await page.waitForTimeout(3200);
+                  const file='dist/visual-evidence/creator-owned-'+name+'-'+width+'x'+height+'.png';
+                  await page.screenshot({path:file});
+                  if(fs.statSync(file).size<15000)throw Error('Screenshot empty: '+file);
+                  await context.close();
+                }
+              }
+            } finally {await browser.close();}
+          })().catch(e=>{console.error(e);process.exitCode=1;});
+          JS
+
       # A-012: screenshots only; production export and test steps unchanged.
       - name: Capture Start Home and Who Is Playing at 1180x820
         shell: bash

@@ -39,6 +39,7 @@ static func mount(root: Node3D, appearance: Dictionary) -> AnimationPlayer:
     # Preserve legacy saved identity for cross-scene consumers without rendering
     # any procedural geometry over the official Knight's original head.
     _species_identity_only(skeleton, appearance)
+    _hide_native_hand_props(skeleton)
     _bone_socket(skeleton, "handslot.r", MiniUtopiaAvatarContract.SOCKET_WEAPON_R)
     _bone_socket(skeleton, "handslot.l", MiniUtopiaAvatarContract.SOCKET_WEAPON_L)
     # A-012 visual check: no packaged official crown asset exists.
@@ -62,6 +63,41 @@ static func mount(root: Node3D, appearance: Dictionary) -> AnimationPlayer:
         for descendant in legacy.find_children("*", "MeshInstance3D", true, false):
             (descendant as MeshInstance3D).visible = false
     return animation
+
+
+# The bundled Knight GLB has a 1H sword, 2H sword and several shields
+# already displayed on its imported hands. They are showcase meshes, NOT
+# items owned by the signed-in child. Remove their render layer, even if the
+# original animation changes visible, before mounting the verified loadout.
+# Do not hide the animated hand bones or the official helmet.
+static func _hide_native_hand_props(skeleton: Skeleton3D) -> void:
+    for hand in ["handslot_l", "handslot_r"]:
+        var original := skeleton.get_node_or_null(hand) as Node3D
+        if original == null:
+            continue
+        # Only original direct mesh children; a runtime Socket_WeaponR/L
+        # inserted below the imported holder MUST remain drawable.
+        for part in original.get_children():
+            if part is MeshInstance3D:
+                (part as MeshInstance3D).layers = 0
+
+
+static func visible_hand_style(root: Node3D, slot: String, style: String) -> bool:
+    var socket_name := (
+        MiniUtopiaAvatarContract.SOCKET_WEAPON_L
+        if slot == "weapon_offhand"
+        else MiniUtopiaAvatarContract.SOCKET_WEAPON_R
+    )
+    var socket := mounted_weapon_socket(root, socket_name)
+    if socket == null:
+        return false
+    var equipment := socket.get_node_or_null("Equipment_" + slot) as Node3D
+    if equipment == null or String(equipment.get_meta("kaykit_style", "")) != style:
+        return false
+    for mesh in equipment.find_children("*", "MeshInstance3D", true, false):
+        if (mesh as MeshInstance3D).is_visible_in_tree():
+            return true
+    return false
 
 
 static func hand_skin(appearance: Dictionary) -> String:
@@ -108,6 +144,13 @@ static func apply_hand_skin(root: Node3D, appearance: Dictionary, equipment: Dic
         var model := packed.instantiate() as Node3D
         if model != null:
             model.name = "Equipment_" + slot
+            model.set_meta("kaykit_style", style)
+            # The imported hand grip points a prop's local Y axis toward
+            # the camera; rotate it into the standing plane instead. The
+            # official sword, wand and staff must show a full recognizable
+            # silhouette, not an end-on disc or a cross-body rod.
+            if style in ["sword_1handed", "staff", "wand"]:
+                model.rotation_degrees.z = 90.0
             socket.add_child(model)
 
 
@@ -133,6 +176,21 @@ static func _bone_socket(
         return
     if skeleton.find_child(socket_name, true, false) != null:
         return
+    # Prefer the source GLB's already-authored hands: these imported holders
+    # have the grip pose/rotation for the bundled KayKit equipment models.
+    # A fresh BoneAttachment3D at the bare bone origin turns a long staff into
+    # a sideways disc in the real Web screenshot.
+    var imported_hand := (
+        "handslot_r" if bone_name == "handslot.r" else
+        "handslot_l" if bone_name == "handslot.l" else ""
+    )
+    if not imported_hand.is_empty():
+        var existing := skeleton.get_node_or_null(imported_hand) as Node3D
+        if existing != null:
+            var hand_socket := Node3D.new()
+            hand_socket.name = socket_name
+            existing.add_child(hand_socket)
+            return
     var binding := BoneAttachment3D.new()
     binding.name = "KayKitBone_" + bone_name
     binding.bone_name = bone_name
