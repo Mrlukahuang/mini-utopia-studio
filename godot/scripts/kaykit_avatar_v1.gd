@@ -145,10 +145,12 @@ static func apply_hand_skin(root: Node3D, appearance: Dictionary, equipment: Dic
         if model != null:
             model.name = "Equipment_" + slot
             model.set_meta("kaykit_style", style)
-            # Imported Knight grips can point a long prop into the camera.
-            # Turn staff/wand locally so they are identifiable in Web preview.
-            if style in ["staff", "wand"]:
-                model.rotation_degrees.x = -90.0
+            # The imported hand grip points a prop's local Y axis toward
+            # the camera; rotate it into the standing plane instead. The
+            # official sword, wand and staff must show a full recognizable
+            # silhouette, not an end-on disc or a cross-body rod.
+            if style in ["sword_1handed", "staff", "wand"]:
+                model.rotation_degrees.z = 90.0
             socket.add_child(model)
 
 
