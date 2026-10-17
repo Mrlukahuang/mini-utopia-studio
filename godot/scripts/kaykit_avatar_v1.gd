@@ -226,12 +226,13 @@ static func apply_hand_skin(root: Node3D, appearance: Dictionary, equipment: Dic
                 ) as Skeleton3D
                 socket.add_child(pivot)
                 model.name = "OfficialHandProp"
-                # Use the same imported hands lot for every frame. Grasp the
-                # unscaled, continuous staff shaft at local y=-0.45 (the shaft
-                # reaches down to -0.9004), keeping the gem farther ahead of
-                # the face without detaching or camera-dependent correction.
+                # Keep the original imported handslot fixed. Hold farther
+                # down the unscaled continuous staff shaft at local y=-0.65
+                # (official mesh shaft bottom y=-0.9004). This moves the wide
+                # green crown forward/up without floating the hand or chasing
+                # the camera, and leaves 0.25m of shaft below the grip.
                 if style == "staff":
-                    model.position.y = 0.45
+                    model.position.y = 0.65
                 pivot.add_child(model)
             else:
                 model.name = "Equipment_" + slot
