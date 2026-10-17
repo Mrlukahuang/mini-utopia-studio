@@ -20,7 +20,13 @@ const WEAPONS := {
 # This preserves a fixed natural pose through Idle/Walking_A/Running_A.
 class HeadClearancePivot extends Node3D:
     var actor: Node3D
+    var rig: Skeleton3D
     var style := "sword_1handed"
+    # Official staff.gltf POSITION bounds: upper Y=1.2543, half-depth Z=.1462.
+    # The smoke requires >= .46m side clearance at the upper endpoint.
+    const STAFF_REACH := 1.2542541
+    const STAFF_END_HALF_DEPTH := 0.146173
+    const STAFF_SIDE_CLEARANCE := 0.46
 
     func _ready() -> void:
         # Imported AnimationPlayer changes handslot_r in idle processing.
@@ -28,6 +34,10 @@ class HeadClearancePivot extends Node3D:
         # causing one-frame Walk/Run drift toward the helmet. Resolve the
         # visual-only grip AFTER the rig update, with no socket translation.
         process_priority = 100
+        if rig != null:
+            # Animated BoneAttachment3D transforms are refreshed when the
+            # skeleton updates, not necessarily before our generic _process.
+            rig.skeleton_updated.connect(_orient_in_actor_space)
         _orient_in_actor_space()
 
     func _process(_delta: float) -> void:
@@ -46,10 +56,33 @@ class HeadClearancePivot extends Node3D:
                 # clearly in a head-on Creator preview.
                 axis = basis.y + basis.z + basis.x * (0.18 * side)
             "staff":
-                # A staff is a longer, asymmetrical object. Put the green
-                # jewel *outside and behind* the helmet, not in front of the
-                # face; the shaft continues to originate at the real grip.
-                axis = basis.y * 2.00 - basis.z * 1.45 + basis.x * (1.10 * side)
+                # Web geometry at Walk 90°: the grip advances .31m in front
+                # of the head. A fixed tilt leaves the green jewel over the
+                # helmet, even when the staff long axis itself is correct.
+                # Derive the minimum backward component from the *animated*
+                # grip and true head bone. Keep the bottom anchored to the
+                # imported hand: no socket shift and no test threshold change.
+                var outward := 0.28
+                var backward := 0.68
+                if rig != null:
+                    var head_index := rig.find_bone("head")
+                    if head_index >= 0:
+                        var head := rig.to_global(
+                            rig.get_bone_global_pose(head_index).origin
+                        )
+                        var grip_behind := (global_position - head).dot(-basis.z)
+                        var required := (
+                            STAFF_SIDE_CLEARANCE + STAFF_END_HALF_DEPTH + 0.06
+                            - grip_behind
+                        ) / STAFF_REACH
+                        backward = clampf(required, 0.60, 0.89)
+                var upward := sqrt(
+                    1.0 - backward * backward - outward * outward
+                )
+                axis = (
+                    basis.y * upward - basis.z * backward
+                    + basis.x * (outward * side)
+                )
             _:
                 # Short wand: near upright, modest outward tilt.
                 axis = basis.y * 1.3 + basis.x * (0.55 * side)
@@ -196,6 +229,9 @@ static func apply_hand_skin(root: Node3D, appearance: Dictionary, equipment: Dic
                 pivot.set_meta("kaykit_style", style)
                 pivot.actor = root
                 pivot.style = style
+                pivot.rig = root.get_node("KayKitBody").find_child(
+                    "Skeleton3D", true, false
+                ) as Skeleton3D
                 socket.add_child(pivot)
                 model.name = "OfficialHandProp"
                 pivot.add_child(model)
