@@ -100,6 +100,87 @@ jobs:
           npm install --prefix /tmp/mini-utopia-playwright --no-audit --no-fund playwright@1.56.1
           /tmp/mini-utopia-playwright/node_modules/.bin/playwright install --with-deps chromium
           mkdir -p dist/visual-evidence
+          # A-012 isolated Knight rig/clip survey; temp file removed before
+          # any formal smoke or production export. No source asset changes.
+          python3 - <<'PY'
+          import os,subprocess
+          from pathlib import Path
+          probe=Path('godot/tests/_ci_lanec_staff_rig_probe.gd')
+          source=r'''
+          extends SceneTree
+          func _initialize() -> void:
+              var packed := load("res://assets/kaykit/adventurers/Knight.glb") as PackedScene
+              if packed == null:
+                  push_error("Knight GLB missing")
+                  quit(1)
+                  return
+              var actor := packed.instantiate()
+              root.add_child(actor)
+              var rig := actor.find_child("Skeleton3D", true, false) as Skeleton3D
+              var animation := actor.find_child("AnimationPlayer", true, false) as AnimationPlayer
+              if rig == null or animation == null:
+                  push_error("Knight Skeleton3D/AnimationPlayer missing")
+                  quit(1)
+                  return
+              var bones: Array = []
+              for i in range(rig.get_bone_count()):
+                  var parent := rig.get_bone_parent(i)
+                  var pose := rig.get_bone_pose(i)
+                  var rest := rig.get_bone_rest(i)
+                  bones.append({
+                      "index": i,
+                      "name": rig.get_bone_name(i),
+                      "parent": rig.get_bone_name(parent) if parent >= 0 else "",
+                      "pose_origin": [pose.origin.x, pose.origin.y, pose.origin.z],
+                      "rest_origin": [rest.origin.x, rest.origin.y, rest.origin.z],
+                      "rest_quaternion": [rest.basis.get_rotation_quaternion().x,
+                          rest.basis.get_rotation_quaternion().y,
+                          rest.basis.get_rotation_quaternion().z,
+                          rest.basis.get_rotation_quaternion().w],
+                  })
+              var clips: Array = []
+              for name in animation.get_animation_list():
+                  var clip := animation.get_animation(name)
+                  var tracks: Array = []
+                  for track in range(clip.get_track_count()):
+                      var track_path := String(clip.track_get_path(track))
+                      if (
+                          track_path.to_lower().contains("arm")
+                          or track_path.to_lower().contains("hand")
+                          or track_path.to_lower().contains("wrist")
+                      ):
+                          tracks.append(track_path)
+                  clips.append({
+                      "name": String(name),
+                      "length": clip.length,
+                      "right_arm_track_candidates": tracks,
+                  })
+              var hand := rig.get_node_or_null("handslot_r") as Node3D
+              var record := {
+                  "source": "unchanged checked-in official Knight.glb",
+                  "bones": bones, "clips": clips,
+                  "right_hand_node": hand.get_path() if hand != null else "",
+                  "hand_to_rig": hand.transform.origin if hand != null else Vector3.ZERO,
+              }
+              var out := OS.get_environment("GITHUB_WORKSPACE") + "/dist/visual-evidence/staff-rig-survey.json"
+              var file := FileAccess.open(out, FileAccess.WRITE)
+              if file == null:
+                  push_error("Cannot save staff rig survey")
+                  quit(1)
+                  return
+              file.store_string(JSON.stringify(record, "\t"))
+              file.close()
+              print("LANE_C_STAFF_RIG " + JSON.stringify(record))
+              quit(0)
+          '''
+          probe.write_text(source)
+          try:
+              subprocess.run([os.environ["GODOT_BINARY"],"--headless","--path","godot",
+                  "--script","res://tests/_ci_lanec_staff_rig_probe.gd"],check=True)
+              assert Path("dist/visual-evidence/staff-rig-survey.json").stat().st_size > 300
+          finally:
+              probe.unlink(missing_ok=True)
+          PY
           python3 - <<'PY'
           import os,re,subprocess
           from pathlib import Path
@@ -407,6 +488,7 @@ jobs:
           path: |
             dist/visual-evidence/diag-*.png
             dist/visual-evidence/clearance-geometry.json
+            dist/visual-evidence/staff-rig-survey.json
             dist/visual-evidence/*-A3-*-cycle.*
           if-no-files-found: warn
           retention-days: 14
