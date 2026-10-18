@@ -1,7 +1,7 @@
 class_name MiniUtopiaFamilyHeroLibrary
 extends Control
 
-## My Heroes / 我的角色 — accessible in-game on Mac and iPad.
+## 我的英雄es / 我的角色 — accessible in-game on Mac and iPad.
 ## A parent may supply a private HTTPS endpoint + scoped token in this session
 ## only. No child name, token, or credentials are written to local storage.
 ## The production parent sign-in/short-lived token issuer is a separate step.
@@ -181,7 +181,7 @@ func _build_profile_picker() -> void:
         name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
         name.text = (
-            ("Child A / 大宝" if profile_id == "child_a" else "Child B / 二宝")
+            ("大宝" if profile_id == "child_a" else "二宝")
             + "\n🌈 我的英雄"
         )
         name.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -600,8 +600,8 @@ func _build_ui() -> void:
     profile_choice = OptionButton.new()
     profile_choice.name = "ChildProfile"
     profile_choice.custom_minimum_size.y = 48
-    profile_choice.add_item("Child A / 大宝", 0)
-    profile_choice.add_item("Child B / 二宝", 1)
+    profile_choice.add_item("大宝", 0)
+    profile_choice.add_item("二宝", 1)
     connection_panel.add_child(profile_choice)
 
     api_input = LineEdit.new()
@@ -850,44 +850,44 @@ func _cancel_movie_restore() -> void:
 
 func _refresh_films() -> void:
     if not bridge.has_family_session() or bridge.is_busy():
-        _set_status("Unlock your private account to see My Movies.", true)
+        _set_status("请家长先解锁，才能查看我的电影。", true)
         return
     if not _movie_phase.is_empty():
         return
     var error := bridge.list_family_films()
     if error != OK:
-        _set_status("My Movies could not be loaded.", true)
+        _set_status("暂时打不开我的电影，请稍后再试。", true)
     else:
-        _set_status("Finding your private saved movies…", false)
+        _set_status("正在寻找你保存的电影…", false)
 
 
 func _on_film_download_pressed(film_id: String) -> void:
     if not bridge.has_family_session():
-        _set_status("Unlock your private account before saving a movie.", true)
+        _set_status("请家长先解锁，才能保存电影。", true)
         return
     if bridge.has_prepared_private_movie(film_id):
         # This second direct tap preserves Safari's user-gesture requirement.
         var saved := bridge.save_prepared_private_movie(film_id)
         if saved == OK:
-            _set_status("Your private MP4 was offered for saving on this device.", false)
+            _set_status("电影已经发送到设备，请查看保存提示。", false)
         else:
-            _set_status("Saving this MP4 is supported in the Web version.", true)
+            _set_status("请在网页版本保存这部电影。", true)
         var ready := movie_list.get_node_or_null("Download_" + film_id) as Button
         if ready != null:
-            ready.text = "🎬 Prepare private MP4 again"
+            ready.text = "🎬 重新准备电影"
         return
     if bridge.is_busy() or not _movie_phase.is_empty():
         return
     var error := bridge.prepare_private_movie_download(film_id)
     if error != OK:
-        _set_status("Could not request your private MP4.", true)
+        _set_status("暂时无法准备电影，请稍后再试。", true)
         return
     var download_button := movie_list.get_node_or_null(
         "Download_" + film_id
     ) as Button
     if download_button != null:
         download_button.disabled = true
-    _set_status("Checking parent's final MP4 release and loading safely…", false)
+    _set_status("正在确认家长许可并准备电影…", false)
 
 
 func _on_saved_movie_pressed(film_id: String) -> void:
@@ -898,16 +898,16 @@ func _on_saved_movie_pressed(film_id: String) -> void:
         or not film_id.begins_with("FILM_")
         or film_id.contains("/")
     ):
-        _set_status("Finish the current request before reopening a movie.", true)
+        _set_status("请等当前操作完成后，再打开电影。", true)
         return
     _cancel_movie_restore()
     _movie_restore["requested_id"] = film_id
     _movie_phase = "film"
     var error := bridge.get_family_film(film_id)
     if error != OK:
-        _movie_restore_failed("Could not reopen this private movie.")
+        _movie_restore_failed("暂时无法重新打开这部电影。")
         return
-    _set_status("Checking saved film and fetching its original cast…", false)
+    _set_status("正在打开电影，准备原来的角色…", false)
 
 
 func _movie_restore_failed(message: String) -> void:
@@ -921,18 +921,18 @@ func _movie_restore_failed(message: String) -> void:
 
 func _request_movie_cast(character_id: String, stage: String) -> void:
     if not character_id.begins_with("CHAR_") or "/" in character_id:
-        _movie_restore_failed("Saved movie has an invalid actor.")
+        _movie_restore_failed("电影中的角色信息暂时不可用。")
         return
     _movie_cast_id = character_id
     _movie_phase = stage + "_character"
     if bridge.get_character(character_id) != OK:
-        _movie_restore_failed("Could not verify saved film actor.")
+        _movie_restore_failed("暂时无法确认电影里的角色。")
 
 
 func _request_movie_gear(stage: String) -> void:
     _movie_phase = stage + "_equipment"
     if bridge.get_equipment(_movie_cast_id) != OK:
-        _movie_restore_failed("Could not fetch actor's own wardrobe.")
+        _movie_restore_failed("暂时无法取得角色原来的装备。")
 
 
 func _finish_movie_restore() -> void:
@@ -940,7 +940,7 @@ func _finish_movie_restore() -> void:
     if family == null or not family.restore_owned_film(
         _movie_restore.get("record", {})
     ):
-        _movie_restore_failed("This saved film no longer has an authorized cast.")
+        _movie_restore_failed("这部电影的角色暂时无法使用。")
         return
     _cancel_movie_restore()
     Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -952,7 +952,7 @@ func _consume_movie_restore(kind: String, payload: Dictionary) -> bool:
         return false
     var family := _family_state()
     if family == null or not bridge.has_family_session():
-        _movie_restore_failed("Unlock your private child account again.")
+        _movie_restore_failed("请家长重新解锁你的账号。")
         return true
 
     if _movie_phase == "film" and kind == "films:get":
@@ -965,7 +965,7 @@ func _consume_movie_restore(kind: String, payload: Dictionary) -> bool:
             or typeof(draft) != TYPE_DICTIONARY
             or not String(draft.get("character_id", "")).begins_with("CHAR_")
         ):
-            _movie_restore_failed("Private movie data was not verified.")
+            _movie_restore_failed("暂时无法确认这部电影的信息。")
             return true
         _movie_restore["record"] = payload.duplicate(true)
         family.clear_selection()
@@ -983,7 +983,7 @@ func _consume_movie_restore(kind: String, payload: Dictionary) -> bool:
                 else family.select_second_cast_character(payload)
             )
         ):
-            _movie_restore_failed("Saved actor is missing or not privately owned.")
+            _movie_restore_failed("电影中的角色暂时无法打开。")
             return true
         var which := "primary" if _movie_phase == "primary_character" else "second"
         _request_movie_gear(which)
@@ -1002,7 +1002,7 @@ func _consume_movie_restore(kind: String, payload: Dictionary) -> bool:
                 else family.select_second_cast_equipment(gear)
             )
         ):
-            _movie_restore_failed("Actor clothes or props could not be verified.")
+            _movie_restore_failed("电影角色的衣服或道具暂时无法确认。")
             return true
         if _movie_phase == "primary_equipment":
             var draft: Dictionary = _movie_restore["record"]["draft"]
@@ -1010,7 +1010,7 @@ func _consume_movie_restore(kind: String, payload: Dictionary) -> bool:
             var second := String(raw_second) if typeof(raw_second) == TYPE_STRING else ""
             if not second.is_empty():
                 if second == _movie_cast_id:
-                    _movie_restore_failed("Film cannot cast the same actor twice.")
+                    _movie_restore_failed("同一个角色不能在一部电影里重复出场。")
                     return true
                 _request_movie_cast(second, "second")
                 return true
@@ -1230,10 +1230,10 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             or String(payload.get("schema_version", "")) != "1.0"
             or typeof(films) != TYPE_ARRAY
         ):
-            _set_status("Private movie list could not be verified.", true)
+            _set_status("暂时无法确认我的电影列表。", true)
             return
         var heading := Label.new()
-        heading.text = "🎞 My Movies / 我的电影"
+        heading.text = "🎞 我的电影"
         movie_list.add_child(heading)
         for entry in films:
             if typeof(entry) != TYPE_DICTIONARY:
@@ -1244,7 +1244,7 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
                 continue
             var button := Button.new()
             button.name = "Film_" + id
-            button.text = "🎬 " + String(draft.get("display_name", "My Film")) + " · Continue"
+            button.text = "🎬 " + String(draft.get("display_name", "我的电影")) + " · 继续制作"
             button.custom_minimum_size.y = 62
             button.pressed.connect(_on_saved_movie_pressed.bind(id))
             movie_list.add_child(button)
@@ -1274,7 +1274,10 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             child_save_button.pressed.connect(_on_film_download_pressed.bind(id))
             movie_list.add_child(child_save_button)
             child_save_button.visible = not _parent_controls_open
-        _set_status(str(films.size()) + " private movie(s) saved.", false)
+        _set_status(
+            "还没有保存的电影。" if films.is_empty()
+            else "已保存 " + str(films.size()) + " 部电影。", false
+        )
         return
     if _consume_movie_restore(kind, payload):
         return
@@ -1487,7 +1490,7 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
     )
     for hero in heroes:
         var character_id := String(hero.get("character_id", ""))
-        var name := String(hero.get("display_name", "My Hero"))
+        var name := String(hero.get("display_name", "我的英雄"))
         var button := Button.new()
         button.name = "Hero_" + character_id
         button.text = ""
@@ -1580,7 +1583,7 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         if not primary.is_empty() and character_id != primary:
             var cast_button := Button.new()
             cast_button.name = "Cast_" + character_id
-            cast_button.text = "🎬 Invite " + name + " into my film"
+            cast_button.text = "🎬 邀请 " + name + " 一起拍电影"
             cast_button.custom_minimum_size.y = 58
             cast_button.pressed.connect(_on_cast_pressed.bind(character_id))
             hero_list.add_child(cast_button)
@@ -1608,8 +1611,8 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         var preview := _profile_portraits.get(current_id) as MiniUtopiaCreatorAvatarStage
         if caption != null:
             caption.text = (
-                ("Child A / 大宝" if current_id == "child_a" else "Child B / 二宝")
-                + ("\n⭐ " + String(heroes[0].get("display_name", "My Hero"))
+                ("大宝" if current_id == "child_a" else "二宝")
+                + ("\n⭐ " + String(heroes[0].get("display_name", "我的英雄"))
                     if not heroes.is_empty() else "\n🌈 创建我的英雄")
             )
         if preview != null and not heroes.is_empty():
@@ -1659,7 +1662,7 @@ func _on_bridge_failure(kind: String, status_code: int, _code: String, _message:
 
     if kind == "films:get" and not _pending_review_film_id.is_empty():
         _cancel_parent_movie_review()
-        _set_status("This film is not currently available to this child.", true)
+        _set_status("这部电影暂时不能打开。", true)
         return
     if kind.begins_with("family:film-review:"):
         parent_movie_approve.disabled = false
@@ -1672,12 +1675,12 @@ func _on_bridge_failure(kind: String, status_code: int, _code: String, _message:
         return
     if kind == "films:list":
         _clear_movie_list()
-        _set_status("Your private movies could not be loaded.", true)
+        _set_status("暂时无法打开我的电影，请稍后再试。", true)
         return
     if not _movie_phase.is_empty() and kind in [
         "films:get", "character:get", "equipment:get"
     ]:
-        _movie_restore_failed("Saved movie or private actor cannot be reopened.")
+        _movie_restore_failed("暂时无法打开电影或其中的角色。")
         return
     if kind in ["family:cast-approve", "family:cast-revoke"]:
         share_submit.disabled = false
