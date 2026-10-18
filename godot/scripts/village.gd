@@ -610,9 +610,11 @@ func _build_ground() -> void:
         var patch := _cylinder("Hill", Vector3(p.x, -0.10, p.z),
             8.0, 0.06, palette.grass2)
         patch.scale = Vector3(1.8, 1.0, 1.4)
+        patch.add_to_group("lane_a_ground_patch")
     var mound := _cylinder("VillageMound", Vector3(0, -0.10, -12),
         12.0, 0.06, palette.grass_dark)
     mound.scale = Vector3(1.2, 1.0, 0.85)
+    mound.add_to_group("lane_a_ground_patch")
 
 func _build_path() -> void:
     var stones: Array[Vector3] = []
