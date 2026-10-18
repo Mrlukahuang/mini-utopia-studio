@@ -310,12 +310,7 @@ func _initialize() -> void:
     # True root cause: cosmetic Hill/VillageMound meshes must never rise
     # above the flat collision plane. These 6 decorative patches are batched.
     var ground_patches := 0
-    for patch_node in scene.get_children():
-        if not (patch_node is MeshInstance3D):
-            continue
-        if not (String(patch_node.name).begins_with("Hill")
-                or String(patch_node.name) == "VillageMound"):
-            continue
+    for patch_node in get_nodes_in_group("lane_a_ground_patch"):
         var patch_mesh := patch_node as MeshInstance3D
         if not (patch_mesh.mesh is CylinderMesh):
             _fail("raised non-colliding decorative grass hill remains: " + patch_mesh.name)
