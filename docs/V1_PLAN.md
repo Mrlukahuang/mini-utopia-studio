@@ -111,7 +111,7 @@ CC0 套件：KayKit / Kenney / Quaternius
 
 ---
 
-### W2：声音（⏸ 暂停，见 AMEND A-010）
+### W2：声音（🟡 工程开发恢复；A-013，真 iPad 验收仍待）
 
 **交付物：** 带音轨的 MP4
 
@@ -177,10 +177,11 @@ CC0 套件：KayKit / Kenney / Quaternius
 ## 8. 本周任务（代理只从这里领任务）
 
 ```text
-当前：W1.5 视觉与可玩性冲刺（AMEND A-010，方向锁定）
-暂停：W2 全部（#386 不合并）
+当前：W2 声音工程开发（AMEND A-013）；优先已有 #386 的 CI 定向排障，再完成 MP4 混音、儿童私有录音与预览
+W1.5：Mac Web 工程基线可用于继续开发；真 iPad Safari 最终验收推迟，NOT_VERIFIED，不能称 v1 通过
+保持暂停：#454 法杖（Draft）、#452 外观素材；不能恢复与 W2 无关的新功能
 三个 Codex 并行，各自只做自己的通道（Lane），只改自己负责的文件
-完成 W1.5 三项后：通知负责人用 iPad 复测，负责人认可后才能恢复 W2
+按 A-013，允许在真 iPad 复测前推进 W2 零费用工程；v1 最终交付与 iPad 验收条件没有放宽
 ```
 
 ### 8.1 并行通道与文件所有权（W1.5 期间生效）
@@ -200,6 +201,20 @@ CC0 套件：KayKit / Kenney / Quaternius
 6. 谁都不改：`AGENTS.md`、`AMEND.md`、`tools/scope_guard.py`、`.github/workflows/`。需要改时交给负责人。
 7. 每条通道每天各自最多合并 15 个 PR（互不占用，见 AMEND A-011）。全力推进，不需要保守。PR 标题用任务 ID 开头（V1-W15-01/02/03）。
 8. 每个 PR 都要附上 1180×820 iPad 截图；自己通道完成后，在 PR 里通知负责人。
+
+### 8.2 W2 三 Lane 增量开发责任（A-013 生效；不沿用 W1.5 §8.1 文件分工）
+
+当前只接续**已存在的 W2-01/02/03**，不重做已合并功能、不新增新的子系统。共享契约必须遵守 AGENTS §5，真实儿童数据/声音不得上传公开 CI。
+
+| 通道 | W2 单一职责 | 可编辑范围与前置依赖 |
+|---|---|---|
+| **Lane A — 后期音轨** | V1-W2-01 音乐混入最终 MP4；后续合入 C 提供的逐镜私有声音，离线 `ffprobe` 检查音轨时长/位置 | 优先 `studio/` 内现有私有渲染 / FFmpeg 音轨组合模块及对应 `tests/`；**先等 B 的 #386 合并后**再改共享的 `studio/family_film_render.py` 等数据契约，不修改 B Director UI 或 C 录音上传/API |
+| **Lane B — 导演台选曲、保存和预览** | 先继续**原 Draft PR #386**，排查 #387 的 `run_one()` CI 失败（仅一次有根因证据的定向修复）；通过后基于现有 UI 完成 W2-03 声音预览接线 | #386 原有变更文件 `godot/scripts/director_stage.gd`、`family_director_session.gd`、`family_scene_state.gd`、现有 Director smoke、`studio/family_films.py`、`studio/family_film_render.py` 限定于 #386 音乐选曲契约；`run_one()` 根因落在 A 文件时只交接 A，禁止交叉并改 |
+| **Lane C — 儿童私有逐镜录音** | V1-W2-02 孩子逐镜短句录音：浏览器可信 HTTPS 输入、私有上传/存储契约、与镜头绑定的合成回归；提供 B 可接线的接口，不开发通用音频系统 | 仅新/既有录音采集与客户端桥接、必要的 `studio/family_api.py` 音频接口及对应 C/录音 smoke；不修改 B 的 Director UI 或 A 的 FFmpeg 混音文件；录音入口若需 B UI，明确交由 B 接线 |
+
+**调度顺序**：① B 原 #386 的定向诊断（#387 所述 CI 重试例外，仅一次）与 C 独立录音底层可并行；A 同步阅读现有渲染管线、只读设计混音验证，**不要在 #386 合并前修改交叉文件**。② #386 CI 全绿且合并后 A 进入音轨混音实现。③ C 音频接口稳定后 B 做导演台录音/声音预览接线，A 完成最终 MP4 的同步/音轨验收。各 Lane 每个已批准任务用最小 PR，发现新的高风险、付费、治理或跨文件冲突先停。
+
+**工程验收与真机边界**：仅允许合成家庭/录音 fixture；用真实 Godot Web 行为、离线 FFmpeg 输出 MP4 和 `ffprobe` 验证音轨，而不是测试按钮存在就标记通过；iPad Safari 麦克风许可、实际扬声器播放、真机性能、家长端的整条闭环均继续 `NOT_VERIFIED`。
 
 **W1 家长设备预检（非孩子试玩记录，不能替代 §7）：** Mac Safari 与 iPhone Safari/Chrome 已在家庭 HTTPS 下加载游戏，直接 POST Child B 的家庭 API 返回 HTTP 201；Godot 家长解锁页面显示 `Parent unlock could not start` / `Parent unlock denied`。项目负责人明确要求允许 8 位家长口令。记录为 V1-W1-03 的单项阻断修复；真 iPad 验收及粘贴体验后续独立记录。
 
