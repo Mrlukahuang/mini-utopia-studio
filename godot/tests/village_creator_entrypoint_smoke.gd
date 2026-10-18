@@ -307,6 +307,30 @@ func _initialize() -> void:
                 var y: float = (mesh_part.global_transform * point).y
                 knight_min_y = minf(knight_min_y, y)
                 knight_max_y = maxf(knight_max_y, y)
+    # True root cause: cosmetic Hill/VillageMound meshes must never rise
+    # above the flat collision plane. These 6 decorative patches are batched.
+    var ground_patches := 0
+    for patch_node in scene.get_children():
+        if not (patch_node is MeshInstance3D):
+            continue
+        if not (String(patch_node.name).begins_with("Hill")
+                or String(patch_node.name) == "VillageMound"):
+            continue
+        var patch_mesh := patch_node as MeshInstance3D
+        if not (patch_mesh.mesh is CylinderMesh):
+            _fail("raised non-colliding decorative grass hill remains: " + patch_mesh.name)
+            return
+        var patch_top := (patch_mesh.global_transform * patch_mesh.mesh.get_aabb().get_endpoint(7)).y
+        if patch_top > -0.049:
+            _fail("grass patch visually intersects landed player: %s at Y=%f" % [patch_mesh.name, patch_top])
+            return
+        if patch_top < -0.16:
+            _fail("grass patch disappeared beneath KayKit tiles: " + patch_mesh.name)
+            return
+        ground_patches += 1
+    if ground_patches != 6:
+        _fail("expected six batched ground-level grass patches: " + str(ground_patches))
+        return
     var tiles_top_y := -0.16
     var grass_batches := get_nodes_in_group("lane_a_static_batch")
     for batch_node in grass_batches:
