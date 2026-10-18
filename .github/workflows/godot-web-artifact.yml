@@ -202,6 +202,11 @@ jobs:
               if anim == null or anim.current_animation.is_empty():
                   return
               var axes := actor.global_transform.basis.orthonormalized()
+              # Same sign definition as HeadClearancePivot after Web render.
+              var socket_delta := hand.global_position - actor.global_position
+              var socket_actor_x := socket_delta.dot(axes.x)
+              var measured_side := -1.0 if socket_actor_x < 0.0 else 1.0
+              var final_axis := hand.global_transform.basis.y.normalized()
               var d := tip-head
               var px1 := cam.unproject_position(head)
               var px2 := cam.unproject_position(tip)
@@ -216,6 +221,11 @@ jobs:
                       "head": _ci_v(head),
                       "grip": _ci_v(hand.global_position),
                       "grip_parent": _ci_v((hand.get_parent() as Node3D).global_position),
+                      "actor_origin": _ci_v(actor.global_position),
+                      "socket_actor_x": socket_actor_x,
+                      "socket_actor_xyz": [socket_delta.dot(axes.x),socket_delta.dot(axes.y),socket_delta.dot(axes.z)],
+                      "computed_side": measured_side,
+                      "final_axis_actor_xyz": [final_axis.dot(axes.x),final_axis.dot(axes.y),final_axis.dot(axes.z)],
                       "grip_basis_x": _ci_v(hand.global_transform.basis.x),
                       "grip_basis_y": _ci_v(hand.global_transform.basis.y),
                       "grip_basis_z": _ci_v(hand.global_transform.basis.z),
@@ -304,7 +314,8 @@ jobs:
                   }
                 }
                 if(width===1366){
-                  const key='staff|Walk|270';
+                  for(const [pose,angle,tag] of [['Walk',270,'A2-left-Walk-cycle'],['Run',90,'A2-right-Run-cycle'],['Run',270,'A2-left-Run-cycle']]){
+                  const key=['staff',pose,angle].join('|');
                   await page.evaluate(x=>{window.__MU_REQUEST=x;window.__MU_DIAG_JSON='';},key);
                   await page.waitForFunction(x=>{
                     try{return JSON.parse(window.__MU_DIAG_JSON||'{}').request===x;}
@@ -312,7 +323,7 @@ jobs:
                   },key,{timeout:45000});
                   const info=await page.evaluate(()=>JSON.parse(window.__MU_DIAG_JSON));
                   if(!(info.animation_length>0 && info.animation_length<30))
-                    throw Error('Invalid Walk cycle length');
+                    throw Error('Invalid '+pose+' cycle length');
                   // Record the real rendered canvas at normal game resolution.
                   // Software rendering can run slower than wall-clock animation time.
                   // Stop only after observed wraps, with a bounded timeout.
@@ -346,19 +357,26 @@ jobs:
                     return {bytes,frames,elapsedMs:performance.now()-start,canvas:[canvas.width,canvas.height]};
                   },durationMs);
                   const frames=recording.frames;
-                  let wraps=0;
-                  for(let i=1;i<frames.length;i++){
-                    if(frames[i].animation_time<frames[i-1].animation_time)wraps++;
+                  let wraps=0,sideChanges=0,sideMin=Infinity,sideMax=-Infinity;
+                  for(let i=0;i<frames.length;i++){
+                    const frame=frames[i];
+                    sideMin=Math.min(sideMin,frame.socket_actor_x);
+                    sideMax=Math.max(sideMax,frame.socket_actor_x);
+                    if(i>0){
+                      if(frame.animation_time<frames[i-1].animation_time)wraps++;
+                      if(frame.computed_side!==frames[i-1].computed_side)sideChanges++;
+                    }
                   }
-                  fs.writeFileSync('dist/visual-evidence/A2-left-Walk-cycle.webm',
+                  fs.writeFileSync('dist/visual-evidence/'+tag+'.webm',
                     Buffer.from(recording.bytes));
-                  fs.writeFileSync('dist/visual-evidence/A2-left-Walk-cycle.json',
-                    JSON.stringify({source:process.env.GITHUB_SHA,viewport:[width,height],
-                      canvas:recording.canvas,durationMs:recording.elapsedMs,wraps,frames,
+                  fs.writeFileSync('dist/visual-evidence/'+tag+'.json',
+                    JSON.stringify({source:process.env.GITHUB_SHA,pose,sideAngle:angle,viewport:[width,height],
+                      canvas:recording.canvas,durationMs:recording.elapsedMs,wraps,sideChanges,socketActorXMin:sideMin,socketActorXMax:sideMax,frames,
                       limitation:'World-space mesh/crown and head-bone references; not a helmet mesh intersection test.'},null,2));
                   if(frames.length<12 || wraps<2)
                     throw Error('Recording lacks a full wrap-to-wrap Walk cycle: '+wraps);
-                  console.log('A2 Walk recording: '+frames.length+' rendered frames, '+wraps+' wraps');
+                  console.log(tag+': '+frames.length+' frames, '+wraps+' wraps, '+sideChanges+' side flips, X=['+sideMin+','+sideMax+']');
+                  }
                 }
                 await context.close();
               }
@@ -378,7 +396,7 @@ jobs:
           path: |
             dist/visual-evidence/diag-*.png
             dist/visual-evidence/clearance-geometry.json
-            dist/visual-evidence/A2-left-Walk-cycle.*
+            dist/visual-evidence/A2-*-cycle.*
           if-no-files-found: warn
           retention-days: 14
 
@@ -675,14 +693,13 @@ jobs:
           JS
 
       # A-012 screenshot-only CI fixtures; never included in production artifact.
-      # A-012 complete visual acceptance: 160 real Godot Web before/after frames,
-      # both props, Idle/Walk/Run, front/left/right/back and both game viewports.
-      # The A2 grip, sword pose and all production/test steps are unchanged.
+      # A-012 focused Run-loop diagnosis before full 160-frame retest.
+      # A2, sword, production export and smoke remain unchanged.
       - name: Capture actual Godot Web weapon clearance before and after
         shell: bash
         run: |
           set -euo pipefail
-          export MU_CLEARANCE_MATRIX=full
+          export MU_CLEARANCE_MATRIX=small
           sed -i -E 's|^run/main_scene=".*"$|run/main_scene="res://scenes/character_creator.tscn"|' godot/project.godot
           python3 - <<'PY'
           import os
