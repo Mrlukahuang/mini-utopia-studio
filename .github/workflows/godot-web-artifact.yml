@@ -398,19 +398,19 @@ jobs:
           const {chromium} = require('/tmp/mini-utopia-playwright/node_modules/playwright');
           (async () => {
             const browser = await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox']});
+            try {
             for (const [width,height] of [[1180,820],[1366,1024]]) {
             const context = await browser.newContext({viewport:{width,height},deviceScaleFactor:1,isMobile:true,hasTouch:true});
-            try {
               const page = await context.newPage();
               await page.goto('http://127.0.0.1:8771/',{waitUntil:'load',timeout:120000});
               await page.waitForFunction(()=>document.querySelector('#loader')===null,null,{timeout:120000});
               await page.waitForTimeout(3000);
-              await page.screenshot({path:'dist/visual-evidence/home-${width}x${height}.png'});
+              await page.screenshot({path:`dist/visual-evidence/home-${width}x${height}.png`});
               await page.mouse.click(width/2,height/2+75);
               await page.waitForTimeout(7000);
-              await page.screenshot({path:'dist/visual-evidence/home-to-who-is-playing-${width}x${height}.png'});
+              await page.screenshot({path:`dist/visual-evidence/home-to-who-is-playing-${width}x${height}.png`});
               const fs=require('node:fs');
-              for(const file of ['home-1180x820.png','home-to-who-is-playing-1180x820.png']){
+              for(const file of [`home-${width}x${height}.png`,`home-to-who-is-playing-${width}x${height}.png`]){
                 if(fs.statSync('dist/visual-evidence/'+file).size<12000)throw Error('Empty screenshot: '+file);
               }
               await context.close();
