@@ -565,6 +565,20 @@ jobs:
                   "schema_version": "1.0", "characters": heroes
               })
               if _ci_visual_state in ["movies-empty", "movies-film"]:
+                  movies_button.pressed.emit()
+              # The new Lane C first-touch chooser must not cover the
+              # library-content evidence once it lands on main.
+              var chooser := get_node_or_null("WhoIsPlaying") as Control
+              if chooser != null:
+                  chooser.hide()
+
+          '''
+          source = source.replace(anchor, fixture + anchor, 1)
+          # CI-only movie response uses the production button's pressed signal.
+          method_anchor = 'func _refresh_films() -> void:'
+          assert source.count(method_anchor) == 1
+          movie_fixture = '''
+              if _ci_visual_state in ["movies-empty", "movies-film"]:
                   var synthetic_films: Array = []
                   if _ci_visual_state == "movies-film":
                       synthetic_films.append({
@@ -578,14 +592,9 @@ jobs:
                   _on_bridge_success("films:list", {
                       "schema_version": "1.0", "films": synthetic_films
                   })
-              # The new Lane C first-touch chooser must not cover the
-              # library-content evidence once it lands on main.
-              var chooser := get_node_or_null("WhoIsPlaying") as Control
-              if chooser != null:
-                  chooser.hide()
-
+                  return
           '''
-          source = source.replace(anchor, fixture + anchor, 1)
+          source = source.replace(method_anchor, method_anchor + '\n' + movie_fixture, 1)
           ready_end = '        _set_status("想保存新角色？请家长先点「家长入口」。", false)'
           assert source.count(ready_end) == 1
           source = source.replace(ready_end, ready_end + '\n    call_deferred("_ci_library_fixture")', 1)
