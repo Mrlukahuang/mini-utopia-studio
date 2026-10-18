@@ -288,6 +288,34 @@ func _initialize() -> void:
         return
 
     var player := scene.get_node_or_null("Player") as CharacterBody3D
+    # #460 diagnosis: measure actual landed physical capsule and source Knight
+    # bounds against the visible KayKit ground. Logs only; no gameplay change.
+    await create_timer(0.6).timeout
+    var capsule := player.get_node("CollisionShape3D") as CollisionShape3D
+    var capsule_bottom: float = capsule.global_position.y - (capsule.shape as CapsuleShape3D).height * 0.5
+    var knight := player.get_node_or_null("KayKitBody") as Node3D
+    var knight_min_y := INF
+    var knight_max_y := -INF
+    if knight != null:
+        for part in knight.find_children("*", "MeshInstance3D", true, false):
+            var mesh_part := part as MeshInstance3D
+            if mesh_part.mesh == null or not mesh_part.is_visible_in_tree():
+                continue
+            var bounds: AABB = mesh_part.mesh.get_aabb()
+            for corner in range(8):
+                var point: Vector3 = bounds.get_endpoint(corner)
+                var y: float = (mesh_part.global_transform * point).y
+                knight_min_y = minf(knight_min_y, y)
+                knight_max_y = maxf(knight_max_y, y)
+    var tiles_top_y := -0.16
+    var grass_batches := get_nodes_in_group("lane_a_static_batch")
+    for batch_node in grass_batches:
+        if String(batch_node.name).begins_with("KayKitGrass"):
+            var grass_batch := batch_node as MultiMeshInstance3D
+            tiles_top_y = maxf(tiles_top_y, -0.16 + grass_batch.multimesh.mesh.get_aabb().end.y * 1.58)
+    print("lane_a_460_probe: root_y=%.3f capsule_bottom=%.3f knight_min=%.3f knight_max=%.3f physical_ground_top=-0.050 grass_top=%.3f on_floor=%s" % [
+        player.global_position.y, capsule_bottom, knight_min_y, knight_max_y, tiles_top_y, str(player.is_on_floor())
+    ])
     if player == null or player.get_node_or_null("CollisionShape3D") == null:
         _fail("player has no physical collider")
         return
