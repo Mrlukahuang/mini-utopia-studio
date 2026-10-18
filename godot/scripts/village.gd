@@ -598,12 +598,21 @@ func _build_ground() -> void:
         for col in range(-12, 13):
             tiles.append(Vector3(float(col) * 2.9 + (1.45 if row % 2 else 0.0), -0.16, float(row) * 2.7))
     _batch_kaykit_props(KAYKIT_GRASS, tiles, 1.58, "KayKitGrass", false)
+    # #460: the old visual-only Hill spheres rose 3.2m above the flat
+    # collision ground; the VillageMound rose 0.44m. Players walking through
+    # those uncollided domes appeared to sink into the grass. Preserve the
+    # colored ground patches, but keep their tops just below the -0.05m
+    # physical floor and above the -0.16m KayKit grass tiles.
     for p in [
         Vector3(-20,0,18), Vector3(22,0,-15), Vector3(-25,0,-20),
         Vector3(25,0,20), Vector3(0,0,-34)
     ]:
-        _sphere("Hill", p + Vector3(0,-1.2,0), 8.0, palette.grass2, Vector3(1.8,0.55,1.4))
-    _sphere("VillageMound", Vector3(0,-1.0,-12), 12.0, palette.grass_dark, Vector3(1.2,0.12,0.85))
+        var patch := _cylinder("Hill", Vector3(p.x, -0.10, p.z),
+            8.0, 0.06, palette.grass2)
+        patch.scale = Vector3(1.8, 1.0, 1.4)
+    var mound := _cylinder("VillageMound", Vector3(0, -0.10, -12),
+        12.0, 0.06, palette.grass_dark)
+    mound.scale = Vector3(1.2, 1.0, 0.85)
 
 func _build_path() -> void:
     var stones: Array[Vector3] = []
