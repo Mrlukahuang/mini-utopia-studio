@@ -384,7 +384,7 @@ jobs:
           JS
 
       # A-012: screenshots only; production export and test steps unchanged.
-      - name: Capture Start Home and Who Is Playing at 1180x820
+      - name: Capture Start Home and Who Is Playing at both iPad landscape sizes
         shell: bash
         run: |
           set -euo pipefail
@@ -398,20 +398,23 @@ jobs:
           const {chromium} = require('/tmp/mini-utopia-playwright/node_modules/playwright');
           (async () => {
             const browser = await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox']});
-            const context = await browser.newContext({viewport:{width:1180,height:820},deviceScaleFactor:1,isMobile:true,hasTouch:true});
+            for (const [width,height] of [[1180,820],[1366,1024]]) {
+            const context = await browser.newContext({viewport:{width,height},deviceScaleFactor:1,isMobile:true,hasTouch:true});
             try {
               const page = await context.newPage();
               await page.goto('http://127.0.0.1:8771/',{waitUntil:'load',timeout:120000});
               await page.waitForFunction(()=>document.querySelector('#loader')===null,null,{timeout:120000});
               await page.waitForTimeout(3000);
-              await page.screenshot({path:'dist/visual-evidence/home-1180x820.png'});
-              await page.mouse.click(590,485);
+              await page.screenshot({path:'dist/visual-evidence/home-${width}x${height}.png'});
+              await page.mouse.click(width/2,height/2+75);
               await page.waitForTimeout(7000);
-              await page.screenshot({path:'dist/visual-evidence/home-to-who-is-playing-1180x820.png'});
+              await page.screenshot({path:'dist/visual-evidence/home-to-who-is-playing-${width}x${height}.png'});
               const fs=require('node:fs');
               for(const file of ['home-1180x820.png','home-to-who-is-playing-1180x820.png']){
                 if(fs.statSync('dist/visual-evidence/'+file).size<12000)throw Error('Empty screenshot: '+file);
               }
+              await context.close();
+            }
             } finally {await browser.close();}
           })().catch(e=>{console.error(e);process.exitCode=1;});
           JS
@@ -561,6 +564,20 @@ jobs:
               _on_bridge_success("characters:list", {
                   "schema_version": "1.0", "characters": heroes
               })
+              if _ci_visual_state in ["movies-empty", "movies-film"]:
+                  var synthetic_films: Array = []
+                  if _ci_visual_state == "movies-film":
+                      synthetic_films.append({
+                          "film_id": "FILM_CI_SYNTHETIC",
+                          "draft": {
+                              "display_name": "小星星的电影",
+                              "character_id": "CHAR_CI_SYNTHETIC",
+                              "duration_seconds": 15
+                          }
+                      })
+                  _on_bridge_success("films:list", {
+                      "schema_version": "1.0", "films": synthetic_films
+                  })
               # The new Lane C first-touch chooser must not cover the
               # library-content evidence once it lands on main.
               var chooser := get_node_or_null("WhoIsPlaying") as Control
@@ -576,7 +593,7 @@ jobs:
           PY
           # Capture the initial two-player chooser before injecting a synthetic
           # owner-scoped session into the other two isolated CI exports.
-          for state in chooser pin empty hero; do
+          for state in chooser pin empty hero movies-empty movies-film; do
             sed -i 's|var _ci_visual_state := "[^"]*"|var _ci_visual_state := "'"$state"'"|' godot/scripts/family_hero_library.gd
             "$GODOT_BINARY" --headless --path godot --editor --quit
             mkdir -p "$GITHUB_WORKSPACE/dist/library-$state-visual"
@@ -585,7 +602,7 @@ jobs:
             test -s "dist/library-$state-visual/index.pck"
           done
 
-      - name: Screenshot Who Is Playing and Hero Library at 1180x820
+      - name: Screenshot Who Is Playing Hero Library and actual My Movies at two sizes
         shell: bash
         run: |
           set -euo pipefail
@@ -593,6 +610,8 @@ jobs:
           python3 -m http.server 8769 --bind 127.0.0.1 --directory dist/library-hero-visual >/tmp/mini-utopia-library-hero.log 2>&1 &
           python3 -m http.server 8770 --bind 127.0.0.1 --directory dist/library-chooser-visual >/tmp/mini-utopia-chooser.log 2>&1 &
           python3 -m http.server 8781 --bind 127.0.0.1 --directory dist/library-pin-visual >/tmp/mini-utopia-parent-pin.log 2>&1 &
+          python3 -m http.server 8782 --bind 127.0.0.1 --directory dist/library-movies-empty-visual >/tmp/mini-utopia-movies-empty.log 2>&1 &
+          python3 -m http.server 8783 --bind 127.0.0.1 --directory dist/library-movies-film-visual >/tmp/mini-utopia-movies-film.log 2>&1 &
           node <<'JS'
           const {chromium} = require('/tmp/mini-utopia-playwright/node_modules/playwright');
           const fs = require('node:fs');
@@ -602,9 +621,10 @@ jobs:
               args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--no-sandbox']
             });
             try {
-              for (const [state, port] of [['who-is-playing', 8770], ['parent-pin', 8781], ['empty', 8768], ['with-hero', 8769]]) {
+              for (const [width,height] of [[1180,820],[1366,1024]]) {
+              for (const [state, port] of [['who-is-playing', 8770], ['parent-pin', 8781], ['empty', 8768], ['with-hero', 8769], ['movies-empty',8782], ['movies-film',8783]]) {
                 const context = await browser.newContext({
-                  viewport: {width: 1180, height: 820},
+                  viewport: {width, height},
                   deviceScaleFactor: 1, isMobile: true, hasTouch: true
                 });
                 const page = await context.newPage();
@@ -621,15 +641,16 @@ jobs:
                   null, {timeout: 120000}
                 );
                 await page.waitForTimeout(5000);
-                const file = 'dist/visual-evidence/' + (state === 'who-is-playing' || state === 'parent-pin' ? state : 'library-' + state) + '-1180x820.png';
+                const file = 'dist/visual-evidence/' + (state === 'who-is-playing' || state === 'parent-pin' ? state : state.startsWith('movies-') ? state : 'library-' + state) + `-${width}x${height}.png`;
                 await page.screenshot({path: file, fullPage: false, timeout: 90000});
                 if (fs.statSync(file).size < 12000 || errors.length ||
-                    (state === 'parent-pin' && fs.existsSync('dist/visual-evidence/home-1180x820.png') &&
+                    (state === 'parent-pin' && fs.existsSync('`dist/visual-evidence/home-${width}x${height}.png`') &&
                     fs.readFileSync(file).equals(fs.readFileSync('dist/visual-evidence/home-1180x820.png')))) {
                   throw Error('Invalid library screenshot ' + state + ': ' + errors.join('; '));
                 }
                 console.log('Captured isolated, synthetic library: ' + file);
                 await context.close();
+              }
               }
             } finally { await browser.close(); }
           })().catch(e => {console.error(e); process.exitCode = 1;});
@@ -639,6 +660,14 @@ jobs:
           test -s dist/visual-evidence/library-empty-1180x820.png
           test -s dist/visual-evidence/library-with-hero-1180x820.png
 
+          test -s dist/visual-evidence/home-1366x1024.png
+          test -s dist/visual-evidence/who-is-playing-1366x1024.png
+          test -s dist/visual-evidence/library-empty-1366x1024.png
+          test -s dist/visual-evidence/library-with-hero-1366x1024.png
+          test -s dist/visual-evidence/movies-empty-1180x820.png
+          test -s dist/visual-evidence/movies-film-1180x820.png
+          test -s dist/visual-evidence/movies-empty-1366x1024.png
+          test -s dist/visual-evidence/movies-film-1366x1024.png
       - name: Publish iPad Creator visual evidence
         if: always()
         uses: actions/upload-artifact@v4
