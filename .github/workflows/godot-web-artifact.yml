@@ -228,13 +228,18 @@ jobs:
                   avatar_stage.apply_appearance(_draft_appearance)
                   avatar_stage.play_preview_animation(String(parts[2]))
                   avatar_stage.avatar_root().rotation_degrees.y = float(parts[3])
-                  # CI-only same-binary before/after: prop shaft still meets
-                  # real handslot; do not modify the shipped A3 asset.
+                  # Same compiled Web: A2/Staff-hold toggle only. Both variants
+                  # use the same original handslot and 0.65 shaft grip.
                   var staff_mesh := avatar_stage.avatar_root().find_child(
                       "OfficialHandProp", true, false
                   ) as Node3D
                   if staff_mesh != null:
-                      staff_mesh.position.y = 0.65 if String(parts[0]) == "before" else 0.80
+                      staff_mesh.position.y = 0.65
+                  var pivot := avatar_stage.avatar_root().find_child(
+                      "Equipment_weapon_main", true, false
+                  ) as Node3D
+                  if pivot != null:
+                      pivot.set("staff_arm_overlay_enabled", String(parts[0]) == "after")
                   return
               var actor := avatar_stage.avatar_root()
               var hand := actor.find_child(
@@ -405,7 +410,7 @@ jobs:
                 }
                 if(width===1366){
                   for(const variant of ['before','after']){
-                  for(const [pose,angle,tag] of [['Walk',270,'A3-left-Walk-cycle'],['Run',90,'A3-right-Run-cycle'],['Run',270,'A3-left-Run-cycle']]){
+                  for(const [pose,angle,tag] of [['Walk',270,'S1-left-Walk-cycle'],['Run',90,'S1-right-Run-cycle'],['Run',270,'S1-left-Run-cycle']]){
                   const key=[variant,'staff',pose,angle].join('|');
                   await page.evaluate(x=>{window.__MU_REQUEST=x;window.__MU_DIAG_JSON='';},key);
                   await page.waitForFunction(x=>{
@@ -461,7 +466,7 @@ jobs:
                   fs.writeFileSync('dist/visual-evidence/'+variant+'-'+tag+'.webm',
                     Buffer.from(recording.bytes));
                   fs.writeFileSync('dist/visual-evidence/'+variant+'-'+tag+'.json',
-                    JSON.stringify({source:process.env.GITHUB_SHA,variant,gripY:variant==='before'?0.65:0.80,pose,sideAngle:angle,viewport:[width,height],
+                    JSON.stringify({source:process.env.GITHUB_SHA,variant,gripY:0.65,staffOnlyArmOverlay:variant==='after',pose,sideAngle:angle,viewport:[width,height],
                       canvas:recording.canvas,durationMs:recording.elapsedMs,wraps,sideChanges,socketActorXMin:sideMin,socketActorXMax:sideMax,frames,
                       limitation:'World-space mesh/crown and head-bone references; not a helmet mesh intersection test.'},null,2));
                   if(frames.length<12 || wraps<2)
@@ -489,7 +494,7 @@ jobs:
             dist/visual-evidence/diag-*.png
             dist/visual-evidence/clearance-geometry.json
             dist/visual-evidence/staff-rig-survey.json
-            dist/visual-evidence/*-A3-*-cycle.*
+            dist/visual-evidence/*-S1-*-cycle.*
           if-no-files-found: warn
           retention-days: 14
 
@@ -786,8 +791,8 @@ jobs:
           JS
 
       # A-012 screenshot-only CI fixtures; never included in production artifact.
-      # A-012 focused A2 versus single staff-grip A3 before/after evidence.
-      # No 160-frame matrix until both Run loops and left Walk pass.
+      # A-012: compare unchanged A2 against single Staff-only right-arm hold.
+      # No 160-frame matrix until left/right Run and left Walk pass visually.
       - name: Capture actual Godot Web weapon clearance before and after
         shell: bash
         run: |

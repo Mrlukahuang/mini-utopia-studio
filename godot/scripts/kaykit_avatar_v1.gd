@@ -22,6 +22,16 @@ class HeadClearancePivot extends Node3D:
     var actor: Node3D
     var rig: Skeleton3D
     var style := "sword_1handed"
+    # Staff only: the real right arm inherits Idle holding pose while the
+    # original Walk/Run locomotion controls the rest of the Knight skeleton.
+    # The flag is true in production; A-012's isolated before fixture can
+    # disable the overlay without changing any production weapon/animation.
+    var staff_arm_overlay_enabled := true
+    var _staff_idle_arm: Dictionary = {}
+    const STAFF_ARM_BONES := [
+        "upperarm.r", "lowerarm.r", "hand.r", "handslot.r"
+    ]
+    const STAFF_IDLE_HOLD_BLEND := 0.75
     # Official staff.gltf POSITION bounds: upper Y=1.2543, half-depth Z=.1462.
     # The smoke requires >= .46m side clearance at the upper endpoint.
     const STAFF_REACH := 1.2542541
@@ -35,12 +45,64 @@ class HeadClearancePivot extends Node3D:
         # visual-only grip AFTER the rig update, with no socket translation.
         process_priority = 100
         if rig != null:
+            if style == "staff":
+                _cache_idle_right_arm()
             # Animated BoneAttachment3D transforms are refreshed when the
             # skeleton updates, not necessarily before our generic _process.
             rig.skeleton_updated.connect(_orient_in_actor_space)
         _orient_in_actor_space()
 
+    func _cache_idle_right_arm() -> void:
+        if rig == null or actor == null:
+            return
+        var player := actor.find_child(
+            "AnimationPlayer", true, false
+        ) as AnimationPlayer
+        if player == null or not player.has_animation("Idle"):
+            return
+        var idle := player.get_animation("Idle")
+        for bone_name in STAFF_ARM_BONES:
+            var bone_id := rig.find_bone(bone_name)
+            if bone_id < 0:
+                continue
+            for track in range(idle.get_track_count()):
+                if (
+                    idle.track_get_type(track) == Animation.TYPE_ROTATION_3D
+                    and String(idle.track_get_path(track)).ends_with(":" + bone_name)
+                ):
+                    _staff_idle_arm[bone_id] = idle.rotation_track_interpolate(
+                        track, 0.0
+                    )
+                    break
+
+    func _apply_staff_hold_after_animation() -> void:
+        if (
+            style != "staff" or not staff_arm_overlay_enabled
+            or rig == null or actor == null or _staff_idle_arm.is_empty()
+        ):
+            return
+        var player := actor.find_child(
+            "AnimationPlayer", true, false
+        ) as AnimationPlayer
+        if player == null or player.current_animation not in [
+            "Walking_A", "Running_A"
+        ]:
+            return
+        # Original AnimationPlayer processes before priority=100. Blend only
+        # the imported right-arm chain, not hips/spine/other hand/speed.
+        for bone_id in _staff_idle_arm:
+            var source_rotation := rig.get_bone_pose_rotation(int(bone_id))
+            rig.set_bone_pose_rotation(
+                int(bone_id),
+                source_rotation.slerp(
+                    _staff_idle_arm[bone_id], STAFF_IDLE_HOLD_BLEND
+                )
+            )
+        # Force socket + palm refresh before the prop is reoriented.
+        rig.force_update_all_bone_transforms()
+
     func _process(_delta: float) -> void:
+        _apply_staff_hold_after_animation()
         _orient_in_actor_space()
 
     func _orient_in_actor_space() -> void:
@@ -226,12 +288,12 @@ static func apply_hand_skin(root: Node3D, appearance: Dictionary, equipment: Dic
                 ) as Skeleton3D
                 socket.add_child(pivot)
                 model.name = "OfficialHandProp"
-                # A3 trial, based on Run mesh-projection evidence: same fixed
-                # A2 shaft direction and real handslot, but grip local y=-0.80
-                # instead of -0.65. Staff shaft ends at -0.9004, leaving a
-                # visible ~0.10m handle below the unchanged hand.
+                # Revert failed A3: original accepted A2 continuous shaft
+                # grip at local y=-0.65, with ~0.25m handle below the palm.
+                # The Staff-only arm pose carries the REAL handslot + palm
+                # together; sword orientation and the side rule are unchanged.
                 if style == "staff":
-                    model.position.y = 0.80
+                    model.position.y = 0.65
                 pivot.add_child(model)
             else:
                 model.name = "Equipment_" + slot
