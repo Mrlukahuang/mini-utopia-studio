@@ -226,13 +226,12 @@ static func apply_hand_skin(root: Node3D, appearance: Dictionary, equipment: Dic
                 ) as Skeleton3D
                 socket.add_child(pivot)
                 model.name = "OfficialHandProp"
-                # Keep the original imported handslot fixed. Hold farther
-                # down the unscaled continuous staff shaft at local y=-0.65
-                # (official mesh shaft bottom y=-0.9004). This moves the wide
-                # green crown forward/up without floating the hand or chasing
-                # the camera, and leaves 0.25m of shaft below the grip.
+                # A3 trial, based on Run mesh-projection evidence: same fixed
+                # A2 shaft direction and real handslot, but grip local y=-0.80
+                # instead of -0.65. Staff shaft ends at -0.9004, leaving a
+                # visible ~0.10m handle below the unchanged hand.
                 if style == "staff":
-                    model.position.y = 0.65
+                    model.position.y = 0.80
                 pivot.add_child(model)
             else:
                 model.name = "Equipment_" + slot
