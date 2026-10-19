@@ -543,8 +543,11 @@ jobs:
           import json
           import subprocess
           import tempfile
+          import sys
+          import traceback
           from pathlib import Path
 
+          from studio.family_private_movie_worker import render_private_movie
           from studio.family_api import FamilyApplication
           from studio.family_movie_media import approved_fingerprint, media_path
           from studio.family_render_queue import (
@@ -658,11 +661,38 @@ jobs:
 
               # This calls the REAL isolated Godot/Xvfb/FFmpeg renderer through
               # SQLite's adult-only queue, not a stub or direct worker shortcut.
-              result = queue.run_one(
-                  project_dir=Path("godot"), store_root=store,
-                  godot="/tmp/godot/Godot_v4.7.2-stable_linux.x86_64",
-                  ffmpeg="ffmpeg", ffprobe="ffprobe", xvfb_run="xvfb-run",
-              )
+              # A-013: synthetic-only diagnostic. Never log messages, paths,
+              # subprocess output, child media or credentials.
+              def synthetic_probe_renderer(**kwargs):
+                  try:
+                      return render_private_movie(**kwargs)
+                  except Exception as exc:
+                      sites = traceback.extract_tb(exc.__traceback__)
+                      print("SYNTHETIC_RENDER_EXCEPTION", type(exc).__name__,
+                            [(Path(site.filename).name, site.name, site.lineno)
+                             for site in sites[-8:]], flush=True)
+                      raise
+
+              def synthetic_queue_trace(frame, event, arg):
+                  if (event == "exception"
+                          and frame.f_code.co_name == "run_one"
+                          and Path(frame.f_code.co_filename).name == "family_render_queue.py"):
+                      print("SYNTHETIC_QUEUE_EXCEPTION", arg[0].__name__,
+                            ("family_render_queue.py", "run_one", frame.f_lineno),
+                            flush=True)
+                  return synthetic_queue_trace
+
+              prior_trace = sys.gettrace()
+              try:
+                  sys.settrace(synthetic_queue_trace)
+                  result = queue.run_one(
+                      project_dir=Path("godot"), store_root=store,
+                      godot="/tmp/godot/Godot_v4.7.2-stable_linux.x86_64",
+                      ffmpeg="ffmpeg", ffprobe="ffprobe", xvfb_run="xvfb-run",
+                      renderer=synthetic_probe_renderer,
+                  )
+              finally:
+                  sys.settrace(prior_trace)
               assert result and result["status"] == "completed"
               assert result["job_id"] == job["job_id"]
               assert result["attempts"] == 1
