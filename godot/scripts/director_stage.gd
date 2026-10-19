@@ -8,6 +8,7 @@ var film_title_input: LineEdit
 var film_note_input: LineEdit
 var save_film_button: Button
 var record_voice_button: Button
+var music_preview: MiniUtopiaFamilyMusicPreview
 var voice_recorder: MiniUtopiaFamilyVoiceRecorder
 var saved_film_id := ""
 var saved_film_revision := ""
@@ -31,6 +32,10 @@ func _ready() -> void:
     ) as MiniUtopiaFamilySceneState
     if family_state != null:
         family_state.bind_family_client(film_bridge)
+
+    music_preview = MiniUtopiaFamilyMusicPreview.new()
+    music_preview.name = "DirectorMusicPreview"
+    add_child(music_preview)
 
     voice_recorder = MiniUtopiaFamilyVoiceRecorder.new()
     voice_recorder.name = "PrivateShotVoiceRecorder"
@@ -186,8 +191,8 @@ func _refresh_choice_labels() -> void:
     var music_button: Button = child_choice_buttons.get("music_id")
     if music_button != null:
         var music_id := String(choices.get("music_id", "none"))
-        music_button.text = "🎵 Music: " + String(
-            MiniUtopiaFamilyDirectorSession.MUSIC_TITLES.get(music_id, "Off")
+        music_button.text = "音乐  " + String(
+            MiniUtopiaFamilyDirectorSession.MUSIC_TITLES.get(music_id, "关闭")
         )
 
 
@@ -213,6 +218,9 @@ func _cycle_child_choice(key: String) -> void:
     var index := options.find(old_value)
     family.director_shot_choices[key] = options[(index + 1) % options.size()]
     _refresh_choice_labels()
+    if key == "music_id" and music_preview != null:
+        if not music_preview.choose_on_user_tap(String(family.director_shot_choices[key])):
+            status_label.text = "音乐预览暂时不可用"
     var shot := _current_family_payload()
     if shot.is_empty():
         return
@@ -359,6 +367,8 @@ func _on_replay_pressed() -> void:
 
 
 func _on_back_to_village_pressed() -> void:
+    if music_preview != null:
+        music_preview.clear_preview()
     Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
     get_tree().change_scene_to_file("res://scenes/main.tscn")
 
@@ -421,7 +431,7 @@ func _on_voice_tapped() -> void:
 
 func _on_voice_ready(media_type: String, audio: PackedByteArray) -> void:
     if film_bridge == null or film_bridge.upload_private_film_voice(
-        saved_film_id, audio, media_type
+        saved_film_id, audio, media_type, saved_film_revision
     ) != OK:
         status_label.text = "声音上传失败，请重试"
     else:
@@ -435,6 +445,13 @@ func _on_voice_failed() -> void:
 
 
 func _on_film_bridge_success(kind: String, payload: Dictionary) -> void:
+    if kind == "films:get":
+        var current_revision := String(payload.get("revision", ""))
+        if current_revision.is_valid_int() and int(current_revision) > 0:
+            saved_film_revision = current_revision
+        status_label.text = "电影已更新，请检查最新内容后重新录音"
+        _refresh_record_button()
+        return
     if kind == "films:voice:0":
         saved_film_revision = String(payload.get("revision", ""))
         status_label.text = "声音已保存，请家长确认"
@@ -463,8 +480,16 @@ func _on_film_bridge_failure(
     kind: String, status_code: int, _code: String, _message: String
 ) -> void:
     if kind == "films:voice:0":
-        status_label.text = "声音未保存，请检查麦克风"
+        if status_code == 409:
+            status_label.text = "电影版本已变化，正在刷新，请重新确认后录音"
+            if film_bridge != null and not saved_film_id.is_empty():
+                film_bridge.get_family_film(saved_film_id)
+        else:
+            status_label.text = "声音未保存，请检查麦克风"
         _refresh_record_button()
+        return
+    if kind == "films:get":
+        status_label.text = "无法刷新电影，请重新打开"
         return
     if kind not in ["films:post", "films:put"]:
         return
