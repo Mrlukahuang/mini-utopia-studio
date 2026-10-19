@@ -305,7 +305,7 @@ def test_real_private_worker_ffmpeg_mp4_after_saved_choice_and_parent_approval(
     """Real SQLite/API, review, private worker, FFmpeg and ffprobe; Godot frames synthetic."""
     import shutil
     from studio.family_music_catalog import MUSIC_BASE, music_file
-    from tests.test_family_music_mix import _minimal_synthetic_png
+    import struct\n    import zlib\n\n    def _minimal_synthetic_png():\n        def chunk(kind, data):\n            return (struct.pack(">I", len(data)) + kind + data\n                    + struct.pack(">I", zlib.crc32(kind + data) & 0xffffffff))\n        row = b"\\x00" + b"\\xb9\\xe7\\xd0" * 64\n        return (b"\\x89PNG\\r\\n\\x1a\\n"\n                + chunk(b"IHDR", struct.pack(">IIBBBBB", 64, 64, 8, 2, 0, 0, 0))\n                + chunk(b"IDAT", zlib.compress(row * 64))\n                + chunk(b"IEND", b""))
 
     db = tmp_path / "family.db"
     api = app_for(db)
