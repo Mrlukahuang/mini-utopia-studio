@@ -24,6 +24,10 @@ class PrivateVoicePolicyError(ValueError):
     """Unsupported or overlong child-recording candidate; safe for logs."""
 
 
+class PrivateVoiceRevisionConflict(PrivateVoicePolicyError):
+    """The private film changed while the child was recording."""
+
+
 def voice_path_relative(
     *,
     owner: str,
@@ -131,6 +135,7 @@ def save_private_shot_voice(
     repository, *, voice_root: Path, owner: str, film_id: str,
     shot_index: int, media_type: str, blob: bytes,
     runner=None, ffprobe: str = "ffprobe",
+    expected_revision: str | None = None,
 ) -> dict:
     """Probe uploaded binary before an immutable 0600 save and film revision bump."""
     import hashlib
@@ -153,6 +158,11 @@ def save_private_shot_voice(
         or "family_film_draft" not in asset.metadata
     ):
         raise PrivateVoicePolicyError("Owned film not found")
+    # The pinned contract is optional for existing one-shot Director clients;
+    # future UI may pass its saved revision to reject late/stale recordings.
+    # FamilyApplication holds its per-process write lock around this check.
+    if expected_revision is not None and str(asset.version) != expected_revision:
+        raise PrivateVoiceRevisionConflict("Film revision changed during recording")
     if not isinstance(blob, bytes) or not (0 < len(blob) <= MAX_VOICE_BYTES):
         raise PrivateVoicePolicyError("Voice exceeds private size limit")
     folder = _private_voice_dir(voice_root, owner, film_id, create=True)
