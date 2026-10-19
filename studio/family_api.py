@@ -20,7 +20,7 @@ from pathlib import Path
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Literal, Mapping
-from urllib.parse import unquote, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
@@ -30,7 +30,8 @@ from studio.family_props import FamilyCraftedProp, craft_family_prop
 from studio.family_films import FamilyFilmDraft, cast_is_owned, film_contract, save_film_draft
 from studio.family_film_render import build_family_film_render_source
 from studio.family_voice_policy import (
-    MAX_VOICE_BYTES, PrivateVoicePolicyError, save_private_shot_voice,
+    MAX_VOICE_BYTES, PrivateVoicePolicyError, PrivateVoiceRevisionConflict,
+    save_private_shot_voice,
 )
 from studio.family_movie_review import current_review_state, decide_private_film_review
 from studio.family_movie_media import (
@@ -531,6 +532,15 @@ class FamilyApplication:
                 return BridgeResponse(HTTPStatus.SERVICE_UNAVAILABLE, {
                     "error": "private_voice_unavailable",
                 })
+            # Optional source-revision pin for the current one-shot film.
+            # Old clients with no query keep their established upload contract.
+            query = parse_qs(urlsplit(path).query, keep_blank_values=True)
+            values = query.get("revision", [])
+            if (set(query) - {"revision"} or len(values) > 1
+                or (values and not re.fullmatch(r"[1-9][0-9]{0,9}", values[0]))):
+                return BridgeResponse(HTTPStatus.BAD_REQUEST, {
+                    "error": "invalid_film_revision",
+                })
             mime = content_type.split(";", 1)[0].strip().lower()
             try:
                 with self._session_lock:
@@ -539,7 +549,12 @@ class FamilyApplication:
                         owner=owner, film_id=voice_route.group(1),
                         shot_index=int(voice_route.group(2)),
                         media_type=mime, blob=body,
+                        expected_revision=values[0] if values else None,
                     )
+            except PrivateVoiceRevisionConflict:
+                return BridgeResponse(HTTPStatus.CONFLICT, {
+                    "error": "film_revision_conflict",
+                })
             except PrivateVoicePolicyError:
                 return BridgeResponse(HTTPStatus.BAD_REQUEST, {
                     "error": "invalid_private_voice",
