@@ -129,10 +129,28 @@ func _verify(stage: Node) -> void:
     var label = stage.get_node_or_null(
         "DirectorStageOverlay/StatusPanel/StatusMargin/StatusLabel"
     ) as Label
-    if label == null or "SHOT_01_01" not in label.text:
-        push_error("director_stage_scene_smoke: ready overlay missing shot")
+    # The runtime retains the canonical shot ID independently from UI copy.
+    # Child-visible labels must never expose these synthetic session IDs.
+    if String(runtime.payload.get("shot_id", "")) != "SHOT_01_01":
+        push_error("director_stage_scene_smoke: runtime lost shot ID")
         quit(1)
         return
+    if String(runtime.get_meta("shot_id", "")) != "SHOT_01_01":
+        push_error("director_stage_scene_smoke: runtime metadata lost shot ID")
+        quit(1)
+        return
+    if label == null or "镜头准备好了！" not in label.text:
+        push_error("director_stage_scene_smoke: Chinese ready state missing")
+        quit(1)
+        return
+    for secret in [
+        "SHOT_01_01", "SCENE_01", "DIR_STAGE_SMOKE", "LOC_STAGE",
+        "res://", "Fallback Stage", "Stage World",
+    ]:
+        if secret in label.text:
+            push_error("director_stage_scene_smoke: technical identifier visible: " + secret)
+            quit(1)
+            return
 
     print(
         "director_stage_scene_smoke: PASS · launchable scene + overlay + runtime"

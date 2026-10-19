@@ -20,7 +20,7 @@ from pathlib import Path
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Literal, Mapping
-from urllib.parse import unquote, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
@@ -29,6 +29,10 @@ from studio.bridge.equipment import EquipmentBridgeGateway
 from studio.family_props import FamilyCraftedProp, craft_family_prop
 from studio.family_films import FamilyFilmDraft, cast_is_owned, film_contract, save_film_draft
 from studio.family_film_render import build_family_film_render_source
+from studio.family_voice_policy import (
+    MAX_VOICE_BYTES, PrivateVoicePolicyError, PrivateVoiceRevisionConflict,
+    save_private_shot_voice,
+)
 from studio.family_movie_review import current_review_state, decide_private_film_review
 from studio.family_movie_media import (
     PrivateMovieMediaError, release_status, set_parent_release,
@@ -110,6 +114,10 @@ class FamilyApplication:
         )
         self.private_movie_root = (
             Path(private_movie_root) if private_movie_root is not None else None
+        )
+        self.private_voice_root = (
+            Path(repository.db_path).absolute().parent / "voice-clips"
+            if hasattr(repository, "db_path") else None
         )
         self._session_lock = threading.RLock()
         # Only token SHA-256 digests are retained on the server, not raw tokens.
@@ -393,6 +401,7 @@ class FamilyApplication:
         authorization: str = "",
         origin: str | None = None,
         body: bytes = b"",
+        content_type: str = "",
     ) -> BridgeResponse:
         if origin is not None and origin not in self.allowed_origins:
             return BridgeResponse(HTTPStatus.FORBIDDEN, {"error": "origin_not_allowed"})
@@ -511,6 +520,46 @@ class FamilyApplication:
             return BridgeResponse(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
 
         route = urlsplit(path).path
+        voice_route = re.fullmatch(
+            r"/family/films/(FILM_[A-Za-z0-9_-]{3,96})/voices/([0-7])", route
+        )
+        if voice_route is not None:
+            if method != "POST":
+                return BridgeResponse(HTTPStatus.METHOD_NOT_ALLOWED, {
+                    "error": "method_not_allowed",
+                })
+            if self.private_voice_root is None:
+                return BridgeResponse(HTTPStatus.SERVICE_UNAVAILABLE, {
+                    "error": "private_voice_unavailable",
+                })
+            # Optional source-revision pin for the current one-shot film.
+            # Old clients with no query keep their established upload contract.
+            query = parse_qs(urlsplit(path).query, keep_blank_values=True)
+            values = query.get("revision", [])
+            if (set(query) - {"revision"} or len(values) > 1
+                or (values and not re.fullmatch(r"[1-9][0-9]{0,9}", values[0]))):
+                return BridgeResponse(HTTPStatus.BAD_REQUEST, {
+                    "error": "invalid_film_revision",
+                })
+            mime = content_type.split(";", 1)[0].strip().lower()
+            try:
+                with self._session_lock:
+                    stored = save_private_shot_voice(
+                        self.repository, voice_root=self.private_voice_root,
+                        owner=owner, film_id=voice_route.group(1),
+                        shot_index=int(voice_route.group(2)),
+                        media_type=mime, blob=body,
+                        expected_revision=values[0] if values else None,
+                    )
+            except PrivateVoiceRevisionConflict:
+                return BridgeResponse(HTTPStatus.CONFLICT, {
+                    "error": "film_revision_conflict",
+                })
+            except PrivateVoicePolicyError:
+                return BridgeResponse(HTTPStatus.BAD_REQUEST, {
+                    "error": "invalid_private_voice",
+                })
+            return BridgeResponse(HTTPStatus.CREATED, stored)
         if route == "/family/films":
             if method == "GET":
                 films = [
@@ -845,7 +894,14 @@ def build_family_server(
                 size = int(self.headers.get("Content-Length", "0"))
             except ValueError:
                 size = -1
-            if size < 0 or size > MAX_REQUEST_BODY_BYTES:
+            # Only a strict owner-scoped voice upload accepts a 1.5 MB body.
+            # Existing JSON endpoints retain their 64 KB cap.
+            is_voice = method == "POST" and re.fullmatch(
+                r"/family/films/FILM_[A-Za-z0-9_-]{3,96}/voices/[0-7]",
+                urlsplit(self.path).path,
+            ) is not None
+            limit = MAX_VOICE_BYTES if is_voice else MAX_REQUEST_BODY_BYTES
+            if size < 0 or size > limit:
                 response = BridgeResponse(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {
                     "error": "request_too_large",
                 })
@@ -858,6 +914,7 @@ def build_family_server(
                         authorization=self.headers.get("Authorization", ""),
                         origin=self.headers.get("Origin"),
                         body=body,
+                        content_type=self.headers.get("Content-Type", ""),
                     )
                 except Exception:
                     # Do not leak exception details or private data over HTTP.

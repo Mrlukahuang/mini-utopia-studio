@@ -22,6 +22,12 @@ var _world_creative: MiniUtopiaWorldCreativeRuntime
 
 
 func apply_to_player(player: CharacterBody3D) -> Dictionary:
+    # Spawn at the clear south village entrance, facing the village center.
+    # This applies to the actual village scene, not Director actors.
+    if player.get_parent() != null and player.get_parent().name == "MiniUtopiaWorld":
+        player.position = Vector3(0.0, 1.2, 23.0)
+        player.rotation.y = PI
+        player.set("_spawn_position", player.global_position)
     # The selected, server-saved family Hero always takes priority over the
     # checked-in demo fixture. The same adapter also feeds Director staging.
     var selection := get_node_or_null("/root/FamilySceneState") as MiniUtopiaFamilySceneState
@@ -54,6 +60,7 @@ func apply_payload_to_player(
         _player,
         equipment
     )
+    MiniUtopiaKaykitAvatarV1.apply_hand_skin(_player, character, equipment)
 
     var final_stats: Dictionary = equipment.get("final_stats", {})
     _player.set_meta("mini_utopia_stats", final_stats)

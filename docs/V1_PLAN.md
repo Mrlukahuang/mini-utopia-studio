@@ -96,15 +96,30 @@ CC0 套件：KayKit / Kenney / Quaternius
 
 ---
 
-### W2：声音
+### W1.5：视觉与可玩性冲刺（AMEND A-010，方向锁定，优先于 W2–W4）
+
+**交付物：** 孩子第一眼就觉得"好看、想玩"，并且能自己建角色进村子走走
+
+| ID | 任务 | 验收标准 | 状态 |
+|---|---|---|---|
+| V1-W15-01 | 展示村子：≥20 栋 KayKit 房子 + 15 个不同 KayKit NPC，NPC 有待机/闲逛动画，所有物体都有碰撞，不能穿模 | iPad 截图：俯视 + 第三人称两张；玩家撞房子、撞 NPC 都会被挡住 | ✅ |
+| V1-W15-02 | UI 整体换风格：以 Logo 为基准的马卡龙方块玩具风，统一首页、角色库、Creator、村子 HUD、导演台；首页放 Logo | 每个界面一张 iPad 截图，风格统一，不再有灰色开发者界面 | 🟡 Lane B Theme/首页/导演台 PR，待 CI 截图与 Lane A/C 继承验收 |
+| V1-W15-03 | 建角色 → 进村：孩子自己建角色、命名、保存，直接进村子行走；孩子界面不出现任何技术文字，家长登录收进家长入口 | iPad 上 3 次点按以内从首页进到 Creator；保存后一次点按进村子 | ✅ Lane C CI 全绿＋1180×820 截图已生成；等三 Lane 集成后真 iPad 验收 |
+
+**顺序：** 01 → 02 → 03，可以在不冲突的部分并行。
+**不做：** 声音、录音、新玩法、战斗、任务系统、安全加固。
+
+---
+
+### W2：声音（🟡 工程开发恢复；A-013，真 iPad 验收仍待）
 
 **交付物：** 带音轨的 MP4
 
 | ID | 任务 | 验收标准 | 状态 |
 |---|---|---|---|
-| V1-W2-01 | 背景音乐：内置 3–5 首 CC0 音乐，导演台可选，混入 MP4 | ffprobe 检测到音轨；iPad 播放有音乐 | 🟡 3 首原创 CC0 WAV 已提交，导演台选择及 MP4 混音待后续 PR |
-| V1-W2-02 | 孩子录音：每个镜头可录一句话（≤10 秒），保存为私有音频，按时间线混入 MP4 | 成片里能听到孩子的声音，与对应镜头对齐 | ⬜ |
-| V1-W2-03 | 预览时也能听到音乐和录音 | 导演台预览有声音 | ⬜ |
+| V1-W2-01 | 背景音乐：内置 3–5 首 CC0 音乐，导演台可选，混入 MP4 | ffprobe 检测到音轨；iPad 播放有音乐 | 🟡 #385 三首音乐、#388 AAC、#389 worker 已合并；选曲 UI #386 受 §9.2 阻断，iPad 待验收 |
+| V1-W2-02 | 孩子录音：每个镜头可录一句话（≤10 秒），保存为私有音频，按时间线混入 MP4 | 成片里能听到孩子的声音，与对应镜头对齐 | 🟡 #391 元数据政策已合并；当前单镜头 9s Safari 录音 → owner 私有上传/FFprobe → 家长重新审核 → AAC MP4 开发中，真实 iPad 尚未验收 |
+| V1-W2-03 | 预览时也能听到音乐和录音 | 导演台预览有声音 | 🟡 #390 点击播放 helper 已合并，Director 接线依赖 #386；录音预览尚未实现 |
 
 **实现提示：** 优先评估 Godot Movie Maker（`--write-movie`，可同时输出音频）；如果不适合现有逐帧管线，就用 FFmpeg 在合成步骤混音（`-c:a aac`）。录音文件与 MP4 一样默认私有。
 **不做：** TTS、声音克隆、音效编辑器、AI 配乐。
@@ -162,11 +177,44 @@ CC0 套件：KayKit / Kenney / Quaternius
 ## 8. 本周任务（代理只从这里领任务）
 
 ```text
-当前周：W1
-可领取：V1-W1-01、V1-W1-02（需人类执行）、V1-W1-04
-V1-W1-03 A-008 iPad 试玩阻断：① UI 中文方框（PR #373 已合并，✅ CI 字体通过；真机待验收）；② Creator 动画按钮竖条遮挡预览（PR #374 已合并，✅ 两档 Playwright Web 截图无按钮遮挡；真机待验收）；③ KayKit 原始模型/动画/装备未入 Web 包（PR #375 ✅ 已合并：41骨骼/76动画/4装备）；④ Creator/村子/导演台 KayKit 共用真身与物种头（PR #380 ✅ 已合并，真实Web截图完整；真机待验收）；⑤ New Hero Save/Play 变灰（PR5 🟡 验证登录/命名/保存/私有装备/Play门禁，防止错用他人缓存）。每个缺陷一个 PR，顺序固定，CI 必须有 1180×820 与 1366×1024 Playwright Web 截图。
-V1-W1-03 家长 2026-10-15 已报告具体阻断：Mac Safari/iPhone 登录时无法粘贴长口令，手输短密码被 Godot 客户端拒绝；本次只处理“8 位家长口令被客户端长度校验拒绝”，长口令粘贴问题由独立 PR 进行中，仍需 Mac/iPad Safari 验收
+当前：W2 声音工程开发（AMEND A-013）；优先已有 #386 的 CI 定向排障，再完成 MP4 混音、儿童私有录音与预览
+W1.5：Mac Web 工程基线可用于继续开发；真 iPad Safari 最终验收推迟，NOT_VERIFIED，不能称 v1 通过
+保持暂停：#454 法杖（Draft）、#452 外观素材；不能恢复与 W2 无关的新功能
+三个 Codex 并行，各自只做自己的通道（Lane），只改自己负责的文件
+按 A-013，允许在真 iPad 复测前推进 W2 零费用工程；v1 最终交付与 iPad 验收条件没有放宽
 ```
+
+### 8.1 并行通道与文件所有权（W1.5 期间生效）
+
+| 通道 | 任务 | 只能改这些文件 |
+|---|---|---|
+| **Lane A 村子** | V1-W15-01 展示村子（#394 进行中） | `godot/scripts/village.gd`、`kaykit_village_npc.gd`、`camera_rig.gd`、`player.gd`、`touch_controls.gd`、`newbie_village*.gd`、`godot/scenes/newbie_village*.tscn`、`godot/scenes/player.tscn`、**`godot/assets/kaykit/**`（所有新 3D 素材统一由 Lane A 入库）**、`tools/` 下的素材准备脚本、`godot/tests/village_*`、`godot/tests/lane_a_*` |
+| **Lane B UI 风格** | V1-W15-02 UI 换风格 | `godot/ui/theme/**`（新建：全局 Theme、StyleBox、配色）、`godot/assets/ui/**`（新建：Logo 副本、图标、按钮贴图）、`godot/assets/fonts/**`（标题字体）、`godot/project.godot` 里的 theme 配置、`godot/scenes/main.tscn`（首页）、`godot/scenes/director_stage.tscn`、`godot/scripts/director_stage.gd`（只改界面部分）、`godot/tests/lane_b_*` |
+| **Lane C 建角色进村** | V1-W15-03 建角色 → 进村 | `godot/scenes/character_creator.tscn`、`godot/scenes/family_hero_library.tscn`、`godot/scripts/character_creator_shell.gd`、`creator_avatar_stage.gd`、`creator_avatar_catalog.gd`、`kaykit_avatar_v1.gd`、`family_hero_library.gd`、`bridge_client.gd`、`family_character_play_adapter.gd`、`hero_runtime_loader.gd`、`creator_play_runtime.gd`、`studio/family_api.py`（只在必要时）、`godot/tests/creator_*`、`godot/tests/lane_c_*` |
+
+**共同规则：**
+1. 不在自己通道里的文件**一律不改**。确实需要改别人的文件时，在 PR 描述里写"需要 Lane X 配合：___"，然后停下等对方处理，不要自己动手。
+2. **Lane B 负责定义外观，Lane A 和 Lane C 负责使用。** Lane B 把风格做成 Godot 全局 Theme（`project.godot` 里的 theme），所有 Control 节点自动继承。Lane A 和 Lane C 不在自己的文件里写死颜色、字体或 StyleBox；已有的写死样式在各自文件里删掉，让全局 Theme 生效。
+3. 村子 HUD（`village.gd` 里的界面）由 Lane A 改，等 Lane B 的 Theme 合并后，Lane A 只做"套用 Theme"的小改动。
+4. 素材：Lane C 需要新角色或部件素材时，告诉 Lane A 入库，自己不直接往 `godot/assets/kaykit/` 放文件。
+5. 共享文件：`docs/V1_PLAN.md` 只更新自己那一行的状态；`godot/THIRD_PARTY_NOTICES.md` 只追加、不改别人写的内容。合并前先 rebase 最新 main。
+6. 谁都不改：`AGENTS.md`、`AMEND.md`、`tools/scope_guard.py`、`.github/workflows/`。需要改时交给负责人。
+7. 每条通道每天各自最多合并 15 个 PR（互不占用，见 AMEND A-011）。全力推进，不需要保守。PR 标题用任务 ID 开头（V1-W15-01/02/03）。
+8. 每个 PR 都要附上 1180×820 iPad 截图；自己通道完成后，在 PR 里通知负责人。
+
+### 8.2 W2 三 Lane 增量开发责任（A-013 生效；不沿用 W1.5 §8.1 文件分工）
+
+当前只接续**已存在的 W2-01/02/03**，不重做已合并功能、不新增新的子系统。共享契约必须遵守 AGENTS §5，真实儿童数据/声音不得上传公开 CI。
+
+| 通道 | W2 单一职责 | 可编辑范围与前置依赖 |
+|---|---|---|
+| **Lane A — 后期音轨** | V1-W2-01 音乐混入最终 MP4；后续合入 C 提供的逐镜私有声音，离线 `ffprobe` 检查音轨时长/位置 | 优先 `studio/` 内现有私有渲染 / FFmpeg 音轨组合模块及对应 `tests/`；**先等 B 的 #386 合并后**再改共享的 `studio/family_film_render.py` 等数据契约，不修改 B Director UI 或 C 录音上传/API |
+| **Lane B — 导演台选曲、保存和预览** | 先继续**原 Draft PR #386**，排查 #387 的 `run_one()` CI 失败（仅一次有根因证据的定向修复）；通过后基于现有 UI 完成 W2-03 声音预览接线 | #386 原有变更文件 `godot/scripts/director_stage.gd`、`family_director_session.gd`、`family_scene_state.gd`、现有 Director smoke、`studio/family_films.py`、`studio/family_film_render.py` 限定于 #386 音乐选曲契约；`run_one()` 根因落在 A 文件时只交接 A，禁止交叉并改 |
+| **Lane C — 儿童私有逐镜录音** | V1-W2-02 孩子逐镜短句录音：浏览器可信 HTTPS 输入、私有上传/存储契约、与镜头绑定的合成回归；提供 B 可接线的接口，不开发通用音频系统 | 仅新/既有录音采集与客户端桥接、必要的 `studio/family_api.py` 音频接口及对应 C/录音 smoke；不修改 B 的 Director UI 或 A 的 FFmpeg 混音文件；录音入口若需 B UI，明确交由 B 接线 |
+
+**调度顺序**：① B 原 #386 的定向诊断（#387 所述 CI 重试例外，仅一次）与 C 独立录音底层可并行；A 同步阅读现有渲染管线、只读设计混音验证，**不要在 #386 合并前修改交叉文件**。② #386 CI 全绿且合并后 A 进入音轨混音实现。③ C 音频接口稳定后 B 做导演台录音/声音预览接线，A 完成最终 MP4 的同步/音轨验收。各 Lane 每个已批准任务用最小 PR，发现新的高风险、付费、治理或跨文件冲突先停。
+
+**工程验收与真机边界**：仅允许合成家庭/录音 fixture；用真实 Godot Web 行为、离线 FFmpeg 输出 MP4 和 `ffprobe` 验证音轨，而不是测试按钮存在就标记通过；iPad Safari 麦克风许可、实际扬声器播放、真机性能、家长端的整条闭环均继续 `NOT_VERIFIED`。
 
 **W1 家长设备预检（非孩子试玩记录，不能替代 §7）：** Mac Safari 与 iPhone Safari/Chrome 已在家庭 HTTPS 下加载游戏，直接 POST Child B 的家庭 API 返回 HTTP 201；Godot 家长解锁页面显示 `Parent unlock could not start` / `Parent unlock denied`。项目负责人明确要求允许 8 位家长口令。记录为 V1-W1-03 的单项阻断修复；真 iPad 验收及粘贴体验后续独立记录。
 

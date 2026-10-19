@@ -1,7 +1,7 @@
 class_name MiniUtopiaFamilyHeroLibrary
 extends Control
 
-## My Heroes / 我的角色 — accessible in-game on Mac and iPad.
+## 我的英雄es / 我的角色 — accessible in-game on Mac and iPad.
 ## A parent may supply a private HTTPS endpoint + scoped token in this session
 ## only. No child name, token, or credentials are written to local storage.
 ## The production parent sign-in/short-lived token issuer is a separate step.
@@ -10,6 +10,18 @@ var bridge: MiniUtopiaBridgeClient
 var status_label: Label
 var hero_list: VBoxContainer
 var connection_panel: VBoxContainer
+var parent_entry_button: Button
+var profile_picker: Panel
+var picker_message: Label
+var parent_pin_panel: Panel
+var parent_pin_dots: Label
+var parent_pin_hint: Label
+var parent_pin_submit: Button
+var _parent_pin := ""
+var _profile_portraits: Dictionary = {}
+var _profile_labels: Dictionary = {}
+var _selected_profile := ""
+var _parent_controls_open := false
 var api_input: LineEdit
 var token_input: LineEdit
 var paste_secret_button: Button
@@ -22,6 +34,7 @@ var refresh_button: Button
 var logout_button: Button
 var shoot_button: Button
 var _pending_cast_character_id := ""
+var _pending_direct_play_character_id := ""
 var _pending_guest_grant_id := ""
 var _share_character_id := ""
 var _active_grant_id := ""
@@ -32,6 +45,7 @@ var share_submit: Button
 var share_revoke: Button
 var guests_refresh_button: Button
 var movies_button: Button
+var parent_tools: VBoxContainer
 var movie_list: VBoxContainer
 var _movie_restore: Dictionary = {}
 var _movie_phase := ""
@@ -55,6 +69,7 @@ func _ready() -> void:
     bridge.request_failed.connect(_on_bridge_failure)
 
     _build_ui()
+    _build_profile_picker()
     if OS.has_feature("web"):
         # On the approved single-origin family host, no child/parent should
         # have to manually type a backend address. The URL is taken only from
@@ -74,7 +89,295 @@ func _ready() -> void:
         _refresh_characters()
     else:
         _set_connected(false)
-        _set_status("Parent: connect your private Family Cloud to load saved Heroes.", false)
+        _set_status("想保存新角色？请家长先点「家长入口」。", false)
+
+
+# Lane C first-touch player choice, within its owned Hero Library scene.
+# Real private avatar details appear only after owner-scoped session retrieval.
+func _build_profile_picker() -> void:
+    profile_picker = Panel.new()
+    profile_picker.name = "WhoIsPlaying"
+    profile_picker.set_anchors_preset(Control.PRESET_FULL_RECT)
+    add_child(profile_picker)
+
+    var margin := MarginContainer.new()
+    margin.name = "Margin"
+    margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+    for side in ["left", "top", "right", "bottom"]:
+        margin.add_theme_constant_override("margin_" + side, 28)
+    profile_picker.add_child(margin)
+
+    var column := VBoxContainer.new()
+    column.name = "Column"
+    column.add_theme_constant_override("separation", 16)
+    margin.add_child(column)
+
+    var header := HBoxContainer.new()
+    column.add_child(header)
+    var logo := TextureRect.new()
+    logo.texture = load("res://assets/ui/mini_utopia_logo_horizontal.png")
+    logo.custom_minimum_size = Vector2(270, 74)
+    logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+    logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+    logo.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    header.add_child(logo)
+
+    var parent_corner := Button.new()
+    parent_corner.name = "ParentCornerButton"
+    parent_corner.text = "家长入口"
+    parent_corner.custom_minimum_size = Vector2(152, 56)
+    parent_corner.pressed.connect(_open_parent_from_picker)
+    header.add_child(parent_corner)
+
+    var top_space := Control.new()
+    top_space.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    column.add_child(top_space)
+    var title := Label.new()
+    title.name = "ChoosePlayerTitle"
+    title.text = "✨ 谁在玩？"
+    title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    column.add_child(title)
+    var hint := Label.new()
+    hint.text = "选自己的头像，开始今天的冒险！"
+    hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    column.add_child(hint)
+
+    var cards := HBoxContainer.new()
+    cards.name = "PlayerCards"
+    cards.alignment = BoxContainer.ALIGNMENT_CENTER
+    cards.add_theme_constant_override("separation", 24)
+    column.add_child(cards)
+    for profile_id in ["child_a", "child_b"]:
+        var card := Button.new()
+        card.name = "PlayerChildA" if profile_id == "child_a" else "PlayerChildB"
+        card.custom_minimum_size = Vector2(335, 345)
+        card.text = ""
+        card.pressed.connect(_on_player_card_pressed.bind(profile_id))
+        cards.add_child(card)
+
+        var portrait := MiniUtopiaCreatorAvatarStage.new()
+        portrait.name = "Portrait3D"
+        portrait.anchor_left = 0.0
+        portrait.anchor_right = 1.0
+        portrait.anchor_bottom = 1.0
+        portrait.offset_left = 22
+        portrait.offset_right = -22
+        portrait.offset_top = 16
+        portrait.offset_bottom = -87
+        card.add_child(portrait)
+        portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        _profile_portraits[profile_id] = portrait
+
+        var name := Label.new()
+        name.name = "PlayerLabel"
+        name.anchor_left = 0.0
+        name.anchor_right = 1.0
+        name.anchor_top = 1.0
+        name.anchor_bottom = 1.0
+        name.offset_left = 12
+        name.offset_right = -12
+        name.offset_top = -82
+        name.offset_bottom = -8
+        name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+        name.text = (
+            ("大宝" if profile_id == "child_a" else "二宝")
+            + "\n🌈 我的英雄"
+        )
+        name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        card.add_child(name)
+        _profile_labels[profile_id] = name
+
+    picker_message = Label.new()
+    picker_message.name = "PlayerChoiceMessage"
+    picker_message.text = ""
+    picker_message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    column.add_child(picker_message)
+    var bottom_space := Control.new()
+    bottom_space.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    column.add_child(bottom_space)
+    _build_parent_pin_pad()
+
+    # The global pastel Panel theme is translucent. Hide the underlying
+    # library content while this first-touch chooser is visible so labels,
+    # toolbar buttons and parent forms cannot show through its background.
+    # Keep the original library Background visible for Theme consistency.
+    profile_picker.visibility_changed.connect(_sync_player_picker_visibility)
+    _sync_player_picker_visibility()
+
+
+func _sync_player_picker_visibility() -> void:
+    var library_content := get_node_or_null("Margin") as Control
+    if library_content != null:
+        library_content.visible = not profile_picker.visible
+
+
+
+# Godot-only 8-digit keypad; the existing server decides if the PIN is valid.
+func _build_parent_pin_pad() -> void:
+    parent_pin_panel = Panel.new()
+    parent_pin_panel.name = "ParentPinPad"
+    parent_pin_panel.set_anchors_preset(Control.PRESET_CENTER)
+    parent_pin_panel.offset_left = -286
+    parent_pin_panel.offset_right = 286
+    parent_pin_panel.offset_top = -362
+    parent_pin_panel.offset_bottom = 362
+    profile_picker.add_child(parent_pin_panel)
+    var margin := MarginContainer.new()
+    margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+    for side in ["left", "top", "right", "bottom"]:
+        margin.add_theme_constant_override("margin_" + side, 20)
+    parent_pin_panel.add_child(margin)
+    var content := VBoxContainer.new()
+    content.add_theme_constant_override("separation", 9)
+    margin.add_child(content)
+    var heading := Label.new()
+    heading.text = "👨‍👩‍👧 家长解锁 · 8 位数字口令"
+    heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    content.add_child(heading)
+    var profile_row := HBoxContainer.new()
+    profile_row.add_theme_constant_override("separation", 12)
+    content.add_child(profile_row)
+    for id in ["child_a", "child_b"]:
+        var pick := Button.new()
+        pick.name = "PinChildA" if id == "child_a" else "PinChildB"
+        pick.text = "👧 大宝" if id == "child_a" else "🧒 二宝"
+        pick.custom_minimum_size = Vector2(245, 56)
+        pick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        pick.pressed.connect(_choose_pin_child.bind(id))
+        profile_row.add_child(pick)
+    parent_pin_dots = Label.new()
+    parent_pin_dots.name = "PinDots"
+    parent_pin_dots.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    content.add_child(parent_pin_dots)
+    var number_keys := GridContainer.new()
+    number_keys.name = "NumberKeys"
+    number_keys.columns = 3
+    number_keys.add_theme_constant_override("h_separation", 10)
+    number_keys.add_theme_constant_override("v_separation", 9)
+    content.add_child(number_keys)
+    for digit in ["1","2","3","4","5","6","7","8","9","清空","0","⌫"]:
+        var key := Button.new()
+        key.name = "Digit" + digit if digit.is_valid_int() else (
+            "Clear" if digit == "清空" else "Backspace"
+        )
+        key.text = "删除" if digit == "⌫" else digit
+        key.custom_minimum_size = Vector2(153, 62)
+        key.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        key.pressed.connect(_press_pin_key.bind(digit))
+        number_keys.add_child(key)
+    parent_pin_hint = Label.new()
+    parent_pin_hint.name = "PinHint"
+    parent_pin_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    content.add_child(parent_pin_hint)
+    parent_pin_submit = Button.new()
+    parent_pin_submit.name = "UnlockWithPin"
+    parent_pin_submit.text = "🔓 解锁孩子的小世界"
+    parent_pin_submit.custom_minimum_size.y = 68
+    parent_pin_submit.pressed.connect(_submit_parent_pin)
+    content.add_child(parent_pin_submit)
+    var cancel := Button.new()
+    cancel.name = "CancelParentPin"
+    cancel.text = "← 返回选择头像"
+    cancel.custom_minimum_size.y = 50
+    cancel.pressed.connect(_close_parent_pin_pad)
+    content.add_child(cancel)
+    parent_pin_panel.hide()
+    _update_pin_dots()
+
+
+func _update_pin_dots() -> void:
+    if parent_pin_dots == null:
+        return
+    var dots := ""
+    for i in range(8):
+        dots += ("● " if i < _parent_pin.length() else "○ ")
+    parent_pin_dots.text = dots.strip_edges()
+    parent_pin_submit.disabled = _parent_pin.length() != 8
+
+
+func _choose_pin_child(id: String) -> void:
+    _selected_profile = id
+    profile_choice.select(0 if id == "child_a" else 1)
+    parent_pin_hint.text = "已选择大宝" if id == "child_a" else "已选择二宝"
+
+
+func _press_pin_key(digit: String) -> void:
+    if digit == "清空":
+        _parent_pin = ""
+    elif digit == "⌫":
+        _parent_pin = _parent_pin.left(maxi(0, _parent_pin.length() - 1))
+    elif digit.is_valid_int() and digit.length() == 1 and _parent_pin.length() < 8:
+        _parent_pin += digit
+    parent_pin_hint.text = ""
+    _update_pin_dots()
+
+
+func _close_parent_pin_pad() -> void:
+    _parent_pin = ""
+    token_input.clear()
+    parent_pin_panel.hide()
+    (profile_picker.get_node("Margin") as Control).show()
+    _update_pin_dots()
+
+
+func _submit_parent_pin() -> void:
+    if _parent_pin.length() != 8:
+        parent_pin_hint.text = "请输入完整的 8 位数字口令"
+        return
+    token_input.text = _parent_pin
+    _parent_pin = ""
+    _update_pin_dots()
+    _on_connect_pressed()
+    if not connect_button.disabled:
+        parent_pin_hint.text = "暂时没成功，请检查家庭网络后再试"
+
+
+func _on_player_card_pressed(profile_id: String) -> void:
+    if profile_id not in ["child_a", "child_b"]:
+        return
+    _selected_profile = profile_id
+    profile_choice.select(0 if profile_id == "child_a" else 1)
+    var family := _family_state()
+    if (
+        family != null
+        and family.has_family_connection()
+        and family.current_profile_id() == profile_id
+        and bridge.has_family_session()
+    ):
+        profile_picker.hide()
+        _parent_controls_open = false
+        _refresh_parent_entry()
+        _refresh_characters()
+        return
+    picker_message.text = "请家长点右上角「家长入口」，帮你打开自己的小世界 💕"
+
+
+func _open_parent_from_picker() -> void:
+    # Never reuse Child A's session to open Child B or vice versa.
+    var family := _family_state()
+    if family != null and family.has_family_connection():
+        if family.current_profile_id() != _selected_profile:
+            family.disconnect_family()
+            bridge.clear_family_session()
+            _clear_hero_list()
+            _set_connected(false)
+    _parent_controls_open = false
+    _refresh_parent_entry()
+    _parent_pin = ""
+    token_input.clear()
+    _choose_pin_child(_selected_profile if _selected_profile in ["child_a", "child_b"] else "child_a")
+    (profile_picker.get_node("Margin") as Control).hide()
+    parent_pin_panel.show()
+    _update_pin_dots()
+
+
+func _show_player_picker() -> void:
+    _close_parent_pin_pad()
+    _parent_controls_open = false
+    _refresh_parent_entry()
+    picker_message.text = ""
+    profile_picker.show()
 
 
 func _family_state() -> MiniUtopiaFamilySceneState:
@@ -82,9 +385,8 @@ func _family_state() -> MiniUtopiaFamilySceneState:
 
 
 func _build_ui() -> void:
-    var background := ColorRect.new()
+    var background := Panel.new()
     background.name = "Background"
-    background.color = Color("#F8F2FC")
     background.set_anchors_preset(Control.PRESET_FULL_RECT)
     add_child(background)
 
@@ -100,14 +402,21 @@ func _build_ui() -> void:
     column.add_theme_constant_override("separation", 12)
     margin.add_child(column)
 
+    var brand := TextureRect.new()
+    brand.name = "LibraryLogo"
+    brand.texture = load("res://assets/ui/mini_utopia_logo_horizontal.png")
+    brand.custom_minimum_size = Vector2(280, 72)
+    brand.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+    brand.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+    brand.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    column.add_child(brand)
+
     var title := Label.new()
-    title.text = "✨ My Heroes / 我的角色"
-    title.add_theme_font_size_override("font_size", 30)
+    title.text = "我的英雄"
     column.add_child(title)
 
     var subtitle := Label.new()
-    subtitle.text = "Choose one to dress, play, or film. Every hero stays yours."
-    subtitle.add_theme_font_size_override("font_size", 17)
+    subtitle.text = "选择你的英雄，继续冒险吧！"
     column.add_child(subtitle)
 
     var toolbar := HBoxContainer.new()
@@ -115,47 +424,61 @@ func _build_ui() -> void:
     toolbar.add_theme_constant_override("separation", 10)
     column.add_child(toolbar)
 
+    # Advanced actions stay within the deliberate adult entry.
+    # A-012 visual check: use Lane B's merged SVG resources, no glyph icons.
+    parent_tools = VBoxContainer.new()
+    parent_tools.name = "ParentTools"
+    parent_tools.add_theme_constant_override("separation", 10)
+    parent_tools.visible = false
+    column.add_child(parent_tools)
+
     guests_refresh_button = Button.new()
     guests_refresh_button.name = "RefreshParentApprovedGuests"
-    guests_refresh_button.text = "🎬 Find parent-approved guest actors"
+    guests_refresh_button.text = "查看家长已允许的客串角色"
+    guests_refresh_button.icon = load("res://assets/ui/icons/refresh.svg") as Texture2D
     guests_refresh_button.custom_minimum_size.y = 52
     guests_refresh_button.disabled = true
     guests_refresh_button.pressed.connect(_refresh_approved_guests)
-    column.add_child(guests_refresh_button)
+    parent_tools.add_child(guests_refresh_button)
 
     new_button = Button.new()
     new_button.name = "NewHeroButton"
-    new_button.text = "＋ New Hero"
-    new_button.custom_minimum_size = Vector2(170, 52)
+    new_button.text = "创建英雄"
+    new_button.icon = load("res://assets/ui/icons/hero_plus.svg") as Texture2D
+    new_button.custom_minimum_size = Vector2(218, 68)
     new_button.pressed.connect(_on_new_pressed)
     toolbar.add_child(new_button)
 
     shoot_button = Button.new()
     shoot_button.name = "ShootWithCastButton"
-    shoot_button.text = "🎬 Film Together"
+    shoot_button.text = "合作拍电影"
+    shoot_button.icon = load("res://assets/ui/icons/camera.svg") as Texture2D
     shoot_button.custom_minimum_size = Vector2(200, 52)
     shoot_button.disabled = true
     shoot_button.pressed.connect(_on_shoot_together_pressed)
-    toolbar.add_child(shoot_button)
+    parent_tools.add_child(shoot_button)
 
     refresh_button = Button.new()
     refresh_button.name = "RefreshButton"
-    refresh_button.text = "↻ Refresh"
+    refresh_button.text = "刷新角色"
+    refresh_button.icon = load("res://assets/ui/icons/refresh.svg") as Texture2D
     refresh_button.custom_minimum_size = Vector2(150, 52)
     refresh_button.pressed.connect(_refresh_characters)
-    toolbar.add_child(refresh_button)
+    parent_tools.add_child(refresh_button)
 
     movies_button = Button.new()
     movies_button.name = "MyMoviesButton"
-    movies_button.text = "🎞 My Movies / 我的电影"
-    movies_button.custom_minimum_size = Vector2(190, 52)
+    movies_button.text = "我的电影"
+    movies_button.icon = load("res://assets/ui/icons/movie.svg") as Texture2D
+    movies_button.custom_minimum_size = Vector2(218, 68)
     movies_button.pressed.connect(_refresh_films)
     toolbar.add_child(movies_button)
 
     var back := Button.new()
     back.name = "BackButton"
-    back.text = "← Village"
-    back.custom_minimum_size = Vector2(158, 52)
+    back.text = "去村子"
+    back.icon = load("res://assets/ui/icons/action.svg") as Texture2D
+    back.custom_minimum_size = Vector2(218, 68)
     back.pressed.connect(_on_back_pressed)
     toolbar.add_child(back)
 
@@ -164,7 +487,14 @@ func _build_ui() -> void:
     logout_button.text = "Parent: Disconnect"
     logout_button.custom_minimum_size = Vector2(210, 52)
     logout_button.pressed.connect(_on_disconnect_pressed)
-    toolbar.add_child(logout_button)
+    # Parent-only actions live in the parent area, not the child's toolbar.
+
+    parent_entry_button = Button.new()
+    parent_entry_button.name = "ParentEntryButton"
+    parent_entry_button.text = "家长入口"
+    parent_entry_button.custom_minimum_size = Vector2(150, 52)
+    parent_entry_button.pressed.connect(_toggle_parent_entry)
+    toolbar.add_child(parent_entry_button)
 
     adult_share_panel = VBoxContainer.new()
     adult_share_panel.name = "ParentFilmConsent"
@@ -210,7 +540,6 @@ func _build_ui() -> void:
     parent_movie_summary = Label.new()
     parent_movie_summary.name = "FilmDetailsToReview"
     parent_movie_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    parent_movie_summary.add_theme_font_size_override("font_size", 18)
     parent_movie_panel.add_child(parent_movie_summary)
 
     parent_movie_secret = LineEdit.new()
@@ -271,8 +600,8 @@ func _build_ui() -> void:
     profile_choice = OptionButton.new()
     profile_choice.name = "ChildProfile"
     profile_choice.custom_minimum_size.y = 48
-    profile_choice.add_item("Child A / 大宝", 0)
-    profile_choice.add_item("Child B / 二宝", 1)
+    profile_choice.add_item("大宝", 0)
+    profile_choice.add_item("二宝", 1)
     connection_panel.add_child(profile_choice)
 
     api_input = LineEdit.new()
@@ -305,15 +634,16 @@ func _build_ui() -> void:
     connect_button.custom_minimum_size.y = 52
     connect_button.pressed.connect(_on_connect_pressed)
     connection_panel.add_child(connect_button)
+    connection_panel.add_child(logout_button)
 
     status_label = Label.new()
     status_label.name = "LibraryStatus"
     status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    status_label.add_theme_font_size_override("font_size", 17)
     column.add_child(status_label)
 
     var scroll := ScrollContainer.new()
     scroll.name = "HeroScroll"
+    scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
     scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
     column.add_child(scroll)
 
@@ -323,6 +653,7 @@ func _build_ui() -> void:
     hero_list.add_theme_constant_override("separation", 12)
     var list_stack := VBoxContainer.new()
     list_stack.name = "LibraryListStack"
+    list_stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     list_stack.add_theme_constant_override("separation", 16)
     scroll.add_child(list_stack)
     list_stack.add_child(hero_list)
@@ -331,6 +662,7 @@ func _build_ui() -> void:
     movie_list.name = "MovieList"
     movie_list.add_theme_constant_override("separation", 10)
     list_stack.add_child(movie_list)
+    _refresh_parent_entry()
 
 
 func _set_connected(connected: bool) -> void:
@@ -354,6 +686,47 @@ func _set_connected(connected: bool) -> void:
         _pending_cast_character_id = ""
     else:
         _refresh_cast_button()
+    _refresh_parent_entry()
+
+
+func _toggle_parent_entry() -> void:
+    _parent_controls_open = not _parent_controls_open
+    _refresh_parent_entry()
+
+
+func _refresh_parent_entry() -> void:
+    # The parent form can exist for old smoke tests and in-memory sessions,
+    # but its endpoint/password widgets are never exposed on the child screen.
+    if connection_panel != null:
+        var connected := bridge.has_family_session()
+        connection_panel.visible = not connected or _parent_controls_open
+        for widget in connection_panel.get_children():
+            if widget is Control:
+                widget.visible = (
+                    _parent_controls_open
+                    and (widget == logout_button if connected else widget != logout_button)
+                )
+    if parent_entry_button != null:
+        parent_entry_button.text = (
+            "返回角色库" if _parent_controls_open else "家长入口"
+        )
+    if parent_tools != null:
+        parent_tools.visible = _parent_controls_open
+    if hero_list != null:
+        for widget in hero_list.get_children():
+            if widget.name.begins_with("Share_"):
+                widget.visible = _parent_controls_open
+    if movie_list != null:
+        for widget in movie_list.get_children():
+            if widget.name.begins_with("Review_") or widget.name.begins_with("Download_"):
+                widget.visible = _parent_controls_open
+            elif widget.name.begins_with("SaveMovie_"):
+                widget.visible = not _parent_controls_open
+    if not _parent_controls_open:
+        if adult_share_panel != null:
+            adult_share_panel.hide()
+        if parent_movie_panel != null:
+            parent_movie_panel.hide()
 
 
 func _on_paste_parent_unlock() -> void:
@@ -426,6 +799,8 @@ func _on_connect_pressed() -> void:
     token_input.clear()
     bridge.configure(url)
     if not bridge.base_url.begins_with("https://"):
+        if parent_pin_panel != null and parent_pin_panel.visible:
+            parent_pin_hint.text = "请从家庭 HTTPS 页面打开游戏"
         _set_status("A private HTTPS Family Cloud URL is required.", true)
         return
 
@@ -449,14 +824,14 @@ func _on_connect_pressed() -> void:
 func _refresh_characters() -> void:
     if not bridge.has_family_session():
         _set_connected(false)
-        _set_status("Parent connection required to see saved Heroes.", true)
+        _set_status("请家长先帮你解锁。", true)
         return
     if bridge.is_busy():
         return
-    _set_status("Loading your saved Heroes…", false)
+    _set_status("正在寻找你的英雄…", false)
     var error := bridge.list_characters()
     if error != OK:
-        _set_status("Could not start loading Heroes.", true)
+        _set_status("英雄暂时没有打开，请稍后重试。", true)
 
 
 func _clear_movie_list() -> void:
@@ -475,44 +850,44 @@ func _cancel_movie_restore() -> void:
 
 func _refresh_films() -> void:
     if not bridge.has_family_session() or bridge.is_busy():
-        _set_status("Unlock your private account to see My Movies.", true)
+        _set_status("请家长先解锁，才能查看我的电影。", true)
         return
     if not _movie_phase.is_empty():
         return
     var error := bridge.list_family_films()
     if error != OK:
-        _set_status("My Movies could not be loaded.", true)
+        _set_status("暂时打不开我的电影，请稍后再试。", true)
     else:
-        _set_status("Finding your private saved movies…", false)
+        _set_status("正在寻找你保存的电影…", false)
 
 
 func _on_film_download_pressed(film_id: String) -> void:
     if not bridge.has_family_session():
-        _set_status("Unlock your private account before saving a movie.", true)
+        _set_status("请家长先解锁，才能保存电影。", true)
         return
     if bridge.has_prepared_private_movie(film_id):
         # This second direct tap preserves Safari's user-gesture requirement.
         var saved := bridge.save_prepared_private_movie(film_id)
         if saved == OK:
-            _set_status("Your private MP4 was offered for saving on this device.", false)
+            _set_status("电影已经发送到设备，请查看保存提示。", false)
         else:
-            _set_status("Saving this MP4 is supported in the Web version.", true)
+            _set_status("请在网页版本保存这部电影。", true)
         var ready := movie_list.get_node_or_null("Download_" + film_id) as Button
         if ready != null:
-            ready.text = "🎬 Prepare private MP4 again"
+            ready.text = "🎬 重新准备电影"
         return
     if bridge.is_busy() or not _movie_phase.is_empty():
         return
     var error := bridge.prepare_private_movie_download(film_id)
     if error != OK:
-        _set_status("Could not request your private MP4.", true)
+        _set_status("暂时无法准备电影，请稍后再试。", true)
         return
     var download_button := movie_list.get_node_or_null(
         "Download_" + film_id
     ) as Button
     if download_button != null:
         download_button.disabled = true
-    _set_status("Checking parent's final MP4 release and loading safely…", false)
+    _set_status("正在确认家长许可并准备电影…", false)
 
 
 func _on_saved_movie_pressed(film_id: String) -> void:
@@ -523,16 +898,16 @@ func _on_saved_movie_pressed(film_id: String) -> void:
         or not film_id.begins_with("FILM_")
         or film_id.contains("/")
     ):
-        _set_status("Finish the current request before reopening a movie.", true)
+        _set_status("请等当前操作完成后，再打开电影。", true)
         return
     _cancel_movie_restore()
     _movie_restore["requested_id"] = film_id
     _movie_phase = "film"
     var error := bridge.get_family_film(film_id)
     if error != OK:
-        _movie_restore_failed("Could not reopen this private movie.")
+        _movie_restore_failed("暂时无法重新打开这部电影。")
         return
-    _set_status("Checking saved film and fetching its original cast…", false)
+    _set_status("正在打开电影，准备原来的角色…", false)
 
 
 func _movie_restore_failed(message: String) -> void:
@@ -546,18 +921,18 @@ func _movie_restore_failed(message: String) -> void:
 
 func _request_movie_cast(character_id: String, stage: String) -> void:
     if not character_id.begins_with("CHAR_") or "/" in character_id:
-        _movie_restore_failed("Saved movie has an invalid actor.")
+        _movie_restore_failed("电影中的角色信息暂时不可用。")
         return
     _movie_cast_id = character_id
     _movie_phase = stage + "_character"
     if bridge.get_character(character_id) != OK:
-        _movie_restore_failed("Could not verify saved film actor.")
+        _movie_restore_failed("暂时无法确认电影里的角色。")
 
 
 func _request_movie_gear(stage: String) -> void:
     _movie_phase = stage + "_equipment"
     if bridge.get_equipment(_movie_cast_id) != OK:
-        _movie_restore_failed("Could not fetch actor's own wardrobe.")
+        _movie_restore_failed("暂时无法取得角色原来的装备。")
 
 
 func _finish_movie_restore() -> void:
@@ -565,7 +940,7 @@ func _finish_movie_restore() -> void:
     if family == null or not family.restore_owned_film(
         _movie_restore.get("record", {})
     ):
-        _movie_restore_failed("This saved film no longer has an authorized cast.")
+        _movie_restore_failed("这部电影的角色暂时无法使用。")
         return
     _cancel_movie_restore()
     Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -577,7 +952,7 @@ func _consume_movie_restore(kind: String, payload: Dictionary) -> bool:
         return false
     var family := _family_state()
     if family == null or not bridge.has_family_session():
-        _movie_restore_failed("Unlock your private child account again.")
+        _movie_restore_failed("请家长重新解锁你的账号。")
         return true
 
     if _movie_phase == "film" and kind == "films:get":
@@ -590,7 +965,7 @@ func _consume_movie_restore(kind: String, payload: Dictionary) -> bool:
             or typeof(draft) != TYPE_DICTIONARY
             or not String(draft.get("character_id", "")).begins_with("CHAR_")
         ):
-            _movie_restore_failed("Private movie data was not verified.")
+            _movie_restore_failed("暂时无法确认这部电影的信息。")
             return true
         _movie_restore["record"] = payload.duplicate(true)
         family.clear_selection()
@@ -608,7 +983,7 @@ func _consume_movie_restore(kind: String, payload: Dictionary) -> bool:
                 else family.select_second_cast_character(payload)
             )
         ):
-            _movie_restore_failed("Saved actor is missing or not privately owned.")
+            _movie_restore_failed("电影中的角色暂时无法打开。")
             return true
         var which := "primary" if _movie_phase == "primary_character" else "second"
         _request_movie_gear(which)
@@ -627,7 +1002,7 @@ func _consume_movie_restore(kind: String, payload: Dictionary) -> bool:
                 else family.select_second_cast_equipment(gear)
             )
         ):
-            _movie_restore_failed("Actor clothes or props could not be verified.")
+            _movie_restore_failed("电影角色的衣服或道具暂时无法确认。")
             return true
         if _movie_phase == "primary_equipment":
             var draft: Dictionary = _movie_restore["record"]["draft"]
@@ -635,7 +1010,7 @@ func _consume_movie_restore(kind: String, payload: Dictionary) -> bool:
             var second := String(raw_second) if typeof(raw_second) == TYPE_STRING else ""
             if not second.is_empty():
                 if second == _movie_cast_id:
-                    _movie_restore_failed("Film cannot cast the same actor twice.")
+                    _movie_restore_failed("同一个角色不能在一部电影里重复出场。")
                     return true
                 _request_movie_cast(second, "second")
                 return true
@@ -800,7 +1175,10 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             return
         button.disabled = false
         button.text = "💾 Save MP4 to this iPad / Mac"
-        _set_status("Movie ready! Tap the Save MP4 button now.", false)
+        var child_button := movie_list.get_node_or_null("SaveMovie_" + id) as Button
+        if child_button != null:
+            child_button.text = "💾 现在保存我的电影"
+        _set_status("电影准备好啦！再点一次保存。", false)
         return
 
     if kind == "films:get" and not _pending_review_film_id.is_empty():
@@ -852,11 +1230,10 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             or String(payload.get("schema_version", "")) != "1.0"
             or typeof(films) != TYPE_ARRAY
         ):
-            _set_status("Private movie list could not be verified.", true)
+            _set_status("暂时无法确认我的电影列表。", true)
             return
         var heading := Label.new()
-        heading.text = "🎞 My Movies / 我的电影"
-        heading.add_theme_font_size_override("font_size", 23)
+        heading.text = "🎞 我的电影"
         movie_list.add_child(heading)
         for entry in films:
             if typeof(entry) != TYPE_DICTIONARY:
@@ -867,9 +1244,8 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
                 continue
             var button := Button.new()
             button.name = "Film_" + id
-            button.text = "🎬 " + String(draft.get("display_name", "My Film")) + " · Continue"
+            button.text = "🎬 " + String(draft.get("display_name", "我的电影")) + " · 继续制作"
             button.custom_minimum_size.y = 62
-            button.add_theme_font_size_override("font_size", 18)
             button.pressed.connect(_on_saved_movie_pressed.bind(id))
             movie_list.add_child(button)
             var review_button := Button.new()
@@ -880,6 +1256,7 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
                 _on_parent_review_movie_pressed.bind(id)
             )
             movie_list.add_child(review_button)
+            review_button.visible = _parent_controls_open
 
             var save_movie_button := Button.new()
             save_movie_button.name = "Download_" + id
@@ -889,7 +1266,18 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
                 _on_film_download_pressed.bind(id)
             )
             movie_list.add_child(save_movie_button)
-        _set_status(str(films.size()) + " private movie(s) saved.", false)
+            save_movie_button.visible = _parent_controls_open
+            var child_save_button := Button.new()
+            child_save_button.name = "SaveMovie_" + id
+            child_save_button.text = "💾 保存我的电影"
+            child_save_button.custom_minimum_size.y = 56
+            child_save_button.pressed.connect(_on_film_download_pressed.bind(id))
+            movie_list.add_child(child_save_button)
+            child_save_button.visible = not _parent_controls_open
+        _set_status(
+            "还没有保存的电影。" if films.is_empty()
+            else "已保存 " + str(films.size()) + " 部电影。", false
+        )
         return
     if _consume_movie_restore(kind, payload):
         return
@@ -917,7 +1305,10 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             _set_status("Parent approval failed. Please try again.", true)
             return
         api_input.clear()
+        _parent_controls_open = false
         _set_connected(true)
+        _close_parent_pin_pad()
+        profile_picker.hide()
         _refresh_characters()
         return
 
@@ -1002,6 +1393,43 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         _refresh_cast_button()
         return
 
+    if kind == "character:get" and not _pending_direct_play_character_id.is_empty():
+        var direct_id := _pending_direct_play_character_id
+        var family := _family_state()
+        if (
+            not bridge.has_family_session()
+            or String(payload.get("character_id", "")) != direct_id
+            or family == null
+            or not family.select_character(payload)
+        ):
+            _pending_direct_play_character_id = ""
+            _set_status("无法打开这个英雄，请重试。", true)
+            return
+        var error := bridge.get_equipment(direct_id)
+        if error != OK:
+            _pending_direct_play_character_id = ""
+            family.clear_selection()
+            _set_status("衣服还没准备好，请再试一次。", true)
+        return
+
+    if kind == "equipment:get" and not _pending_direct_play_character_id.is_empty():
+        var direct_id := _pending_direct_play_character_id
+        _pending_direct_play_character_id = ""
+        var family := _family_state()
+        var runtime = payload.get("runtime", {})
+        if (
+            family == null
+            or typeof(runtime) != TYPE_DICTIONARY
+            or String(runtime.get("character_asset_id", "")) != direct_id
+            or not family.select_equipment(runtime)
+        ):
+            if family != null:
+                family.clear_selection()
+            _set_status("只有自己的英雄和装备才能去村子玩。", true)
+            return
+        get_tree().change_scene_to_file("res://scenes/main.tscn")
+        return
+
     if kind == "character:get" and not _pending_cast_character_id.is_empty():
         var family := _family_state()
         if (
@@ -1062,14 +1490,77 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
     )
     for hero in heroes:
         var character_id := String(hero.get("character_id", ""))
-        var name := String(hero.get("display_name", "My Hero"))
+        var name := String(hero.get("display_name", "我的英雄"))
         var button := Button.new()
         button.name = "Hero_" + character_id
-        button.text = "✦ " + name + "     ✎ Edit / Dress"
-        button.custom_minimum_size.y = 64
-        button.add_theme_font_size_override("font_size", 21)
+        button.text = ""
+        button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        button.custom_minimum_size = Vector2(720, 164)
         button.pressed.connect(_on_hero_pressed.bind(character_id))
         hero_list.add_child(button)
+
+        # Real 3D miniature of the saved avatar, rendered via SubViewport.
+        var portrait := MiniUtopiaCreatorAvatarStage.new()
+        portrait.name = "Portrait3D"
+        portrait.anchor_top = 0.0
+        portrait.anchor_bottom = 1.0
+        portrait.offset_left = 12.0
+        portrait.offset_top = 8.0
+        portrait.offset_right = 154.0
+        portrait.offset_bottom = -8.0
+        button.add_child(portrait)
+        portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        var profile = hero.get("profile", {})
+        if typeof(profile) == TYPE_DICTIONARY:
+            var appearance = profile.get("avatar", {})
+            if typeof(appearance) == TYPE_DICTIONARY:
+                portrait.apply_appearance(appearance)
+
+        var hero_name := Label.new()
+        hero_name.name = "HeroName"
+        hero_name.text = name + "\n我的英雄"
+        hero_name.anchor_left = 0.0
+        hero_name.anchor_right = 1.0
+        hero_name.offset_left = 172.0
+        hero_name.offset_right = -16.0
+        hero_name.offset_top = 18.0
+        hero_name.offset_bottom = 84.0
+        hero_name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        hero_name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        button.add_child(hero_name)
+
+        # These are deliberately large, separate iPad actions on EACH hero
+        # card; tapping the card body still opens the editor as before.
+        var actions := HBoxContainer.new()
+        actions.name = "HeroActions"
+        actions.anchor_left = 1.0
+        actions.anchor_right = 1.0
+        actions.anchor_top = 1.0
+        actions.anchor_bottom = 1.0
+        actions.offset_left = -370.0
+        actions.offset_right = -14.0
+        actions.offset_top = -75.0
+        actions.offset_bottom = -13.0
+        actions.add_theme_constant_override("separation", 10)
+        button.add_child(actions)
+
+        var edit_hero := Button.new()
+        edit_hero.name = "EditHero"
+        edit_hero.text = "编辑"
+        edit_hero.icon = load("res://assets/ui/icons/create.svg") as Texture2D
+        edit_hero.custom_minimum_size = Vector2(166, 60)
+        edit_hero.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        edit_hero.pressed.connect(_on_hero_pressed.bind(character_id))
+        actions.add_child(edit_hero)
+
+        var play_hero := Button.new()
+        play_hero.name = "PlayHero"
+        play_hero.text = "去玩"
+        play_hero.icon = load("res://assets/ui/icons/action.svg") as Texture2D
+        play_hero.custom_minimum_size = Vector2(166, 60)
+        play_hero.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        play_hero.pressed.connect(_on_library_play_pressed.bind(character_id))
+        actions.add_child(play_hero)
 
         var family := _family_state()
         if (
@@ -1083,6 +1574,7 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
             share.custom_minimum_size.y = 52
             share.pressed.connect(_on_share_candidate.bind(character_id))
             hero_list.add_child(share)
+            share.visible = _parent_controls_open
 
         var primary := (
             String(family.active_character.get("character_id", ""))
@@ -1091,18 +1583,44 @@ func _on_bridge_success(kind: String, payload: Dictionary) -> void:
         if not primary.is_empty() and character_id != primary:
             var cast_button := Button.new()
             cast_button.name = "Cast_" + character_id
-            cast_button.text = "🎬 Invite " + name + " into my film"
+            cast_button.text = "🎬 邀请 " + name + " 一起拍电影"
             cast_button.custom_minimum_size.y = 58
-            cast_button.add_theme_font_size_override("font_size", 18)
             cast_button.pressed.connect(_on_cast_pressed.bind(character_id))
             hero_list.add_child(cast_button)
 
+    if heroes.is_empty():
+        var hint := Label.new()
+        hint.name = "CreateFirstHeroHint"
+        hint.text = "还没有英雄，点上面的「创建英雄」开始吧！"
+        hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        hint.custom_minimum_size.y = 92
+        hero_list.add_child(hint)
     var message := (
-        "No saved Heroes yet. Tap ＋ New Hero to create one!"
-        if heroes.is_empty()
-        else str(heroes.size()) + " saved Hero(es) · tap one to edit."
+        "让我们做出第一个小英雄！" if heroes.is_empty()
+        else "找到你的英雄啦！选一个继续冒险 ✨"
     )
     _set_status(message, false)
+    # Only the owner-scoped list updates the selected card. Do not persist
+    # the sibling's name or appearance outside the current authorized session.
+    var current_family := _family_state()
+    var current_id := (
+        current_family.current_profile_id() if current_family != null else ""
+    )
+    if current_id in ["child_a", "child_b"]:
+        var caption := _profile_labels.get(current_id) as Label
+        var preview := _profile_portraits.get(current_id) as MiniUtopiaCreatorAvatarStage
+        if caption != null:
+            caption.text = (
+                ("大宝" if current_id == "child_a" else "二宝")
+                + ("\n⭐ " + String(heroes[0].get("display_name", "我的英雄"))
+                    if not heroes.is_empty() else "\n🌈 创建我的英雄")
+            )
+        if preview != null and not heroes.is_empty():
+            var hero_profile = heroes[0].get("profile", {})
+            if typeof(hero_profile) == TYPE_DICTIONARY:
+                var appearance = hero_profile.get("avatar", {})
+                if typeof(appearance) == TYPE_DICTIONARY:
+                    preview.apply_appearance(appearance)
 
 
 func _clear_hero_list() -> void:
@@ -1129,6 +1647,11 @@ func _on_bridge_failure(kind: String, status_code: int, _code: String, _message:
                 if button != null:
                     button.disabled = false
                     button.text = "⬇ Prepare private MP4 (parent release required)"
+            elif String(entry.name).begins_with("SaveMovie_"):
+                var child_button := entry as Button
+                if child_button != null:
+                    child_button.disabled = false
+                    child_button.text = "💾 保存我的电影"
         _set_status(
             "Parent must approve the finished MP4 before you can save it."
             if status_code in [403, 404]
@@ -1139,7 +1662,7 @@ func _on_bridge_failure(kind: String, status_code: int, _code: String, _message:
 
     if kind == "films:get" and not _pending_review_film_id.is_empty():
         _cancel_parent_movie_review()
-        _set_status("This film is not currently available to this child.", true)
+        _set_status("这部电影暂时不能打开。", true)
         return
     if kind.begins_with("family:film-review:"):
         parent_movie_approve.disabled = false
@@ -1152,12 +1675,12 @@ func _on_bridge_failure(kind: String, status_code: int, _code: String, _message:
         return
     if kind == "films:list":
         _clear_movie_list()
-        _set_status("Your private movies could not be loaded.", true)
+        _set_status("暂时无法打开我的电影，请稍后再试。", true)
         return
     if not _movie_phase.is_empty() and kind in [
         "films:get", "character:get", "equipment:get"
     ]:
-        _movie_restore_failed("Saved movie or private actor cannot be reopened.")
+        _movie_restore_failed("暂时无法打开电影或其中的角色。")
         return
     if kind in ["family:cast-approve", "family:cast-revoke"]:
         share_submit.disabled = false
@@ -1184,6 +1707,11 @@ func _on_bridge_failure(kind: String, status_code: int, _code: String, _message:
     if kind == "family:session":
         connect_button.disabled = false
         _pending_profile_id = ""
+        if parent_pin_panel != null and parent_pin_panel.visible:
+            parent_pin_hint.text = (
+                "尝试太多次啦，请稍后再试。" if status_code == 429
+                else "口令没通过，请重新输入 8 位数字。"
+            )
         _set_connected(false)
         _set_status(
             "Parent unlock temporarily limited. Try again later."
@@ -1191,6 +1719,14 @@ func _on_bridge_failure(kind: String, status_code: int, _code: String, _message:
             else "Parent unlock denied. Check the private URL and secret.",
             true
         )
+        return
+
+    if kind in ["character:get", "equipment:get"] and not _pending_direct_play_character_id.is_empty():
+        _pending_direct_play_character_id = ""
+        var family := _family_state()
+        if family != null:
+            family.clear_selection()
+        _set_status("没能打开自己的英雄，请稍后重试。", true)
         return
 
     if kind in ["character:get", "equipment:get"] and not _pending_cast_character_id.is_empty():
@@ -1348,6 +1884,25 @@ func _on_guest_pressed(grant_id: String) -> void:
         _set_status("Checking parent's film guest approval…", false)
 
 
+func _on_library_play_pressed(character_id: String) -> void:
+    var family := _family_state()
+    if (
+        family == null
+        or not family.has_family_connection()
+        or not bridge.has_family_session()
+        or bridge.is_busy()
+    ):
+        _set_status("请家长先解锁你的角色。", true)
+        return
+    _pending_direct_play_character_id = character_id
+    var error := bridge.get_character(character_id)
+    if error != OK:
+        _pending_direct_play_character_id = ""
+        _set_status("暂时打不开这个英雄，请再试一次。", true)
+    else:
+        _set_status("正在给你的英雄准备衣服和道具…", false)
+
+
 func _on_hero_pressed(character_id: String) -> void:
     var family := _family_state()
     if family == null or not family.open_character(character_id):
@@ -1377,8 +1932,10 @@ func _on_disconnect_pressed() -> void:
         family.disconnect_family()
     bridge.clear_family_session()
     _clear_hero_list()
+    _parent_controls_open = false
     _set_connected(false)
-    _set_status("Disconnected · your Heroes remain safe in your private account.", false)
+    _set_status("你已返回欢迎页，可以请家长再来帮忙。", false)
+    _show_player_picker()
 
 
 func _on_back_pressed() -> void:
@@ -1387,5 +1944,16 @@ func _on_back_pressed() -> void:
 
 
 func _set_status(message: String, error: bool) -> void:
-    status_label.text = message
-    status_label.modulate = Color("#B5485D") if error else Color("#4F4868")
+    var safe_message := message
+    if not _parent_controls_open:
+        var lower := message.to_lower()
+        for hidden_word in [
+            "url", "token", "secret", "session", "bridge",
+            "family cloud", "https://", "http://", "localhost", "endpoint",
+        ]:
+            if lower.contains(hidden_word):
+                safe_message = "请家长打开「家长入口」帮忙。"
+                break
+    if not _parent_controls_open:
+        safe_message = safe_message.replace("MP4", "电影").replace("mp4", "电影")
+    status_label.text = ("💡 " if error else "") + safe_message

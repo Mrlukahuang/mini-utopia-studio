@@ -137,6 +137,9 @@ func apply_appearance(appearance: Dictionary) -> void:
         _avatar_root,
         _equipment_runtime
     )
+    MiniUtopiaKaykitAvatarV1.apply_hand_skin(
+        _avatar_root, _appearance, _equipment_runtime
+    )
 
 
 func current_appearance() -> Dictionary:
@@ -145,10 +148,14 @@ func current_appearance() -> Dictionary:
 
 func apply_equipment_runtime(payload: Dictionary) -> Dictionary:
     _equipment_runtime = payload.duplicate(true)
-    return MiniUtopiaEquipmentRuntime.attach_loadout(
+    var attached := MiniUtopiaEquipmentRuntime.attach_loadout(
         _avatar_root,
         _equipment_runtime
     )
+    MiniUtopiaKaykitAvatarV1.apply_hand_skin(
+        _avatar_root, _appearance, _equipment_runtime
+    )
+    return attached
 
 
 func current_equipment_runtime() -> Dictionary:

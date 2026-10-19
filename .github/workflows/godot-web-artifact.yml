@@ -235,13 +235,43 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sed -i 's|run/main_scene="res://scenes/main.tscn"|run/main_scene="res://scenes/character_creator.tscn"|' godot/project.godot
+          sed -i -E 's|^run/main_scene=".*"$|run/main_scene="res://scenes/character_creator.tscn"|' godot/project.godot
           grep -Fx 'run/main_scene="res://scenes/character_creator.tscn"' godot/project.godot
           mkdir -p "$GITHUB_WORKSPACE/dist/creator-visual"
           "$GODOT_BINARY" --headless --path godot --export-release "Web" \
             "$GITHUB_WORKSPACE/dist/creator-visual/index.html"
           test -s dist/creator-visual/index.pck
           test -s dist/creator-visual/index.wasm
+
+      # A-012: synthetic successful-save celebration in a screenshot-only
+      # Creator export. Production Web export above remains untouched.
+      - name: Export isolated Creator save celebration visual build
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("godot/scripts/character_creator_shell.gd")
+          source = path.read_text()
+          anchor = '    _build_save_celebration()'
+          assert source.count(anchor) == 1
+          source = source.replace(anchor, anchor + '\n    call_deferred("_ci_saved_hero_preview")', 1)
+          source += '''
+          func _ci_saved_hero_preview() -> void:
+              hero_name_input.text = "小星星 Star"
+              character_label.text = "小星星 Star"
+              play_button.disabled = false
+              _celebrate_saved_hero()
+              _set_status("保存成功啦！你的英雄可以去村子玩！", false)
+          '''
+          path.write_text(source)
+          PY
+          sed -i -E 's|^run/main_scene=".*"$|run/main_scene="res://scenes/character_creator.tscn"|' godot/project.godot
+          mkdir -p dist/creator-celebration-visual
+          "$GODOT_BINARY" --headless --path godot --editor --quit
+          "$GODOT_BINARY" --headless --path godot --export-release "Web" \
+            "$GITHUB_WORKSPACE/dist/creator-celebration-visual/index.html"
+          test -s dist/creator-celebration-visual/index.pck
 
       - name: Install pinned Playwright Chromium
         shell: bash
@@ -260,20 +290,193 @@ jobs:
           test -s dist/visual-evidence/creator-1180x820.png
           test -s dist/visual-evidence/creator-1366x1024.png
 
+      # A-012 screenshot-only synthetic OWNED sword versus staff. Production
+      # Web export and all smoke tests above remain completely untouched.
+      - name: Screenshot owner-scoped hand item swap in isolated Creator builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          sed -i -E 's|^run/main_scene=".*"$|run/main_scene="res://scenes/character_creator.tscn"|' godot/project.godot
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import os
+
+          path = Path("godot/scripts/character_creator_shell.gd")
+          # The previous screenshot-only "save celebration" step temporarily
+          # edits this same file. Always start from the CHECKED-IN source:
+          # these evidence frames must not imply a real save occurred.
+          original = subprocess.check_output(
+              ["git", "show", "HEAD:godot/scripts/character_creator_shell.gd"],
+              text=True,
+          )
+          anchor = '    _build_save_celebration()'
+          assert original.count(anchor) == 1
+          for style, label in [
+              ("sword_1handed", "剑"),
+              ("staff", "法杖"),
+          ]:
+              source = original.replace(
+                  anchor,
+                  anchor + '\n    call_deferred("_ci_preview_owned_hand")',
+                  1,
+              )
+              source += f'''
+          func _ci_preview_owned_hand() -> void:
+              var owned := {{
+                  "character_asset_id": "CHAR_CI_OWNED_FIXTURE",
+                  "equipped": {{
+                      "weapon_main": {{
+                          "item_instance_id": "ITEM_CI_OWNED_SWORD",
+                          "display_name": "Star Sword",
+                          "mesh_asset_id": "sword_1handed",
+                          "rarity": "blue",
+                      }},
+                  }},
+                  "final_stats": {{}},
+              }}
+              _draft_appearance["compatible_tags"] = ["humanoid", "kaykit_style_{style}"]
+              avatar_stage.apply_appearance(_draft_appearance)
+              avatar_stage.apply_equipment_runtime(owned)
+              _set_status("CI合成演示：已拥有的剑 → {label}", false)
+          '''
+              path.write_text(source)
+              subprocess.run(
+                  [os.environ["GODOT_BINARY"], "--headless", "--path", "godot", "--editor", "--quit"],
+                  check=True,
+              )
+              target = Path("dist/creator-hand-" + style)
+              target.mkdir(parents=True, exist_ok=True)
+              subprocess.run(
+                  [os.environ["GODOT_BINARY"], "--headless", "--path", "godot",
+                   "--export-release", "Web", str(target.resolve() / "index.html")],
+                  check=True,
+              )
+              assert (target / "index.pck").stat().st_size > 0
+          path.write_text(original)
+          PY
+          python3 -m http.server 8775 --bind 127.0.0.1 --directory dist/creator-hand-sword_1handed >/tmp/ci-hand-sword.log 2>&1 &
+          python3 -m http.server 8776 --bind 127.0.0.1 --directory dist/creator-hand-staff >/tmp/ci-hand-staff.log 2>&1 &
+          node <<'JS'
+          const {chromium} = require('/tmp/mini-utopia-playwright/node_modules/playwright');
+          const fs = require('node:fs');
+          (async () => {
+            const browser = await chromium.launch({headless:true,args:[
+              '--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox'
+            ]});
+            try {
+              for (const [name,port] of [['sword',8775],['staff',8776]]) {
+                for (const [width,height] of [[1180,820],[1366,1024]]) {
+                  const context=await browser.newContext({viewport:{width,height},
+                    deviceScaleFactor:1,isMobile:true,hasTouch:true});
+                  const page=await context.newPage();
+                  await page.goto('http://127.0.0.1:'+port+'/',{waitUntil:'load',timeout:120000});
+                  await page.waitForFunction(()=>document.querySelector('#loader')===null,null,{timeout:120000});
+                  await page.waitForTimeout(3200);
+                  const file='dist/visual-evidence/creator-owned-'+name+'-'+width+'x'+height+'.png';
+                  await page.screenshot({path:file});
+                  if(fs.statSync(file).size<15000)throw Error('Screenshot empty: '+file);
+                  await context.close();
+                }
+              }
+            } finally {await browser.close();}
+          })().catch(e=>{console.error(e);process.exitCode=1;});
+          JS
+
+      # A-012: screenshots only; production export and test steps unchanged.
+      - name: Capture Start Home and Who Is Playing at both iPad landscape sizes
+        shell: bash
+        run: |
+          set -euo pipefail
+          sed -i -E 's|^run/main_scene=".*"$|run/main_scene="res://ui/theme/home.tscn"|' godot/project.godot
+          mkdir -p dist/home-visual dist/visual-evidence
+          "$GODOT_BINARY" --headless --path godot --export-release "Web" \
+            "$GITHUB_WORKSPACE/dist/home-visual/index.html"
+          test -s dist/home-visual/index.pck
+          python3 -m http.server 8771 --bind 127.0.0.1 --directory dist/home-visual >/tmp/mini-utopia-home.log 2>&1 &
+          node <<'JS'
+          const {chromium} = require('/tmp/mini-utopia-playwright/node_modules/playwright');
+          (async () => {
+            const browser = await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox']});
+            try {
+            for (const [width,height] of [[1180,820],[1366,1024]]) {
+            const context = await browser.newContext({viewport:{width,height},deviceScaleFactor:1,isMobile:true,hasTouch:true});
+              const page = await context.newPage();
+              await page.goto('http://127.0.0.1:8771/',{waitUntil:'load',timeout:120000});
+              await page.waitForFunction(()=>document.querySelector('#loader')===null,null,{timeout:120000});
+              await page.waitForTimeout(3000);
+              await page.screenshot({path:`dist/visual-evidence/home-${width}x${height}.png`});
+              await page.mouse.click(width/2,height/2+75);
+              await page.waitForTimeout(7000);
+              await page.screenshot({path:`dist/visual-evidence/home-to-who-is-playing-${width}x${height}.png`});
+              const fs=require('node:fs');
+              for(const file of [`home-${width}x${height}.png`,`home-to-who-is-playing-${width}x${height}.png`]){
+                if(fs.statSync('dist/visual-evidence/'+file).size<12000)throw Error('Empty screenshot: '+file);
+              }
+              await context.close();
+            }
+            } finally {await browser.close();}
+          })().catch(e=>{console.error(e);process.exitCode=1;});
+          JS
+
+      - name: Screenshot Creator saved-Hero celebration at 1180x820
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8772 --bind 127.0.0.1 --directory dist/creator-celebration-visual >/tmp/mini-utopia-save-celebration.log 2>&1 &
+          node <<'JS'
+          const {chromium} = require('/tmp/mini-utopia-playwright/node_modules/playwright');
+          const fs = require('node:fs');
+          (async () => {
+            const browser = await chromium.launch({
+              headless: true, args: ['--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox']
+            });
+            try {
+              const context = await browser.newContext({
+                viewport: {width:1180,height:820},
+                deviceScaleFactor:1,isMobile:true,hasTouch:true
+              });
+              const page = await context.newPage();
+              const errors = [];
+              page.on('pageerror', e => errors.push(e.message));
+              await page.goto('http://127.0.0.1:8772/',{waitUntil:'load',timeout:120000});
+              await page.locator('canvas').first().waitFor({state:'visible',timeout:120000});
+              await page.waitForFunction(() => document.getElementById('status') === null,null,{timeout:120000});
+              await page.waitForTimeout(4500);
+              const file = 'dist/visual-evidence/creator-save-celebration-1180x820.png';
+              await page.screenshot({path:file,fullPage:false,timeout:90000});
+              if (fs.statSync(file).size < 12000 || errors.length)
+                throw Error('Invalid Creator celebration screenshot: '+errors.join(';'));
+              await context.close();
+            } finally {await browser.close();}
+          })().catch(e=>{console.error(e);process.exitCode=1;});
+          JS
+          test -s dist/visual-evidence/creator-save-celebration-1180x820.png
+
       # A-009: new source-only CI exports for visual evidence. They use
       # checked-in synthetic session fixtures and never capture family data.
       - name: Export isolated Village and Director visual-check builds
         shell: bash
         run: |
           set -euo pipefail
-          sed -i 's|run/main_scene="res://scenes/character_creator.tscn"|run/main_scene="res://scenes/main.tscn"|' godot/project.godot
+          sed -i -E 's|^run/main_scene=".*"$|run/main_scene="res://scenes/main.tscn"|' godot/project.godot
           grep -Fx 'run/main_scene="res://scenes/main.tscn"' godot/project.godot
           mkdir -p "$GITHUB_WORKSPACE/dist/village-visual"
           "$GODOT_BINARY" --headless --path godot --export-release "Web" \
             "$GITHUB_WORKSPACE/dist/village-visual/index.html"
           test -s dist/village-visual/index.pck
-          sed -i 's|run/main_scene="res://scenes/main.tscn"|run/main_scene="res://scenes/director_stage.tscn"|' godot/project.godot
+          sed -i -E 's|^run/main_scene=".*"$|run/main_scene="res://scenes/director_stage.tscn"|' godot/project.godot
           grep -Fx 'run/main_scene="res://scenes/director_stage.tscn"' godot/project.godot
+          # A-012 screenshot-only fixture: show Director choice controls even
+          # without a private family login; never included in production export.
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("godot/scripts/director_stage.gd")
+          source = path.read_text()
+          marker = '    _build_overlay()\n'
+          assert source.count(marker) == 1
+          path.write_text(source.replace(marker, marker + '    call_deferred("_build_child_director_controls")\n', 1))
+          PY
           # The Director requires a validated play session; provide a
           # deterministic SYNTHETIC fixture only for this isolated CI export.
           # The production Web artifact was exported earlier and is unchanged.
@@ -315,6 +518,165 @@ jobs:
           test -s dist/visual-evidence/village-1366x1024.png
           test -s dist/visual-evidence/director-1366x1024.png
 
+      # Governance-only evidence: isolated synthetic library builds. Never use
+      # household credentials or export this fixture in the production Web PCK.
+      - name: Export isolated empty and populated Hero Library visual builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          sed -i 's|run/main_scene="res://scenes/director_stage.tscn"|run/main_scene="res://scenes/family_hero_library.tscn"|' godot/project.godot
+          grep -Fx 'run/main_scene="res://scenes/family_hero_library.tscn"' godot/project.godot
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("godot/scripts/family_hero_library.gd")
+          source = path.read_text()
+          anchor = 'func _family_state() -> MiniUtopiaFamilySceneState:'
+          assert source.count(anchor) == 1
+          # CI-only injectable fixture: session is synthetic and never sent to a host.
+          fixture = '''
+          var _ci_visual_state := "chooser"
+
+          func _ci_library_fixture() -> void:
+              if _ci_visual_state == "chooser":
+                  return
+              if _ci_visual_state == "pin":
+                  _open_parent_from_picker()
+                  return
+              var family := _family_state()
+              if family == null:
+                  return
+              if not family.connect_family(
+                  "https://family.invalid",
+                  "CI_FAKE_NON_SECRET_0123456789abcdefghij",
+                  "child_a"
+              ):
+                  return
+              if not family.bind_family_client(bridge):
+                  return
+              _set_connected(true)
+              var heroes: Array = []
+              if _ci_visual_state == "hero":
+                  heroes.append({
+                      "character_id": "CHAR_CI_SYNTHETIC",
+                      "display_name": "小星星 Star",
+                      "profile": {"avatar": {}}
+                  })
+              _on_bridge_success("characters:list", {
+                  "schema_version": "1.0", "characters": heroes
+              })
+              if _ci_visual_state in ["movies-empty", "movies-film"]:
+                  movies_button.pressed.emit()
+              # The new Lane C first-touch chooser must not cover the
+              # library-content evidence once it lands on main.
+              var chooser := get_node_or_null("WhoIsPlaying") as Control
+              if chooser != null:
+                  chooser.hide()
+
+          '''
+          source = source.replace(anchor, fixture + anchor, 1)
+          # CI-only movie response uses the production button's pressed signal.
+          method_anchor = 'func _refresh_films() -> void:'
+          assert source.count(method_anchor) == 1
+          movie_fixture = '''
+              if _ci_visual_state in ["movies-empty", "movies-film"]:
+                  var synthetic_films: Array = []
+                  if _ci_visual_state == "movies-film":
+                      synthetic_films.append({
+                          "film_id": "FILM_CI_SYNTHETIC",
+                          "draft": {
+                              "display_name": "小星星的电影",
+                              "character_id": "CHAR_CI_SYNTHETIC",
+                              "duration_seconds": 15
+                          }
+                      })
+                  _on_bridge_success("films:list", {
+                      "schema_version": "1.0", "films": synthetic_films
+                  })
+                  return
+          '''
+          source = source.replace(method_anchor, method_anchor + '\n' + movie_fixture, 1)
+          ready_end = '        _set_status("想保存新角色？请家长先点「家长入口」。", false)'
+          assert source.count(ready_end) == 1
+          source = source.replace(ready_end, ready_end + '\n    call_deferred("_ci_library_fixture")', 1)
+          path.write_text(source)
+          PY
+          # Capture the initial two-player chooser before injecting a synthetic
+          # owner-scoped session into the other two isolated CI exports.
+          for state in chooser pin empty hero movies-empty movies-film; do
+            sed -i 's|var _ci_visual_state := "[^"]*"|var _ci_visual_state := "'"$state"'"|' godot/scripts/family_hero_library.gd
+            "$GODOT_BINARY" --headless --path godot --editor --quit
+            mkdir -p "$GITHUB_WORKSPACE/dist/library-$state-visual"
+            "$GODOT_BINARY" --headless --path godot --export-release "Web" \
+              "$GITHUB_WORKSPACE/dist/library-$state-visual/index.html"
+            test -s "dist/library-$state-visual/index.pck"
+          done
+
+      - name: Screenshot Who Is Playing Hero Library and actual My Movies at two sizes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8768 --bind 127.0.0.1 --directory dist/library-empty-visual >/tmp/mini-utopia-library-empty.log 2>&1 &
+          python3 -m http.server 8769 --bind 127.0.0.1 --directory dist/library-hero-visual >/tmp/mini-utopia-library-hero.log 2>&1 &
+          python3 -m http.server 8770 --bind 127.0.0.1 --directory dist/library-chooser-visual >/tmp/mini-utopia-chooser.log 2>&1 &
+          python3 -m http.server 8781 --bind 127.0.0.1 --directory dist/library-pin-visual >/tmp/mini-utopia-parent-pin.log 2>&1 &
+          python3 -m http.server 8782 --bind 127.0.0.1 --directory dist/library-movies-empty-visual >/tmp/mini-utopia-movies-empty.log 2>&1 &
+          python3 -m http.server 8783 --bind 127.0.0.1 --directory dist/library-movies-film-visual >/tmp/mini-utopia-movies-film.log 2>&1 &
+          node <<'JS'
+          const {chromium} = require('/tmp/mini-utopia-playwright/node_modules/playwright');
+          const fs = require('node:fs');
+          (async () => {
+            const browser = await chromium.launch({
+              headless: true,
+              args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--no-sandbox']
+            });
+            try {
+              for (const [width,height] of [[1180,820],[1366,1024]]) {
+              for (const [state, port] of [['who-is-playing', 8770], ['parent-pin', 8781], ['empty', 8768], ['with-hero', 8769], ['movies-empty',8782], ['movies-film',8783]]) {
+                const context = await browser.newContext({
+                  viewport: {width, height},
+                  deviceScaleFactor: 1, isMobile: true, hasTouch: true
+                });
+                const page = await context.newPage();
+                const errors = [];
+                page.on('pageerror', e => errors.push(e.message));
+                await page.goto('http://127.0.0.1:' + port + '/', {
+                  waitUntil: 'load', timeout: 120000
+                });
+                await page.locator('canvas').first().waitFor({
+                  state: 'visible', timeout: 120000
+                });
+                await page.waitForFunction(
+                  () => document.getElementById('status') === null,
+                  null, {timeout: 120000}
+                );
+                await page.waitForTimeout(5000);
+                const file = 'dist/visual-evidence/' + (state === 'who-is-playing' || state === 'parent-pin' ? state : state.startsWith('movies-') ? state : 'library-' + state) + `-${width}x${height}.png`;
+                await page.screenshot({path: file, fullPage: false, timeout: 90000});
+                if (fs.statSync(file).size < 12000 || errors.length ||
+                    (state === 'parent-pin' && fs.existsSync('`dist/visual-evidence/home-${width}x${height}.png`') &&
+                    fs.readFileSync(file).equals(fs.readFileSync('dist/visual-evidence/home-1180x820.png')))) {
+                  throw Error('Invalid library screenshot ' + state + ': ' + errors.join('; '));
+                }
+                console.log('Captured isolated, synthetic library: ' + file);
+                await context.close();
+              }
+              }
+            } finally { await browser.close(); }
+          })().catch(e => {console.error(e); process.exitCode = 1;});
+          JS
+          test -s dist/visual-evidence/parent-pin-1180x820.png
+          test -s dist/visual-evidence/who-is-playing-1180x820.png
+          test -s dist/visual-evidence/library-empty-1180x820.png
+          test -s dist/visual-evidence/library-with-hero-1180x820.png
+
+          test -s dist/visual-evidence/home-1366x1024.png
+          test -s dist/visual-evidence/who-is-playing-1366x1024.png
+          test -s dist/visual-evidence/library-empty-1366x1024.png
+          test -s dist/visual-evidence/library-with-hero-1366x1024.png
+          test -s dist/visual-evidence/movies-empty-1180x820.png
+          test -s dist/visual-evidence/movies-film-1180x820.png
+          test -s dist/visual-evidence/movies-empty-1366x1024.png
+          test -s dist/visual-evidence/movies-film-1366x1024.png
       - name: Publish iPad Creator visual evidence
         if: always()
         uses: actions/upload-artifact@v4

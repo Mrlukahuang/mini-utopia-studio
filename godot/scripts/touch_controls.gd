@@ -31,13 +31,15 @@ func _build_controls() -> void:
     _overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
     # Four directions at bottom-left; large enough for fingers.
-    _make_button("MoveForward", "▲", "move_forward", false, Vector2(100, -208), Vector2(72, 72))
+    # The bundled Web font renders U+25B2 (▲) as a missing-glyph box.
+    # A familiar single Chinese character is supported by the shipped UI font.
+    _make_button("MoveForward", "上", "move_forward", false, Vector2(100, -208), Vector2(72, 72))
     _make_button("MoveLeft", "◀", "move_left", false, Vector2(20, -132), Vector2(72, 72))
     _make_button("MoveBack", "▼", "move_back", false, Vector2(100, -132), Vector2(72, 72))
     _make_button("MoveRight", "▶", "move_right", false, Vector2(180, -132), Vector2(72, 72))
     # Leave the center-right free for a one-finger camera drag.
-    _make_button("Jump", "跳跃", "jump", true, Vector2(-132, -128), Vector2(112, 72))
-    _make_button("Interact", "互动", "interact", true, Vector2(-132, -216), Vector2(112, 72))
+    _make_button("Jump", "跳跃", "jump", true, Vector2(-154, -128), Vector2(112, 72))
+    _make_button("Interact", "互动", "interact", true, Vector2(-154, -216), Vector2(112, 72))
 
 
 func _make_button(
@@ -54,6 +56,8 @@ func _make_button(
     button.focus_mode = Control.FOCUS_NONE
     button.mouse_filter = Control.MOUSE_FILTER_STOP
     button.keep_pressed_outside = true
+    button.clip_text = true
+    button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
     button.add_theme_font_size_override("font_size", 23)
     button.anchor_left = 1.0 if right_side else 0.0
     button.anchor_right = 1.0 if right_side else 0.0

@@ -16,6 +16,8 @@ from pathlib import Path
 from typing import Callable
 
 from studio.family_film_render import build_family_film_render_source
+from studio.family_voice_policy import read_private_shot_voice, voice_path_relative
+from studio.family_music_mix import FamilyMusicMixError, private_movie_ffmpeg_args
 from studio.family_movie_review import current_review_state
 from studio.family_movie_media import (
     MAX_PRIVATE_MP4_BYTES, PrivateMovieMediaError, approved_fingerprint, media_path,
@@ -168,16 +170,38 @@ def render_private_movie(
         count = len(list(frames.glob("frame_*.png")))
         if count != seconds * fps:
             raise PrivateMovieError("Private movie frame count mismatch")
+        voice_file = None
+        clip = source.get("voice_clips", {}).get("0")
+        if clip is not None:
+            # Read only the exact owner/film/hash saved before parent approval.
+            # Its bytes are copied into this 0700 temporary render sandbox.
+            raw_voice = read_private_shot_voice(
+                Path(db_path).absolute().parent / "voice-clips",
+                owner=owner, film_id=film_id, clip=clip,
+            )
+            suffix = voice_path_relative(
+                owner=owner, film_id=film_id, shot_index=0,
+                media_type=clip["media_type"],
+            ).suffix
+            voice_file = sandbox / ("private-shot-00" + suffix)
+            voice_file.write_bytes(raw_voice)
+            voice_file.chmod(0o600)
         staging = sandbox / "private-film.mp4"
-        _run_checked(
-            [ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error",
-             "-y", "-framerate", str(fps), "-i",
-             str(frames / "frame_%05d.png"), "-c:v", "libx264",
-             "-threads", "2", "-preset", "ultrafast", "-crf", "28",
-             "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-             str(staging)],
-            runner,
-        )
+        # Film music is chosen only from the pinned CC0 catalog, through
+        # source generated from an owner-scoped, currently approved draft.
+        # The source has no music field for legacy silent films.
+        music_id = str(source.get("director_choices", {}).get("music_id", "none"))
+        try:
+            ffmpeg_args = private_movie_ffmpeg_args(
+                project_root=sandbox,
+                frames_pattern=frames / "frame_%05d.png",
+                destination=staging, music_id=music_id, fps=fps,
+                duration_seconds=seconds, ffmpeg=ffmpeg,
+                voice_file=voice_file,
+            )
+        except FamilyMusicMixError as exc:
+            raise PrivateMovieError("Selected packaged background music is unavailable") from exc
+        _run_checked(ffmpeg_args, runner)
         if not staging.is_file() or staging.stat().st_size <= 256:
             raise PrivateMovieError("Encoded private MP4 is missing")
         if b"ftyp" not in staging.read_bytes()[:32]:
@@ -193,6 +217,15 @@ def render_private_movie(
             raise PrivateMovieError("Cannot verify private MP4 length") from exc
         if abs(actual_seconds - seconds) > 0.6:
             raise PrivateMovieError("Private movie duration mismatch")
+        if music_id != "none" or voice_file is not None:
+            audio_check = _run_checked(
+                [ffprobe, "-v", "error", "-select_streams", "a:0",
+                 "-show_entries", "stream=codec_name",
+                 "-of", "default=noprint_wrappers=1:nokey=1", str(staging)],
+                runner,
+            )
+            if audio_check.stdout.strip() != "aac":
+                raise PrivateMovieError("Selected music missing from private AAC MP4")
         if staging.stat().st_size > MAX_PRIVATE_MP4_BYTES:
             raise PrivateMovieError("Private MP4 exceeds the 32 MiB download limit")
 

@@ -351,6 +351,40 @@ func save_prepared_private_movie(film_id: String) -> int:
     return OK
 
 
+func upload_private_film_voice(
+    film_id: String, voice: PackedByteArray, media_type: String,
+    expected_revision: String = ""
+) -> int:
+    if (
+        not has_family_session() or is_busy()
+        or not film_id.begins_with("FILM_") or "/" in film_id
+        or media_type not in ["audio/mp4", "audio/webm", "audio/wav"]
+        or voice.is_empty() or voice.size() > 1500000
+    ):
+        return ERR_INVALID_PARAMETER
+    if not expected_revision.is_empty():
+        if (
+            not expected_revision.is_valid_int()
+            or int(expected_revision) < 1
+            or expected_revision.length() > 10
+        ):
+            return ERR_INVALID_PARAMETER
+    var headers := _request_headers()
+    headers[1] = "Content-Type: " + media_type
+    _active_kind = "films:voice:0"
+    _request.timeout = 20.0
+    var path := "/family/films/" + film_id.uri_encode() + "/voices/0"
+    if not expected_revision.is_empty():
+        path += "?revision=" + expected_revision.uri_encode()
+    var error := _request.request_raw(
+        base_url + path, headers, HTTPClient.METHOD_POST, voice
+    )
+    if error != OK:
+        _active_kind = ""
+        _request.timeout = 5.0
+    return error
+
+
 func list_family_films() -> int:
     return _start_request("films:list", "/family/films", HTTPClient.METHOD_GET)
 
@@ -496,6 +530,8 @@ func _on_request_completed(
 ) -> void:
     var kind := _active_kind
     _active_kind = ""
+    if kind == "films:voice:0":
+        _request.timeout = 5.0
 
     if kind.begins_with("films:download:"):
         _request.timeout = 5.0

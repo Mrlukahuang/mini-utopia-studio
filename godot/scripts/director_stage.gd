@@ -7,6 +7,8 @@ var film_bridge: MiniUtopiaBridgeClient
 var film_title_input: LineEdit
 var film_note_input: LineEdit
 var save_film_button: Button
+var record_voice_button: Button
+var voice_recorder: MiniUtopiaFamilyVoiceRecorder
 var saved_film_id := ""
 var saved_film_revision := ""
 var fallback_world_environment: WorldEnvironment
@@ -30,6 +32,12 @@ func _ready() -> void:
     if family_state != null:
         family_state.bind_family_client(film_bridge)
 
+    voice_recorder = MiniUtopiaFamilyVoiceRecorder.new()
+    voice_recorder.name = "PrivateShotVoiceRecorder"
+    add_child(voice_recorder)
+    voice_recorder.voice_ready.connect(_on_voice_ready)
+    voice_recorder.voice_failed.connect(_on_voice_failed)
+
     director_runtime = MiniUtopiaDirectorShotRuntime.new()
     director_runtime.name = "DirectorShotRuntime"
     add_child(director_runtime)
@@ -49,6 +57,7 @@ func _ready() -> void:
                 )
                 film_note_input.text = String(draft.get("private_story_note", ""))
                 _refresh_choice_labels()
+                _refresh_record_button()
             stage_payload(family_payload)
             return
 
@@ -82,47 +91,77 @@ func _build_child_director_controls() -> void:
     var overlay := get_node_or_null("DirectorStageOverlay") as CanvasLayer
     if overlay == null:
         return
+    var intro_margin := overlay.get_node_or_null("KidDirectorCard/DirectorIntroMargin")
+    if intro_margin != null:
+        intro_margin.hide()
     var controls := VBoxContainer.new()
     controls.name = "KidDirectorChoices"
-    controls.position = Vector2(24, 170)
-    controls.add_theme_constant_override("separation", 8)
+    controls.position = Vector2(34, 190)
+    controls.add_theme_constant_override("separation", 4)
     overlay.add_child(controls)
     var title := Label.new()
-    title.text = "🎥 My Movie / 我来当导演"
-    title.add_theme_font_size_override("font_size", 21)
+    title.text = "我的小电影"
+    title.add_theme_font_override("font", preload("res://assets/fonts/Fredoka-UI.tres"))
+    title.add_theme_font_size_override("font_size", 25)
     controls.add_child(title)
     for key in ["camera", "action", "duration_seconds", "caption_preset", "music_id"]:
         var button := Button.new()
         button.name = "Choice_" + key
-        button.custom_minimum_size = Vector2(238, 54)
-        button.add_theme_font_size_override("font_size", 18)
+        button.custom_minimum_size = Vector2(324, 60)
+        button.add_theme_font_size_override("font_size", 19)
         button.pressed.connect(_cycle_child_choice.bind(key))
         controls.add_child(button)
+        match key:
+            "camera": button.icon = preload("res://assets/ui/icons/camera.svg")
+            "action": button.icon = preload("res://assets/ui/icons/action.svg")
+            "duration_seconds": button.icon = preload("res://assets/ui/icons/length.svg")
+            "caption_preset": button.icon = preload("res://assets/ui/icons/subtitle.svg")
         child_choice_buttons[key] = button
     _refresh_choice_labels()
 
     film_title_input = LineEdit.new()
     film_title_input.name = "MyFilmTitle"
-    film_title_input.text = "My Mini Utopia Movie"
-    film_title_input.placeholder_text = "Name your movie"
+    film_title_input.text = "我的小电影"
+    film_title_input.placeholder_text = "给电影起个名字"
     film_title_input.max_length = 64
-    film_title_input.custom_minimum_size = Vector2(238, 50)
+    film_title_input.custom_minimum_size = Vector2(324, 50)
     controls.add_child(film_title_input)
 
     film_note_input = LineEdit.new()
     film_note_input.name = "MyFilmNote"
-    film_note_input.placeholder_text = "Your story idea"
+    film_note_input.placeholder_text = "写下你的小故事"
     film_note_input.max_length = 280
-    film_note_input.custom_minimum_size = Vector2(238, 48)
+    film_note_input.custom_minimum_size = Vector2(324, 48)
     controls.add_child(film_note_input)
 
     save_film_button = Button.new()
     save_film_button.name = "SaveMyMovieButton"
-    save_film_button.text = "Save My Movie"
-    save_film_button.custom_minimum_size = Vector2(238, 56)
+    save_film_button.text = "保存电影"
+    save_film_button.custom_minimum_size = Vector2(324, 60)
     save_film_button.disabled = not film_bridge.has_family_session()
     save_film_button.pressed.connect(_on_save_private_film_pressed)
     controls.add_child(save_film_button)
+
+    record_voice_button = Button.new()
+    record_voice_button.name = "RecordShotVoiceButton"
+    record_voice_button.text = "录一段声音"
+    record_voice_button.icon = preload("res://assets/ui/icons/voice.svg")
+    record_voice_button.custom_minimum_size = Vector2(324, 60)
+    record_voice_button.add_theme_font_size_override("font_size", 18)
+    record_voice_button.pressed.connect(_on_voice_tapped)
+    controls.add_child(record_voice_button)
+    _refresh_record_button()
+
+
+func _refresh_record_button() -> void:
+    if record_voice_button == null:
+        return
+    record_voice_button.disabled = (
+        saved_film_id.is_empty() or film_bridge == null
+        or not film_bridge.has_family_session()
+        or film_bridge.is_busy()
+        or (voice_recorder != null and voice_recorder.recording)
+    )
 
 
 func _refresh_choice_labels() -> void:
@@ -135,15 +174,15 @@ func _refresh_choice_labels() -> void:
     var length_button: Button = child_choice_buttons.get("duration_seconds")
     var caption_button: Button = child_choice_buttons.get("caption_preset")
     if camera_button != null:
-        camera_button.text = "📷 Camera: " + String(choices.get("camera", "follow")).capitalize()
+        camera_button.text = "镜头  " + {"follow":"跟随","wide":"远景","close":"特写"}.get(String(choices.get("camera", "follow")), "跟随")
     if action_button != null:
-        action_button.text = "🎭 Action: " + String(choices.get("action", "walk")).capitalize()
+        action_button.text = "动作  " + {"walk":"走路","run":"跑步","celebrate":"庆祝"}.get(String(choices.get("action", "walk")), "走路")
     if length_button != null:
-        length_button.text = "⏱️ Length: " + str(int(choices.get("duration_seconds", 15))) + "s"
+        length_button.text = "时长  " + str(int(choices.get("duration_seconds", 15))) + "秒"
     if caption_button != null:
         var preset_id := String(choices.get("caption_preset", "none"))
         var caption := MiniUtopiaFamilyDirectorSession.caption_text(preset_id)
-        caption_button.text = "💬 Subtitle: " + (caption if not caption.is_empty() else "Off")
+        caption_button.text = "字幕  " + ("开启" if not caption.is_empty() else "关闭")
     var music_button: Button = child_choice_buttons.get("music_id")
     if music_button != null:
         var music_id := String(choices.get("music_id", "none"))
@@ -242,10 +281,35 @@ func _build_overlay() -> void:
     layer.name = "DirectorStageOverlay"
     add_child(layer)
 
+    # Decorative panel uses the inherited global Theme. Preserve existing
+    # KidDirectorChoices / StatusPanel paths and functional signal connections.
+    var choices_card := PanelContainer.new()
+    choices_card.name = "KidDirectorCard"
+    choices_card.position = Vector2(22, 168)
+    choices_card.custom_minimum_size = Vector2(378, 700)
+    choices_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    layer.add_child(choices_card)
+
+    # A friendly idle state for the isolated Web screenshot and for children
+    # arriving without a playable Hero. It hides when real choices are shown.
+    var intro_margin := MarginContainer.new()
+    intro_margin.name = "DirectorIntroMargin"
+    intro_margin.add_theme_constant_override("margin_left", 22)
+    intro_margin.add_theme_constant_override("margin_right", 20)
+    intro_margin.add_theme_constant_override("margin_top", 28)
+    choices_card.add_child(intro_margin)
+    var intro := Label.new()
+    intro.name = "DirectorIntro"
+    intro.text = "选好英雄，开始拍电影！"
+    intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    intro.add_theme_font_override("font", preload("res://assets/fonts/Fredoka-UI.tres"))
+    intro.add_theme_font_size_override("font_size", 25)
+    intro_margin.add_child(intro)
+
     var panel := PanelContainer.new()
     panel.name = "StatusPanel"
     panel.position = Vector2(24.0, 24.0)
-    panel.custom_minimum_size = Vector2(560.0, 118.0)
+    panel.custom_minimum_size = Vector2(620.0, 128.0)
     layer.add_child(panel)
 
     var buttons := HBoxContainer.new()
@@ -260,7 +324,7 @@ func _build_overlay() -> void:
 
     var replay := Button.new()
     replay.name = "ReplayButton"
-    replay.text = "↻ Replay"
+    replay.text = "再看一次"
     replay.custom_minimum_size = Vector2(160.0, 54.0)
     replay.add_theme_font_size_override("font_size", 20)
     replay.pressed.connect(_on_replay_pressed)
@@ -268,7 +332,7 @@ func _build_overlay() -> void:
 
     var home := Button.new()
     home.name = "BackToVillageButton"
-    home.text = "← Village"
+    home.text = "返回村子"
     home.custom_minimum_size = Vector2(185.0, 54.0)
     home.add_theme_font_size_override("font_size", 20)
     home.pressed.connect(_on_back_to_village_pressed)
@@ -284,7 +348,7 @@ func _build_overlay() -> void:
 
     status_label = Label.new()
     status_label.name = "StatusLabel"
-    status_label.text = "🎬 Director Stage / 导演模式"
+    status_label.text = "我的小电影"
     status_label.add_theme_font_size_override("font_size", 18)
     margin.add_child(status_label)
 
@@ -329,7 +393,7 @@ func _on_save_private_film_pressed() -> void:
         return
     var draft := _private_film_draft()
     if draft.is_empty():
-        status_label.text = "Please name your film and select your saved Hero."
+        status_label.text = "先给电影起名，再选英雄"
         return
     var error := (
         film_bridge.create_family_film(draft)
@@ -339,51 +403,83 @@ func _on_save_private_film_pressed() -> void:
         )
     )
     if error != OK:
-        status_label.text = "Could not start private film save."
+        status_label.text = "保存失败，请重试"
         return
     save_film_button.disabled = true
-    status_label.text = "Saving your film privately…"
+    status_label.text = "正在保存电影…"
+
+
+func _on_voice_tapped() -> void:
+    if saved_film_id.is_empty() or film_bridge == null or film_bridge.is_busy():
+        return
+    if not voice_recorder.start_on_user_tap():
+        status_label.text = "需要安全连接才能录音"
+        return
+    _refresh_record_button()
+    status_label.text = "正在录音（最多9秒）…"
+
+
+func _on_voice_ready(media_type: String, audio: PackedByteArray) -> void:
+    if film_bridge == null or film_bridge.upload_private_film_voice(
+        saved_film_id, audio, media_type
+    ) != OK:
+        status_label.text = "声音上传失败，请重试"
+    else:
+        status_label.text = "正在保存声音…"
+    _refresh_record_button()
+
+
+func _on_voice_failed() -> void:
+    status_label.text = "暂时无法使用麦克风"
+    _refresh_record_button()
 
 
 func _on_film_bridge_success(kind: String, payload: Dictionary) -> void:
+    if kind == "films:voice:0":
+        saved_film_revision = String(payload.get("revision", ""))
+        status_label.text = "声音已保存，请家长确认"
+        _refresh_record_button()
+        return
+
     if kind not in ["films:post", "films:put"]:
         return
     var id := String(payload.get("film_id", ""))
     var revision := String(payload.get("revision", ""))
     if not id.begins_with("FILM_") or revision.is_empty():
-        status_label.text = "Film save returned an invalid response."
+        status_label.text = "保存未成功，请重试"
         save_film_button.disabled = false
         return
     saved_film_id = id
     saved_film_revision = revision
     save_film_button.disabled = false
-    status_label.text = "💖 Movie saved to your private Family Cloud!"
+    _refresh_record_button()
+    status_label.text = "电影已保存！"
     var family := get_node_or_null("/root/FamilySceneState") as MiniUtopiaFamilySceneState
     if family != null and family.second_cast_is_parent_guest:
-        status_label.text += "\nSibling guest approval is temporary, not stored."
+        status_label.text += "\n客串邀请只在本次游戏有效"
 
 
 func _on_film_bridge_failure(
     kind: String, status_code: int, _code: String, _message: String
 ) -> void:
+    if kind == "films:voice:0":
+        status_label.text = "声音未保存，请检查麦克风"
+        _refresh_record_button()
+        return
     if kind not in ["films:post", "films:put"]:
         return
     save_film_button.disabled = false
     status_label.text = (
-        "Your saved movie changed. Reopen it before editing."
+        "电影内容已更新，请重新打开"
         if status_code == 409
-        else "Could not save privately. Please retry."
+        else "暂时无法保存，请重试"
     )
 
 
 func _show_missing_payload() -> void:
     if status_label == null:
         return
-    status_label.text = (
-        "🎬 Director Stage / 导演模式\n"
-        + "⚠️ No Director payload found.\n"
-        + "Return to Mini Utopia → Episodes → Stage Shot first."
-    )
+    status_label.text = "还没有拍摄内容，请先选择一个场景"
     push_warning(
         "DIR-04B: no director_shot_session.json; Stage Shot in Creator first."
     )
@@ -392,31 +488,9 @@ func _show_missing_payload() -> void:
 func _show_ready(payload: Dictionary) -> void:
     if status_label == null:
         return
-
-    var camera_payload = payload.get("camera", {})
-    var camera_text := ""
-    if typeof(camera_payload) == TYPE_DICTIONARY:
-        camera_text = String(camera_payload.get("movement", ""))
-
-    var world_line := "Fallback Stage"
-    if director_runtime != null and director_runtime.bound_world_loaded:
-        world_line = "Real World · " + director_runtime.bound_scene_path
-    elif director_runtime != null and not director_runtime.world_load_error.is_empty():
-        world_line = "Fallback · " + director_runtime.world_load_error
-
-    status_label.text = (
-        "🎬 Director Stage / 导演模式"
-        + "\n"
-        + String(payload.get("scene_id", "—"))
-        + " · "
-        + String(payload.get("shot_id", "—"))
-        + " · "
-        + String(payload.get("animation_intent", "idle")).capitalize()
-        + " · "
-        + str(float(payload.get("duration_seconds", 0.0)))
-        + "s"
-        + "\n🎥 "
-        + camera_text
-        + "\n🌍 "
-        + world_line
-    )
+    # Stage IDs, internal scene paths and synthetic CI identifiers belong only
+    # in diagnostics, never the child-facing Director status panel.
+    var seconds := int(round(float(payload.get("duration_seconds", 0.0))))
+    status_label.text = "镜头准备好了！"
+    if seconds > 0:
+        status_label.text += "\n时长 " + str(seconds) + " 秒"

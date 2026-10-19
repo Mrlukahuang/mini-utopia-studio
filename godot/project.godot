@@ -3,13 +3,14 @@ config_version=5
 
 [application]
 config/name="Mini Utopia - Newbie Village"
-run/main_scene="res://scenes/main.tscn"
+run/main_scene="res://ui/theme/home.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
 [autoload]
 FamilySceneState="*res://scripts/family_scene_state.gd"
 
 [gui]
+theme/custom="res://ui/theme/mini_utopia_theme.tres"
 theme/custom_font="res://assets/fonts/NotoSansSC-UI.tres"
 
 [display]

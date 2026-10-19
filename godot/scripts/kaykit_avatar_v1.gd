@@ -36,9 +36,25 @@ static func mount(root: Node3D, appearance: Dictionary) -> AnimationPlayer:
     )
     model.scale = Vector3(width, 1.0, width)
     model.visible = true
-    _head_for_species(skeleton, appearance)
+    # Preserve legacy saved identity for cross-scene consumers without rendering
+    # any procedural geometry over the official Knight's original head.
+    _species_identity_only(skeleton, appearance)
+    _hide_native_hand_props(skeleton)
     _bone_socket(skeleton, "handslot.r", MiniUtopiaAvatarContract.SOCKET_WEAPON_R)
     _bone_socket(skeleton, "handslot.l", MiniUtopiaAvatarContract.SOCKET_WEAPON_L)
+    # A-012 visual check: no packaged official crown asset exists.
+    # CI confirmation: preserve native Knight helmet across every animation.
+    # Real headwear belongs to the animated head bone, never a fixed-height
+    # world/root socket. No separately licensed KayKit crown model is bundled
+    # yet: hide the socket so legacy procedural crowns cannot float over the
+    # Knight helmet. Existing saved outfit data stays unchanged.
+    _bone_socket(skeleton, "head", MiniUtopiaAvatarContract.SOCKET_HEADWEAR)
+    var headwear := skeleton.find_child(
+        MiniUtopiaAvatarContract.SOCKET_HEADWEAR, true, false
+    ) as Node3D
+    if headwear != null:
+        headwear.position = Vector3(0.0, 0.24, 0.0)
+        headwear.visible = false
 
     # Keep legacy nodes for the save/preview contract and tests, but never
     # render an overlapping procedural body when official KayKit exists.
@@ -47,6 +63,95 @@ static func mount(root: Node3D, appearance: Dictionary) -> AnimationPlayer:
         for descendant in legacy.find_children("*", "MeshInstance3D", true, false):
             (descendant as MeshInstance3D).visible = false
     return animation
+
+
+# The bundled Knight GLB has a 1H sword, 2H sword and several shields
+# already displayed on its imported hands. They are showcase meshes, NOT
+# items owned by the signed-in child. Remove their render layer, even if the
+# original animation changes visible, before mounting the verified loadout.
+# Do not hide the animated hand bones or the official helmet.
+static func _hide_native_hand_props(skeleton: Skeleton3D) -> void:
+    for hand in ["handslot_l", "handslot_r"]:
+        var original := skeleton.get_node_or_null(hand) as Node3D
+        if original == null:
+            continue
+        # Only original direct mesh children; a runtime Socket_WeaponR/L
+        # inserted below the imported holder MUST remain drawable.
+        for part in original.get_children():
+            if part is MeshInstance3D:
+                (part as MeshInstance3D).layers = 0
+
+
+static func visible_hand_style(root: Node3D, slot: String, style: String) -> bool:
+    var socket_name := (
+        MiniUtopiaAvatarContract.SOCKET_WEAPON_L
+        if slot == "weapon_offhand"
+        else MiniUtopiaAvatarContract.SOCKET_WEAPON_R
+    )
+    var socket := mounted_weapon_socket(root, socket_name)
+    if socket == null:
+        return false
+    var equipment := socket.get_node_or_null("Equipment_" + slot) as Node3D
+    if equipment == null or String(equipment.get_meta("kaykit_style", "")) != style:
+        return false
+    for mesh in equipment.find_children("*", "MeshInstance3D", true, false):
+        if (mesh as MeshInstance3D).is_visible_in_tree():
+            return true
+    return false
+
+
+static func hand_skin(appearance: Dictionary) -> String:
+    var tags = appearance.get("compatible_tags", [])
+    if typeof(tags) != TYPE_ARRAY:
+        return ""
+    for tag in tags:
+        var value := String(tag).trim_prefix("kaykit_style_")
+        if WEAPONS.has(value):
+            return value
+    return ""
+
+
+static func apply_hand_skin(root: Node3D, appearance: Dictionary, equipment: Dictionary) -> void:
+    var style := hand_skin(appearance)
+    if style.is_empty():
+        return
+    var equipped = equipment.get("equipped", {})
+    if typeof(equipped) != TYPE_DICTIONARY:
+        return
+    var slot := "weapon_offhand" if style == "shield_round" else "weapon_main"
+    if not equipped.has(slot):
+        return
+    var owned_item = equipped.get(slot, {})
+    if typeof(owned_item) != TYPE_DICTIONARY:
+        return
+    var crafted = owned_item.get("visual_recipe", {})
+    if typeof(crafted) == TYPE_DICTIONARY and not crafted.is_empty():
+        return
+    var socket_name := (
+        MiniUtopiaAvatarContract.SOCKET_WEAPON_L
+        if slot == "weapon_offhand"
+        else MiniUtopiaAvatarContract.SOCKET_WEAPON_R
+    )
+    var socket := mounted_weapon_socket(root, socket_name)
+    if socket == null:
+        return
+    var previous := socket.get_node_or_null("Equipment_" + slot)
+    if previous != null:
+        socket.remove_child(previous)
+        previous.free()
+    var packed := load(String(WEAPONS[style])) as PackedScene
+    if packed != null:
+        var model := packed.instantiate() as Node3D
+        if model != null:
+            model.name = "Equipment_" + slot
+            model.set_meta("kaykit_style", style)
+            # The imported hand grip points a prop's local Y axis toward
+            # the camera; rotate it into the standing plane instead. The
+            # official sword, wand and staff must show a full recognizable
+            # silhouette, not an end-on disc or a cross-body rod.
+            if style in ["sword_1handed", "staff", "wand"]:
+                model.rotation_degrees.z = 90.0
+            socket.add_child(model)
 
 
 static func play(animation: AnimationPlayer, semantic: String) -> void:
@@ -71,6 +176,21 @@ static func _bone_socket(
         return
     if skeleton.find_child(socket_name, true, false) != null:
         return
+    # Prefer the source GLB's already-authored hands: these imported holders
+    # have the grip pose/rotation for the bundled KayKit equipment models.
+    # A fresh BoneAttachment3D at the bare bone origin turns a long staff into
+    # a sideways disc in the real Web screenshot.
+    var imported_hand := (
+        "handslot_r" if bone_name == "handslot.r" else
+        "handslot_l" if bone_name == "handslot.l" else ""
+    )
+    if not imported_hand.is_empty():
+        var existing := skeleton.get_node_or_null(imported_hand) as Node3D
+        if existing != null:
+            var hand_socket := Node3D.new()
+            hand_socket.name = socket_name
+            existing.add_child(hand_socket)
+            return
     var binding := BoneAttachment3D.new()
     binding.name = "KayKitBone_" + bone_name
     binding.bone_name = bone_name
@@ -80,62 +200,33 @@ static func _bone_socket(
     binding.add_child(socket)
 
 
-static func _head_for_species(skeleton: Skeleton3D, appearance: Dictionary) -> void:
+
+# Compatibility for saved nonhuman IDs: zero meshes, zero drawn species shell.
+# The older cross-scene smoke still reads these metadata-only MeshInstance3Ds.
+# They MUST remain meshless until official KayKit species assets are supplied.
+static func _species_identity_only(skeleton: Skeleton3D, appearance: Dictionary) -> void:
     var previous := skeleton.get_node_or_null("KayKitHeadOverlay")
     if previous != null:
         skeleton.remove_child(previous)
         previous.free()
-    var species := String(appearance.get("species_head_id", "species_head_human_v1"))
-    if species == "species_head_human_v1" or skeleton.find_bone("head") < 0:
+    if String(appearance.get("species_head_id", "species_head_human_v1")) == "species_head_human_v1":
+        return
+    if skeleton.find_bone("head") < 0:
         return
 
-    # All four nonhuman Creator choices remain real, visually distinct heads
-    # mounted to the *animated* original KayKit head bone in every runtime.
     var anchor := BoneAttachment3D.new()
     anchor.name = "KayKitHeadOverlay"
     anchor.bone_name = "head"
+    anchor.visible = false
     skeleton.add_child(anchor)
-    var color := Color(String(appearance.get("surface_color_hex", "#F2C7A5")))
-    var eye_color := Color(String(appearance.get("eye_color_hex", "#7A5238")))
-    var head := MeshInstance3D.new()
-    head.name = "SpeciesShell"
-    if species == "species_head_robot_v1":
-        var cube := BoxMesh.new()
-        cube.size = Vector3(0.72, 0.64, 0.70)
-        head.mesh = cube
-    else:
-        var sphere := SphereMesh.new()
-        sphere.radius = 0.48 if species == "species_head_cloud_v1" else 0.42
-        sphere.height = 0.90 if species == "species_head_cloud_v1" else 0.79
-        head.mesh = sphere
-    head.material_override = _material(color)
-    head.position = Vector3(0, 0.06, 0.0)
-    anchor.add_child(head)
-
-    for side in [-1.0, 1.0]:
-        var eye := MeshInstance3D.new()
-        eye.name = "SpeciesEyeL" if side < 0.0 else "SpeciesEyeR"
-        var eye_mesh := SphereMesh.new()
-        eye_mesh.radius = 0.072
-        eye_mesh.height = 0.14
-        eye.mesh = eye_mesh
-        eye.material_override = _material(eye_color)
-        eye.position = Vector3(side * 0.17, 0.11, 0.40)
-        anchor.add_child(eye)
-        if species in ["species_head_cat_v1", "species_head_sheep_v1"]:
-            var ear := MeshInstance3D.new()
-            ear.name = "SpeciesEarL" if side < 0.0 else "SpeciesEarR"
-            var ear_mesh := SphereMesh.new()
-            ear_mesh.radius = 0.15
-            ear_mesh.height = 0.39 if species == "species_head_cat_v1" else 0.22
-            ear.mesh = ear_mesh
-            ear.material_override = _material(color)
-            ear.position = Vector3(side * 0.36, 0.35, 0.0)
-            anchor.add_child(ear)
-
-
-static func _material(color: Color) -> StandardMaterial3D:
+    var identity_shell := MeshInstance3D.new()
+    identity_shell.name = "SpeciesShell"
+    # Mesh intentionally null: never cover the true KayKit head.
     var material := StandardMaterial3D.new()
-    material.albedo_color = color
-    material.roughness = 0.85
-    return material
+    material.albedo_color = Color(String(appearance.get("surface_color_hex", "#F2C7A5")))
+    identity_shell.material_override = material
+    anchor.add_child(identity_shell)
+    for node_name in ["SpeciesEarL", "SpeciesEarR"]:
+        var ear_identity := MeshInstance3D.new()
+        ear_identity.name = node_name
+        anchor.add_child(ear_identity)

@@ -84,6 +84,17 @@ def build_family_film_render_source(
         },
         "fps": 2, "width": 480, "height": 270,
     }
+    # Include a trusted, fixed voice manifest in the adult review fingerprint.
+    # Legacy silent films retain their unchanged render-source contract.
+    voice_clips = film.metadata.get("family_voice_clips", {})
+    if voice_clips:
+        if (
+            not isinstance(voice_clips, dict)
+            or set(voice_clips) != {"0"}
+            or not isinstance(voice_clips["0"], dict)
+        ):
+            return None
+        result["voice_clips"] = {"0": dict(voice_clips["0"])}
     # Existing silent films retain the exact v1 render contract.
     if draft.music_id != "none":
         result["director_choices"]["music_id"] = draft.music_id

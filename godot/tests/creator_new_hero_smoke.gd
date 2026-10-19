@@ -43,6 +43,115 @@ func _initialize() -> void:
     root.add_child(scene)
     await process_frame
 
+    var title_label := scene.get_node_or_null(
+        "RootMargin/MainColumn/HeaderRow/TitleColumn/Title"
+    ) as Label
+    if title_label == null or title_label.text != "做一个你的小英雄！":
+        _fail("Creator Chinese title is missing")
+        return
+    var ui_labels := {
+        "RootMargin/MainColumn/StepTabs/LookStep": "1 · 外观",
+        "RootMargin/MainColumn/StepTabs/PersonalityStep": "2 · 个性",
+        "RootMargin/MainColumn/StepTabs/OutfitStep": "3 · 换装",
+        "RootMargin/MainColumn/StepTabs/ReadyStep": "4 · 完成",
+        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/Heading": "创建小英雄",
+        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/BodyRow/SlimButton": "瘦瘦",
+        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/BodyRow/StandardButton": "标准",
+        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/BodyRow/ChubbyButton": "圆圆",
+        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SurfaceGrid/CloudButton": "云朵",
+        "RootMargin/MainColumn/CreatorBody/PreviewPanel/AnimationControls/IdleButton": "站立",
+        "RootMargin/MainColumn/CreatorBody/PreviewPanel/AnimationControls/WalkButton": "走路",
+        "RootMargin/MainColumn/CreatorBody/PreviewPanel/AnimationControls/RunButton": "跑步",
+        "RootMargin/MainColumn/CreatorBody/PreviewPanel/AnimationControls/JumpButton": "跳跃",
+        "RootMargin/MainColumn/FooterRow/SaveButton": "保存英雄",
+        "RootMargin/MainColumn/FooterRow/PlayButton": "去村子玩",
+        "RootMargin/MainColumn/FooterRow/BackButton": "返回",
+    }
+    for node_path in ui_labels:
+        var control := scene.get_node_or_null(node_path) as Control
+        if control == null or String(control.get("text")) != String(ui_labels[node_path]):
+            _fail("Creator Chinese child UI missing: " + node_path)
+            return
+    var scene_shell := scene as Control
+    var eye_choice := scene.get_node(
+        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/EyeStyleOption"
+    ) as OptionButton
+    var hair_choice := scene.get_node(
+        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/HairStyleOption"
+    ) as OptionButton
+    if eye_choice.get_item_text(0) != "圆眼睛" or hair_choice.get_item_text(0) != "没有头发":
+        _fail("Creator eye/hair display labels are not localized")
+        return
+    if scene_shell.get("_eye_option_ids").size() != eye_choice.item_count:
+        _fail("eye option identifiers changed while translating UI")
+        return
+    if scene_shell.get("_hair_option_ids").size() != hair_choice.item_count:
+        _fail("hair option identifiers changed while translating UI")
+        return
+    scene._select_creator_tab("outfit")
+    var heading := scene.get_node(
+        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/Heading"
+    ) as Label
+    if heading.text != "给英雄换装":
+        _fail("wardrobe heading not localized")
+        return
+    scene._select_creator_tab("look")
+    if heading.text != "创建小英雄":
+        _fail("look heading not restored after wardrobe tab")
+        return
+    var species_grid := scene.get_node_or_null(
+        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/SpeciesGrid"
+    ) as GridContainer
+    if species_grid == null or not (species_grid.get_node("HumanButton") as Button).visible:
+        _fail("supported Knight species must be visible")
+        return
+    for hidden_species in ["SheepButton", "RobotButton", "CatButton", "CloudButton"]:
+        if (species_grid.get_node(hidden_species) as Button).visible:
+            _fail("unavailable species still visible: " + hidden_species)
+            return
+    var content := scene.get_node(
+        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content"
+    ) as VBoxContainer
+    for unavailable in [
+        "SurfaceLabel", "SurfaceGrid", "EyeLabel", "EyeStyleOption",
+        "HairLabel", "HairStyleOption",
+        "ColorLabel", "ColorTargetOption", "ColorGrid",
+    ]:
+        if (content.get_node(unavailable) as Control).visible:
+            _fail("Knight exposes invisible-only control: " + unavailable)
+            return
+    scene._select_creator_tab("outfit")
+    scene._select_creator_tab("look")
+    for unavailable in [
+        "SurfaceGrid", "EyeStyleOption", "HairStyleOption", "ColorGrid",
+    ]:
+        if (content.get_node(unavailable) as Control).visible:
+            _fail("switching tabs restored invisible-only control: " + unavailable)
+            return
+    if not (content.get_node("BodyRow") as Control).visible:
+        _fail("actual Knight body width choices were hidden")
+        return
+    var hint := content.get_node("Hint") as Label
+    if hint.text != "眼睛、发型等暂未开放":
+        _fail("Knight does not explain unavailable looks")
+        return
+    var original_look: Dictionary = scene._draft_appearance.duplicate(true)
+    scene._on_random_look_pressed()
+    if String(scene._draft_appearance.get("body_type", "")) == String(original_look.get("body_type", "")):
+        _fail("random body choice did not visibly change Knight width")
+        return
+    for identity_field in [
+        "species_head_id", "surface_type", "eye_style_id",
+        "hair_style_id", "surface_color_hex", "eye_color_hex", "hair_color_hex",
+    ]:
+        if scene._draft_appearance.get(identity_field) != original_look.get(identity_field):
+            _fail("random body choice changed unsupported saved field: " + identity_field)
+            return
+    scene._draft_appearance = original_look
+    scene.avatar_stage.apply_appearance(original_look)
+    scene._appearance_dirty = false
+    scene._refresh_look_controls()
+
     var name_input := scene.get_node(
         "RootMargin/MainColumn/HeaderRow/TitleColumn/HeroNameInput"
     ) as LineEdit
@@ -64,6 +173,190 @@ func _initialize() -> void:
     if stage.avatar_root().get_node_or_null("KayKitBody") == null:
         _fail("Creator screenshot uses fallback instead of real KayKit")
         return
+    # A saved legacy nonhuman selection must never cover the official Knight.
+    var old_species := stage.current_appearance()
+    old_species["species_head_id"] = "species_head_robot_v1"
+    stage.apply_appearance(old_species)
+    var model := stage.avatar_root().get_node("KayKitBody") as Node3D
+    var skeleton := model.find_child("Skeleton3D", true, false) as Skeleton3D
+    var identity := skeleton.get_node_or_null("KayKitHeadOverlay") as BoneAttachment3D
+    var shell := identity.get_node_or_null("SpeciesShell") as MeshInstance3D if identity != null else null
+    if (
+        identity == null or identity.visible
+        or shell == null or shell.mesh != null
+    ):
+        _fail("nonhuman legacy identity has a visible species head mesh")
+        return
+    old_species["species_head_id"] = "species_head_human_v1"
+    stage.apply_appearance(old_species)
+    var headwear := MiniUtopiaKaykitAvatarV1.mounted_weapon_socket(
+        stage.avatar_root(), MiniUtopiaAvatarContract.SOCKET_HEADWEAR
+    )
+    if (
+        headwear == null
+        or not (headwear.get_parent() is BoneAttachment3D)
+        or (headwear.get_parent() as BoneAttachment3D).bone_name != "head"
+        or headwear.visible
+    ):
+        _fail("headwear is not safely mounted to animated KayKit head bone")
+        return
+    # First-touch selection has two themed, real SubViewport KayKit cards.
+    # Clicking without an adult-issued session cannot expose either child's
+    # library or parent-only token inputs.
+    # Parent-only widgets must not appear on a child's library screen.
+    var library := load("res://scenes/family_hero_library.tscn").instantiate() as MiniUtopiaFamilyHeroLibrary
+    root.add_child(library)
+    await process_frame
+    var chooser := library.get_node_or_null("WhoIsPlaying") as Panel
+    var child_a := library.get_node_or_null(
+        "WhoIsPlaying/Margin/Column/PlayerCards/PlayerChildA"
+    ) as Button
+    var child_b := library.get_node_or_null(
+        "WhoIsPlaying/Margin/Column/PlayerCards/PlayerChildB"
+    ) as Button
+    if chooser == null or not chooser.visible:
+        _fail("who-is-playing page must be the first Hero Library view")
+        return
+    # The pastel overlay itself may be translucent, but the underlying
+    # library must never bleed through. Closing it restores the same content.
+    var library_content := library.get_node_or_null("Margin") as Control
+    if library_content == null or library_content.visible:
+        _fail("library content shows through who-is-playing chooser")
+        return
+    chooser.hide()
+    if not library_content.visible:
+        _fail("library content stays hidden after leaving chooser")
+        return
+    chooser.show()
+    if library_content.visible:
+        _fail("library content leaked after reopening chooser")
+        return
+    if child_a == null or child_b == null:
+        _fail("missing two child profile cards")
+        return
+    for card in [child_a, child_b]:
+        if card.custom_minimum_size.y < 300:
+            _fail("player card is too small for iPad")
+            return
+        var avatar := card.get_node_or_null("Portrait3D") as MiniUtopiaCreatorAvatarStage
+        if avatar == null or avatar.avatar_root().get_node_or_null("KayKitBody") == null:
+            _fail("who-is-playing card needs a real 3D KayKit avatar")
+            return
+    library._on_player_card_pressed("child_b")
+    if not chooser.visible or library.profile_choice.get_selected_id() != 1:
+        _fail("unauthorized child switched profiles without adult")
+        return
+    if library.api_input.visible or library.token_input.visible:
+        _fail("child library exposes technical login inputs")
+        return
+    library._toggle_parent_entry()
+    if not library.api_input.visible or not library.token_input.visible:
+        _fail("parent entry did not reveal adult login controls")
+        return
+    library._toggle_parent_entry()
+    if library.api_input.visible or library.token_input.visible:
+        _fail("parent login controls remained visible on the child page")
+        return
+    # Parent unlock now uses large on-canvas buttons, not clipboard paste.
+    library._open_parent_from_picker()
+    var pin_pad := library.get_node_or_null("WhoIsPlaying/ParentPinPad") as Panel
+    if pin_pad == null or not pin_pad.visible or library.token_input.visible:
+        _fail("the parent eight-digit keypad did not open safely")
+        return
+    for digit in ["1", "2", "3", "4", "5", "6", "7", "8"]:
+        library._press_pin_key(digit)
+    if library._parent_pin.length() != 8 or library.parent_pin_submit.disabled:
+        _fail("eight-digit parent unlock did not enable the button")
+        return
+    library._press_pin_key("⌫")
+    if not library.parent_pin_submit.disabled:
+        _fail("incomplete parent PIN enabled unlock")
+        return
+    library._close_parent_pin_pad()
+    if pin_pad.visible or not chooser.get_node("Margin").visible:
+        _fail("parent PIN did not return to the child chooser")
+        return
+    # Reuse the existing owner-scoped list contract for real 3D cards.
+    var family_for_card := root.get_node("FamilySceneState") as MiniUtopiaFamilySceneState
+    var synthetic_token := "synthetic_hero_card_token_0123456789abcdef"
+    if not family_for_card.connect_family("https://family.example", synthetic_token):
+        _fail("synthetic portrait session failed")
+        return
+    if not family_for_card.bind_family_client(library.bridge):
+        _fail("portrait session could not bind")
+        return
+    library._set_connected(true)
+    library._on_bridge_success("characters:list", {
+        "schema_version": "1.0",
+        "characters": [{
+            "character_id": "CHAR_PORTRAIT_TEST",
+            "display_name": "Lily",
+            "profile": {"avatar": stage.current_appearance()},
+        }],
+    })
+    var portrait_button := library.hero_list.get_node_or_null("Hero_CHAR_PORTRAIT_TEST") as Button
+    if portrait_button == null or portrait_button.custom_minimum_size.y < 120:
+        _fail("big hero card missing")
+        return
+    var edit_action := portrait_button.get_node_or_null("HeroActions/EditHero") as Button
+    var play_action := portrait_button.get_node_or_null("HeroActions/PlayHero") as Button
+    if (
+        edit_action == null or play_action == null
+        or edit_action.custom_minimum_size.y < 56
+        or play_action.custom_minimum_size.y < 56
+    ):
+        _fail("each saved Hero needs large Edit and Play touch buttons")
+        return
+    var portrait := portrait_button.get_node_or_null("Portrait3D") as MiniUtopiaCreatorAvatarStage
+    if portrait == null or portrait.avatar_root().get_node_or_null("KayKitBody") == null:
+        _fail("KayKit 3D SubViewport portrait missing")
+        return
+    library._on_bridge_success("characters:list", {
+        "schema_version": "1.0", "characters": []
+    })
+    if library.hero_list.get_node_or_null("CreateFirstHeroHint") == null:
+        _fail("empty library must show an easy create hint")
+        return
+    for required_name in ["NewHeroButton", "MyMoviesButton", "BackButton"]:
+        var action := library.get_node_or_null("Margin/Column/Toolbar/" + required_name) as Button
+        if action == null or action.icon == null or action.custom_minimum_size.y < 60:
+            _fail("child library needs three large SVG-icon actions: " + required_name)
+            return
+    # The chooser still covers the Library after the synthetic list event;
+    # close it before inspecting the actual child-facing toolbar.
+    chooser.hide()
+    if library.refresh_button.is_visible_in_tree() or library.shoot_button.is_visible_in_tree() or library.guests_refresh_button.is_visible_in_tree():
+        _fail("adult-only tools leaked into child's library")
+        return
+    library._toggle_parent_entry()
+    if not library.refresh_button.is_visible_in_tree() or library.refresh_button.icon == null:
+        _fail("adult refresh must use imported SVG icon")
+        return
+    library._toggle_parent_entry()
+    family_for_card.disconnect_family()
+    library.queue_free()
+
+    var name_button := scene.get_node("RootMargin/MainColumn/HeaderRow/HelpNameButton") as Button
+    var random_button := scene.get_node(
+        "RootMargin/MainColumn/CreatorBody/ChoicePanel/Margin/Scroll/Content/RandomLookButton"
+    ) as Button
+    if name_button == null or random_button == null:
+        _fail("child-friendly Creator actions missing")
+        return
+    scene._on_help_name_pressed()
+    if not scene.hero_name_input.text.contains(" "):
+        _fail("name suggestion should include Chinese and English")
+        return
+    scene._on_random_look_pressed()
+    if not scene._appearance_dirty:
+        _fail("random look must be explicitly saved")
+        return
+    if MiniUtopiaKaykitAvatarV1.hand_skin({
+        "compatible_tags": ["humanoid", "kaykit_style_staff"]
+    }) != "staff":
+        _fail("KayKit hand style not carried with avatar")
+        return
+
     name_input.text = "Lily"
     scene._on_hero_name_changed(name_input.text)
     if not save_button.disabled:
@@ -71,8 +364,14 @@ func _initialize() -> void:
         return
 
     var token := "test_only_family_token_not_a_real_secret_123456"
-    if not scene.activate_family_session(token, "https://family.example"):
+    if not scene.activate_family_session(token, "https://family.example:8443"):
         _fail("family session activation failed")
+        return
+    if scene.bridge.base_url != "https://family.example:8443":
+        _fail("family origin lost the parent's HTTPS port")
+        return
+    if scene.status_label.text.contains("暂时没成功"):
+        _fail("successful parent unlock displayed a false Creator error")
         return
     if save_button.disabled:
         _fail("named hero should become saveable with a scoped session")
@@ -95,6 +394,16 @@ func _initialize() -> void:
     })
     if scene.character_id != "CHAR_DEMO_LILY":
         _fail("created hero did not receive a canonical stable ID")
+        return
+    var stars := scene.avatar_stage.get_parent().get_node_or_null("SavedStars") as Label
+    if stars == null or not stars.visible:
+        _fail("save success did not celebrate with visible stars")
+        return
+    if scene.avatar_stage.current_preview_animation() != "Jump":
+        _fail("saved Hero did not jump to celebrate")
+        return
+    if play_button.text != "🌳 去村子玩！" or play_button.custom_minimum_size.y < 68:
+        _fail("save success did not offer the large village button")
         return
     if save_button.disabled:
         _fail("saved hero should remain editable")
@@ -125,6 +434,20 @@ func _initialize() -> void:
         _fail("saved Hero and matching gear did not enable Play")
         return
 
+    # Editing an existing Hero must include the new look in the canonical PUT,
+    # without changing unrelated profile fields or the server revision.
+    scene._draft_appearance["body_type"] = "chubby"
+    var updated: Dictionary = scene._character_update_payload("Lily New Look")
+    if String(updated.get("display_name", "")) != "Lily New Look":
+        _fail("Hero rename was not included in the saved payload")
+        return
+    if String(updated.get("profile", {}).get("avatar", {}).get("body_type", "")) != "chubby":
+        _fail("edited avatar did not persist in the Character PUT payload")
+        return
+    if String(updated.get("revision", "")) != "2026-10-14T00:00:00+00:00":
+        _fail("save dropped the canonical revision")
+        return
+
     # Simulate an optimistic stale-equipment cache after PUT. A successful
     # save must never enable Play for a different child-owned wardrobe.
     scene.equipment_state = {"runtime": foreign_runtime}
@@ -136,6 +459,20 @@ func _initialize() -> void:
     if play_button.disabled:
         _fail("Play did not recover once own equipment was verified")
         return
+
+    # Spawn position is owned by CreatorPlayRuntime, never village.gd.
+    var world_stub := Node3D.new()
+    world_stub.name = "MiniUtopiaWorld"
+    root.add_child(world_stub)
+    var dummy := CharacterBody3D.new()
+    world_stub.add_child(dummy)
+    var runtime := MiniUtopiaCreatorPlayRuntime.new()
+    world_stub.add_child(runtime)
+    runtime.apply_to_player(dummy)
+    if not is_equal_approx(dummy.position.z, 23.0) or not is_equal_approx(dummy.rotation.y, PI):
+        _fail("village entrance spawn is incorrect")
+        return
+    world_stub.queue_free()
 
     # Press the actual Creator Play handler and verify its two private
     # selections before Godot changes scenes on the following frame.
