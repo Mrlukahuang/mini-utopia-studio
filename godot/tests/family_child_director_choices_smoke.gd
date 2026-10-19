@@ -71,6 +71,26 @@ func _initialize() -> void:
         _fail("two saved Heroes not staged")
         return
     stage._cycle_child_choice("music_id")
+    if stage.music_preview == null or stage.music_preview.stream == null:
+        _fail("Director tap did not play selected bundled music")
+        return
+    var music_button := controls.get_node("Choice_music_id") as Button
+    if music_button.text != "音乐  阳光草地":
+        _fail("Director music choice is not displayed in Chinese")
+        return
+    stage._cycle_child_choice("music_id")
+    if music_button.text != "音乐  云朵游行":
+        _fail("second music title is not Chinese")
+        return
+    stage._cycle_child_choice("music_id")
+    if music_button.text != "音乐  月光花园":
+        _fail("third music title is not Chinese")
+        return
+    stage._cycle_child_choice("music_id")
+    if stage.music_preview.stream != null or music_button.text != "音乐  关闭":
+        _fail("music off did not stop preview")
+        return
+    stage._cycle_child_choice("music_id")
     if family.director_shot_choices.get("music_id") != "sunny_meadow":
         _fail("Director music choice did not select whitelisted music")
         return
