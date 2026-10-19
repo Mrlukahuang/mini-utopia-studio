@@ -10,10 +10,10 @@ const DURATION_SECONDS := 15.0
 # Immutable kid-safe captions. No raw story notes, uploaded text or commands
 # cross the rendering boundary. Live Director and captured MP4 share this map.
 const MUSIC_TITLES := {
-    "none": "Off",
-    "sunny_meadow": "Sunny Meadow",
-    "cloud_parade": "Cloud Parade",
-    "moonlit_garden": "Moonlit Garden",
+    "none": "关闭",
+    "sunny_meadow": "阳光草地",
+    "cloud_parade": "云朵游行",
+    "moonlit_garden": "月光花园",
 }
 
 const CAPTION_PRESETS := {
