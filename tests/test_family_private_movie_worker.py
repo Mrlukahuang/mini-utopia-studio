@@ -292,3 +292,100 @@ def test_background_music_uses_whitelisted_wav_and_requires_actual_aac(tmp_path,
             runner=no_audio,
         )
     assert not output.exists()
+
+
+@pytest.mark.skipif(
+    __import__("shutil").which("ffmpeg") is None or __import__("shutil").which("ffprobe") is None,
+    reason="Real media encoder/probe not installed",
+)
+@pytest.mark.parametrize("seconds,music", [(15, "sunny_meadow"), (30, "cloud_parade"), (15, "none")])
+def test_real_private_worker_ffmpeg_mp4_after_saved_choice_and_parent_approval(
+    tmp_path, seconds, music,
+):
+    """Real SQLite/API, review, private worker, FFmpeg and ffprobe; Godot frames synthetic."""
+    import shutil
+    from studio.family_music_catalog import MUSIC_BASE, music_file
+    from tests.test_family_music_mix import _minimal_synthetic_png
+
+    db = tmp_path / "family.db"
+    api = app_for(db)
+    hero = call(api, "POST", "/characters", {"display_name": "Synthetic Hero"})
+    cid = hero.payload["character_id"]
+    draft = {
+        "schema_version": "1.0", "display_name": "Synthetic Film",
+        "character_id": cid, "camera": "wide", "action": "run",
+        "duration_seconds": seconds, "music_id": music,
+    }
+    saved = call(api, "POST", "/family/films", draft)
+    assert saved.status == 201
+    film_id = saved.payload["film_id"]
+    project = tmp_path / "checkout" / "godot"
+    project.mkdir(parents=True)
+    (project / "project.godot").write_text("config_version=5\\n")
+    if music != "none":
+        original = music_file(Path(__file__).resolve().parents[1], music)
+        assert original is not None and original.is_file()
+        target = project / MUSIC_BASE
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(original, target / original.name)
+    private = tmp_path / "private"
+    private.mkdir(mode=0o700)
+    output = private / "movie.mp4"
+
+    # An unapproved film cannot reach the encoder or publish bytes.
+    with pytest.raises(PrivateMovieError, match="approval"):
+        render_private_movie(
+            db_path=db, project_dir=project, film_id=film_id,
+            owner="child_a", output_path=output, fps=2,
+        )
+    assert not output.exists()
+    approval = decide_private_film_review(
+        api.repository, owner="child_a", film_id=film_id,
+        revision=saved.payload["revision"], decision="approve",
+    )
+    assert approval["approved_for_private_render"]
+
+    calls = []
+    def real_media_with_synthetic_godot(argv, **kwargs):
+        calls.append(argv)
+        if "--path" in argv:
+            workspace = Path(argv[argv.index("--path") + 1])
+            state = workspace / "runtime_state"
+            if "res://scripts/family_movie_prepare.gd" in argv:
+                source = json.loads((state / "family_movie_export_request.json").read_text())
+                assert source["director_choices"].get("music_id", "none") == music
+                (state / "shot_capture_request.json").write_text(json.dumps({
+                    "fps": 2, "frame_count": seconds * 2,
+                    "director_session": {"character_asset_id": cid},
+                }))
+            elif "res://scripts/shot_frame_capture.gd" in argv:
+                frames = state / "family_movie_frames" / "EP_FAMILY_PREVIEW"
+                frames.mkdir(parents=True)
+                pixel = _minimal_synthetic_png()
+                for i in range(seconds * 2):
+                    (frames / f"frame_{i:05d}.png").write_bytes(pixel)
+            return subprocess.CompletedProcess(argv, 0, stdout="")
+        return subprocess.run(argv, **kwargs)
+
+    result = render_private_movie(
+        db_path=db, project_dir=project, film_id=film_id,
+        owner="child_a", output_path=output, fps=2,
+        runner=real_media_with_synthetic_godot,
+    )
+    assert result["duration_seconds"] == seconds
+    assert output.is_file() and output.stat().st_mode & 0o077 == 0
+    probe = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "a",
+         "-show_entries", "stream=codec_name,start_time,duration",
+         "-of", "json", str(output)],
+        check=True, capture_output=True, text=True, timeout=30,
+    )
+    streams = json.loads(probe.stdout)["streams"]
+    if music == "none":
+        assert streams == [], "Legacy silent MP4 must contain no audio"
+    else:
+        assert len(streams) == 1 and streams[0]["codec_name"] == "aac"
+        assert abs(float(streams[0]["start_time"])) <= 0.06
+        assert abs(float(streams[0]["duration"]) - seconds) <= 0.6
+    assert sum(cmd[0] == "ffprobe" for cmd in calls) == 2
