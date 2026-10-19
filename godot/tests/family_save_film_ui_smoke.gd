@@ -99,6 +99,10 @@ func _initialize() -> void:
     if not voice_button.disabled:
         _fail("failed GET unlocked recording")
         return
+    # The real bridge clears _active_kind before emitting request_succeeded.
+    # The synthetic GET below must release the pending HTTP state first.
+    stage.film_bridge._request.cancel_request()
+    stage.film_bridge._active_kind = ""
     stage._on_film_bridge_success("films:get", {
         "film_id":"FILM_TEST_SAVED", "revision":"4",
         "draft": {
