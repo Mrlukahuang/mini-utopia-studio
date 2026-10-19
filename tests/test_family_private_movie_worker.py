@@ -97,7 +97,7 @@ def test_isolated_private_render_worker_never_uses_repo_or_public_artifacts(tmp_
         if argv[0] == "ffmpeg":
             Path(argv[-1]).write_bytes(b"\x00\x00\x00\x18ftypisom" + b"0" * 800)
         return subprocess.CompletedProcess(
-            argv, 0, stdout="15.0\n" if argv[0] == "ffprobe" else ""
+            argv, 0, stdout=(json.dumps({"streams": []}) if argv[0] == "ffprobe" and "-select_streams" in argv else "15.0\n") if argv[0] == "ffprobe" else ""
         )
 
     result = render_private_movie(
@@ -171,7 +171,7 @@ def test_parent_revocation_mid_render_cannot_publish_completed_mp4(tmp_path):
             )
             assert revoked["approved_for_private_render"] is False
         return subprocess.CompletedProcess(
-            argv, 0, stdout="15.0\n" if argv[0] == "ffprobe" else ""
+            argv, 0, stdout=(json.dumps({"streams": []}) if argv[0] == "ffprobe" and "-select_streams" in argv else "15.0\n") if argv[0] == "ffprobe" else ""
         )
 
     with pytest.raises(PrivateMovieError, match="changed during rendering"):
@@ -208,7 +208,7 @@ def test_oversized_render_is_rejected_before_private_release(tmp_path):
                 movie.write(b"\x00\x00\x00\x18ftypisom")
                 movie.truncate(32 * 1024 * 1024 + 1)
         return subprocess.CompletedProcess(
-            argv, 0, stdout="15.0\n" if argv[0] == "ffprobe" else ""
+            argv, 0, stdout=(json.dumps({"streams": []}) if argv[0] == "ffprobe" and "-select_streams" in argv else "15.0\n") if argv[0] == "ffprobe" else ""
         )
 
     with pytest.raises(PrivateMovieError, match="32 MiB"):
@@ -260,9 +260,9 @@ def test_background_music_uses_whitelisted_wav_and_requires_actual_aac(tmp_path,
             assert "sunny_meadow.wav" in " ".join(argv)
             Path(argv[-1]).write_bytes(b"\x00\x00\x00\x18ftypisom" + b"0" * 900)
         if argv[0] == "ffprobe":
-            codec = "stream=codec_name" in argv
+            codec = "-select_streams" in argv
             return subprocess.CompletedProcess(
-                argv, 0, stdout="aac\n" if codec else "15.0\n"
+                argv, 0, stdout=json.dumps({"streams": [{"codec_name": "aac", "start_time": "0.0", "duration": "15.0"}]}) if codec else "15.0\n"
             )
         return subprocess.CompletedProcess(argv, 0, stdout="")
 
@@ -280,7 +280,7 @@ def test_background_music_uses_whitelisted_wav_and_requires_actual_aac(tmp_path,
     output.unlink()
     def no_audio(argv, **kwargs):
         result = synthetic_render(argv, **kwargs)
-        if argv[0] == "ffprobe" and "stream=codec_name" in argv:
+        if argv[0] == "ffprobe" and "-select_streams" in argv:
             return subprocess.CompletedProcess(argv, 0, stdout="")
         return result
 
