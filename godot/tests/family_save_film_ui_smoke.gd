@@ -87,6 +87,14 @@ func _initialize() -> void:
     if stage.saved_film_revision != "3":
         _fail("voice recording did not advance current film revision")
         return
+    stage._on_film_bridge_failure("films:voice:0", 409, "film_revision_conflict", "")
+    if not stage.status_label.text.contains("版本"):
+        _fail("409 conflict did not ask child to refresh film")
+        return
+    stage._on_film_bridge_success("films:get", {"revision":"4"})
+    if stage.saved_film_revision != "4":
+        _fail("stale voice revision not refreshed from current film")
+        return
     stage._on_film_bridge_success("films:put", {
         "film_id":"FILM_TEST_SAVED", "revision":"2"
     })
