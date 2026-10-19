@@ -338,7 +338,8 @@ def test_real_private_worker_ffmpeg_mp4_after_saved_choice_and_parent_approval(
     if selected_music != "none":
         original = music_file(Path(__file__).resolve().parents[1], selected_music)
         assert original is not None and original.is_file()
-        target = project / MUSIC_BASE
+        # MUSIC_BASE starts with "godot/"; project is already that root.
+        target = project / MUSIC_BASE.relative_to("godot")
         target.parent.mkdir(parents=True, exist_ok=True)
         target.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(original, target / original.name)
