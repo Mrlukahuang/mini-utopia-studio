@@ -298,7 +298,7 @@ def test_background_music_uses_whitelisted_wav_and_requires_actual_aac(tmp_path,
     __import__("shutil").which("ffmpeg") is None or __import__("shutil").which("ffprobe") is None,
     reason="Real media encoder/probe not installed",
 )
-@pytest.mark.parametrize("seconds,music", [(15, "sunny_meadow"), (30, "cloud_parade"), (15, "none")])
+@pytest.mark.parametrize("seconds,music", [(15, "sunny_meadow"), (30, "cloud_parade"), (15, "none"), (15, "sunny_meadow_voice"), (30, "cloud_parade_voice")])
 def test_real_private_worker_ffmpeg_mp4_after_saved_choice_and_parent_approval(
     tmp_path, seconds, music,
 ):
@@ -322,10 +322,12 @@ def test_real_private_worker_ffmpeg_mp4_after_saved_choice_and_parent_approval(
     api = app_for(db)
     hero = call(api, "POST", "/characters", {"display_name": "Synthetic Hero"})
     cid = hero.payload["character_id"]
+    with_voice = music.endswith("_voice")
+    selected_music = music.removesuffix("_voice")
     draft = {
         "schema_version": "1.0", "display_name": "Synthetic Film",
         "character_id": cid, "camera": "wide", "action": "run",
-        "duration_seconds": seconds, "music_id": music,
+        "duration_seconds": seconds, "music_id": selected_music,
     }
     saved = call(api, "POST", "/family/films", draft)
     assert saved.status == 201
@@ -333,8 +335,8 @@ def test_real_private_worker_ffmpeg_mp4_after_saved_choice_and_parent_approval(
     project = tmp_path / "checkout" / "godot"
     project.mkdir(parents=True)
     (project / "project.godot").write_text("config_version=5\\n")
-    if music != "none":
-        original = music_file(Path(__file__).resolve().parents[1], music)
+    if selected_music != "none":
+        original = music_file(Path(__file__).resolve().parents[1], selected_music)
         assert original is not None and original.is_file()
         target = project / MUSIC_BASE
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -351,9 +353,57 @@ def test_real_private_worker_ffmpeg_mp4_after_saved_choice_and_parent_approval(
             owner="child_a", output_path=output, fps=2,
         )
     assert not output.exists()
+    if with_voice:
+        # Genuine API ingest, ffprobe metadata, immutable private bytes and
+        # revision pinning. The WAV contains only a generated 440 Hz tone.
+        voice_wav = tmp_path / "generated-tone.wav"
+        subprocess.run([
+            "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error",
+            "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=16000:duration=1.3",
+            "-ac", "1", "-c:a", "pcm_s16le", str(voice_wav),
+        ], check=True, capture_output=True, timeout=30)
+        voice_bytes = voice_wav.read_bytes()
+        voice_route = f"/family/films/{film_id}/voices/0?revision=1"
+        wrong_child = api.handle(
+            method="POST", path=voice_route, origin="https://family.example",
+            authorization="Bearer synthetic-private-b", body=voice_bytes,
+            content_type="audio/wav",
+        )
+        assert wrong_child.status == 400
+        uploaded = api.handle(
+            method="POST", path=voice_route, origin="https://family.example",
+            authorization="Bearer synthetic-private-a", body=voice_bytes,
+            content_type="audio/wav",
+        )
+        assert uploaded.status == 201 and uploaded.payload["revision"] == "2"
+        stale = api.handle(
+            method="POST", path=voice_route, origin="https://family.example",
+            authorization="Bearer synthetic-private-a", body=voice_bytes,
+            content_type="audio/wav",
+        )
+        assert stale.status == 409
+        from studio.family_film_render import build_family_film_render_source
+        from studio.family_voice_policy import read_private_shot_voice
+        source = build_family_film_render_source(
+            api.repository, owner="child_a", film_id=film_id,
+        )
+        clip = source["voice_clips"]["0"]
+        assert clip["sha256"] == hashlib.sha256(voice_bytes).hexdigest()
+        assert read_private_shot_voice(
+            tmp_path / "voice-clips", owner="child_a", film_id=film_id, clip=clip,
+        ) == voice_bytes
+        with pytest.raises(PrivateMovieError, match="approval"):
+            render_private_movie(
+                db_path=db, project_dir=project, film_id=film_id,
+                owner="child_a", output_path=output, fps=2,
+            )
+        assert not output.exists()
+        approved_revision = "2"
+    else:
+        approved_revision = saved.payload["revision"]
     approval = decide_private_film_review(
         api.repository, owner="child_a", film_id=film_id,
-        revision=saved.payload["revision"], decision="approve",
+        revision=approved_revision, decision="approve",
     )
     assert approval["approved_for_private_render"]
 
@@ -365,7 +415,7 @@ def test_real_private_worker_ffmpeg_mp4_after_saved_choice_and_parent_approval(
             state = workspace / "runtime_state"
             if "res://scripts/family_movie_prepare.gd" in argv:
                 source = json.loads((state / "family_movie_export_request.json").read_text())
-                assert source["director_choices"].get("music_id", "none") == music
+                assert source["director_choices"].get("music_id", "none") == selected_music
                 (state / "shot_capture_request.json").write_text(json.dumps({
                     "fps": 2, "frame_count": seconds * 2,
                     "director_session": {"character_asset_id": cid},
@@ -393,7 +443,7 @@ def test_real_private_worker_ffmpeg_mp4_after_saved_choice_and_parent_approval(
         check=True, capture_output=True, text=True, timeout=30,
     )
     streams = json.loads(probe.stdout)["streams"]
-    if music == "none":
+    if selected_music == "none":
         assert streams == [], "Legacy silent MP4 must contain no audio"
     else:
         assert len(streams) == 1 and streams[0]["codec_name"] == "aac"
