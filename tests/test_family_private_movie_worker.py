@@ -110,7 +110,8 @@ def test_isolated_private_render_worker_never_uses_repo_or_public_artifacts(tmp_
     assert result["duration_seconds"] == 15
     assert result["bytes"] > 256
     assert output.exists() and output.stat().st_mode & 0o077 == 0
-    assert len(observed["commands"]) == 5
+    assert len(observed["commands"]) == 6
+    assert sum(cmd[0] == "ffprobe" for cmd in observed["commands"]) == 2
     assert any("res://scripts/shot_frame_capture.gd" in cmd for cmd in observed["commands"])
     assert (project / "runtime_state" / "never_copy_private_data.txt").read_text() == "SECRET"
     assert not (project / "runtime_state" / "shot_capture_request.json").exists()
@@ -284,7 +285,7 @@ def test_background_music_uses_whitelisted_wav_and_requires_actual_aac(tmp_path,
             return subprocess.CompletedProcess(argv, 0, stdout="")
         return result
 
-    with pytest.raises(PrivateMovieError, match="AAC"):
+    with pytest.raises(PrivateMovieError, match="audio verification failed"):
         render_private_movie(
             db_path=db, project_dir=project, film_id=film_id,
             owner="child_a", output_path=output, fps=2,
