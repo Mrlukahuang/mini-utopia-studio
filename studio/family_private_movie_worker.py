@@ -217,15 +217,28 @@ def render_private_movie(
             raise PrivateMovieError("Cannot verify private MP4 length") from exc
         if abs(actual_seconds - seconds) > 0.6:
             raise PrivateMovieError("Private movie duration mismatch")
-        if music_id != "none" or voice_file is not None:
-            audio_check = _run_checked(
-                [ffprobe, "-v", "error", "-select_streams", "a:0",
-                 "-show_entries", "stream=codec_name",
-                 "-of", "default=noprint_wrappers=1:nokey=1", str(staging)],
-                runner,
-            )
-            if audio_check.stdout.strip() != "aac":
-                raise PrivateMovieError("Selected music missing from private AAC MP4")
+        # Verify every audio stream, not just a:0. Silent legacy movies must
+        # remain silent, and mixed music/voice must produce exactly one AAC track.
+        audio_check = _run_checked(
+            [ffprobe, "-v", "error", "-select_streams", "a",
+             "-show_entries", "stream=codec_name,start_time,duration",
+             "-of", "json", str(staging)], runner,
+        )
+        try:
+            audio_streams = json.loads(audio_check.stdout)["streams"]
+            expected_audio = music_id != "none" or voice_file is not None
+            if expected_audio:
+                if len(audio_streams) != 1 or audio_streams[0]["codec_name"] != "aac":
+                    raise ValueError("AAC stream count mismatch")
+                audio = audio_streams[0]
+                if abs(float(audio["start_time"])) > 0.06:
+                    raise ValueError("Audio start mismatch")
+                if abs(float(audio["duration"]) - seconds) > 0.6:
+                    raise ValueError("Audio duration mismatch")
+            elif audio_streams:
+                raise ValueError("Legacy silent movie unexpectedly has audio")
+        except (ValueError, TypeError, KeyError, IndexError) as exc:
+            raise PrivateMovieError("Private MP4 audio verification failed") from exc
         if staging.stat().st_size > MAX_PRIVATE_MP4_BYTES:
             raise PrivateMovieError("Private MP4 exceeds the 32 MiB download limit")
 
