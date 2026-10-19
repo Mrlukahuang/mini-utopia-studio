@@ -88,12 +88,38 @@ func _initialize() -> void:
         _fail("voice recording did not advance current film revision")
         return
     stage._on_film_bridge_failure("films:voice:0", 409, "film_revision_conflict", "")
-    if not stage.status_label.text.contains("版本"):
-        _fail("409 conflict did not ask child to refresh film")
+    if not stage.voice_refresh_blocked or not voice_button.disabled:
+        _fail("409 must block recording until full film is restored")
         return
     stage._on_film_bridge_success("films:get", {"revision":"4"})
-    if stage.saved_film_revision != "4":
-        _fail("stale voice revision not refreshed from current film")
+    if not stage.voice_refresh_blocked or stage.saved_film_revision != "3":
+        _fail("incomplete GET incorrectly unlocked stale voice")
+        return
+    stage._on_film_bridge_failure("films:get", 503, "network_error", "")
+    if not voice_button.disabled:
+        _fail("failed GET unlocked recording")
+        return
+    stage._on_film_bridge_success("films:get", {
+        "film_id":"FILM_TEST_SAVED", "revision":"4",
+        "draft": {
+            "schema_version":"1.0", "display_name":"最新电影",
+            "character_id":"CHAR_SAVE_A", "second_character_id":null,
+            "camera":"wide", "action":"run", "duration_seconds":15,
+            "caption_preset":"hello", "music_id":"cloud_parade",
+            "private_story_note":"最新故事"
+        }
+    })
+    if stage.voice_refresh_blocked or voice_button.disabled:
+        _fail("valid full GET did not unlock recording")
+        return
+    if stage.saved_film_revision != "4" or stage.film_title_input.text != "最新电影":
+        _fail("film revision and visible title were not restored together")
+        return
+    if family.director_shot_choices.get("music_id") != "cloud_parade" or family.director_shot_choices.get("camera") != "wide":
+        _fail("GET did not restore latest music and camera choices")
+        return
+    if stage._private_film_draft().get("music_id") != "cloud_parade":
+        _fail("new revision still references stale music")
         return
     stage._on_film_bridge_success("films:put", {
         "film_id":"FILM_TEST_SAVED", "revision":"2"
