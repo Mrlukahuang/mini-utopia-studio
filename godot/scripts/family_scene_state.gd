@@ -210,10 +210,15 @@ func restore_owned_film(film: Dictionary) -> bool:
     var caption_preset := String(draft.get("caption_preset", "none"))
     if not MiniUtopiaFamilyDirectorSession.CAPTION_PRESETS.has(caption_preset):
         return false
+    var music_id := String(draft.get("music_id", "none"))
+    if not MiniUtopiaFamilyDirectorSession.MUSIC_TITLES.has(music_id):
+        return false
     director_shot_choices = {
         "camera": camera, "action": action, "duration_seconds": seconds,
         "caption_preset": caption_preset
     }
+    if music_id != "none":
+        director_shot_choices["music_id"] = music_id
     opened_saved_film = film.duplicate(true)
     return true
 

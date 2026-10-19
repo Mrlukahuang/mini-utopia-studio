@@ -95,6 +95,9 @@ def build_family_film_render_source(
         ):
             return None
         result["voice_clips"] = {"0": dict(voice_clips["0"])}
+    # Existing silent films retain the exact v1 render contract.
+    if draft.music_id != "none":
+        result["director_choices"]["music_id"] = draft.music_id
     if draft.second_character_id is not None:
         second = render_actor(draft.second_character_id)
         if second is None:

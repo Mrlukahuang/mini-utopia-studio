@@ -58,7 +58,7 @@ func _initialize() -> void:
     if controls == null:
         _fail("child director controls missing")
         return
-    for key in ["camera", "action", "duration_seconds", "caption_preset"]:
+    for key in ["camera", "action", "duration_seconds", "caption_preset", "music_id"]:
         var button := controls.get_node_or_null("Choice_" + key) as Button
         if button == null or button.custom_minimum_size.y < 48:
             _fail("iPad director touch button missing or undersized: " + key)
@@ -69,6 +69,13 @@ func _initialize() -> void:
 
     if stage.director_runtime.actor == null or stage.director_runtime.second_actor == null:
         _fail("two saved Heroes not staged")
+        return
+    stage._cycle_child_choice("music_id")
+    if family.director_shot_choices.get("music_id") != "sunny_meadow":
+        _fail("Director music choice did not select whitelisted music")
+        return
+    if stage._private_film_draft().get("music_id") != "sunny_meadow":
+        _fail("Music choice did not persist in canonical draft")
         return
     stage._cycle_child_choice("caption_preset")
     if family.director_shot_choices.get("caption_preset") != "hello":
@@ -135,7 +142,7 @@ func _initialize() -> void:
         return
 
     family.disconnect_family()
-    if family.director_shot_choices["duration_seconds"] != 15 or family.director_shot_choices.get("caption_preset") != "none":
+    if family.director_shot_choices["duration_seconds"] != 15 or family.director_shot_choices.get("caption_preset") != "none" or family.director_shot_choices.get("music_id", "none") != "none":
         _fail("child choices leaked to the next profile after logout")
         return
 
