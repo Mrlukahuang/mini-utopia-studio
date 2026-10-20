@@ -7,4 +7,8 @@ cp /opt/godot/Godot_v4.7.2-stable_linux.arm64 /tmp/godot/
 chmod 755 /tmp/godot/Godot_v4.7.2-stable_linux.arm64
 cmp /opt/godot/Godot_v4.7.2-stable_linux.arm64 /tmp/godot/Godot_v4.7.2-stable_linux.arm64
 /tmp/godot/Godot_v4.7.2-stable_linux.arm64 --headless --version >/dev/null
+mkdir -p /tmp/bin
+ln -s /tmp/godot/Godot_v4.7.2-stable_linux.arm64 /tmp/bin/godot
+export PATH="/tmp/bin:$PATH"
+command -v godot >/dev/null
 exec "$@"
