@@ -451,3 +451,114 @@ def test_real_private_worker_ffmpeg_mp4_after_saved_choice_and_parent_approval(
         assert abs(float(streams[0]["start_time"])) <= 0.06
         assert abs(float(streams[0]["duration"]) - seconds) <= 0.6
     assert sum(cmd[0] == "ffprobe" for cmd in calls) == 2
+
+
+@pytest.mark.skipif(
+    __import__("platform").machine() != "aarch64",
+    reason="Full real-Godot integration requires native Linux ARM64 CI",
+)
+@pytest.mark.parametrize("seconds,music_id", [(15, "sunny_meadow"), (30, "cloud_parade")])
+def test_arm64_real_godot_private_movie_mixes_cc0_and_uploaded_voice(
+    tmp_path, seconds, music_id,
+):
+    """Native ARM64: real Godot frames, adult-approved queue, FFmpeg and two sound sources."""
+    import os
+    import shutil
+    from studio.family_render_queue import PrivateFamilyRenderQueue
+    from studio.family_movie_media import approved_fingerprint, media_path
+
+    godot = "/tmp/godot/Godot_v4.7.2-stable_linux.arm64"
+    assert Path(godot).is_file(), "ARM64 CI must provide verified Godot 4.7.2"
+    assert all(shutil.which(x) for x in ("xvfb-run", "ffmpeg", "ffprobe"))
+    assert Path("godot/project.godot").is_file()
+    db = tmp_path / "synthetic-family.sqlite"
+    api = app_for(db)
+    hero = call(api, "POST", "/characters", {"display_name": "Synthetic ARM64 Sheep"})
+    assert hero.status == 201
+    saved = call(api, "POST", "/family/films", {
+        "schema_version": "1.0", "display_name": "Synthetic ARM64 Audio",
+        "character_id": hero.payload["character_id"],
+        "camera": "wide", "action": "walk",
+        "duration_seconds": seconds, "music_id": music_id,
+    })
+    assert saved.status == 201
+    film_id = saved.payload["film_id"]
+    voice = tmp_path / "synthetic-440hz.wav"
+    subprocess.run([
+        "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error",
+        "-f", "lavfi", "-i",
+        "sine=frequency=440:sample_rate=16000:duration=2",
+        "-ac", "1", "-c:a", "pcm_s16le", str(voice),
+    ], check=True, capture_output=True, timeout=30)
+    route = f"/family/films/{film_id}/voices/0?revision={saved.payload['revision']}"
+    denied = api.handle(
+        method="POST", path=route, origin="https://family.example",
+        authorization="Bearer synthetic-private-b", body=voice.read_bytes(),
+        content_type="audio/wav",
+    )
+    assert denied.status == 400
+    uploaded = api.handle(
+        method="POST", path=route, origin="https://family.example",
+        authorization="Bearer synthetic-private-a", body=voice.read_bytes(),
+        content_type="audio/wav",
+    )
+    assert uploaded.status == 201
+    assert uploaded.payload["revision"] != saved.payload["revision"]
+    stale = api.handle(
+        method="POST", path=route, origin="https://family.example",
+        authorization="Bearer synthetic-private-a", body=voice.read_bytes(),
+        content_type="audio/wav",
+    )
+    assert stale.status == 409
+    queue = PrivateFamilyRenderQueue(db)
+    with pytest.raises(Exception, match="approve"):
+        queue.enqueue(owner="child_a", film_id=film_id, fps=2)
+    assert queue.list_jobs(owner="child_b") == []
+    with pytest.raises(Exception, match="approve"):
+        queue.enqueue(owner="child_b", film_id=film_id, fps=2)
+    approved = decide_private_film_review(
+        api.repository, owner="child_a", film_id=film_id,
+        revision=uploaded.payload["revision"], decision="approve",
+    )
+    assert approved["approved_for_private_render"]
+    job = queue.enqueue(owner="child_a", film_id=film_id, fps=2)
+    assert job["status"] == "queued"
+    assert queue.enqueue(owner="child_a", film_id=film_id, fps=2)["job_id"] == job["job_id"]
+    store = tmp_path / "private-movies"
+    store.mkdir(mode=0o700)
+    result = queue.run_one(
+        project_dir=Path("godot"), store_root=store,
+        godot=godot, ffmpeg="ffmpeg", ffprobe="ffprobe", xvfb_run="xvfb-run",
+    )
+    assert result is not None and result["status"] == "completed", result
+    output = media_path(
+        store, owner="child_a", film_id=film_id,
+        fingerprint=approved_fingerprint(api.repository, owner="child_a", film_id=film_id),
+    )
+    assert output.is_file() and output.stat().st_mode & 0o077 == 0
+    probe = subprocess.run([
+        "ffprobe", "-v", "error", "-show_entries",
+        "format=duration:stream=codec_name,codec_type,start_time,duration",
+        "-of", "json", str(output),
+    ], check=True, capture_output=True, text=True, timeout=30)
+    media = json.loads(probe.stdout)
+    assert abs(float(media["format"]["duration"]) - seconds) <= 0.6
+    video = [x for x in media["streams"] if x["codec_type"] == "video"]
+    audio = [x for x in media["streams"] if x["codec_type"] == "audio"]
+    assert len(video) == 1 and video[0]["codec_name"] == "h264"
+    assert len(audio) == 1 and audio[0]["codec_name"] == "aac"
+    assert abs(float(audio[0]["start_time"])) <= 0.06
+    assert abs(float(audio[0]["duration"]) - seconds) <= 0.6
+    assert queue.list_jobs(owner="child_b") == []
+    revoked = decide_private_film_review(
+        api.repository, owner="child_a", film_id=film_id,
+        revision=uploaded.payload["revision"], decision="revoke",
+    )
+    assert not revoked["approved_for_private_render"]
+    with pytest.raises(Exception, match="approve"):
+        queue.enqueue(owner="child_a", film_id=film_id, fps=2) if False else render_private_movie(
+            db_path=db, project_dir=Path("godot"), film_id=film_id,
+            owner="child_a", output_path=store / "no-revoked-output.mp4",
+        )
+    assert not (store / "no-revoked-output.mp4").exists()
+    print(f"ARM64_REAL_GODOT_BGM_VOICE_{seconds}s PASS: H264, AAC single stream, approval and revocation")
