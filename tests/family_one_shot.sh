@@ -28,6 +28,7 @@ HOST_UID="$(id -u)"
 HOST_GID="$(id -g)"
 OWN_VOLUME=0
 OWN_IMAGE=0
+OWN_CONTAINERS=0
 # Restricted to our synthetic paths; initializer alone uses CAP_CHOWN/FOWNER.
 chown_synthetic() {
   docker run --rm --platform linux/arm64 --network none --read-only \
@@ -41,9 +42,11 @@ chown_synthetic() {
 cleanup() {
   rc=$?
   trap - EXIT
-  for kind in seed worker api; do
-    docker container rm -f "$NAME-$kind" >/dev/null 2>&1 || true
-  done
+  if (( OWN_CONTAINERS )); then
+    for kind in seed worker api; do
+      docker container rm -f "$NAME-$kind" >/dev/null 2>&1 || true
+    done
+  fi
   if (( OWN_VOLUME && OWN_IMAGE )); then
     chown_synthetic "$HOST_UID" "$HOST_GID" >/dev/null 2>&1 || true
   fi
@@ -82,6 +85,12 @@ OWN_IMAGE=1
 docker volume create "$VOLUME" >/dev/null
 OWN_VOLUME=1
 chown_synthetic 10001 10001 >/dev/null
+for kind in seed worker api; do
+  ! docker container inspect "$NAME-$kind" >/dev/null 2>&1 || {
+    echo 'Refusing pre-existing container name' >&2; exit 1;
+  }
+done
+OWN_CONTAINERS=1
 COMMON=(--rm --platform linux/arm64 --network none --read-only
   --user 10001:10001 --cap-drop ALL --security-opt no-new-privileges
   --cpus 4 --memory 4g --memory-swap 4g --pids-limit 256
