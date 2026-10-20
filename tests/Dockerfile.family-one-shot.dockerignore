@@ -1,0 +1,14 @@
+# Retain the existing root protections but admit ONLY publicly checked-out inputs.
+.git
+.github
+data
+docs
+scripts
+tools
+*.db
+*.db-wal
+*.db-shm
+.env
+**/.env
+deploy/family/web
+deploy/family/backups
