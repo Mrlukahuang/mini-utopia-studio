@@ -462,9 +462,8 @@ def test_arm64_real_godot_private_movie_mixes_cc0_and_uploaded_voice(
     tmp_path, seconds, music_id,
 ):
     """Native ARM64: real Godot frames, adult-approved queue, FFmpeg and two sound sources."""
-    import os
     import shutil
-    from studio.family_render_queue import PrivateFamilyRenderQueue
+    from studio.family_render_queue import PrivateFamilyRenderQueue, PrivateRenderQueueError
     from studio.family_movie_media import approved_fingerprint, media_path
 
     godot = "/tmp/godot/Godot_v4.7.2-stable_linux.arm64"
@@ -511,10 +510,10 @@ def test_arm64_real_godot_private_movie_mixes_cc0_and_uploaded_voice(
     )
     assert stale.status == 409
     queue = PrivateFamilyRenderQueue(db)
-    with pytest.raises(Exception, match="approve"):
+    with pytest.raises(PrivateRenderQueueError, match="approve"):
         queue.enqueue(owner="child_a", film_id=film_id, fps=2)
     assert queue.list_jobs(owner="child_b") == []
-    with pytest.raises(Exception, match="approve"):
+    with pytest.raises(PrivateRenderQueueError, match="approve"):
         queue.enqueue(owner="child_b", film_id=film_id, fps=2)
     approved = decide_private_film_review(
         api.repository, owner="child_a", film_id=film_id,
@@ -555,8 +554,8 @@ def test_arm64_real_godot_private_movie_mixes_cc0_and_uploaded_voice(
         revision=uploaded.payload["revision"], decision="revoke",
     )
     assert not revoked["approved_for_private_render"]
-    with pytest.raises(Exception, match="approve"):
-        queue.enqueue(owner="child_a", film_id=film_id, fps=2) if False else render_private_movie(
+    with pytest.raises(PrivateMovieError, match="approval"):
+        render_private_movie(
             db_path=db, project_dir=Path("godot"), film_id=film_id,
             owner="child_a", output_path=store / "no-revoked-output.mp4",
         )
