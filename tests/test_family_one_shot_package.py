@@ -28,6 +28,12 @@ def test_one_shot_image_is_explicitly_private_and_contains_existing_worker():
     assert "sunny_meadow.wav" in recipe
     assert "sha256sum -c -" in recipe
     assert "USER 10001:10001" in recipe
+    # Absolute-path script execution does not put /app on sys.path.
+    # The mounted rehearsal runner must import studio from its image root.
+    assert "PYTHONPATH=/app" in recipe
+    assert "import studio.family_api; import studio.family_render_queue" in recipe
+    assert "import family_one_shot_trial" in recipe
+    assert recipe.index("USER 10001:10001") < recipe.index("import family_one_shot_trial")
     # Build context comes from git archive under umask 077: files may be 0600.
     # Explicitly make only packaged public code readable, then build-probe as UID10001.
     assert "chmod -R a+rX /app/studio /app/godot /app/tests" in recipe
