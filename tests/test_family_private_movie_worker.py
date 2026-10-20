@@ -530,11 +530,13 @@ def test_arm64_real_godot_private_movie_mixes_cc0_and_uploaded_voice(
         godot=godot, ffmpeg="ffmpeg", ffprobe="ffprobe", xvfb_run="xvfb-run",
     )
     assert result is not None and result["status"] == "completed", result
+    assert result["job_id"] == job["job_id"] and result["attempts"] == 1
     output = media_path(
         store, owner="child_a", film_id=film_id,
         fingerprint=approved_fingerprint(api.repository, owner="child_a", film_id=film_id),
     )
     assert output.is_file() and output.stat().st_mode & 0o077 == 0
+    assert output.stat().st_size > 256
     probe = subprocess.run([
         "ffprobe", "-v", "error", "-show_entries",
         "format=duration:stream=codec_name,codec_type,start_time,duration",
