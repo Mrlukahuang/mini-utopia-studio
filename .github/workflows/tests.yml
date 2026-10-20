@@ -722,3 +722,76 @@ jobs:
                     "single-worker claim → real synthetic MP4 → parent "
                     "release → owner download → revoke")
           PY
+
+
+  arm64-private-worker:
+    # Public-repository GitHub-hosted ARM64. This job uses synthetic CI media only.
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+    timeout-minutes: 45
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install isolated ARM64 test dependencies
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "aarch64"
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb ffmpeg unzip libgl1 libegl1
+          python -m pip install -r requirements.txt
+          python -m pip install PyYAML
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
+
+      - name: Install verified Godot 4.7.2 Linux ARM64
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/godot
+          curl --fail --location --retry 3 -o /tmp/godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.arm64.zip
+          echo "5dd0d86405cf7e8adf79fb6377b38ba682a2846cb378ffe5364f38c01ad29b9d  /tmp/godot.zip" | sha256sum -c -
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v4.7.2-stable_linux.arm64
+          /tmp/godot/Godot_v4.7.2-stable_linux.arm64 --headless --version
+          /tmp/godot/Godot_v4.7.2-stable_linux.arm64 --headless --path godot --editor --quit
+
+      - name: Real ARM64 Godot 15s and 30s plus approved private worker chain
+        run: |
+          set -euo pipefail
+          # Reuse the EXISTING x86 CI's synthetic Godot scenarios without
+          # copying production media or creating a second test pipeline.
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+          import yaml
+
+          ci = yaml.safe_load(Path(".github/workflows/tests.yml").read_text())
+          steps = ci["jobs"]["godot-parse"]["steps"]
+          names = (
+              "Smoke-test full 15-second family Hero film MP4",
+              "Smoke-test two saved Heroes in one real 15-second MP4",
+              "Render genuine edited 30-second two-Hero family MP4",
+              "End-to-end verified synthetic parent-review to private MP4 delivery",
+          )
+          for name in names:
+              matches = [s for s in steps if s.get("name") == name]
+              assert len(matches) == 1, f"Missing or duplicate CI scenario: {name}"
+              script = matches[0]["run"].replace(
+                  "Godot_v4.7.2-stable_linux.x86_64",
+                  "Godot_v4.7.2-stable_linux.arm64",
+              )
+              print("RUNNING EXISTING SYNTHETIC SCENARIO:", name, flush=True)
+              subprocess.run(["bash", "-e", "-o", "pipefail", "-c", script], check=True)
+          print("ARM64 Godot/FFmpeg synthetic scenarios PASS", flush=True)
+          PY
+
+      - name: Verify synthetic audio and private worker contracts
+        run: |
+          python -m pytest -q tests/test_family_music_mix.py tests/test_family_private_movie_worker.py
