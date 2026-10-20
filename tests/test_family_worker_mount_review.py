@@ -1,7 +1,7 @@
 """Synthetic checks for the one-shot Worker mount plan; no Docker connection."""
 import copy
 import unittest
-from tests.family_worker_mount_review import review
+from family_worker_mount_review import review
 
 
 class TestFamilyWorkerMountReview(unittest.TestCase):
