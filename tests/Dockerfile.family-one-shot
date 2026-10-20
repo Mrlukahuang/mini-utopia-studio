@@ -1,0 +1,32 @@
+# V1-W2-01 #471. Single-use adult Worker; no resident service or HTTP port.
+ARG BASE_REF
+FROM --platform=linux/arm64 ${BASE_REF}
+ARG GODOT_ZIP_SHA
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 HOME=/scratch \
+    TMPDIR=/tmp XDG_CACHE_HOME=/scratch/.cache XDG_CONFIG_HOME=/scratch/.config
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl ca-certificates unzip xvfb xauth ffmpeg libgl1 libegl1 && \
+    rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY requirements.txt /app/requirements.txt
+RUN python -m pip install --no-cache-dir -r requirements.txt
+RUN mkdir -p /opt/godot && curl --fail --location --retry 3 \
+    -o /opt/godot.zip \
+    https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.arm64.zip && \
+    echo "${GODOT_ZIP_SHA}  /opt/godot.zip" | sha256sum -c - && \
+    unzip -q /opt/godot.zip -d /opt/godot && \
+    chmod 755 /opt/godot/Godot_v4.7.2-stable_linux.arm64 && rm /opt/godot.zip
+COPY studio /app/studio
+COPY godot /app/godot
+COPY tests/family_one_shot_trial.py /app/tests/family_one_shot_trial.py
+COPY tests/family_one_shot_entrypoint.sh /app/tests/family_one_shot_entrypoint.sh
+RUN test -d /app/studio && test -f /app/godot/project.godot && \
+    test -f /app/godot/assets/audio/cc0_music/sunny_meadow.wav && \
+    test -f /app/tests/family_one_shot_trial.py && \
+    useradd -u 10001 -g 100 -M -s /usr/sbin/nologin worker && \
+    mkdir -p /data /movies /scratch && \
+    chown 10001:100 /data /movies /scratch && \
+    chmod 700 /data /movies && chmod 1777 /scratch
+USER 10001:10001
+ENTRYPOINT ["/bin/sh", "/app/tests/family_one_shot_entrypoint.sh"]
+CMD ["python", "-m", "studio.family_render_queue", "--db", "/data/studio.db", "--godot-project", "/app/godot", "--store-root", "/movies", "run-one"]
