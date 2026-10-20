@@ -3,10 +3,12 @@ ARG BASE_REF
 FROM --platform=linux/arm64 ${BASE_REF}
 ARG GODOT_ZIP_SHA
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 HOME=/scratch \
-    TMPDIR=/tmp XDG_CACHE_HOME=/scratch/.cache XDG_CONFIG_HOME=/scratch/.config
+    TMPDIR=/tmp XDG_CACHE_HOME=/scratch/.cache XDG_CONFIG_HOME=/scratch/.config \
+    XDG_RUNTIME_DIR=/tmp/xdg-runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ca-certificates unzip xvfb xauth ffmpeg libgl1 libegl1 && \
     rm -rf /var/lib/apt/lists/*
+RUN python --version && dpkg-query -W -f='${Package}=${Version}\n' ffmpeg xvfb
 WORKDIR /app
 COPY requirements.txt /app/requirements.txt
 RUN python -m pip install --no-cache-dir -r requirements.txt
