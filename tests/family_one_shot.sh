@@ -31,7 +31,7 @@ OWN_IMAGE=0
 # Restricted to our synthetic paths; initializer alone uses CAP_CHOWN/FOWNER.
 chown_synthetic() {
   docker run --rm --platform linux/arm64 --network none --read-only \
-    --user 0:0 --cap-drop ALL --cap-add CHOWN --cap-add FOWNER \
+    --user 0:0 --cap-drop ALL --cap-add CHOWN --cap-add FOWNER --cap-add DAC_OVERRIDE \
     --security-opt no-new-privileges --memory 256m --pids-limit 64 \
     --mount "type=volume,src=$VOLUME,dst=/data" \
     --mount "type=bind,src=$MOVIES,dst=/movies" \
