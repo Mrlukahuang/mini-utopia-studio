@@ -4,7 +4,7 @@ FROM --platform=linux/arm64 ${BASE_REF}
 ARG GODOT_ZIP_SHA
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 HOME=/scratch \
     TMPDIR=/tmp XDG_CACHE_HOME=/scratch/.cache XDG_CONFIG_HOME=/scratch/.config \
-    XDG_RUNTIME_DIR=/tmp/xdg-runtime
+    XDG_RUNTIME_DIR=/tmp/xdg-runtime PYTHONPATH=/app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ca-certificates unzip xvfb xauth ffmpeg libgl1 libegl1 && \
     rm -rf /var/lib/apt/lists/*
@@ -37,6 +37,7 @@ RUN test -r /app/tests/family_one_shot_entrypoint.sh && \
     test -r /app/studio/family_render_queue.py && \
     test -r /app/godot/project.godot && \
     test -r /app/godot/assets/audio/cc0_music/sunny_meadow.wav && \
-    /bin/sh -n /app/tests/family_one_shot_entrypoint.sh
+    /bin/sh -n /app/tests/family_one_shot_entrypoint.sh && \
+    cd /tmp && python -c "import sys; assert '/app' in sys.path; import studio.family_api; import studio.family_render_queue; sys.path.insert(0, '/app/tests'); import family_one_shot_trial"
 ENTRYPOINT ["/bin/sh", "/app/tests/family_one_shot_entrypoint.sh"]
 CMD ["python", "-m", "studio.family_render_queue", "--db", "/data/studio.db", "--godot-project", "/app/godot", "--store-root", "/movies", "run-one"]
