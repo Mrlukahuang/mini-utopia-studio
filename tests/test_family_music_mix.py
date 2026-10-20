@@ -104,3 +104,50 @@ def test_real_synthetic_mp4_has_aac_music_without_voices(tmp_path):
     assert "codec_name=aac" in result.stdout
     assert "codec_type=video" in result.stdout
     assert "codec_type=audio" in result.stdout
+
+
+@pytest.mark.skipif(
+    shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None,
+    reason="Real FFmpeg/ffprobe required for synthetic audio mix",
+)
+@pytest.mark.parametrize("seconds", [15, 30])
+def test_real_synthetic_music_and_voice_mix_single_aac(seconds, tmp_path):
+    """Real encoder mix of packaged CC0 music and generated non-child voice tone."""
+    import json
+    import math
+    import wave
+
+    frames = tmp_path / "frames"
+    frames.mkdir()
+    pixel = _minimal_synthetic_png()
+    for i in range(seconds * 2):
+        (frames / f"frame_{i:05d}.png").write_bytes(pixel)
+    voice = tmp_path / "synthetic_voice.wav"
+    rate = 8000
+    with wave.open(str(voice), "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(rate)
+        # Two seconds of deliberately generated tone, not a child's recording.
+        wav.writeframes(b"".join(
+            struct.pack("<h", int(5000 * math.sin(2 * math.pi * 440 * n / rate)))
+            for n in range(rate * 2)
+        ))
+    output = tmp_path / "mixed.mp4"
+    argv = private_movie_ffmpeg_args(
+        project_root=ROOT, frames_pattern=frames / "frame_%05d.png",
+        destination=output, music_id="sunny_meadow",
+        voice_file=voice, fps=2, duration_seconds=seconds,
+    )
+    assert "amix=" in " ".join(argv)
+    subprocess.run(argv, check=True, capture_output=True, timeout=120)
+    probe = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "a",
+         "-show_entries", "stream=codec_name,start_time,duration",
+         "-of", "json", str(output)],
+        check=True, capture_output=True, text=True, timeout=30,
+    )
+    streams = json.loads(probe.stdout)["streams"]
+    assert len(streams) == 1 and streams[0]["codec_name"] == "aac"
+    assert abs(float(streams[0]["start_time"])) <= 0.06
+    assert abs(float(streams[0]["duration"]) - seconds) <= 0.6

@@ -37,8 +37,15 @@ jobs:
           python -c "from studio.models.reference import ReferenceCharacterConfig"
           python -c "from studio.core.enums import AssetType; assert AssetType.WEARABLE.value == 'wearable'"
 
+      - name: Install and identify real FFmpeg tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
+
       - name: Run tests
-        run: python -m pytest -q
+        run: python -m pytest -q -rs
 
 
   godot-parse:
