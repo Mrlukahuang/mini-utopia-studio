@@ -21,12 +21,13 @@ chmod 700 "$WORK" "$REPORT"
 ID="$(basename "$WORK" | tr '[:upper:]' '[:lower:]')"
 IMAGE="mu471-one-shot:$ID"
 VOLUME="mu471-volume-$ID"
+# Docker-native synthetic movie storage: only this freshly created volume
+# may be exposed as a bind mount to the synthetic API/Worker.
+MOVIES_VOLUME="mu471-movies-$ID"
 NAME="mu471-$ID"
-MOVIES="$WORK/movies"
-mkdir -m 700 "$MOVIES"
-HOST_UID="$(id -u)"
-HOST_GID="$(id -g)"
+MOVIES=""
 OWN_VOLUME=0
+OWN_MOVIES_VOLUME=0
 OWN_IMAGE=0
 OWN_CONTAINERS=0
 # Restricted to our synthetic paths; initializer alone uses CAP_CHOWN/FOWNER.
@@ -47,9 +48,8 @@ cleanup() {
       docker container rm -f "$NAME-$kind" >/dev/null 2>&1 || true
     done
   fi
-  if (( OWN_VOLUME && OWN_IMAGE )); then
-    chown_synthetic "$HOST_UID" "$HOST_GID" >/dev/null 2>&1 || true
-  fi
+  # Both named volumes were uniquely allocated by this run, never pre-existing.
+  (( OWN_MOVIES_VOLUME )) && docker volume rm "$MOVIES_VOLUME" >/dev/null 2>&1 || true
   (( OWN_VOLUME )) && docker volume rm "$VOLUME" >/dev/null 2>&1 || true
   (( OWN_IMAGE )) && docker image rm "$IMAGE" >/dev/null 2>&1 || true
   rm -rf -- "$WORK" || true
@@ -84,7 +84,34 @@ OWN_IMAGE=1
 ! docker volume inspect "$VOLUME" >/dev/null 2>&1 || exit 1
 docker volume create "$VOLUME" >/dev/null
 OWN_VOLUME=1
+! docker volume inspect "$MOVIES_VOLUME" >/dev/null 2>&1 || exit 1
+docker volume create "$MOVIES_VOLUME" >/dev/null
+OWN_MOVIES_VOLUME=1
+# Mac host bind mounts may remap inode UID despite a successful chown.
+# Bind a newly-created Docker-Linux-VM volume's *exact* directory instead.
+# The daemon root + volume name invariant prevents binding any existing data.
+DOCKER_ROOT="$(docker info --format '{{.DockerRootDir}}')"
+MOVIES="$(docker volume inspect -f '{{.Mountpoint}}' "$MOVIES_VOLUME")"
+[[ "$DOCKER_ROOT" == /* && "$MOVIES" == "$DOCKER_ROOT/volumes/$MOVIES_VOLUME/_data" ]] || {
+  echo 'FAIL_CLOSED: synthetic movie bind did not resolve to new Docker volume' >&2
+  exit 1
+}
+test "$(docker volume inspect -f '{{.Driver}}' "$MOVIES_VOLUME")" = local
 chown_synthetic 10001 10001 >/dev/null
+# Invariant must be true before generating any synthetic SQLite/media data.
+docker run --rm --platform linux/arm64 --network none --read-only \
+  --user 10001:10001 --cap-drop ALL --security-opt no-new-privileges \
+  --memory 256m --pids-limit 64 \
+  --mount "type=volume,src=$VOLUME,dst=/data" \
+  --mount "type=bind,src=$MOVIES,dst=/movies,readonly" \
+  --entrypoint /bin/sh "$IMAGE" -ec \
+  'test "$(stat -c %u /data)" = 10001 &&
+   test "$(stat -c %u /movies)" = 10001 &&
+   test "$(stat -c %a /movies)" = 700' || {
+  echo 'FAIL_CLOSED: synthetic bind UID or permissions mismatch' >&2
+  exit 1
+}
+echo SYNTHETIC_DOCKER_NATIVE_BIND_PREFLIGHT_PASS
 for kind in seed worker api; do
   ! docker container inspect "$NAME-$kind" >/dev/null 2>&1 || {
     echo 'Refusing pre-existing container name' >&2; exit 1;

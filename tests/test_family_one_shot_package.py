@@ -60,7 +60,17 @@ def test_trial_restricts_real_worker_and_requires_api_readonly_media_view():
         "--pids-limit 256", "/tmp:rw,exec,nosuid",
     ):
         assert flag in script
-    assert script.count("dst=/movies,readonly") == 2
+    # Separate synthetic API view in preflight, seed, and verify must be RO.
+    assert script.count("dst=/movies,readonly") == 3
+    assert 'MOVIES_VOLUME="mu471-movies-$ID"' in script
+    assert 'docker volume create "$MOVIES_VOLUME"' in script
+    assert 'docker volume rm "$MOVIES_VOLUME"' in script
+    assert 'docker volume inspect -f' in script
+    assert 'DOCKER_ROOT="$(docker info --format' in script
+    assert '"$DOCKER_ROOT/volumes/$MOVIES_VOLUME/_data"' in script
+    assert "SYNTHETIC_DOCKER_NATIVE_BIND_PREFLIGHT_PASS" in script
+    assert "FAIL_CLOSED: synthetic bind UID or permissions mismatch" in script
+    assert 'mkdir -m 700 "$MOVIES"' not in script
     assert "type=volume,src=$VOLUME,dst=/data" in script
     assert "--godot-project /app/godot --store-root /movies run-one" in script
     assert "NO_PRODUCTION_DB_ACCESS" in script
