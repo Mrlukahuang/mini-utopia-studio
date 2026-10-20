@@ -28,6 +28,13 @@ def test_one_shot_image_is_explicitly_private_and_contains_existing_worker():
     assert "sunny_meadow.wav" in recipe
     assert "sha256sum -c -" in recipe
     assert "USER 10001:10001" in recipe
+    # Build context comes from git archive under umask 077: files may be 0600.
+    # Explicitly make only packaged public code readable, then build-probe as UID10001.
+    assert "chmod -R a+rX /app/studio /app/godot /app/tests" in recipe
+    assert recipe.index("chmod -R a+rX") < recipe.index("USER 10001:10001")
+    assert "RUN test -r /app/tests/family_one_shot_entrypoint.sh" in recipe
+    assert "test -r /app/studio/family_render_queue.py" in recipe
+    assert "test -r /app/godot/project.godot" in recipe
     assert "studio.family_render_queue" in recipe
     assert "run-one" in recipe
     assert "tests" not in ignored and "godot" not in ignored
