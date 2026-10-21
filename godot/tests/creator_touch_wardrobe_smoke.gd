@@ -276,6 +276,87 @@ func _initialize() -> void:
         return
     world.queue_free()
 
+    var reopened_stage := reopened.avatar_stage as MiniUtopiaCreatorAvatarStage
+
+    # The original fixed 90-degree weapon rotation brought the staff gem into
+    # the helmet at animation extremes. Sample the same official right-hand
+    # mount while Godot advances the imported Idle/Walk/Run animation clips.
+    for pose in ["Idle", "Walk", "Run"]:
+        reopened_stage.play_preview_animation(pose)
+        await process_frame
+        await process_frame
+        var hand := reopened_stage.avatar_root().find_child(
+            "Equipment_weapon_main", true, false
+        ) as Node3D
+        if hand == null or hand.get_node_or_null("OfficialHandProp") == null:
+            _fail("owned long prop no longer follows the animated official hand")
+            return
+        var rig := reopened_stage.avatar_root().get_node(
+            "KayKitBody/Rig/Skeleton3D"
+        ) as Skeleton3D
+        var head_bone := rig.find_bone("head")
+        var center := rig.to_global(rig.get_bone_global_pose(head_bone).origin)
+        var tip := hand.to_global(Vector3(0.0, 1.25, 0.0))
+        var delta := tip - center
+        var axes := reopened_stage.avatar_root().global_transform.basis.orthonormalized()
+        # A 3-D radius alone cannot distinguish a jewel that overlaps the
+        # *side-view projection*. Test BOTH actor-space planar projections:
+        # front/back see X, left/right side see Z.
+        var front_gap := absf(delta.dot(axes.x))
+        var side_gap := absf(delta.dot(axes.z))
+        if front_gap < 0.38 or side_gap < 0.46:
+            _fail(
+                "staff tip projected onto helmet in " + pose
+                + " front=" + str(front_gap) + " side=" + str(side_gap)
+            )
+            return
+        # Separately sample the long prop's centerline against the head in
+        # 3-D. This is a coarse rig-proximity assertion, NOT mesh intersection.
+        var start := hand.global_position
+        var shaft := tip - start
+        var fraction := clampf((center - start).dot(shaft) / shaft.length_squared(), 0.0, 1.0)
+        if center.distance_to(start + shaft * fraction) < 0.35:
+            _fail("staff centerline is too near the 3D helmet in " + pose)
+            return
+
+    # Independent visual-only sword check: saved staff was already
+    # reloaded and applied in Village above. Never PUT synthetic sword data.
+    var sword_appearance := reopened_stage.current_appearance()
+    sword_appearance["compatible_tags"] = [
+        "humanoid", "kaykit_style_sword_1handed"
+    ]
+    reopened_stage.apply_appearance(sword_appearance)
+    reopened_stage.apply_equipment_runtime({
+        "equipped": {"weapon_main": {
+            "item_instance_id": "ITEM_CI_SWORD",
+            "display_name": "Synthetic Owned Sword",
+            "mesh_asset_id": "sword_1handed",
+        }},
+        "final_stats": {},
+    })
+    for action in ["Idle", "Walk", "Run"]:
+        reopened_stage.play_preview_animation(action)
+        for frame_index in range(6):
+            await process_frame
+            var sword_root := reopened_stage.avatar_root()
+            var blade_pivot := sword_root.find_child(
+                "Equipment_weapon_main", true, false
+            ) as Node3D
+            if blade_pivot == null or blade_pivot.get_node_or_null("OfficialHandProp") == null:
+                _fail("sword vanished from owned Knight right-hand socket")
+                return
+            var actor_up := sword_root.global_transform.basis.y.normalized()
+            var actor_forward := sword_root.global_transform.basis.z.normalized()
+            var blade_axis := blade_pivot.global_transform.basis.y.normalized()
+            var rise := blade_axis.dot(actor_up)
+            var forward := blade_axis.dot(actor_forward)
+            if rise < 0.64 or rise > 0.77 or forward < 0.64:
+                _fail(
+                    "sword is not forward/upward about 45 degrees in " + action
+                    + ": up=" + str(rise) + " forward=" + str(forward)
+                )
+                return
+
     creator._select_creator_tab("look")
     if outfit.visible:
         _fail("Look tab did not close the wardrobe")

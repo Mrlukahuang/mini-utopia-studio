@@ -13,6 +13,140 @@ const WEAPONS := {
 }
 
 
+# Dynamic *visual-only* grip pivot. The bundled sword and staff mesh long
+# axes are +Y in their GLTF POSITION bounds (sword Y -0.366..1.409,
+# staff Y -0.900..1.254); imported handslot_r supplies the true grip.
+# Reorient the local +Y long axis in ACTOR SPACE, never toward a moving head.
+# This preserves a fixed natural pose through Idle/Walking_A/Running_A.
+class HeadClearancePivot extends Node3D:
+    var actor: Node3D
+    var rig: Skeleton3D
+    var style := "sword_1handed"
+    # Staff only: the real right arm inherits Idle holding pose while the
+    # original Walk/Run locomotion controls the rest of the Knight skeleton.
+    # The flag is true in production; A-012's isolated before fixture can
+    # disable the overlay without changing any production weapon/animation.
+    var staff_arm_overlay_enabled := true
+    var _staff_idle_arm: Dictionary = {}
+    const STAFF_ARM_BONES := [
+        "upperarm.r", "lowerarm.r", "hand.r", "handslot.r"
+    ]
+    const STAFF_IDLE_HOLD_BLEND := 0.75
+    # Official staff.gltf POSITION bounds: upper Y=1.2543, half-depth Z=.1462.
+    # The smoke requires >= .46m side clearance at the upper endpoint.
+    const STAFF_REACH := 1.2542541
+    const STAFF_END_HALF_DEPTH := 0.146173
+    const STAFF_SIDE_CLEARANCE := 0.46
+
+    func _ready() -> void:
+        # Imported AnimationPlayer changes handslot_r in idle processing.
+        # At default priority 0 the prop can orient before the animated hand,
+        # causing one-frame Walk/Run drift toward the helmet. Resolve the
+        # visual-only grip AFTER the rig update, with no socket translation.
+        process_priority = 100
+        if rig != null:
+            if style == "staff":
+                _cache_idle_right_arm()
+            # Animated BoneAttachment3D transforms are refreshed when the
+            # skeleton updates, not necessarily before our generic _process.
+            rig.skeleton_updated.connect(_orient_in_actor_space)
+        _orient_in_actor_space()
+
+    func _cache_idle_right_arm() -> void:
+        if rig == null or actor == null:
+            return
+        var player := actor.find_child(
+            "AnimationPlayer", true, false
+        ) as AnimationPlayer
+        if player == null or not player.has_animation("Idle"):
+            return
+        var idle := player.get_animation("Idle")
+        for bone_name in STAFF_ARM_BONES:
+            var bone_id := rig.find_bone(bone_name)
+            if bone_id < 0:
+                continue
+            for track in range(idle.get_track_count()):
+                if (
+                    idle.track_get_type(track) == Animation.TYPE_ROTATION_3D
+                    and String(idle.track_get_path(track)).ends_with(":" + bone_name)
+                ):
+                    _staff_idle_arm[bone_id] = idle.rotation_track_interpolate(
+                        track, 0.0
+                    )
+                    break
+
+    func _apply_staff_hold_after_animation() -> void:
+        if (
+            style != "staff" or not staff_arm_overlay_enabled
+            or rig == null or actor == null or _staff_idle_arm.is_empty()
+        ):
+            return
+        var player := actor.find_child(
+            "AnimationPlayer", true, false
+        ) as AnimationPlayer
+        if player == null or player.current_animation not in [
+            "Walking_A", "Running_A"
+        ]:
+            return
+        # Original AnimationPlayer processes before priority=100. Blend only
+        # the imported right-arm chain, not hips/spine/other hand/speed.
+        for bone_id in _staff_idle_arm:
+            var source_rotation := rig.get_bone_pose_rotation(int(bone_id))
+            rig.set_bone_pose_rotation(
+                int(bone_id),
+                source_rotation.slerp(
+                    _staff_idle_arm[bone_id], STAFF_IDLE_HOLD_BLEND
+                )
+            )
+        # Force socket + palm refresh before the prop is reoriented.
+        rig.force_update_all_bone_transforms()
+
+    func _process(_delta: float) -> void:
+        _apply_staff_hold_after_animation()
+        _orient_in_actor_space()
+
+    func _orient_in_actor_space() -> void:
+        if actor == null or get_parent() == null:
+            return
+        var basis := actor.global_transform.basis.orthonormalized()
+        var side := -1.0 if (global_position - actor.global_position).dot(basis.x) < 0.0 else 1.0
+        var axis: Vector3
+        match style:
+            "sword_1handed":
+                # Blade 45 degrees above the character's horizontal plane,
+                # pointing *forward*, with a small outward bias so it reads
+                # clearly in a head-on Creator preview.
+                axis = basis.y + basis.z + basis.x * (0.18 * side)
+            "staff":
+                # The actual green jewel occupies a *wide* crown near local
+                # +Y (staff glTF: y 0.70..1.254, x -0.245..0.331).
+                # Tilting backwards kept that whole silhouette against the
+                # back edge of the helmet, despite generous center distances.
+                # Point it forward AND outboard of the real animated grip.
+                # Do not chase the head or camera, scale the jewel, or offset
+                # the socket; sword's fixed ~45-degree axis stays unchanged.
+                # Candidate A: slightly more forward/outboard while retaining
+                # a clearly rising shaft. Actual GLTF crown bounds, not head
+                # center alone, are checked in real-Web side-view evidence.
+                var outward := 0.32
+                var forward := 0.73
+                var upward := sqrt(
+                    1.0 - forward * forward - outward * outward
+                )
+                axis = (
+                    basis.y * upward + basis.z * forward
+                    + basis.x * (outward * side)
+                )
+            _:
+                # Short wand: near upright, modest outward tilt.
+                axis = basis.y * 1.3 + basis.x * (0.55 * side)
+        var local_axis := (
+            (get_parent() as Node3D).global_transform.basis.inverse()
+            * axis.normalized()
+        ).normalized()
+        quaternion = Quaternion(Vector3.UP, local_axis)
+
+
 static func mount(root: Node3D, appearance: Dictionary) -> AnimationPlayer:
     var model := root.get_node_or_null("KayKitBody") as Node3D
     if model == null:
@@ -143,15 +277,28 @@ static func apply_hand_skin(root: Node3D, appearance: Dictionary, equipment: Dic
     if packed != null:
         var model := packed.instantiate() as Node3D
         if model != null:
-            model.name = "Equipment_" + slot
-            model.set_meta("kaykit_style", style)
-            # The imported hand grip points a prop's local Y axis toward
-            # the camera; rotate it into the standing plane instead. The
-            # official sword, wand and staff must show a full recognizable
-            # silhouette, not an end-on disc or a cross-body rod.
             if style in ["sword_1handed", "staff", "wand"]:
-                model.rotation_degrees.z = 90.0
-            socket.add_child(model)
+                var pivot := HeadClearancePivot.new()
+                pivot.name = "Equipment_" + slot
+                pivot.set_meta("kaykit_style", style)
+                pivot.actor = root
+                pivot.style = style
+                pivot.rig = root.get_node("KayKitBody").find_child(
+                    "Skeleton3D", true, false
+                ) as Skeleton3D
+                socket.add_child(pivot)
+                model.name = "OfficialHandProp"
+                # Revert failed A3: original accepted A2 continuous shaft
+                # grip at local y=-0.65, with ~0.25m handle below the palm.
+                # The Staff-only arm pose carries the REAL handslot + palm
+                # together; sword orientation and the side rule are unchanged.
+                if style == "staff":
+                    model.position.y = 0.65
+                pivot.add_child(model)
+            else:
+                model.name = "Equipment_" + slot
+                model.set_meta("kaykit_style", style)
+                socket.add_child(model)
 
 
 static func play(animation: AnimationPlayer, semantic: String) -> void:
